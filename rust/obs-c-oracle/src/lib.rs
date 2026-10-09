@@ -3,9 +3,15 @@
 //! differential tests (`docs/rust-port/testing-policy.md`). Delete each
 //! oracle together with the C source it wraps.
 //!
-//! Also provides a test allocator (`bmalloc`/`brealloc`/`bfree`, from
-//! `oracle/test_bmem.c`) standing in for libobs `util/bmem.c`, linked
-//! whole-archive so any test binary using the oracle resolves it.
+//! Also provides test-only stand-ins for libobs base/platform symbols
+//! (`bcrash`, `os_fopen`, `os_fread_utf8`, ..., from `oracle/test_stubs.c`),
+//! so any test binary using the oracle resolves them.
+
+pub mod bmem;
+pub mod dstr;
+pub mod lexer;
+pub mod text_lookup;
+pub mod utf8;
 
 pub mod path_extension {
     use core::ffi::c_char;

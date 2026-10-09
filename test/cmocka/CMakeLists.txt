@@ -105,6 +105,16 @@ target_link_libraries(test_dstr PRIVATE OBS::libobs ${CMOCKA_LIBRARIES})
 add_dependencies(cmocka-tests test_dstr)
 add_test(test_dstr ${CMAKE_CURRENT_BINARY_DIR}/test_dstr)
 
+# dstr regression tests (obs-rust/obs-studio#46, #47)
+add_executable(test_dstr_regressions test_dstr_regressions.c)
+target_include_directories(test_dstr_regressions PRIVATE ${CMOCKA_INCLUDE_DIR})
+target_link_libraries(test_dstr_regressions PRIVATE OBS::libobs ${CMOCKA_LIBRARIES})
+
+add_dependencies(cmocka-tests test_dstr_regressions)
+add_test(test_dstr_regressions ${CMAKE_CURRENT_BINARY_DIR}/test_dstr_regressions)
+# A regression of #47 loops forever: fail fast instead.
+set_tests_properties(test_dstr_regressions PROPERTIES TIMEOUT 60)
+
 # lexer test
 add_executable(test_lexer test_lexer.c)
 target_include_directories(test_lexer PRIVATE ${CMOCKA_INCLUDE_DIR})

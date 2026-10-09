@@ -1,15 +1,63 @@
 # Every #[unsafe(no_mangle)] C ABI shim in rust/*/src/ffi/, which must be
 # exported from libobs. Enforced by rust/obs-util/tests/export_list.rs.
+# Shims for symbols libobs does not export (utf8_to_wchar, wchar_to_utf8) are
+# hidden via rust-exports.map instead and are not listed here.
 # One symbol per line; lines starting with '#' are comments.
 array_output_serializer_free
 array_output_serializer_init
 array_output_serializer_reset
+astrcmp_n
+astrcmpi
+astrcmpi_n
+astrstri
+base_get_alignment
+bfree
 bitstream_reader_init
 bitstream_reader_r16
 bitstream_reader_r8
 bitstream_reader_read_bits
+bmalloc
+bmemdup
+bnum_allocs
+brealloc
 calc_crc32
+dstr_cat_dstr
+dstr_cat_strref
+dstr_copy
+dstr_copy_strref
+dstr_depad
+dstr_init_copy_strref
+dstr_insert
+dstr_insert_ch
+dstr_insert_dstr
+dstr_left
+dstr_mid
+dstr_ncat
+dstr_ncat_dstr
+dstr_ncopy
+dstr_ncopy_dstr
+dstr_remove
+dstr_replace
+dstr_right
+dstr_safe_printf
+error_data_add
+error_data_buildstring
+lexer_getbasetoken
+lexer_getstroffset
 os_get_path_extension
+strdepad
+strlist_free
+strlist_split
+strref_cmp
+strref_cmp_strref
+strref_cmpi
+strref_cmpi_strref
+text_lookup_add
+text_lookup_create
+text_lookup_destroy
+text_lookup_getstr
+valid_float_str
+valid_int_str
 vec2_abs
 vec2_ceil
 vec2_close

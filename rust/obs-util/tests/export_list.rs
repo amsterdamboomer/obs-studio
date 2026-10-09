@@ -27,6 +27,31 @@ fn no_mangle_fns(src: &str) -> Vec<String> {
     out
 }
 
+/// Plain C identifiers (no `*`, not `rust_eh_personality`) between `local:`
+/// and `};` of a linker version script, ignoring `/* */` comments.
+fn hidden_names(map: &str) -> BTreeSet<String> {
+    let mut text = String::new();
+    let mut rest = map;
+    while let Some(start) = rest.find("/*") {
+        text.push_str(&rest[..start]);
+        let after = &rest[start + 2..];
+        rest = after.find("*/").map_or("", |end| &after[end + 2..]);
+    }
+    text.push_str(rest);
+
+    let local = text
+        .split_once("local:")
+        .expect("rust-exports.map has a local: section")
+        .1;
+    let local = local.split("};").next().unwrap_or(local);
+    local
+        .split(';')
+        .map(str::trim)
+        .filter(|n| !n.is_empty() && !n.contains('*') && *n != "rust_eh_personality")
+        .map(String::from)
+        .collect()
+}
+
 #[test]
 fn rust_exports_list_matches_no_mangle_shims() {
     let list = fs::read_to_string(concat!(
@@ -40,6 +65,15 @@ fn rust_exports_list_matches_no_mangle_shims() {
         .filter(|l| !l.is_empty() && !l.starts_with('#'))
         .map(String::from)
         .collect();
+
+    // Plain C names under `local:` in rust-exports.map: shims for symbols the
+    // C libobs does not export (e.g. utf8.c), hidden instead of listed.
+    let map = fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../libobs/cmake/rust-exports.map"
+    ))
+    .expect("read rust-exports.map");
+    let hidden = hidden_names(&map);
 
     let mut found = BTreeSet::new();
     let mut visited = Vec::new();
@@ -66,11 +100,19 @@ fn rust_exports_list_matches_no_mangle_shims() {
         );
     }
 
-    let missing_from_list: Vec<_> = found.difference(&listed).collect();
-    let missing_from_src: Vec<_> = listed.difference(&found).collect();
+    let both: Vec<_> = listed.intersection(&hidden).collect();
+    assert!(
+        both.is_empty(),
+        "in both rust-exports.txt and the rust-exports.map local: list: {both:?}"
+    );
+
+    let expected: BTreeSet<String> = listed.union(&hidden).cloned().collect();
+    let missing_from_list: Vec<_> = found.difference(&expected).collect();
+    let missing_from_src: Vec<_> = expected.difference(&found).collect();
     assert!(
         missing_from_list.is_empty() && missing_from_src.is_empty(),
-        "shims missing from rust-exports.txt: {missing_from_list:?}; \
-         listed but no #[no_mangle] shim in rust/*/src/ffi:{missing_from_src:?}"
+        "shims neither in rust-exports.txt nor hidden in rust-exports.map: \
+         {missing_from_list:?}; listed or hidden but no #[no_mangle] shim in \
+         rust/*/src/ffi:{missing_from_src:?}"
     );
 }

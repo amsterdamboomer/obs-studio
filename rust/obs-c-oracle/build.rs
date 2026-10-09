@@ -27,18 +27,16 @@ fn main() {
         .file("oracle/darray.c")
         .file("oracle/crc32.c")
         .file("oracle/vec2.c")
+        .file("oracle/utf8.c")
+        .file("oracle/lexer.c")
+        .file("oracle/text_lookup.c")
+        .file("oracle/dstr.c")
+        .file("oracle/dstr_libc.c")
+        .file("oracle/bmem.c")
+        .file("oracle/test_stubs.c")
         .include(&libobs)
         .std("c11")
         .compile("obs_c_oracle");
-
-    // Test allocator, whole-archive so bmalloc/bfree resolve regardless of
-    // link order relative to obs-util.
-    cc::Build::new()
-        .file("oracle/test_bmem.c")
-        .include(&libobs)
-        .std("c11")
-        .link_lib_modifier("+whole-archive")
-        .compile("obs_c_oracle_bmem");
 
     println!("cargo:rerun-if-changed=oracle");
     for header in [
@@ -49,7 +47,19 @@ fn main() {
         "util/array-serializer.h",
         "util/darray.h",
         "util/serializer.h",
+        "util/bmem.c",
         "util/bmem.h",
+        "util/utf8.c",
+        "util/utf8.h",
+        "util/lexer.c",
+        "util/lexer.h",
+        "util/text-lookup.c",
+        "util/text-lookup.h",
+        "util/dstr.c",
+        "util/dstr-libc.c",
+        "util/dstr.h",
+        "util/platform.h",
+        "util/base.h",
         "util/crc32.c",
         "util/crc32.h",
         "graphics/vec2.c",

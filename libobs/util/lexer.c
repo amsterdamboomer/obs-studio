@@ -74,7 +74,7 @@ int strref_cmp_strref(const struct strref *str1, const struct strref *str2)
 	if (strref_is_empty(str1))
 		return strref_is_empty(str2) ? 0 : -1;
 	if (strref_is_empty(str2))
-		return -1;
+		return 1;
 
 	do {
 		char ch1, ch2;
@@ -100,7 +100,7 @@ int strref_cmpi_strref(const struct strref *str1, const struct strref *str2)
 	if (strref_is_empty(str1))
 		return strref_is_empty(str2) ? 0 : -1;
 	if (strref_is_empty(str2))
-		return -1;
+		return 1;
 
 	do {
 		char ch1, ch2;

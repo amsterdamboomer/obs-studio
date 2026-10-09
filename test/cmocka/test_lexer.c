@@ -92,11 +92,11 @@ static void strref_cmp_strref_test(void **state)
 	assert_int_equal(strref_cmp_strref(&upper, &abc), -1);
 	assert_int_equal(strref_cmp_strref(&abc, &upper), 1);
 
-	/* empty handling, including the asymmetric -1 when only the second is
-	 * empty (characterized, not endorsed) */
+	/* empty handling: an empty string sorts before any non-empty one, in
+	 * both argument orders (it used to return -1 both ways, #48) */
 	assert_int_equal(strref_cmp_strref(&empty, &empty2), 0);
 	assert_int_equal(strref_cmp_strref(&empty, &abc), -1);
-	assert_int_equal(strref_cmp_strref(&abc, &empty), -1);
+	assert_int_equal(strref_cmp_strref(&abc, &empty), 1);
 }
 
 static void strref_cmpi_strref_test(void **state)
@@ -118,9 +118,10 @@ static void strref_cmpi_strref_test(void **state)
 	assert_int_equal(strref_cmpi_strref(&ab, &abc), -1);
 	assert_int_equal(strref_cmpi_strref(&abc, &ab), 1);
 
+	/* same empty ordering as strref_cmp_strref (#48) */
 	assert_int_equal(strref_cmpi_strref(&empty, &empty2), 0);
 	assert_int_equal(strref_cmpi_strref(&empty, &abc), -1);
-	assert_int_equal(strref_cmpi_strref(&abc, &empty), -1);
+	assert_int_equal(strref_cmpi_strref(&abc, &empty), 1);
 }
 
 static void valid_int_str_test(void **state)
