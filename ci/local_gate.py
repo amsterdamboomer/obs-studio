@@ -155,8 +155,11 @@ def lane_lint(fix: bool) -> None:
     soldr_cargo(["fmt", "--all"] + ([] if fix else ["--check"]))
     soldr_cargo(["clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"])
     # Pre-expansion Dylints (dylints/*), so host-cfg'd code is checked on
-    # one Linux lane (obs-rust/obs-studio#323).
-    soldr_cargo(["dylint", "--all", "--", "--workspace", "--all-targets"])
+    # one Linux lane (obs-rust/obs-studio#323). They scan whole src/ files,
+    # inline test modules included, so lib + bins covers their scope;
+    # --all-targets would also type-check integration tests that need
+    # CARGO_BIN_EXE_* from a real build.
+    soldr_cargo(["dylint", "--all", "--", "--workspace", "--lib", "--bins"])
 
 
 def lane_rust_test(fix: bool) -> None:

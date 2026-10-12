@@ -19,6 +19,6 @@ panic = "abort"
 opt-level = 3
 
 # Repo Dylints (dylints/*; obs-rust/obs-studio#323). Run by the lint lane:
-# `soldr cargo dylint --all -- --workspace --all-targets`.
+# `soldr cargo dylint --all -- --workspace --lib --bins`.
 [workspace.metadata.dylint]
 libraries = [{ path = "dylints/*" }]

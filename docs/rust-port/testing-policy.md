@@ -338,7 +338,7 @@ directory (`obs-util`, `obs-graphics`, `obs-media-io`, ...).
   (`windows`, `unix`, `target_os`, `target_env`, `target_arch`, ...) and native
   paths (`std::os::{unix,windows,..}`, `libc::`, `windows_sys`) are errors.
   `dylints/ban_platform_cfg_outside_boundary` enforces this in `./lint`
-  (`soldr cargo dylint --all -- --workspace --all-targets`). It reads the
+  (`soldr cargo dylint --all -- --workspace --lib --bins`). It reads the
   source before cfg expansion, so code compiled out on Linux is checked too;
   that is what lets one Linux lint lane stand in for every OS. Out of scope:
   `obs-c-oracle`, `rust/tools`, and `tests/`. There is no allowlist: move the
