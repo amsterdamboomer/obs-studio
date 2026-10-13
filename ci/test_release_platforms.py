@@ -11,11 +11,14 @@ already builds macOS x86_64.
 from __future__ import annotations
 
 import re
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github" / "workflows" / "release-rust.yaml"
+sys.path.insert(0, str(ROOT / "ci"))
+import release_decision  # noqa: E402
 
 # (os, target) pairs every beta must be built for.
 REQUIRED = {
@@ -61,6 +64,17 @@ class ReleasePlatformsTest(unittest.TestCase):
     def test_collect_finds_the_intel_dmg(self):
         # package-obs names the x86_64 DMG *-macos-intel.dmg, not -apple.
         self.assertIn("kind=intel", self.text, "Collect and verify looks only for -apple.dmg")
+
+    def test_release_requires_every_built_package(self):
+        # The release refuses to publish without these (#622); a leg the
+        # matrix builds must be on the list, or it can silently go missing.
+        required = release_decision.required_assets("1.0")
+        for os_, target in sorted(REQUIRED - {("linux", "x86_64")}):
+            with self.subTest(os=os_, target=target):
+                self.assertTrue(
+                    any(f"-{os_}-{target}." in a for a in required),
+                    f"{os_}-{target} missing from {required}",
+                )
 
 
 if __name__ == "__main__":
