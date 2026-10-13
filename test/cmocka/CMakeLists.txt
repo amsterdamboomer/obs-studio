@@ -588,13 +588,19 @@ add_dependencies(cmocka-tests test_video_frame)
 add_test(test_video_frame ${CMAKE_CURRENT_BINARY_DIR}/test_video_frame)
 
 # cmocka_qt_runtime(<test> <Qt target>): lets a Qt-linked test find Qt at run
-# time outside the app bundle. macOS gets the frameworks' directory on the
-# build rpath; Windows gets Qt's bin directory on the test's PATH. Linux
-# finds Qt through the system loader.
+# time outside the app bundle, through the test's environment: macOS gets the
+# directory holding the Qt frameworks on DYLD_FRAMEWORK_PATH (a build rpath
+# does not reach the binary under the Xcode generator), Windows gets Qt's bin
+# directory on PATH. Linux finds Qt through the system loader.
 function(cmocka_qt_runtime test qt_target)
   if(OS_MACOS)
     # .../lib/QtCore.framework/Versions/A -> .../lib
-    set_property(TARGET ${test} APPEND PROPERTY BUILD_RPATH "$<TARGET_LINKER_FILE_DIR:${qt_target}>/../../..")
+    set_property(
+      TEST ${test}
+      APPEND
+      PROPERTY
+        ENVIRONMENT_MODIFICATION "DYLD_FRAMEWORK_PATH=path_list_prepend:$<TARGET_LINKER_FILE_DIR:${qt_target}>/../../.."
+    )
   elseif(OS_WINDOWS)
     set_property(
       TEST ${test}
