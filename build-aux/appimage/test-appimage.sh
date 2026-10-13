@@ -209,7 +209,7 @@ case "${ID_LIKE:-} ${ID}" in
         dejavu-sans-fonts gdb procps-ng mesa-dri-drivers mesa-libGL mesa-libEGL mesa-libgbm libdrm libva \
         libglvnd-glx libglvnd-egl libglvnd-opengl libwayland-client libwayland-egl vulkan-loader >/dev/null
     ;;
-arch)
+*arch*)
     FAMILY=arch
     # A rolling distribution: its glibc is newer than the one the AppImage is
     # built with, and its Mesa (libgallium -> libLLVM) needs that newer glibc
@@ -508,7 +508,7 @@ fedora)
         pipewire wireplumber pipewire-pulseaudio pulseaudio-utils pipewire-utils \
         gstreamer1 gstreamer1-plugins-base pipewire-gstreamer >/dev/null
     ;;
-arch)
+*arch*)
     pacman -S --noconfirm --needed pipewire wireplumber pipewire-pulse libpulse \
         gstreamer gst-plugins-base gst-plugin-pipewire >/dev/null
     ;;
