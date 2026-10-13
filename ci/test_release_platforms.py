@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
 """The daily beta builds a package for every platform we ship (#628).
 
     uv run python -m unittest ci/test_release_platforms.py

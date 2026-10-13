@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
 """The Rust staticlib is built for the macOS architecture CMake targets.
 
     uv run python -m unittest ci/test_rust_cargo_target.py
