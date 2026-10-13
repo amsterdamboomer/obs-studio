@@ -1,18 +1,24 @@
 {
   "repo": "obs-rust/obs-studio",
-  "generated_at": "2026-10-13T19:22:47Z",
+  "generated_at": "2026-10-13T20:17:44Z",
+  "generated_pacific": "Oct 13, 2026 01:17 PM PDT",
+  "since": "2026-10-13T07:00:00Z",
+  "since_caption": "new since 12:00 AM Pacific (America/Los_Angeles)",
+  "today_total": 77,
   "ranked_by": "merged_prs",
-  "merged_pr_total": 326,
+  "merged_pr_total": 331,
   "unattributed_prs": [],
   "contributors": [
     {
       "login": "rdoupe",
       "avatar_url": "https://github.com/rdoupe.png?size=200",
-      "merged_prs": 125,
+      "merged_prs": 126,
       "issues_filed": 131,
-      "score": 125,
+      "today_prs": 40,
+      "today_badge": "<span class=\"delta delta-up\" title=\"+40 new since 12:00 AM Pacific (America/Los_Angeles)\"><svg viewBox=\"0 0 10 9\" width=\"14\" height=\"12\" aria-label=\"up\"><polygon points=\"5,0 10,9 0,9\"/></svg>+40</span>",
+      "score": 126,
       "first_contribution": "2026-10-10T22:17:15Z",
-      "last_contribution": "2026-10-13T19:16:27Z",
+      "last_contribution": "2026-10-13T20:00:26Z",
       "pr_numbers": [
         109,
         193,
@@ -138,7 +144,8 @@
         601,
         603,
         605,
-        609
+        609,
+        612
       ],
       "issue_numbers": [
         608,
@@ -278,11 +285,13 @@
     {
       "login": "zackees",
       "avatar_url": "https://github.com/zackees.png?size=200",
-      "merged_prs": 110,
-      "issues_filed": 89,
-      "score": 110,
+      "merged_prs": 113,
+      "issues_filed": 91,
+      "today_prs": 35,
+      "today_badge": "<span class=\"delta delta-up\" title=\"+35 new since 12:00 AM Pacific (America/Los_Angeles)\"><svg viewBox=\"0 0 10 9\" width=\"14\" height=\"12\" aria-label=\"up\"><polygon points=\"5,0 10,9 0,9\"/></svg>+35</span>",
+      "score": 113,
       "first_contribution": "2026-10-08T20:57:49Z",
-      "last_contribution": "2026-10-13T17:50:37Z",
+      "last_contribution": "2026-10-13T20:00:34Z",
       "pr_numbers": [
         2,
         3,
@@ -393,9 +402,14 @@
         592,
         595,
         596,
-        599
+        599,
+        606,
+        607,
+        611
       ],
       "issue_numbers": [
+        614,
+        613,
         610,
         566,
         525,
@@ -493,6 +507,8 @@
       "avatar_url": "https://github.com/b7216309-jpg.png?size=200",
       "merged_prs": 27,
       "issues_filed": 4,
+      "today_prs": 0,
+      "today_badge": "<span class=\"delta delta-none\" title=\"none since midnight Pacific\">&ndash;</span>",
       "score": 27,
       "first_contribution": "2026-10-09T19:28:12Z",
       "last_contribution": "2026-10-11T20:58:45Z",
@@ -538,6 +554,8 @@
       "avatar_url": "https://github.com/chriscoveries.png?size=200",
       "merged_prs": 27,
       "issues_filed": 25,
+      "today_prs": 0,
+      "today_badge": "<span class=\"delta delta-none\" title=\"none since midnight Pacific\">&ndash;</span>",
       "score": 27,
       "first_contribution": "2026-10-10T16:44:59Z",
       "last_contribution": "2026-10-13T01:40:03Z",
@@ -604,6 +622,8 @@
       "avatar_url": "https://github.com/nathan-v.png?size=200",
       "merged_prs": 16,
       "issues_filed": 4,
+      "today_prs": 1,
+      "today_badge": "<span class=\"delta delta-up\" title=\"+1 new since 12:00 AM Pacific (America/Los_Angeles)\"><svg viewBox=\"0 0 10 9\" width=\"14\" height=\"12\" aria-label=\"up\"><polygon points=\"5,0 10,9 0,9\"/></svg>+1</span>",
       "score": 16,
       "first_contribution": "2026-10-10T00:51:06Z",
       "last_contribution": "2026-10-13T07:10:50Z",
@@ -638,6 +658,8 @@
       "avatar_url": "https://github.com/swilk19.png?size=200",
       "merged_prs": 8,
       "issues_filed": 1,
+      "today_prs": 0,
+      "today_badge": "<span class=\"delta delta-none\" title=\"none since midnight Pacific\">&ndash;</span>",
       "score": 8,
       "first_contribution": "2026-10-10T17:06:13Z",
       "last_contribution": "2026-10-11T02:51:45Z",
@@ -661,6 +683,8 @@
       "avatar_url": "https://github.com/icp4u.png?size=200",
       "merged_prs": 3,
       "issues_filed": 4,
+      "today_prs": 0,
+      "today_badge": "<span class=\"delta delta-none\" title=\"none since midnight Pacific\">&ndash;</span>",
       "score": 3,
       "first_contribution": "2026-10-09T19:28:47Z",
       "last_contribution": "2026-10-09T19:48:41Z",
@@ -682,6 +706,8 @@
       "avatar_url": "https://github.com/Mquarmoc.png?size=200",
       "merged_prs": 3,
       "issues_filed": 0,
+      "today_prs": 0,
+      "today_badge": "<span class=\"delta delta-none\" title=\"none since midnight Pacific\">&ndash;</span>",
       "score": 3,
       "first_contribution": "2026-10-10T00:14:37Z",
       "last_contribution": "2026-10-10T00:54:23Z",
@@ -698,6 +724,8 @@
       "avatar_url": "https://github.com/cmdr-chara.png?size=200",
       "merged_prs": 3,
       "issues_filed": 0,
+      "today_prs": 0,
+      "today_badge": "<span class=\"delta delta-none\" title=\"none since midnight Pacific\">&ndash;</span>",
       "score": 3,
       "first_contribution": "2026-10-11T22:58:09Z",
       "last_contribution": "2026-10-11T22:58:41Z",
@@ -714,6 +742,8 @@
       "avatar_url": "https://github.com/probonopd.png?size=200",
       "merged_prs": 2,
       "issues_filed": 0,
+      "today_prs": 0,
+      "today_badge": "<span class=\"delta delta-none\" title=\"none since midnight Pacific\">&ndash;</span>",
       "score": 2,
       "first_contribution": "2026-10-11T15:31:31Z",
       "last_contribution": "2026-10-12T06:00:44Z",
@@ -729,6 +759,8 @@
       "avatar_url": "https://github.com/MCPVOT.png?size=200",
       "merged_prs": 1,
       "issues_filed": 1,
+      "today_prs": 0,
+      "today_badge": "<span class=\"delta delta-none\" title=\"none since midnight Pacific\">&ndash;</span>",
       "score": 1,
       "first_contribution": "2026-10-12T02:16:33Z",
       "last_contribution": "2026-10-12T02:16:33Z",
@@ -745,6 +777,8 @@
       "avatar_url": "https://github.com/nmoinvaz.png?size=200",
       "merged_prs": 1,
       "issues_filed": 0,
+      "today_prs": 0,
+      "today_badge": "<span class=\"delta delta-none\" title=\"none since midnight Pacific\">&ndash;</span>",
       "score": 1,
       "first_contribution": "2026-10-12T18:36:35Z",
       "last_contribution": "2026-10-12T18:36:35Z",
@@ -753,6 +787,24 @@
       ],
       "issue_numbers": [],
       "rank": 12
+    },
+    {
+      "login": "ProtonDev-sys",
+      "avatar_url": "https://github.com/ProtonDev-sys.png?size=200",
+      "merged_prs": 1,
+      "issues_filed": 1,
+      "today_prs": 1,
+      "today_badge": "<span class=\"delta delta-up\" title=\"+1 new since 12:00 AM Pacific (America/Los_Angeles)\"><svg viewBox=\"0 0 10 9\" width=\"14\" height=\"12\" aria-label=\"up\"><polygon points=\"5,0 10,9 0,9\"/></svg>+1</span>",
+      "score": 1,
+      "first_contribution": "2026-10-13T19:56:53Z",
+      "last_contribution": "2026-10-13T19:56:53Z",
+      "pr_numbers": [
+        501
+      ],
+      "issue_numbers": [
+        500
+      ],
+      "rank": 13
     }
   ]
 }
