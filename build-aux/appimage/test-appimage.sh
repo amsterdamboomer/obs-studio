@@ -192,7 +192,7 @@ case "${ID_LIKE:-} ${ID}" in
     apt-get update -qq
     apt-get install -y -qq --no-install-recommends \
         ca-certificates xvfb icewm x11-utils imagemagick fonts-dejavu-core gdb procps dbus \
-        libgl1-mesa-dri libglx-mesa0 libegl-mesa0 libgl1 libegl1 libgbm1 libdrm2 libva2 libva-drm2 \
+        libgl1-mesa-dri libglx-mesa0 libegl-mesa0 libgl1 libegl1 libgbm1 libdrm2 libva2 libva-drm2 libva-x11-2 libva-wayland2 libopengl0 \
         libwayland-client0 libwayland-egl1 libvulkan1 >/dev/null
     # HOSTILE_QT=1: a host that has its own, different Qt plugins - the usual desktop - which
     # a bundled Qt must not load (this crashed OBS in QIcon via the host's libqsvgicon.so).
@@ -298,7 +298,7 @@ if [ "$SCENARIO" = bundle ]; then
     # host's Mesa, NVIDIA and VA-API drivers are built against the host's copies and
     # look for their backends in the host's directories, and a bundled copy wins
     # over them through the relative RPATH (obs-rust/obs-studio#625).
-    stack="$(find "$APPDIR" \( -type f -o -type l \) \
+    stack="$(find "$APPDIR" -path '*/qt6/plugins' -prune -o \( -type f -o -type l \) \
         \( -name 'libGL.so*' -o -name 'libGLX*' -o -name 'libEGL*' -o -name 'libOpenGL*' -o -name 'libGLdispatch*' \
         -o -name 'libGLESv*' -o -name 'libglapi*' -o -name 'libgbm*' -o -name 'libdrm*' -o -name 'libva.so*' \
         -o -name 'libva-*' -o -name 'libvulkan*' -o -name 'libwayland-client*' -o -name 'libwayland-egl*' \
