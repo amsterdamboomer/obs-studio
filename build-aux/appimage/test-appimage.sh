@@ -264,7 +264,7 @@ LOADER_ARGS=()
 [ -d "$APPDIR/glibc" ] && LOADER_ARGS=(--library-path "$APPDIR/glibc")
 # Which C library AppRun picked for this run, written by AppRun (bundled|host);
 # empty before AppRun has run, or for an AppImage that always bundles it.
-DRIVER_STACK_RE='libGL\.|libGLX|libEGL|libOpenGL|libGLdispatch|libGLESv|libglapi|libgbm|libdrm|libvulkan|libwayland-(client|egl)|libgallium|libLLVM|libcuda|libnvidia'
+DRIVER_STACK_RE='libGL\.|libGLX|libEGL|libOpenGL|libGLdispatch|libGLESv|libglapi|libgbm|libdrm|libvulkan|libwayland-(client|egl|server)|libgallium|libLLVM|libcuda|libnvidia'
 runtime_mode() { cat /tmp/.obs-rust-appimage-*/mode 2>/dev/null | head -1; }
 # What this host should get: its own glibc and libstdc++ when they are at least
 # as new as the bundled ones (so it can load the host's Mesa/LLVM), else the bundle.
@@ -301,7 +301,7 @@ if [ "$SCENARIO" = bundle ]; then
     stack="$(find "$APPDIR" -path '*/qt6/plugins' -prune -o \( -type f -o -type l \) \
         \( -name 'libGL.so*' -o -name 'libGLX*' -o -name 'libEGL*' -o -name 'libOpenGL*' -o -name 'libGLdispatch*' \
         -o -name 'libGLESv*' -o -name 'libglapi*' -o -name 'libgbm*' -o -name 'libdrm*' \
-        -o -name 'libvulkan*' -o -name 'libwayland-client*' -o -name 'libwayland-egl*' \
+        -o -name 'libvulkan*' -o -name 'libwayland-client*' -o -name 'libwayland-egl*' -o -name 'libwayland-server*' \
         -o -name 'libgallium*' -o -name 'libLLVM*' -o -name 'libcuda*' -o -name 'libnvidia*' \) \
         -printf '%P\n' | sort)"
     if [ -n "$stack" ]; then
