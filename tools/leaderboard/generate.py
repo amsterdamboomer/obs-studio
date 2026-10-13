@@ -36,8 +36,9 @@ against GitHub's merged-PR total; any PR that cannot be attributed to a human
 is logged, and any human who authored/co-authored commits in merged PRs but
 ends with 0 credit is flagged in the log.
 """
-import argparse, json, re, subprocess, sys
+import argparse, html, json, re, subprocess, sys
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 RELAYS = {"zackees"}  # repo owner; also anything treated as a bot
 W_PR = 1
@@ -95,6 +96,21 @@ def merged_list_complete(fetched, total):
     A PR can merge between the two API calls, so a longer list is just fresher.
     """
     return fetched >= total
+
+PACIFIC = ZoneInfo("America/Los_Angeles")
+SINCE_CAPTION = "new since 12:00 AM Pacific (America/Los_Angeles)"
+
+def pacific_midnight(now):
+    """Most recent 00:00 America/Los_Angeles at or before `now`, as aware UTC."""
+    raise NotImplementedError
+
+def count_since(dates, cutoff):
+    """How many ISO-8601 UTC timestamps in `dates` are at or after `cutoff`."""
+    raise NotImplementedError
+
+def delta_badge(n):
+    """HTML for the "new today" marker beside a count."""
+    raise NotImplementedError
 
 def main():
     ap = argparse.ArgumentParser()
