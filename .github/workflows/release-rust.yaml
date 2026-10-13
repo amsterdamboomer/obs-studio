@@ -131,6 +131,13 @@ jobs:
           version: 0.9.31
           shims: true
 
+      # The x86_64 leg is cross-built on an arm64 runner: Corrosion builds
+      # libobs-rust for x86_64-apple-darwin (libobs/cmake/rust-target.cmake),
+      # which needs that target's standard library.
+      - name: Add the Rust x86_64 macOS target 🦀
+        if: matrix.os == 'macos' && matrix.target == 'x86_64'
+        run: rustup target add x86_64-apple-darwin
+
       - name: Build OBS-Studio-Rust 🧱
         uses: ./.github/actions/build-obs
         with:
