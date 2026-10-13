@@ -1,18 +1,18 @@
 {
   "repo": "obs-rust/obs-studio",
-  "generated_at": "2026-10-13T09:49:47Z",
+  "generated_at": "2026-10-13T11:54:24Z",
   "ranked_by": "merged_prs",
-  "merged_pr_total": 279,
+  "merged_pr_total": 288,
   "unattributed_prs": [],
   "contributors": [
     {
       "login": "rdoupe",
       "avatar_url": "https://github.com/rdoupe.png?size=200",
-      "merged_prs": 96,
-      "issues_filed": 102,
-      "score": 96,
+      "merged_prs": 102,
+      "issues_filed": 110,
+      "score": 102,
       "first_contribution": "2026-10-10T22:17:15Z",
-      "last_contribution": "2026-10-13T09:40:23Z",
+      "last_contribution": "2026-10-13T11:43:44Z",
       "pr_numbers": [
         109,
         193,
@@ -109,9 +109,23 @@
         509,
         513,
         518,
-        522
+        522,
+        527,
+        532,
+        535,
+        539,
+        543,
+        546
       ],
       "issue_numbers": [
+        549,
+        547,
+        545,
+        542,
+        540,
+        538,
+        536,
+        534,
         531,
         526,
         523,
@@ -220,11 +234,11 @@
     {
       "login": "zackees",
       "avatar_url": "https://github.com/zackees.png?size=200",
-      "merged_prs": 92,
+      "merged_prs": 95,
       "issues_filed": 87,
-      "score": 92,
+      "score": 95,
       "first_contribution": "2026-10-08T20:57:49Z",
-      "last_contribution": "2026-10-13T09:47:00Z",
+      "last_contribution": "2026-10-13T11:40:31Z",
       "pr_numbers": [
         2,
         3,
@@ -316,8 +330,11 @@
         510,
         511,
         515,
+        528,
         530,
-        533
+        533,
+        541,
+        544
       ],
       "issue_numbers": [
         525,
