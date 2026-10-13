@@ -15,7 +15,7 @@ SYSLIB="/usr/lib/$MULTIARCH"
 # against the host's copies of these and look for their backends in the host's
 # directories, so a bundled copy would shadow them through the relative RPATH
 # (obs-rust/obs-studio#625). Everything else is bundled.
-EXCLUDE='^(linux-vdso|libcuda|libnvidia|libnvcuvid|libGL\.so|libGLX|libEGL|libOpenGL|libGLdispatch|libGLESv|libglapi|libgbm|libdrm|libva(-[a-z0-9]+)?\.so|libvulkan|libwayland-(client|egl|server)|libgallium|libLLVM)'
+EXCLUDE='^(linux-vdso|libcuda|libnvidia|libnvcuvid|libGL\.so|libGLX|libEGL|libOpenGL|libGLdispatch|libGLESv|libglapi|libgbm|libdrm|libvulkan|libwayland-(client|egl|server)|libgallium|libLLVM)'
 
 mkdir -p "$LIBDIR" "$APPDIR/lib64"
 

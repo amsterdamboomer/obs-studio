@@ -20,11 +20,14 @@ pre-release, a tag push attaches it to that tag's release.
 
 - **Everything is bundled** except the GPU driver stack, which has to come from
   the host: `libGL`, `libGLX`, `libEGL`, `libOpenGL`, `libGLdispatch`, `libgbm`,
-  `libdrm`, `libva*`, `libvulkan`, `libwayland-client`/`-egl`, Mesa, LLVM and
+  `libdrm`, `libvulkan`, `libwayland-client`/`-egl`, Mesa, LLVM and
   the NVIDIA libraries (the AppImage excludelist). The host's drivers are built
   against the host's copies of these and look for their backends in the
   host's directories; a bundled copy would win over them through the relative
-  RPATH (#625). The test fails if any of them is bundled.
+  RPATH (#625). The test fails if any of them is bundled. `libva` is the one
+  exception: the bundled FFmpeg needs a newer one than old hosts have (Ubuntu
+  22.04 failed to start without it), so it is bundled and `AppRun` points
+  `LIBVA_DRIVERS_PATH` at the host's `dri` directories.
 - **glibc, libstdc++ and libgcc_s are bundled but the host's are used when they
   are at least as new** (#621). The host's Mesa loads LLVM, which needs the
   host's glibc and libstdc++ (Arch: glibc 2.44, GLIBCXX_3.4.36); on the

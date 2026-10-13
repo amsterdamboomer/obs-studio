@@ -192,7 +192,7 @@ case "${ID_LIKE:-} ${ID}" in
     apt-get update -qq
     apt-get install -y -qq --no-install-recommends \
         ca-certificates xvfb icewm x11-utils imagemagick fonts-dejavu-core gdb procps dbus \
-        libgl1-mesa-dri libglx-mesa0 libegl-mesa0 libgl1 libegl1 libgbm1 libdrm2 libva2 libva-drm2 libva-x11-2 libva-wayland2 libopengl0 \
+        libgl1-mesa-dri libglx-mesa0 libegl-mesa0 libgl1 libegl1 libgbm1 libdrm2 libva2 libva-drm2 libopengl0 \
         libwayland-client0 libwayland-egl1 libvulkan1 >/dev/null
     # HOSTILE_QT=1: a host that has its own, different Qt plugins - the usual desktop - which
     # a bundled Qt must not load (this crashed OBS in QIcon via the host's libqsvgicon.so).
@@ -264,7 +264,7 @@ LOADER_ARGS=()
 [ -d "$APPDIR/glibc" ] && LOADER_ARGS=(--library-path "$APPDIR/glibc")
 # Which C library AppRun picked for this run, written by AppRun (bundled|host);
 # empty before AppRun has run, or for an AppImage that always bundles it.
-DRIVER_STACK_RE='libGL\.|libGLX|libEGL|libOpenGL|libGLdispatch|libGLESv|libglapi|libgbm|libdrm|libva|libvulkan|libwayland-(client|egl)|libgallium|libLLVM|libcuda|libnvidia'
+DRIVER_STACK_RE='libGL\.|libGLX|libEGL|libOpenGL|libGLdispatch|libGLESv|libglapi|libgbm|libdrm|libvulkan|libwayland-(client|egl)|libgallium|libLLVM|libcuda|libnvidia'
 runtime_mode() { cat /tmp/.obs-rust-appimage-*/mode 2>/dev/null | head -1; }
 # What this host should get: its own glibc and libstdc++ when they are at least
 # as new as the bundled ones (so it can load the host's Mesa/LLVM), else the bundle.
@@ -300,8 +300,8 @@ if [ "$SCENARIO" = bundle ]; then
     # over them through the relative RPATH (obs-rust/obs-studio#625).
     stack="$(find "$APPDIR" -path '*/qt6/plugins' -prune -o \( -type f -o -type l \) \
         \( -name 'libGL.so*' -o -name 'libGLX*' -o -name 'libEGL*' -o -name 'libOpenGL*' -o -name 'libGLdispatch*' \
-        -o -name 'libGLESv*' -o -name 'libglapi*' -o -name 'libgbm*' -o -name 'libdrm*' -o -name 'libva.so*' \
-        -o -name 'libva-*' -o -name 'libvulkan*' -o -name 'libwayland-client*' -o -name 'libwayland-egl*' \
+        -o -name 'libGLESv*' -o -name 'libglapi*' -o -name 'libgbm*' -o -name 'libdrm*' \
+        -o -name 'libvulkan*' -o -name 'libwayland-client*' -o -name 'libwayland-egl*' \
         -o -name 'libgallium*' -o -name 'libLLVM*' -o -name 'libcuda*' -o -name 'libnvidia*' \) \
         -printf '%P\n' | sort)"
     if [ -n "$stack" ]; then
@@ -319,7 +319,7 @@ if [ "$SCENARIO" = bundle ]; then
             echo "${f#"$APPDIR"/}:"
             grep -E 'not found|undefined symbol|error while loading' <<<"$out" | sed "s|$APPDIR/||g" | head -5
             unresolved=$((unresolved + 1))
-        elif grep '=> /' <<<"$out" | grep -v "$APPDIR" | grep -vE "=> [^ ]*/($DRIVER_STACK_RE)" | grep .; then
+        elif grep '=> /' <<<"$out" | grep -v "$APPDIR" | grep -v "=> /tmp/.obs-rust-appimage-[0-9a-f]*/lib/" | grep -vE "=> [^ ]*/($DRIVER_STACK_RE)" | grep .; then
             # (the host's GPU driver stack is the only thing allowed outside the bundle)
             echo "  ^ ${f#"$APPDIR"/} resolves the libraries above from the host"
             unresolved=$((unresolved + 1))
@@ -342,7 +342,7 @@ if [ "$SCENARIO" = bundle ]; then
                 "$LOADER" "${LOADER_ARGS[@]}" "$APPDIR/usr/bin/obs" 2>&1 || true)"
             where="$(awk -v l="$lib" '$1 == l && $2 == "=>" {print $3}' <<<"$out")"
             [ "$where" = not ] && where="nothing (not found)"
-            if [[ "$where" != "$APPDIR"/* ]]; then
+            if [[ "$where" != "$APPDIR"/* && "$where" != /tmp/.obs-rust-appimage-*/lib/* ]]; then
                 fail "glibc's $lib is not bundled with libc.so.6: a host driver that links it gets ${where:-nothing}"
             elif grep -E 'undefined symbol|error while loading' <<<"$out"; then
                 fail "the bundled $lib does not load with the bundled loader (see above)"
