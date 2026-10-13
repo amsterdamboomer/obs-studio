@@ -1,8 +1,8 @@
 {
   "repo": "obs-rust/obs-studio",
-  "generated_at": "2026-10-13T09:45:55Z",
+  "generated_at": "2026-10-13T09:49:47Z",
   "ranked_by": "merged_prs",
-  "merged_pr_total": 278,
+  "merged_pr_total": 279,
   "unattributed_prs": [],
   "contributors": [
     {
@@ -220,11 +220,11 @@
     {
       "login": "zackees",
       "avatar_url": "https://github.com/zackees.png?size=200",
-      "merged_prs": 91,
+      "merged_prs": 92,
       "issues_filed": 87,
-      "score": 91,
+      "score": 92,
       "first_contribution": "2026-10-08T20:57:49Z",
-      "last_contribution": "2026-10-13T09:43:08Z",
+      "last_contribution": "2026-10-13T09:47:00Z",
       "pr_numbers": [
         2,
         3,
@@ -316,7 +316,8 @@
         510,
         511,
         515,
-        530
+        530,
+        533
       ],
       "issue_numbers": [
         525,
