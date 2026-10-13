@@ -38,6 +38,9 @@ class WebsocketSubmoduleTest(unittest.TestCase):
         if not (sub / ".git").exists():
             self.skipTest(f"{SUBMODULE} is not checked out; cannot check ancestry of {pointer}")
         has = git("merge-base", "--is-ancestor", BOUNDED_PARSER, pointer, cwd=sub)
+        if has.returncode != 0 and git("rev-parse", "--is-shallow-repository", cwd=sub).stdout.strip() == "true":
+            # A shallow checkout may stop above BOUNDED_PARSER, so a miss here proves nothing.
+            self.skipTest(f"{SUBMODULE} history is shallow; cannot check ancestry of {pointer[:9]}")
         self.assertEqual(
             has.returncode,
             0,
