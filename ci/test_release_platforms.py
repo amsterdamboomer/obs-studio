@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The daily beta builds a package for every platform we ship (#628).
 
-    python3 -m unittest ci/test_release_platforms.py
+    uv run python -m unittest ci/test_release_platforms.py
 
 release-rust.yaml's build matrix decides which packages a beta has. Intel
 Macs got nothing: the matrix had only macos/arm64, although the release gate
