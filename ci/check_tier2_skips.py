@@ -15,7 +15,7 @@ import sys
 
 # Tests the harness must really run: they need the PipeWire/D-Bus/X services
 # the Tier 2 image provides.
-MUST_RUN = re.compile(r"^test_pipewire_")
+MUST_RUN = re.compile(r"^(test_pipewire_|test_vlc_|test_screencast_portal_)")
 SKIPPED = re.compile(r"Test\s+#\d+:\s+(\S+)\s+\.+\s*(?:\*\*\*)?Skipped")
 
 
