@@ -42,7 +42,8 @@ impl AsRef<Path> for ScratchDir {
     }
 }
 
-// RED: cleanup not implemented yet.
 impl Drop for ScratchDir {
-    fn drop(&mut self) {}
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
 }
