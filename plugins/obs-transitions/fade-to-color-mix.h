@@ -19,6 +19,9 @@ static inline float ftc_clamp(float x, float min, float max)
 
 static inline float ftc_smoothstep(float min, float max, float x)
 {
+	/* A zero-width ramp is a step; dividing by it gave NaN or infinity. */
+	if (!(max > min))
+		return x >= max ? 1.0f : 0.0f;
 	x = ftc_clamp((x - min) / (max - min), 0.0f, 1.0f);
 	return x * x * (3 - 2 * x);
 }
