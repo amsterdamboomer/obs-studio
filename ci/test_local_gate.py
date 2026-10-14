@@ -32,6 +32,7 @@ class SoldrCacheTest(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, env or {}, clear=False),
             mock.patch.object(local_gate.subprocess, "run", side_effect=fake_run),
+            mock.patch.object(local_gate, "run", side_effect=fake_run),
             mock.patch.object(local_gate, "tracked_files", return_value=[]),
             mock.patch.object(local_gate, "clang_format"),
             mock.patch.object(local_gate, "gersemi"),
