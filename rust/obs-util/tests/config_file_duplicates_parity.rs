@@ -265,10 +265,11 @@ fn ten_sections_key_only_in_last() {
     run(&blocks, &[]);
 }
 
-/// Every duplicate count up to 40, for sections and for keys.
+/// Every duplicate count up to 120 (past several expansions and uthash's
+/// `noexpand` cut-off), for sections and for keys.
 #[test]
-fn every_duplicate_count_up_to_40() {
-    for n in 1..=40usize {
+fn every_duplicate_count_up_to_120() {
+    for n in 1..=120usize {
         let secs: Vec<Block> = (0..n).map(|i| (0, vec![(0, i as u8)])).collect();
         run(&secs, &[Op::Set(0, 0, 1), Op::Remove(0, 0)]);
         let keys: Vec<Block> = vec![(0, (0..n).map(|i| (0, i as u8)).collect())];
@@ -276,5 +277,53 @@ fn every_duplicate_count_up_to_40() {
             &keys,
             &[Op::Set(0, 0, 1), Op::Remove(0, 0), Op::Remove(0, 0)],
         );
+    }
+}
+
+/// Hundreds of keys, each repeated, so chains fill through hash collisions
+/// of different keys (checks the `HASH_SFH` port and the multi-key chain
+/// bookkeeping), compared through lookups and the saved bytes.
+#[test]
+fn many_distinct_and_repeated_keys() {
+    for (distinct, total) in [(7usize, 150usize), (50, 400), (300, 600), (600, 650)] {
+        let mut text = String::from("[s]\n");
+        for i in 0..total {
+            text.push_str(&format!("key{}=v{i}\n", (i * 7) % distinct));
+        }
+        for i in 0..distinct {
+            text.push_str(&format!("[sec{}]\nk=v{i}\n", i % 40));
+        }
+        let (c_dir, r_dir) = (scratch("c"), scratch("r"));
+        let (c_path, r_path) = (c_dir.join("cfg.ini"), r_dir.join("cfg.ini"));
+        std::fs::write(&c_path, &text).unwrap();
+        std::fs::write(&r_path, &text).unwrap();
+        let cp = CString::new(c_path.as_os_str().as_encoded_bytes()).unwrap();
+        let rp = CString::new(r_path.as_os_str().as_encoded_bytes()).unwrap();
+        let pair = Pair::open(&cp, &rp);
+        let get = |s: &str, k: &str| {
+            let (s, k) = (CString::new(s).unwrap(), CString::new(k).unwrap());
+            // SAFETY: live configs; the C strings outlive the calls.
+            unsafe {
+                (
+                    bytes(oracle_config_get_string(
+                        pair.oracle,
+                        s.as_ptr(),
+                        k.as_ptr(),
+                    )),
+                    bytes(config_get_string(pair.rust, s.as_ptr(), k.as_ptr())),
+                )
+            }
+        };
+        for i in 0..distinct {
+            let (o, r) = get("s", &format!("key{i}"));
+            assert_eq!(r, o, "[s] key{i} ({distinct} distinct, {total} lines)");
+        }
+        for i in 0..40 {
+            let (o, r) = get(&format!("sec{i}"), "k");
+            assert_eq!(r, o, "[sec{i}] k");
+        }
+        drop(pair);
+        let _ = std::fs::remove_dir_all(c_dir);
+        let _ = std::fs::remove_dir_all(r_dir);
     }
 }
