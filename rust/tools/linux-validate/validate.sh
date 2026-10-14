@@ -99,7 +99,9 @@ for mode in OFF ON; do
   fi
 
   echo "== [$mode] ctest"
-  ctest --test-dir "$build" --output-on-failure
+  ctest --test-dir "$build" --output-on-failure 2>&1 | tee "$build.ctest.log"
+  # A PipeWire test that skips for lack of a daemon is a hole, not a pass (#776).
+  python3 /src/ci/check_tier2_skips.py "$build.ctest.log"
 
   if [ "$repeat" -gt 0 ]; then
     echo "== [$mode] ctest --repeat until-fail:$repeat${tests:+ -R $tests}"
