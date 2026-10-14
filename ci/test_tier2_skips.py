@@ -1,5 +1,5 @@
 #!/usr/bin/env -S uv run --script
-"""Tests for ci/check_tier2_skips.py (obs-rust/obs-studio#776).
+"""Tests for rust/tools/linux-validate/check-skips.sh (obs-rust/obs-studio#776).
 
     uv run python -m unittest ci/test_tier2_skips.py
 """
@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CHECK = ROOT / "ci" / "check_tier2_skips.py"
+CHECK = ROOT / "rust" / "tools" / "linux-validate" / "check-skips.sh"
 
 SKIPPED_LOG = """\
 129/200 Test #129: test_pipewire_camera_registry_race ...***Skipped   0.01 sec
@@ -31,7 +31,7 @@ class CheckTier2SkipsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "ctest.log"
             p.write_text(log)
-            return subprocess.run([sys.executable, str(CHECK), str(p)], capture_output=True, text=True)
+            return subprocess.run(["bash", str(CHECK), str(p)], capture_output=True, text=True)
 
     def test_skipped_pipewire_test_fails(self):
         r = self.run_check(SKIPPED_LOG)
