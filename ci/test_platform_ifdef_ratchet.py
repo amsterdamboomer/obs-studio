@@ -43,6 +43,25 @@ class CountTest(unittest.TestCase):
         )
         self.assertEqual(self.lines(text), [1, 3, 5, 6, 9, 11, 13, 14, 15, 16])
 
+    def test_bare_defined_and_negated_forms(self):
+        text = "\n".join(
+            [
+                "#if _WIN32",  # 1
+                "#elif __linux__",  # 2
+                "#elif WIN32",  # 3
+                "#ifdef WIN32",  # 4
+                "#ifndef WIN32",  # 5
+                "#if !defined(_WIN32)",  # 6
+                "#if !defined WIN32 && !defined __APPLE__",  # 7
+                "#if defined( __linux__ )",  # 8
+                "#if (defined(_MSC_VER))",  # 9
+                "#if !_WIN32",  # 10
+                "#elif defined WIN32",  # 11
+                "#if defined(WIN32) || defined(_WIN32)",  # 12
+            ]
+        )
+        self.assertEqual(self.lines(text), list(range(1, 13)))
+
     def test_ignores_other_lines(self):
         text = "\n".join(
             [
@@ -54,6 +73,8 @@ class CountTest(unittest.TestCase):
                 "// #ifdef _WIN32",
                 "int _WIN32_x = 0;",
                 "#if MY_OS_WINDOWS_FLAG",
+                "#ifdef WIN32_LEAN",
+                "#ifdef MYWIN32",
                 "#include <windows.h>",
             ]
         )
