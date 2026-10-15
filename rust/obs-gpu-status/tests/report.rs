@@ -63,9 +63,9 @@ fn red_cases_explain_themselves() {
 
 #[test]
 fn json_shape() {
-    let r = Report::new(Some("Mesa \"llvm\\pipe\""), vec![rtx3060()], None);
+    let r = Report::new(Some("Mesa \"llvmpipe\" a\\b"), vec![rtx3060()], None);
     let j = r.to_json();
-    assert!(j.starts_with("{\"state\":\"yellow\",\"adapter\":\"Mesa \\\"llvm\\\\pipe\\\"\","), "{j}");
+    assert!(j.starts_with("{\"state\":\"yellow\",\"adapter\":\"Mesa \\\"llvmpipe\\\" a\\\\b\","), "{j}");
     assert!(
         j.contains(
             "\"detectedGpus\":[{\"vendor\":\"nvidia\",\"deviceId\":\"2504\",\"name\":\"NVIDIA GeForce RTX 3060\",\"renderNode\":false}]"
