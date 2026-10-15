@@ -32,8 +32,9 @@ void OBSBasic::SourceDeviceBusy(void *data, calldata_t *params)
 {
 	OBSBasic *main = static_cast<OBSBasic *>(data);
 	obs_source_t *source = static_cast<obs_source_t *>(calldata_ptr(params, "source"));
-	if (!source)
+	if (!source) {
 		return;
+	}
 
 	OBSWeakSource weak = OBSGetWeakRef(source);
 	QString device = QT_UTF8(calldata_string(params, "device"));
@@ -47,23 +48,26 @@ void OBSBasic::SourceDeviceBusy(void *data, calldata_t *params)
 		Qt::QueuedConnection);
 }
 
-void OBSBasic::ShowDeviceBusy(OBSWeakSource weak, QString device, QString holder, qint64 pid, bool isObs,
-			      bool canForce)
+void OBSBasic::ShowDeviceBusy(OBSWeakSource weak, QString device, QString holder, qint64 pid, bool isObs, bool canForce)
 {
 	/* one popup per device; the source retries on its own meanwhile */
-	if (busyDevicePopups.contains(device))
+	if (busyDevicePopups.contains(device)) {
 		return;
+	}
 	OBSSource source = OBSGetStrongRef(weak);
-	if (!source)
+	if (!source) {
 		return;
+	}
 
 	QString name = QT_UTF8(obs_source_get_name(source));
-	QString text = holder.isEmpty() ? QTStr("Basic.DeviceBusy.Unknown").arg(name, device)
-					: QTStr("Basic.DeviceBusy.Text").arg(name, device, holder, QString::number(pid));
-	if (isObs)
+	QString text = holder.isEmpty()
+			       ? QTStr("Basic.DeviceBusy.Unknown").arg(name, device)
+			       : QTStr("Basic.DeviceBusy.Text").arg(name, device, holder, QString::number(pid));
+	if (isObs) {
 		text += "\n\n" + QTStr("Basic.DeviceBusy.OtherOBS");
-	text += "\n\n" + (canForce ? QTStr("Basic.DeviceBusy.ForceExplain").arg(holder)
-				   : QTStr("Basic.DeviceBusy.Wait"));
+	}
+	text += "\n\n" +
+		(canForce ? QTStr("Basic.DeviceBusy.ForceExplain").arg(holder) : QTStr("Basic.DeviceBusy.Wait"));
 	source = nullptr;
 
 	QMessageBox box(this);
@@ -73,19 +77,22 @@ void OBSBasic::ShowDeviceBusy(OBSWeakSource weak, QString device, QString holder
 	QPushButton *force = canForce ? box.addButton(QTStr("Basic.DeviceBusy.Force"), QMessageBox::AcceptRole)
 				      : nullptr;
 	box.addButton(canForce ? QMessageBox::Cancel : QMessageBox::Ok);
-	if (force)
+	if (force) {
 		box.setDefaultButton(force);
+	}
 
 	busyDevicePopups.insert(device);
 	box.exec();
 	busyDevicePopups.remove(device);
 
-	if (!force || box.clickedButton() != force)
+	if (!force || box.clickedButton() != force) {
 		return;
+	}
 
 	source = OBSGetStrongRef(weak);
-	if (!source)
+	if (!source) {
 		return;
+	}
 
 	calldata_t cd = {};
 	bool released = proc_handler_call(obs_source_get_proc_handler(source), "force_camera", &cd) &&
