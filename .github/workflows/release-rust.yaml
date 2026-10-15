@@ -147,7 +147,7 @@ jobs:
       - name: Set up soldr 🦀
         uses: zackees/setup-soldr@0f223ac68e97fccaaeab026ef1861e5bf73639ac # v0.9.85
         with:
-          version: 0.9.31
+          version: 0.9.33
           shims: true
 
       # The x86_64 leg is cross-built on an arm64 runner: Corrosion builds
