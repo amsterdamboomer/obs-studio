@@ -10,6 +10,7 @@ use std::path::Path;
 use std::process::Command;
 
 pub mod platform;
+pub mod report;
 
 /// The light's color.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
