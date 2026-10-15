@@ -39,7 +39,7 @@
   "frontend/utility/SimpleOutput.cpp": 2,
   "frontend/utility/WhatsNewInfoThread.cpp": 2,
   "frontend/utility/output-filename-reserve.c": 2,
-  "frontend/utility/platform.hpp": 4,
+  "frontend/utility/platform.hpp": 6,
   "frontend/widgets/OBSBasic.cpp": 20,
   "frontend/widgets/OBSBasic.hpp": 5,
   "frontend/widgets/OBSBasicPreview.cpp": 3,

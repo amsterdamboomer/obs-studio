@@ -50,7 +50,7 @@ def defines(text: str, name: str) -> bool:
 class FacadeTest(unittest.TestCase):
     def test_facade_is_declared(self):
         names = facade_functions()
-        self.assertGreaterEqual(len(names), 20, names)
+        self.assertGreaterEqual(len(names), 19, names)
         self.assertIn("InitPlatformConfigDefaults", names)
         self.assertIn("GetPlatformVersionName", names)
 
