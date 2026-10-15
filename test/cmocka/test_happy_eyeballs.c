@@ -185,8 +185,8 @@ static void test_invalid_arguments(void **state)
 int main(void)
 {
 	const struct CMUnitTest tests[] = {
-		cmocka_unit_test(test_connect_ipv4),     cmocka_unit_test(test_connect_ipv6),
-		cmocka_unit_test(test_connect_refused),  cmocka_unit_test(test_unresolvable_host),
+		cmocka_unit_test(test_connect_ipv4),      cmocka_unit_test(test_connect_ipv6),
+		cmocka_unit_test(test_connect_refused),   cmocka_unit_test(test_unresolvable_host),
 		cmocka_unit_test(test_invalid_arguments),
 	};
 
