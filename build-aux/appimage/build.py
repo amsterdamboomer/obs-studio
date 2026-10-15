@@ -241,6 +241,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     shim = SUDO_SHIM if needs_sudo_shim() else ""
+    # The deps step creates the apt archive dir that later steps' apt-get
+    # calls use; with --skip-deps nothing else would.
+    (ROOT / ".apt-cache" / "partial").mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="obs-appimage-build-") as scratch:
         # Like Actions: GITHUB_ENV carries values to later steps; GITHUB_OUTPUT
         # stays the runner's when there is one (the configure step's `rust`).

@@ -227,6 +227,9 @@ ln -sf "$APP_ID.png" "$APPDIR/.DirIcon"
 # --- everything AppRun points OBS at at runtime must be in the AppDir --------
 "$HERE/check-appdir.sh" "$APPDIR"
 
+# --- nothing in the AppDir may need a glibc newer than the floor (#926) -------
+"$HERE/check-glibc-floor.sh" "$APPDIR" 2.28
+
 # --- sanity: nothing may resolve outside the AppDir except the excluded host libs
 echo "::group::Libraries still resolved from the host"
 # (the binary's interpreter now points at the not-yet-installed loader, so ask the bundled one)
