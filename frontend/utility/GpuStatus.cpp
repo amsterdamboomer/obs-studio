@@ -31,15 +31,18 @@ static Info Parse(int state, const char *json)
 	QJsonObject obj = QJsonDocument::fromJson(QByteArray(info.json.c_str())).object();
 	info.adapter = obj["adapter"].toString();
 	info.summary = obj["summary"].toString();
-	for (const QJsonValue &cause : obj["causes"].toArray())
+	for (const QJsonValue &cause : obj["causes"].toArray()) {
 		info.causes << cause.toString();
+	}
 	for (const QJsonValue &value : obj["detectedGpus"].toArray()) {
 		QJsonObject gpu = value.toObject();
 		QString name = gpu["name"].toString();
-		if (name.isEmpty())
+		if (name.isEmpty()) {
 			name = gpu["vendor"].toString().toUpper() + " " + gpu["deviceId"].toString();
-		if (!gpu["renderNode"].toBool())
+		}
+		if (!gpu["renderNode"].toBool()) {
 			name += " (no render node)";
+		}
 		info.gpus << name;
 	}
 	return info;
@@ -61,8 +64,9 @@ Info Query()
 	/* libobs keeps an average, not a median; close enough for a light. */
 	uint64_t interval = obs_get_frame_interval_ns();
 	uint64_t frame = obs_get_average_frame_time_ns();
-	if (frame == 0)
+	if (frame == 0) {
 		interval = 0; /* no frames rendered yet */
+	}
 
 	int state = 2;
 	char *json = obs_gpu_status_report(haveAdapter ? adapter.c_str() : nullptr, frame, interval, &state);
@@ -101,10 +105,12 @@ void Init()
 	const char *color = info.state == State::Yellow ? "YELLOW" : "RED";
 	blog(LOG_WARNING, "==== GPU acceleration: %s ====", color);
 	blog(LOG_WARNING, "%s", info.summary.toUtf8().constData());
-	for (const QString &gpu : info.gpus)
+	for (const QString &gpu : info.gpus) {
 		blog(LOG_WARNING, "  detected GPU: %s", gpu.toUtf8().constData());
-	for (const QString &cause : info.causes)
+	}
+	for (const QString &cause : info.causes) {
 		blog(LOG_WARNING, "  possible cause: %s", cause.toUtf8().constData());
+	}
 #endif
 }
 
