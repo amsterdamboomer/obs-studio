@@ -317,8 +317,7 @@ static void test_list(void **state)
 	assert_null(obs_properties_add_list(props, "bad", "Bad", OBS_COMBO_TYPE_EDITABLE, OBS_COMBO_FORMAT_INT));
 	assert_null(obs_properties_get(props, "bad"));
 
-	obs_property_t *s =
-		obs_properties_add_list(props, "s", "S", OBS_COMBO_TYPE_EDITABLE, OBS_COMBO_FORMAT_STRING);
+	obs_property_t *s = obs_properties_add_list(props, "s", "S", OBS_COMBO_TYPE_EDITABLE, OBS_COMBO_FORMAT_STRING);
 	assert_int_equal(obs_property_list_type(s), OBS_COMBO_TYPE_EDITABLE);
 	assert_int_equal(obs_property_list_format(s), OBS_COMBO_FORMAT_STRING);
 
@@ -599,11 +598,16 @@ static void test_modified_callbacks(void **state)
 int main(void)
 {
 	const struct CMUnitTest tests[] = {
-		cmocka_unit_test(test_create_param_flags), cmocka_unit_test(test_common_fields),
-		cmocka_unit_test(test_order_and_lookup),   cmocka_unit_test(test_numbers),
-		cmocka_unit_test(test_text_path_editable), cmocka_unit_test(test_list),
-		cmocka_unit_test(test_frame_rate),         cmocka_unit_test(test_button),
-		cmocka_unit_test(test_groups),             cmocka_unit_test(test_modified_callbacks),
+		cmocka_unit_test(test_create_param_flags),
+		cmocka_unit_test(test_common_fields),
+		cmocka_unit_test(test_order_and_lookup),
+		cmocka_unit_test(test_numbers),
+		cmocka_unit_test(test_text_path_editable),
+		cmocka_unit_test(test_list),
+		cmocka_unit_test(test_frame_rate),
+		cmocka_unit_test(test_button),
+		cmocka_unit_test(test_groups),
+		cmocka_unit_test(test_modified_callbacks),
 	};
 
 	return cmocka_run_group_tests(tests, NULL, NULL);
