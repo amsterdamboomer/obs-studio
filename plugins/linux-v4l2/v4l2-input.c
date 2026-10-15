@@ -1053,7 +1053,11 @@ static void v4l2_busy_properties(struct v4l2_data *data, obs_properties_t *props
 	if (known && holder.uid == getuid()) {
 		obs_property_t *button = obs_properties_add_button2(
 			props, "force_camera", obs_module_text("ForceCamera"), v4l2_force_camera, data);
-		dstr_printf(&text, obs_module_text("ForceCamera.ToolTip"), holder.name, (int)holder.pid);
+		char pid[16];
+		snprintf(pid, sizeof(pid), "%d", (int)holder.pid);
+		dstr_copy(&text, obs_module_text("ForceCamera.ToolTip"));
+		dstr_replace(&text, "%1", holder.name);
+		dstr_replace(&text, "%2", pid);
 		obs_property_set_long_description(button, text.array);
 	}
 	dstr_free(&text);
