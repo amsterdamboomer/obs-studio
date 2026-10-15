@@ -70,7 +70,9 @@ static bool process_holds(const char *proc_root, pid_t pid, const char *device)
 
 		char link[PATH_MAX];
 		char target[PATH_MAX];
-		snprintf(link, sizeof(link), "%s/%s", fd_dir, ent->d_name);
+		int n = snprintf(link, sizeof(link), "%s/%s", fd_dir, ent->d_name);
+		if (n < 0 || (size_t)n >= sizeof(link))
+			continue;
 		ssize_t len = readlink(link, target, sizeof(target) - 1);
 		if (len <= 0)
 			continue;
