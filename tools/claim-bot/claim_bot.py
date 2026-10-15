@@ -97,7 +97,22 @@ def is_bot(login: str) -> bool:
 
 def current_claim(issue: Issue) -> Claim | None:
     """The claimant, from the bot's records, else a pre-bot `Claiming:` comment."""
-    raise NotImplementedError  # RED: #909
+    claim: Claim | None = None
+    seen_bot_record = False
+    for c in sorted(issue.comments, key=lambda c: c.created):
+        if c.author != BOT:
+            continue
+        if m := BOT_CLAIM_RE.match(c.body):
+            claim, seen_bot_record = Claim(m.group(1), c.created), True
+        elif BOT_CLEAR_RE.match(c.body):
+            claim, seen_bot_record = None, True
+    if seen_bot_record or CLAIMED not in issue.labels:
+        return claim
+    human = [c for c in issue.comments if not is_bot(c.author) and CLAIM_RE.match(c.first_line())]
+    if not human:
+        return None
+    last = max(human, key=lambda c: c.created)
+    return Claim(last.author, last.created)
 
 
 def stale_hours(issue: Issue) -> int:
@@ -120,7 +135,47 @@ def is_stale(issue: Issue, claim: Claim, now: datetime) -> bool:
 
 def decide_comment(issue: Issue, comment: Comment, now: datetime, open_claims: int) -> list[tuple]:
     """Actions for one new comment. open_claims: other issues the author holds."""
-    raise NotImplementedError  # RED: #909
+    if is_bot(comment.author) or LOCKED in issue.labels:
+        return []
+    line = comment.first_line()
+    claim = current_claim(issue)
+    who = comment.author
+
+    if m := REASSIGN_RE.match(line):
+        if comment.association not in MAINTAINERS:
+            return [("comment", f"{BOT_PREFIX} only maintainers can `/reassign`.")]
+        return move(claim, m.group(1), f"reassigned by @{who}")
+
+    if m := TAKEOVER_RE.match(line):
+        if claim is None:
+            return grant(who, open_claims, "the issue had no claim")
+        if claim.user.lower() != m.group(1).lower():
+            return [("comment", f"{BOT_PREFIX} @{who}, the current claim is held by @{claim.user}, not @{m.group(1)}.")]
+        if not is_stale(issue, claim, now):
+            left = timedelta(hours=stale_hours(issue)) - (now - last_activity(issue, claim))
+            return [("comment", f"{BOT_PREFIX} @{who}, the claim by @{claim.user} is still active; "
+                     f"it goes stale in {fmt_hours(left)} without progress.")]
+        if open_claims >= MAX_CLAIMS:
+            return [("comment", too_many(who))]
+        return move(claim, who, f"stale claim taken over from @{claim.user}")
+
+    if CLAIM_RE.match(line):
+        if claim and claim.user.lower() == who.lower():
+            return []
+        if claim and not is_stale(issue, claim, now):
+            return [("comment", f"{BOT_PREFIX} @{who}, this is already claimed by @{claim.user}. "
+                     "Pick something else or offer help here; once the claim goes stale, "
+                     f"comment `Taking over stale claim from @{claim.user}`.")]
+        if claim:
+            if open_claims >= MAX_CLAIMS:
+                return [("comment", too_many(who))]
+            return move(claim, who, f"stale claim from @{claim.user}")
+        return grant(who, open_claims, None)
+
+    if RELEASE_RE.match(line) and claim and claim.user.lower() == who.lower():
+        return [("unassign", claim.user), ("label_remove", CLAIMED),
+                ("comment", f"{BOT_PREFIX} claim released by @{who}.")]
+    return []
 
 
 def grant(who: str, open_claims: int, note: str | None) -> list[tuple]:
@@ -142,7 +197,24 @@ def move(claim: Claim | None, to: str, why: str) -> list[tuple]:
 
 def decide_sweep(issue: Issue, now: datetime) -> list[tuple]:
     """Warn WARN_HOURS before a claim goes stale, and expire it once it has."""
-    raise NotImplementedError  # RED: #909
+    if LOCKED in issue.labels:
+        return []
+    claim = current_claim(issue)
+    if claim is None:
+        return []
+    last = last_activity(issue, claim)
+    idle = now - last
+    limit = timedelta(hours=stale_hours(issue))
+    if idle >= limit:
+        return [("unassign", claim.user), ("label_remove", CLAIMED),
+                ("comment", f"{BOT_PREFIX} claim expired: no progress from @{claim.user} in "
+                 f"{stale_hours(issue)} h. Anyone may claim it now.")]
+    if idle >= limit - timedelta(hours=WARN_HOURS):
+        warned = any(c.author == BOT and BOT_WARN_RE.match(c.body) and c.created > last for c in issue.comments)
+        if not warned:
+            return [("comment", f"{BOT_PREFIX} claim by @{claim.user} expires in {fmt_hours(limit - idle)} "
+                     "unless there is progress (a comment here, or a push, comment or review on your PR).")]
+    return []
 
 
 def too_many(who: str) -> str:
