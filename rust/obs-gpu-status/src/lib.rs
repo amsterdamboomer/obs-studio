@@ -83,7 +83,22 @@ impl FrameStats {
     /// samples or no interval. A median keeps one slow second, such as the
     /// first one after launch, from turning the light red.
     pub fn from_samples(samples: &[u64], interval_ns: u64) -> Option<Self> {
-        todo!("{samples:?} {interval_ns}")
+        if interval_ns == 0 || samples.len() < MIN_FRAME_SAMPLES {
+            return None;
+        }
+        let mut sorted = samples.to_vec();
+        sorted.sort_unstable();
+        let mid = sorted.len() / 2;
+        let median_frame_ns = if sorted.len() % 2 == 1 {
+            sorted[mid]
+        } else {
+            // Sorted, so this cannot overflow.
+            sorted[mid - 1] + (sorted[mid] - sorted[mid - 1]) / 2
+        };
+        Some(Self {
+            median_frame_ns,
+            interval_ns,
+        })
     }
 }
 
