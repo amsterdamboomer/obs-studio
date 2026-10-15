@@ -3,12 +3,14 @@
 //! obs-nvenc-plugin, so libobs' exported symbol set does not change.
 
 use std::ffi::{CStr, CString, c_char, c_int};
+use std::sync::OnceLock;
 
 use crate::FrameStats;
 use crate::report::Report;
 
-/// Probe the system's GPUs and build the report for `adapter` (null when
-/// graphics init failed). `interval_ns == 0` means no frame timings. Writes
+/// Build the report for `adapter` (null when
+/// graphics init failed) and the system's GPUs, probed once per process
+/// (`nvidia-smi` is too slow to run on every refresh). `interval_ns == 0` means no frame timings. Writes
 /// 0 (green), 1 (yellow) or 2 (red) to `state` when it is not null, and
 /// returns the `gpuAcceleration` JSON, freed with [`obs_gpu_status_free`].
 ///
@@ -26,10 +28,19 @@ pub unsafe extern "C" fn obs_gpu_status_report(
         None
     } else {
         // SAFETY: the caller passes a NUL-terminated string.
-        Some(unsafe { CStr::from_ptr(adapter) }.to_string_lossy().into_owned())
+        Some(
+            unsafe { CStr::from_ptr(adapter) }
+                .to_string_lossy()
+                .into_owned(),
+        )
     };
-    let frames = (interval_ns != 0).then_some(FrameStats { median_frame_ns, interval_ns });
-    let report = Report::new(adapter.as_deref(), crate::platform::system_devices(), frames);
+    let frames = (interval_ns != 0).then_some(FrameStats {
+        median_frame_ns,
+        interval_ns,
+    });
+    static DEVICES: OnceLock<Vec<crate::GpuDevice>> = OnceLock::new();
+    let devices = DEVICES.get_or_init(crate::platform::system_devices).clone();
+    let report = Report::new(adapter.as_deref(), devices, frames);
     if !state.is_null() {
         // SAFETY: the caller passes a writable int.
         unsafe { *state = report.state as c_int };

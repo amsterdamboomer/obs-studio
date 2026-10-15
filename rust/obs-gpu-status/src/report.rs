@@ -37,7 +37,10 @@ impl Report {
                      Check the log for the graphics error."
                 .to_owned(),
             Some(a) if frames.is_some_and(|f| f.median_frame_ns > f.interval_ns) => {
-                let f = frames.unwrap_or(FrameStats { median_frame_ns: 0, interval_ns: 0 });
+                let f = frames.unwrap_or(FrameStats {
+                    median_frame_ns: 0,
+                    interval_ns: 0,
+                });
                 format!(
                     "Frames take {:.1} ms to render against a {:.1} ms budget on {a}; \
                      expect choppy video.",
@@ -59,7 +62,10 @@ impl Report {
                     )
                 }
                 State::Red => {
-                    causes = SOFTWARE_CAUSES[1..].iter().map(|c| (*c).to_owned()).collect();
+                    causes = SOFTWARE_CAUSES[1..]
+                        .iter()
+                        .map(|c| (*c).to_owned())
+                        .collect();
                     format!(
                         "No GPU was detected and OBS is rendering on the CPU ({a}); \
                          expect choppy video."
@@ -67,7 +73,13 @@ impl Report {
                 }
             },
         };
-        Self { state, adapter: adapter.map(str::to_owned), devices, summary, causes }
+        Self {
+            state,
+            adapter: adapter.map(str::to_owned),
+            devices,
+            summary,
+            causes,
+        }
     }
 
     /// The `gpuAcceleration` JSON object:

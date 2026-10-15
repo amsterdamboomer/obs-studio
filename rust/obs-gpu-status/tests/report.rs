@@ -17,9 +17,17 @@ fn rtx3060() -> GpuDevice {
 
 #[test]
 fn green_has_no_causes() {
-    let r = Report::new(Some("NVIDIA GeForce RTX 3060/PCIe/SSE2"), vec![rtx3060()], None);
+    let r = Report::new(
+        Some("NVIDIA GeForce RTX 3060/PCIe/SSE2"),
+        vec![rtx3060()],
+        None,
+    );
     assert_eq!(r.state, State::Green);
-    assert!(r.summary.contains("NVIDIA GeForce RTX 3060/PCIe/SSE2"), "{}", r.summary);
+    assert!(
+        r.summary.contains("NVIDIA GeForce RTX 3060/PCIe/SSE2"),
+        "{}",
+        r.summary
+    );
     assert!(r.causes.is_empty());
 }
 
@@ -27,7 +35,12 @@ fn green_has_no_causes() {
 fn yellow_names_the_gpu_and_the_renderer() {
     let r = Report::new(Some(LLVMPIPE), vec![rtx3060()], None);
     assert_eq!(r.state, State::Yellow);
-    assert!(r.summary.contains("Your GPU (NVIDIA GeForce RTX 3060) was detected"), "{}", r.summary);
+    assert!(
+        r.summary
+            .contains("Your GPU (NVIDIA GeForce RTX 3060) was detected"),
+        "{}",
+        r.summary
+    );
     assert!(r.summary.contains("not using its driver"), "{}", r.summary);
     assert!(r.summary.contains(LLVMPIPE), "{}", r.summary);
     assert!(r.summary.contains("choppy"), "{}", r.summary);
@@ -39,9 +52,17 @@ fn yellow_names_the_gpu_and_the_renderer() {
 
 #[test]
 fn yellow_without_a_name_uses_the_vendor() {
-    let d = GpuDevice { name: None, vendor: Vendor::Amd, ..rtx3060() };
+    let d = GpuDevice {
+        name: None,
+        vendor: Vendor::Amd,
+        ..rtx3060()
+    };
     let r = Report::new(Some(LLVMPIPE), vec![d], None);
-    assert!(r.summary.contains("Your GPU (AMD) was detected"), "{}", r.summary);
+    assert!(
+        r.summary.contains("Your GPU (AMD) was detected"),
+        "{}",
+        r.summary
+    );
 }
 
 #[test]
@@ -52,9 +73,16 @@ fn red_cases_explain_themselves() {
 
     let r = Report::new(None, vec![rtx3060()], None);
     assert_eq!(r.state, State::Red);
-    assert!(r.summary.contains("Graphics initialization failed"), "{}", r.summary);
+    assert!(
+        r.summary.contains("Graphics initialization failed"),
+        "{}",
+        r.summary
+    );
 
-    let slow = FrameStats { median_frame_ns: 95_000_000, interval_ns: 33_333_333 };
+    let slow = FrameStats {
+        median_frame_ns: 95_000_000,
+        interval_ns: 33_333_333,
+    };
     let r = Report::new(Some("NVIDIA GeForce RTX 3060"), vec![rtx3060()], Some(slow));
     assert_eq!(r.state, State::Red);
     assert!(r.summary.contains("95.0 ms"), "{}", r.summary);
@@ -65,7 +93,10 @@ fn red_cases_explain_themselves() {
 fn json_shape() {
     let r = Report::new(Some("Mesa \"llvmpipe\" a\\b"), vec![rtx3060()], None);
     let j = r.to_json();
-    assert!(j.starts_with("{\"state\":\"yellow\",\"adapter\":\"Mesa \\\"llvmpipe\\\" a\\\\b\","), "{j}");
+    assert!(
+        j.starts_with("{\"state\":\"yellow\",\"adapter\":\"Mesa \\\"llvmpipe\\\" a\\\\b\","),
+        "{j}"
+    );
     assert!(
         j.contains(
             "\"detectedGpus\":[{\"vendor\":\"nvidia\",\"deviceId\":\"2504\",\"name\":\"NVIDIA GeForce RTX 3060\",\"renderNode\":false}]"
@@ -79,7 +110,11 @@ fn json_shape() {
 
 #[test]
 fn json_nulls_and_control_characters() {
-    let d = GpuDevice { device_id: None, name: None, ..rtx3060() };
+    let d = GpuDevice {
+        device_id: None,
+        name: None,
+        ..rtx3060()
+    };
     let j = Report::new(None, vec![d], None).to_json();
     assert!(j.starts_with("{\"state\":\"red\",\"adapter\":null,"), "{j}");
     assert!(j.contains("\"deviceId\":null,\"name\":null"), "{j}");
