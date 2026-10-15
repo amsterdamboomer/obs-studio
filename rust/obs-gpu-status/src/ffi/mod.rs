@@ -1,6 +1,7 @@
 //! C ABI for the frontend (`frontend/utility/obs-gpu-status.h`). The
-//! frontend links this crate as its own staticlib, like obs-nvenc links
-//! obs-nvenc-plugin, so libobs' exported symbol set does not change.
+//! frontend links it through the staticlib rust/obs-gpu-status-frontend,
+//! like obs-nvenc links obs-nvenc-plugin, so libobs' exported symbol set
+//! does not change.
 
 use std::ffi::{CStr, CString, c_char, c_int};
 use std::sync::OnceLock;
