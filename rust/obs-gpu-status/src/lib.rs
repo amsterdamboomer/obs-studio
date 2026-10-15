@@ -34,7 +34,17 @@ pub enum Vendor {
 impl Vendor {
     /// Map a PCI vendor ID (`0x10de`, `10de`, ...) to a known GPU vendor.
     pub fn from_pci_id(id: &str) -> Option<Self> {
-        todo!("{id}")
+        let id = id.trim();
+        let hex = id
+            .strip_prefix("0x")
+            .or_else(|| id.strip_prefix("0X"))
+            .unwrap_or(id);
+        match hex.to_ascii_lowercase().as_str() {
+            "10de" => Some(Self::Nvidia),
+            "1002" => Some(Self::Amd),
+            "8086" => Some(Self::Intel),
+            _ => None,
+        }
     }
 }
 
@@ -62,21 +72,76 @@ pub struct FrameStats {
 /// Whether `adapter` names a software renderer (llvmpipe, softpipe,
 /// Microsoft Basic Render Driver, SwiftShader).
 pub fn is_software_renderer(adapter: &str) -> bool {
-    todo!("{adapter}")
+    let a = adapter.to_ascii_lowercase();
+    [
+        "llvmpipe",
+        "softpipe",
+        "microsoft basic render driver",
+        "swiftshader",
+    ]
+    .iter()
+    .any(|s| a.contains(s))
 }
 
 /// Classify the GPU acceleration state.
 ///
 /// `adapter` is `None` when graphics initialization failed.
 pub fn classify(adapter: Option<&str>, devices: &[GpuDevice], frames: Option<FrameStats>) -> State {
-    todo!("{adapter:?} {devices:?} {frames:?}")
+    let Some(adapter) = adapter else {
+        return State::Red;
+    };
+    if frames.is_some_and(|f| f.median_frame_ns > f.interval_ns) {
+        return State::Red;
+    }
+    match (is_software_renderer(adapter), devices.is_empty()) {
+        (false, _) => State::Green,
+        (true, false) => State::Yellow,
+        (true, true) => State::Red,
+    }
 }
 
 /// Detect hardware GPUs from `<root>/sys/class/drm/card*/device/vendor`.
 /// A device has a render node when a `<root>/sys/class/drm/renderD*` entry
 /// has the same vendor and device ID and `<root>/dev/dri/renderD*` exists.
 pub fn detect_devices(root: &Path) -> Vec<GpuDevice> {
-    todo!("{}", root.display())
+    let drm = root.join("sys/class/drm");
+    let Ok(entries) = std::fs::read_dir(&drm) else {
+        return Vec::new();
+    };
+    let read_id = |dir: &Path, file: &str| -> Option<String> {
+        let raw = std::fs::read_to_string(dir.join("device").join(file)).ok()?;
+        let raw = raw.trim();
+        Some(raw.strip_prefix("0x").unwrap_or(raw).to_ascii_lowercase())
+    };
+    let mut cards = Vec::new();
+    let mut render_nodes = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let dir = entry.path();
+        // `card0` and `renderD128`, not connectors such as `card0-HDMI-A-1`.
+        if let Some(n) = name.strip_prefix("card") {
+            if n.bytes().all(|b| b.is_ascii_digit()) && !n.is_empty() {
+                cards.push(dir);
+            }
+        } else if name.starts_with("renderD") && root.join("dev/dri").join(&name).exists() {
+            render_nodes.push((read_id(&dir, "vendor"), read_id(&dir, "device")));
+        }
+    }
+    cards
+        .iter()
+        .filter_map(|dir| {
+            let vendor_id = read_id(dir, "vendor");
+            let vendor = Vendor::from_pci_id(vendor_id.as_deref()?)?;
+            let device_id = read_id(dir, "device");
+            let render_node = render_nodes.contains(&(vendor_id, device_id.clone()));
+            Some(GpuDevice {
+                vendor,
+                device_id,
+                name: None,
+                render_node,
+            })
+        })
+        .collect()
 }
 
 /// Parse `nvidia-smi --query-gpu=name,pci.device_id --format=csv,noheader`.
@@ -84,7 +149,24 @@ pub fn detect_devices(root: &Path) -> Vec<GpuDevice> {
 /// Each line is `<name>, 0x<device><vendor>` (e.g. `NVIDIA GeForce RTX 3060,
 /// 0x250410DE`). Lines that do not parse are skipped.
 pub fn parse_nvidia_smi(output: &str) -> Vec<GpuDevice> {
-    todo!("{output}")
+    output
+        .lines()
+        .filter_map(|line| {
+            let (name, id) = line.rsplit_once(',')?;
+            let id = id.trim();
+            let hex = id.strip_prefix("0x").or_else(|| id.strip_prefix("0X"))?;
+            if hex.len() != 8 || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+                return None;
+            }
+            let (device, vendor) = hex.split_at(4);
+            Some(GpuDevice {
+                vendor: Vendor::from_pci_id(vendor)?,
+                device_id: Some(device.to_ascii_lowercase()),
+                name: Some(name.trim().to_owned()),
+                render_node: false,
+            })
+        })
+        .collect()
 }
 
 /// Run `nvidia-smi`; an absent tool or a failing driver yields no devices.
@@ -101,5 +183,13 @@ pub fn query_nvidia_smi() -> Vec<GpuDevice> {
 /// Add `extra` devices not already in `devices` (same vendor and device ID);
 /// a match fills in the missing name instead.
 pub fn merge_devices(devices: &mut Vec<GpuDevice>, extra: Vec<GpuDevice>) {
-    todo!("{devices:?} {extra:?}")
+    for e in extra {
+        match devices
+            .iter_mut()
+            .find(|d| d.vendor == e.vendor && d.device_id == e.device_id && d.name.is_none())
+        {
+            Some(d) => d.name = e.name,
+            None => devices.push(e),
+        }
+    }
 }

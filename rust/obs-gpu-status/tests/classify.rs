@@ -43,7 +43,11 @@ fn software_with_gpu_present_is_yellow() {
         let d = GpuDevice { vendor, ..nv() };
         for a in SOFTWARE {
             assert!(is_software_renderer(a), "{a}");
-            assert_eq!(classify(Some(a), &[d.clone()], None), State::Yellow, "{a}");
+            assert_eq!(
+                classify(Some(a), std::slice::from_ref(&d), None),
+                State::Yellow,
+                "{a}"
+            );
         }
     }
 }
@@ -65,14 +69,26 @@ fn graphics_init_failure_is_red() {
 fn frame_budget_overrun_is_red() {
     let hw = "NVIDIA GeForce RTX 3060";
     let interval = 33_333_333;
-    let over = FrameStats { median_frame_ns: 95_000_000, interval_ns: interval };
-    let at = FrameStats { median_frame_ns: interval, interval_ns: interval };
-    let fast = FrameStats { median_frame_ns: 2_000_000, interval_ns: interval };
+    let over = FrameStats {
+        median_frame_ns: 95_000_000,
+        interval_ns: interval,
+    };
+    let at = FrameStats {
+        median_frame_ns: interval,
+        interval_ns: interval,
+    };
+    let fast = FrameStats {
+        median_frame_ns: 2_000_000,
+        interval_ns: interval,
+    };
     assert_eq!(classify(Some(hw), &[nv()], Some(over)), State::Red);
     assert_eq!(classify(Some(SOFTWARE[0]), &[nv()], Some(over)), State::Red);
     assert_eq!(classify(Some(hw), &[nv()], Some(at)), State::Green);
     assert_eq!(classify(Some(hw), &[nv()], Some(fast)), State::Green);
-    assert_eq!(classify(Some(SOFTWARE[0]), &[nv()], Some(fast)), State::Yellow);
+    assert_eq!(
+        classify(Some(SOFTWARE[0]), &[nv()], Some(fast)),
+        State::Yellow
+    );
 }
 
 #[test]
@@ -147,13 +163,17 @@ fn missing_sysfs_detects_nothing() {
 
 #[test]
 fn parses_nvidia_smi_output() {
-    let out = "NVIDIA GeForce RTX 3060, 0x250410DE\nNVIDIA GeForce RTX 2080 Ti, 0x1E0710DE\n\ngarbage\n";
+    let out =
+        "NVIDIA GeForce RTX 3060, 0x250410DE\nNVIDIA GeForce RTX 2080 Ti, 0x1E0710DE\n\ngarbage\n";
     let got = parse_nvidia_smi(out);
     assert_eq!(got.len(), 2);
     assert_eq!(got[0].name.as_deref(), Some("NVIDIA GeForce RTX 3060"));
     assert_eq!(got[0].device_id.as_deref(), Some("2504"));
     assert_eq!(got[1].device_id.as_deref(), Some("1e07"));
-    assert!(got.iter().all(|d| d.vendor == Vendor::Nvidia && !d.render_node));
+    assert!(
+        got.iter()
+            .all(|d| d.vendor == Vendor::Nvidia && !d.render_node)
+    );
     assert!(
         parse_nvidia_smi(
             "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
@@ -167,7 +187,9 @@ fn merge_fills_names_and_adds_missing() {
     let mut d = vec![nv()];
     merge_devices(
         &mut d,
-        parse_nvidia_smi("NVIDIA GeForce RTX 3060, 0x250410DE\nNVIDIA GeForce RTX 2080 Ti, 0x1E0710DE"),
+        parse_nvidia_smi(
+            "NVIDIA GeForce RTX 3060, 0x250410DE\nNVIDIA GeForce RTX 2080 Ti, 0x1E0710DE",
+        ),
     );
     assert_eq!(d.len(), 2);
     assert_eq!(d[0].name.as_deref(), Some("NVIDIA GeForce RTX 3060"));
