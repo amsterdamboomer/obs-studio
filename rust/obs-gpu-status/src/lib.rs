@@ -74,6 +74,19 @@ pub struct FrameStats {
     pub interval_ns: u64,
 }
 
+/// Fewest one-second samples [`FrameStats::from_samples`] judges a window on.
+pub const MIN_FRAME_SAMPLES: usize = 5;
+
+impl FrameStats {
+    /// The median of one-second frame-time averages (`obs_get_average_frame_time_ns`
+    /// sampled once a second), or `None` with fewer than [`MIN_FRAME_SAMPLES`]
+    /// samples or no interval. A median keeps one slow second, such as the
+    /// first one after launch, from turning the light red.
+    pub fn from_samples(samples: &[u64], interval_ns: u64) -> Option<Self> {
+        todo!("{samples:?} {interval_ns}")
+    }
+}
+
 /// Whether `adapter` names a software renderer (llvmpipe, softpipe,
 /// Microsoft Basic Render Driver, SwiftShader).
 pub fn is_software_renderer(adapter: &str) -> bool {
