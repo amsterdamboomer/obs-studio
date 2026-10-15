@@ -4,6 +4,7 @@
 
 use std::ffi::{CStr, CString};
 
+use obs_c_oracle as _; // links the test allocator
 use obs_util::ffi::platform_number::{os_dtostr, os_strtod};
 
 fn strtod(s: &str) -> f64 {
