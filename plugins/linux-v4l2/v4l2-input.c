@@ -862,6 +862,32 @@ static void device_removed(void *vptr, calldata_t *calldata)
 #define FORCE_TIMEOUT_MS 5000
 
 /*
+ * Tell the frontend, which shows a "Camera is in use" popup with a Force
+ * Camera button calling the source's force_camera proc. The frontend declares
+ * the signal on the global handler; without a frontend nobody has, and
+ * signalling an undeclared signal does nothing.
+ *
+ * void source_device_busy(ptr source, string device, string holder, int pid,
+ *                         bool is_obs, bool can_force)
+ */
+static void v4l2_busy_announce(struct v4l2_data *data, const struct v4l2_holder *holder)
+{
+	signal_handler_t *sh = obs_get_signal_handler();
+	if (!sh || !data->source)
+		return;
+
+	calldata_t cd = {0};
+	calldata_set_ptr(&cd, "source", data->source);
+	calldata_set_string(&cd, "device", data->device_id);
+	calldata_set_string(&cd, "holder", holder ? holder->name : "");
+	calldata_set_int(&cd, "pid", holder ? holder->pid : 0);
+	calldata_set_bool(&cd, "is_obs", holder && v4l2_holder_is_obs(holder));
+	calldata_set_bool(&cd, "can_force", holder && holder->uid == getuid());
+	signal_handler_signal(sh, "source_device_busy", &cd);
+	calldata_free(&cd);
+}
+
+/*
  * Record whether the last v4l2_init() failed because another process has the
  * device, and who that is. Called with the errno of the failure, or 0.
  */
@@ -891,6 +917,8 @@ static void v4l2_busy_update(struct v4l2_data *data, int err)
 		blog(LOG_WARNING, "%s%s; retrying until it is free", text.array,
 		     known && v4l2_holder_is_obs(&holder) ? ", another OBS instance" : "");
 		dstr_free(&text);
+		/* once per busy episode, not on every retry */
+		v4l2_busy_announce(data, known ? &holder : NULL);
 	}
 	if (busy != was_busy || (busy && known))
 		obs_source_update_properties(data->source);
@@ -949,13 +977,10 @@ static void v4l2_video_tick(void *vptr, float seconds)
 		obs_queue_task(OBS_TASK_UI, v4l2_busy_task, obs_source_get_weak_source(data->source), false);
 }
 
-/* "Force Camera": ask the holder to close, then open the device. */
-static bool v4l2_force_camera(obs_properties_t *props, obs_property_t *property, void *vptr)
+/* "Force Camera": ask the holder to close, then open the device. Returns
+ * whether the holder let go. */
+static bool v4l2_force_camera_now(struct v4l2_data *data)
 {
-	V4L2_DATA(vptr);
-	UNUSED_PARAMETER(props);
-	UNUSED_PARAMETER(property);
-
 	pthread_mutex_lock(&data->busy_mutex);
 	bool can_force = data->busy && data->busy_holder_known;
 	struct v4l2_holder holder = data->busy_holder;
@@ -964,7 +989,9 @@ static bool v4l2_force_camera(obs_properties_t *props, obs_property_t *property,
 		return false;
 
 	blog(LOG_INFO, "Force Camera: asking %s (PID %d) to close", holder.name, (int)holder.pid);
-	switch (v4l2_force_release("/proc", data->device_id, &holder, getuid(), FORCE_TIMEOUT_MS)) {
+	enum v4l2_force_result result =
+		v4l2_force_release("/proc", data->device_id, &holder, getuid(), FORCE_TIMEOUT_MS);
+	switch (result) {
 	case V4L2_FORCE_RELEASED:
 		v4l2_init(data);
 		break;
@@ -981,7 +1008,22 @@ static bool v4l2_force_camera(obs_properties_t *props, obs_property_t *property,
 		     strerror(errno));
 		break;
 	}
+	return result == V4L2_FORCE_RELEASED;
+}
+
+/* The Force Camera button in the source properties */
+static bool v4l2_force_camera(obs_properties_t *props, obs_property_t *property, void *vptr)
+{
+	UNUSED_PARAMETER(props);
+	UNUSED_PARAMETER(property);
+	v4l2_force_camera_now(vptr);
 	return true;
+}
+
+/* proc "void force_camera(out bool released)", for the frontend's popup */
+static void v4l2_force_camera_proc(void *vptr, calldata_t *cd)
+{
+	calldata_set_bool(cd, "released", v4l2_force_camera_now(vptr));
 }
 
 /* While the device is busy: who has it, and the Force Camera button */
@@ -1392,6 +1434,10 @@ static void *v4l2_create(obs_data_t *settings, obs_source_t *source)
 	data->framerate_unchanged = false;
 	pthread_mutex_init(&data->controls_mutex, NULL);
 	pthread_mutex_init(&data->busy_mutex, NULL);
+
+	proc_handler_t *ph = obs_source_get_proc_handler(source);
+	if (ph)
+		proc_handler_add(ph, "void force_camera(out bool released)", v4l2_force_camera_proc, data);
 
 	/* Bitch about build problems ... */
 #ifndef V4L2_CAP_DEVICE_CAPS
