@@ -12,6 +12,7 @@ use std::ffi::{CString, c_char, c_int};
 
 use obs_c_oracle::shader_param_names as c;
 use obs_graphics::ffi::shader_param_names as rs;
+use obs_util as _; // bmem for the C dstr.c
 use proptest::prelude::*;
 
 type Lookup = unsafe extern "C" fn(*const c_char) -> c_int;
