@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 BASELINE = Path(__file__).resolve().parent / "platform-ifdef-baseline.json"
 
 MACROS = (
-    r"_WIN32|_WIN64|_MSC_VER|__APPLE__|__MACH__|TARGET_OS_\w+|__linux__|__FreeBSD__|__OpenBSD__|__unix__"
+    r"WIN32|_WIN32|_WIN64|__linux|_MSC_VER|__APPLE__|__MACH__|TARGET_OS_\w+|__linux__|__FreeBSD__|__OpenBSD__|__unix__"
     r"|OS_WINDOWS|OS_MACOS|OS_LINUX|OS_FREEBSD"
 )
 CONDITIONAL = re.compile(r"^\s*#\s*(?:if|ifdef|ifndef|elif)\b(.*)$")
