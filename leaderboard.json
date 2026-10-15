@@ -1,24 +1,24 @@
 {
   "repo": "obs-rust/obs-studio",
-  "generated_at": "2026-10-15T04:52:25Z",
-  "generated_pacific": "Oct 14, 2026 09:52 PM PDT",
-  "since": "2026-10-14T07:00:00Z",
+  "generated_at": "2026-10-15T13:33:15Z",
+  "generated_pacific": "Oct 15, 2026 06:33 AM PDT",
+  "since": "2026-10-15T07:00:00Z",
   "since_caption": "new since 12:00 AM Pacific (America/Los_Angeles)",
-  "today_total": 68,
+  "today_total": 6,
   "ranked_by": "merged_prs",
-  "merged_pr_total": 441,
+  "merged_pr_total": 452,
   "unattributed_prs": [],
   "contributors": [
     {
       "login": "zackees",
       "avatar_url": "https://github.com/zackees.png?size=200",
-      "merged_prs": 189,
-      "issues_filed": 135,
-      "today_prs": 37,
-      "today_badge": "<span class=\"delta delta-up\" title=\"+37 new since 12:00 AM Pacific (America/Los_Angeles)\"><svg viewBox=\"0 0 10 9\" width=\"14\" height=\"12\" aria-label=\"up\"><polygon points=\"5,0 10,9 0,9\"/></svg>+37</span>",
-      "score": 189,
+      "merged_prs": 192,
+      "issues_filed": 136,
+      "today_prs": 0,
+      "today_badge": "<span class=\"delta delta-none\" title=\"none since midnight Pacific\">&ndash;</span>",
+      "score": 192,
       "first_contribution": "2026-10-08T20:57:49Z",
-      "last_contribution": "2026-10-15T03:03:33Z",
+      "last_contribution": "2026-10-15T06:54:46Z",
       "pr_numbers": [
         2,
         3,
@@ -208,9 +208,13 @@
         787,
         789,
         794,
-        795
+        795,
+        796,
+        800,
+        807
       ],
       "issue_numbers": [
+        806,
         799,
         782,
         777,
@@ -352,13 +356,13 @@
     {
       "login": "rdoupe",
       "avatar_url": "https://github.com/rdoupe.png?size=200",
-      "merged_prs": 142,
-      "issues_filed": 143,
-      "today_prs": 15,
-      "today_badge": "<span class=\"delta delta-up\" title=\"+15 new since 12:00 AM Pacific (America/Los_Angeles)\"><svg viewBox=\"0 0 10 9\" width=\"14\" height=\"12\" aria-label=\"up\"><polygon points=\"5,0 10,9 0,9\"/></svg>+15</span>",
-      "score": 142,
+      "merged_prs": 146,
+      "issues_filed": 149,
+      "today_prs": 3,
+      "today_badge": "<span class=\"delta delta-up\" title=\"+3 new since 12:00 AM Pacific (America/Los_Angeles)\"><svg viewBox=\"0 0 10 9\" width=\"14\" height=\"12\" aria-label=\"up\"><polygon points=\"5,0 10,9 0,9\"/></svg>+3</span>",
+      "score": 146,
       "first_contribution": "2026-10-10T22:17:15Z",
-      "last_contribution": "2026-10-15T03:48:08Z",
+      "last_contribution": "2026-10-15T11:44:01Z",
       "pr_numbers": [
         109,
         193,
@@ -501,9 +505,19 @@
         781,
         791,
         793,
-        798
+        798,
+        803,
+        805,
+        820,
+        822
       ],
       "issue_numbers": [
+        823,
+        821,
+        819,
+        813,
+        804,
+        802,
         797,
         792,
         790,
@@ -655,8 +669,8 @@
       "avatar_url": "https://github.com/chriscoveries.png?size=200",
       "merged_prs": 39,
       "issues_filed": 30,
-      "today_prs": 12,
-      "today_badge": "<span class=\"delta delta-up\" title=\"+12 new since 12:00 AM Pacific (America/Los_Angeles)\"><svg viewBox=\"0 0 10 9\" width=\"14\" height=\"12\" aria-label=\"up\"><polygon points=\"5,0 10,9 0,9\"/></svg>+12</span>",
+      "today_prs": 0,
+      "today_badge": "<span class=\"delta delta-none\" title=\"none since midnight Pacific\">&ndash;</span>",
       "score": 39,
       "first_contribution": "2026-10-10T16:44:59Z",
       "last_contribution": "2026-10-15T03:08:20Z",
@@ -785,13 +799,13 @@
     {
       "login": "nathan-v",
       "avatar_url": "https://github.com/nathan-v.png?size=200",
-      "merged_prs": 22,
+      "merged_prs": 24,
       "issues_filed": 8,
-      "today_prs": 4,
-      "today_badge": "<span class=\"delta delta-up\" title=\"+4 new since 12:00 AM Pacific (America/Los_Angeles)\"><svg viewBox=\"0 0 10 9\" width=\"14\" height=\"12\" aria-label=\"up\"><polygon points=\"5,0 10,9 0,9\"/></svg>+4</span>",
-      "score": 22,
+      "today_prs": 1,
+      "today_badge": "<span class=\"delta delta-up\" title=\"+1 new since 12:00 AM Pacific (America/Los_Angeles)\"><svg viewBox=\"0 0 10 9\" width=\"14\" height=\"12\" aria-label=\"up\"><polygon points=\"5,0 10,9 0,9\"/></svg>+1</span>",
+      "score": 24,
       "first_contribution": "2026-10-10T00:51:06Z",
-      "last_contribution": "2026-10-15T01:34:56Z",
+      "last_contribution": "2026-10-15T13:02:15Z",
       "pr_numbers": [
         61,
         66,
@@ -814,7 +828,9 @@
         707,
         745,
         746,
-        788
+        788,
+        801,
+        808
       ],
       "issue_numbers": [
         784,
@@ -930,6 +946,28 @@
       "rank": 10
     },
     {
+      "login": "vpacher",
+      "avatar_url": "https://github.com/vpacher.png?size=200",
+      "merged_prs": 2,
+      "issues_filed": 4,
+      "today_prs": 2,
+      "today_badge": "<span class=\"delta delta-up\" title=\"+2 new since 12:00 AM Pacific (America/Los_Angeles)\"><svg viewBox=\"0 0 10 9\" width=\"14\" height=\"12\" aria-label=\"up\"><polygon points=\"5,0 10,9 0,9\"/></svg>+2</span>",
+      "score": 2,
+      "first_contribution": "2026-10-15T10:25:47Z",
+      "last_contribution": "2026-10-15T12:38:21Z",
+      "pr_numbers": [
+        810,
+        816
+      ],
+      "issue_numbers": [
+        817,
+        815,
+        811,
+        809
+      ],
+      "rank": 11
+    },
+    {
       "login": "MCPVOT",
       "avatar_url": "https://github.com/MCPVOT.png?size=200",
       "merged_prs": 1,
@@ -945,7 +983,7 @@
       "issue_numbers": [
         291
       ],
-      "rank": 11
+      "rank": 12
     },
     {
       "login": "nmoinvaz",
@@ -961,7 +999,7 @@
         402
       ],
       "issue_numbers": [],
-      "rank": 12
+      "rank": 13
     },
     {
       "login": "ProtonDev-sys",
@@ -979,7 +1017,7 @@
       "issue_numbers": [
         500
       ],
-      "rank": 13
+      "rank": 14
     }
   ]
 }
