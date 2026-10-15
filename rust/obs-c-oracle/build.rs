@@ -484,6 +484,12 @@ fn main() {
         oracle.flag("-Wno-deprecated-declarations");
         owned_flags.push("-Wno-deprecated-declarations".into());
     }
+    // obs-properties.c initializes `struct list_item item = {NULL};`; the
+    // shipped build tolerates it, the oracle's -Werror does not.
+    if !oracle.get_compiler().is_like_msvc() || oracle.get_compiler().is_like_clang_cl() {
+        oracle.flag("-Wno-missing-field-initializers");
+        owned_flags.push("-Wno-missing-field-initializers".into());
+    }
     let jansson_src = manifest.join("vendor/jansson/src");
     oracle.include(&jansson_src);
     owned_flags.push("-Ivendor/jansson/src".into());
