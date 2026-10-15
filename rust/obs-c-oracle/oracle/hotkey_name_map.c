@@ -12,6 +12,13 @@
 #define obs_hotkey_name_map_free oracle_obs_hotkey_name_map_free
 #define obs oracle_hotkey_obs
 
+/* obs_key_from_name returns an int map value as obs_key_t; clang treats the
+ * enum as unsigned and the oracle builds with -Wsign-conversion. libobs
+ * does not. */
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#endif
+
 #include "obs-hotkey-name-map.c"
 
 struct obs_core *oracle_hotkey_obs = NULL;
