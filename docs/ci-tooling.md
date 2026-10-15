@@ -190,9 +190,10 @@ the paths that select them, so a change only triggers the tests it can affect.
   on Linux; file contents are never read. Shared and so every platform:
   `.github/`, `cmake/common/`, `cmake/finders/`, `libobs/cmake/`, the root
   CMake files, `platform/mod.rs`, `test/cmocka/CMakeLists.txt` and the C++
-  cmocka tests with their `tests.d` registrations (#610). Overrides are
-  unchanged: the `ci-full` label, pushes, the merge queue and the release
-  gate still run every platform.
+  cmocka tests with their `tests.d` registrations (#610). Pushes and the
+  merge queue are scoped the same way; every platform runs with the
+  `ci-full` label, on schedule, workflow_dispatch, tags, release branches and
+  in the release gate.
 
 Unchanged lanes are cached by the gate, so a re-run after a small fix is fast.
 
