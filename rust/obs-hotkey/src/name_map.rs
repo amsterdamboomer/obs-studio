@@ -4,7 +4,9 @@
 //! and scans the key list when there is no core. Both find the first key
 //! with the name, so this keeps one lazily built map for every caller.
 
+use std::collections::HashMap;
 use std::ffi::CStr;
+use std::sync::OnceLock;
 
 include!(concat!(env!("OUT_DIR"), "/keys.rs"));
 
@@ -19,13 +21,25 @@ pub fn key_count() -> usize {
 /// `obs_key_to_name`: the name of `key`, or `None` when it is not a key
 /// (C logs and returns `""` then).
 pub fn key_name(key: i32) -> Option<&'static CStr> {
-    let _ = key;
-    todo!("hotkey name map port (#833)")
+    usize::try_from(key)
+        .ok()
+        .and_then(|i| KEY_NAMES.get(i).copied())
+}
+
+fn map() -> &'static HashMap<&'static CStr, i32> {
+    static MAP: OnceLock<HashMap<&'static CStr, i32>> = OnceLock::new();
+    MAP.get_or_init(|| {
+        let mut m = HashMap::with_capacity(KEY_NAMES.len());
+        for (i, name) in KEY_NAMES.iter().enumerate() {
+            // obs_hotkey_name_map_insert keeps the first key with a name.
+            m.entry(*name).or_insert(i as i32);
+        }
+        m
+    })
 }
 
 /// `obs_key_from_name`: the first key named exactly `name`, or
 /// `OBS_KEY_NONE`.
 pub fn key_from_name(name: &CStr) -> i32 {
-    let _ = name;
-    todo!("hotkey name map port (#833)")
+    map().get(name).copied().unwrap_or(KEY_NONE)
 }
