@@ -967,6 +967,12 @@ jobs:
               grep -E 'Test +#|expected \(|moved' || true
           done
           ldd "$b"/libobs/libobs.so.* | sort
+          echo "== as root"
+          sudo -E env HOME=/root xvfb-run -a ctest --test-dir "$b" \
+            -R '^(test_group_empty_bounds|test_scene_dup_group_children)$' --output-on-failure 2>&1 |
+            grep -E 'Test +#|expected \(|moved' || true
+          echo "== cpu"; grep -m1 'model name' /proc/cpuinfo; grep -m1 -o -w 'avx512f\|fma\|avx2' /proc/cpuinfo | sort -u | tr '\n' ' '; echo
+          echo "== env"; env | sort | grep -vE 'TOKEN|SECRET|KEY|PASSWORD' | cut -c1-200
 
       - name: Upload Exports 🧾
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
