@@ -68,6 +68,18 @@ class FacadeTest(unittest.TestCase):
             with self.subTest(function=name):
                 self.assertRegex(text, rf"\b{name}\(", f"OBSApp.cpp never calls {name}")
 
+    def test_implementations_include_the_util_headers_they_call(self):
+        # Code moved out of OBSApp.cpp lost the includes it relied on there;
+        # only the native builds would notice (#987: astrcmpi in platform-osx.mm
+        # and platform-windows.cpp without <util/dstr.h>).
+        headers = {r"\bastrcmpi?\(|\bastrcmp_n\(|\bdstr_\w+\(": "util/dstr.h"}
+        for impl in IMPLEMENTATIONS:
+            text = (UTILITY / impl).read_text()
+            for call, header in headers.items():
+                if re.search(call, text):
+                    with self.subTest(file=impl, header=header):
+                        self.assertRegex(text, rf"#(include|import)\s+[<\"]{re.escape(header)}[>\"]")
+
     def test_obsapp_has_no_platform_conditionals(self):
         text = (ROOT / "frontend" / "OBSApp.cpp").read_text()
         self.assertEqual(ratchet.count_platform_conditionals(text), [])
