@@ -181,3 +181,26 @@ class ClangFormatScopeTest(unittest.TestCase):
             and not local_gate.excluded(f, local_gate.CLANG_EXCLUDE)
         ]
         self.assertEqual(checked, files)
+
+
+class FormatScopeTest(unittest.TestCase):
+    """./lint formats only changed files locally; CI checks every file (#1050)."""
+
+    FILES = ["libobs/obs.c", "frontend/a.cpp", "frontend/b.cpp", "CMakeLists.txt"]
+
+    def test_ci_checks_every_file(self):
+        self.assertEqual(local_gate.format_scope(self.FILES, ["frontend/a.cpp"], ci=True), self.FILES)
+
+    def test_local_checks_only_changed_files(self):
+        self.assertEqual(
+            local_gate.format_scope(self.FILES, ["frontend/a.cpp", "docs/x.md"], ci=False), ["frontend/a.cpp"]
+        )
+
+    def test_unknown_changes_check_every_file(self):
+        # No merge-base with origin/master: nothing to compare against.
+        self.assertEqual(local_gate.format_scope(self.FILES, None, ci=False), self.FILES)
+
+    def test_formatter_config_change_checks_every_file(self):
+        for config in (".clang-format", "libobs/.clang-format", ".gersemirc", "ci/local_gate.py"):
+            with self.subTest(config=config):
+                self.assertEqual(local_gate.format_scope(self.FILES, [config], ci=False), self.FILES)
