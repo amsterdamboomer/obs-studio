@@ -38,12 +38,15 @@ done
 script='set -e; cd /src
 for alias in "$@"; do
   echo "== cross $alias"
-  cmake -S cmake/cross -B "/build/$alias" -G Ninja -DOBS_CROSS_TARGET="$alias"
+  # soldr itself is downloaded once into the shared soldr volume, not per alias.
+  cmake -S cmake/cross -B "/build/$alias" -G Ninja -DOBS_CROSS_TARGET="$alias" \
+    -DOBS_SOLDR_DOWNLOAD_DIR="/root/.soldr/obs-bootstrap/$SOLDR_VERSION"
   cmake --build "/build/$alias" -- -k 0
 done'
 
 # The image only needs cmake, ninja, git and curl: the Tier 2 one has them.
 rust_toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' "$repo/rust-toolchain.toml")
+soldr_version=$(sed -n 's/^set(OBS_SOLDR_VERSION \([0-9.]*\))$/\1/p' "$repo/cmake/common/soldr.cmake")
 exec bash "$repo/ci/docker-task.sh" run --name obs-cross --repo "$repo" \
   --image obs-rust-linux-validate --dockerfile "$repo/rust/tools/linux-validate/Dockerfile" \
   --context "$repo/rust/tools/linux-validate" --build-arg "RUST_TOOLCHAIN=$rust_toolchain" \
@@ -52,4 +55,5 @@ exec bash "$repo/ci/docker-task.sh" run --name obs-cross --repo "$repo" \
   --machine-volume soldr:/root/.soldr \
   --machine-volume deps:/src/.deps \
   --budget build=6G --budget soldr=12G --budget deps=2G \
+  --env "SOLDR_VERSION=$soldr_version" \
   ${task[@]+"${task[@]}"} -- bash -c "$script" cross "${aliases[@]}"
