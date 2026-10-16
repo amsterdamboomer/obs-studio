@@ -137,7 +137,14 @@ def toolchain_gcc_ld() -> str:
 
 
 def self_test() -> None:
-    """The gate's and the repo layout's unit tests: every ci/test_*.py."""
+    """The gate's and the repo layout's unit tests: every ci/test_*.py.
+
+    CI runs them in their own ubuntu-latest job (ci-self-test) and sets
+    OBS_GATE_SKIP_SELF_TEST=1 for the lint step on the scarce ubuntu-26.04
+    runner (#427); locally they always run."""
+    if os.environ.get("OBS_GATE_SKIP_SELF_TEST") == "1":
+        print("+ ci/ self-tests: skipped (OBS_GATE_SKIP_SELF_TEST=1; CI's ci-self-test job runs them)", flush=True)
+        return
     run([sys.executable, "-m", "unittest", "discover", "-s", "ci", "-p", "test_*.py"])
 
 
