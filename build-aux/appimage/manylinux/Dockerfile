@@ -41,7 +41,7 @@ RUN /opt/deps/codecs.sh ffmpeg
 COPY build-aux/appimage/manylinux/deps/misc.sh /opt/deps/misc.sh
 RUN /opt/deps/misc.sh
 
-# Qt last: nothing above needs it, so a Qt bump rebuilds only Qt.
+# Qt last: nothing above needs it, so a Qt bump (a new pinned prebuilt) re-runs only this layer.
 COPY build-aux/appimage/manylinux/deps/qt6.sh /opt/deps/qt6.sh
 RUN /opt/deps/qt6.sh
 ENV CMAKE_PREFIX_PATH=/opt/obs-deps/qt6:/opt/obs-deps
