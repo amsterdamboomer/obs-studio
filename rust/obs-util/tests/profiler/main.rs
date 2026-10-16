@@ -1,5 +1,10 @@
 //! obs-util integration tests: profiler (one module per former tests/*.rs file, #968).
 
+use std::sync::Mutex;
+
+/// One lock for every test that touches the process-global profiler.
+pub(crate) static PROFILER_LOCK: Mutex<()> = Mutex::new(());
+
 mod profiler;
 mod profiler_parity;
 mod profiler_snapshot;
