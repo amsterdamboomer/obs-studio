@@ -148,6 +148,8 @@ ls -lh OBS-Studio-*
 """
 
 STEP_NAMES = ("deps", "libavutil", "version", "configure", "build", "appdir", "appimage")
+# The glibc 2.28 image (--base manylinux) has the dependencies prebuilt (#926).
+MANYLINUX_SKIPPED = ("deps", "libavutil")
 # Left behind by an earlier local run; a CI checkout never has them.
 STALE = {"appdir": ("AppDir",), "appimage": ("appimagetool", "squashfs-root")}
 
@@ -192,7 +194,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         p.error(f"unknown step(s): {', '.join(unknown)}")
     skipped = {"deps"} if args.skip_deps else set()
     if args.base == "manylinux":
-        skipped |= {"deps", "libavutil"}  # the image built them (and its own FFmpeg)
+        skipped |= set(MANYLINUX_SKIPPED)  # the image has them (and its own FFmpeg)
     args.steps = [s for s in STEP_NAMES if s in steps and s not in skipped]
     if args.sha is None:
         args.sha = default_sha()

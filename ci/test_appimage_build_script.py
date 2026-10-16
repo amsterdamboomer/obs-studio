@@ -71,9 +71,11 @@ class BuildScriptTest(unittest.TestCase):
     def test_workflow_calls_every_step_in_order(self):
         called = []
         for line in WORKFLOW.read_text().splitlines():
-            if "build-aux/appimage/build.py --steps " in line:
+            if "build-aux/appimage/build.py " in line and "--steps " in line:
                 called += line.split("--steps ", 1)[1].split()[0].split(",")
-        self.assertEqual(called, list(build.STEP_NAMES))
+        # The workflow builds on the glibc 2.28 image, which has the dependencies (#926).
+        self.assertIn("--base manylinux --steps", WORKFLOW.read_text())
+        self.assertEqual(called, [s for s in build.STEP_NAMES if s not in build.MANYLINUX_SKIPPED])
 
     def test_workflow_passes_every_input(self):
         text = WORKFLOW.read_text()
