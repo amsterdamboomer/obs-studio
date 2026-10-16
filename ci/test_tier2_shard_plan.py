@@ -37,7 +37,7 @@ COSTS = {
 def run_plan(costs: dict[str, float], names: list[str], shards: int) -> dict[int, list[str]]:
     d = Path(tempfile.mkdtemp())
     cost = d / "CTestCostData.txt"
-    cost.write_text("".join(f"{n} 3 {c}\n" for n, c in costs.items()) + "---\ntest_flaky\n")
+    cost.write_text("".join(f"{n} 3 {c}\n" for n, c in costs.items()) + ("---\ntest_flaky\n" if costs else ""))
     listing = d / "names.txt"
     listing.write_text("\n".join(names) + "\n")
     out = d / "out"
@@ -78,6 +78,14 @@ class ShardPlanTest(unittest.TestCase):
         names = list(COSTS) + ["test_brand_new"]
         plan = run_plan(COSTS, names, 3)
         self.assertIn("test_brand_new", [n for t in plan.values() for n in t])
+
+    def test_no_cost_data_still_splits_every_test(self):
+        """First run, or no saved timings: the cost file is empty. awk's
+        FNR == NR then misread the names as costs and every shard came out
+        empty."""
+        plan = run_plan({}, ["test_a", "test_b", "test_c", "test_d"], 2)
+        self.assertEqual(sorted(n for t in plan.values() for n in t), ["test_a", "test_b", "test_c", "test_d"])
+        self.assertEqual(sorted(len(t) for t in plan.values()), [2, 2])
 
     def test_regex_matches_exact_names_only(self):
         plan = run_plan({"test_a": 1.0, "test_ab": 1.0}, ["test_a", "test_ab"], 1)
