@@ -16,7 +16,9 @@
 #   /src/.deps     shared (obs-cross-deps): OBS's pinned prebuilt
 #                  Windows/macOS dependencies
 # The first run downloads soldr, LLVM, the SDK and the deps; later runs
-# reattach the caches and only recompile what changed.
+# reattach the caches and only recompile what changed. Budgets cap each
+# volume (build 6G, soldr 12G, deps 2G): one over it after a run is removed
+# and rebuilt cold next time, so nothing grows without bound.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(cd "$here/../.." && pwd)
@@ -49,4 +51,6 @@ exec bash "$repo/ci/docker-task.sh" run --name obs-cross --repo "$repo" \
   --stack-volume build:/build \
   --machine-volume soldr:/root/.soldr \
   --machine-volume deps:/src/.deps \
+  --budget build=6G --budget soldr=12G --budget deps=2G \
+  --env CARGO_INCREMENTAL=0 \
   ${task[@]+"${task[@]}"} -- bash -c "$script" cross "${aliases[@]}"

@@ -31,6 +31,19 @@
 #                           (ccache, cargo registry)
 #   --mount SRC:DEST[:ro]   extra bind mount
 #   --env K=V               environment for the task
+#   --prune-cargo DIR       after every run, keep only the newest artifacts in
+#                           the cargo target dir DIR (container path) and each
+#                           DIR/<triple>: soldr cache prune-target
+#                           --keep-latest. Safe when each target is built one
+#                           way (one profile, one feature set), as these tasks
+#                           are. soldr comes from a shared tools volume
+#                           (docker-task-soldr-<version>), fetched once at the
+#                           version and SHA256 cmake/common/soldr.cmake pins.
+#   --budget VOL=SIZE       cap a stack or machine volume (SIZE: bytes, or with
+#                           K, M or G): after every run, a volume over its budget
+#                           is removed, so the next run starts it cold. Bounds
+#                           what would otherwise only ever grow (cargo targets,
+#                           compiler caches).
 #   --clean                 remove this checkout's stack volumes first
 #   --clean-all             also remove the machine volumes
 #   --keep                  keep the container after the run (no --rm)
@@ -61,6 +74,31 @@ checkout_id() {
 quiet() { "$@" 2>/dev/null || true; }
 
 volume_in_use() { [ -n "$(quiet docker ps -aq --filter "volume=$1")" ]; }
+
+to_bytes() { # 512, 300K, 20M, 8G
+  local n=${1%[KkMmGg]} unit=${1##*[0-9]}
+  case $unit in
+  K | k) echo $((n * 1024)) ;;
+  M | m) echo $((n * 1024 * 1024)) ;;
+  G | g) echo $((n * 1024 * 1024 * 1024)) ;;
+  *) echo "$n" ;;
+  esac
+}
+
+# Removes VOLUME when it holds more than BUDGET bytes (measured with du in
+# a throwaway container of IMAGE), unless a container still uses it.
+enforce_budget() { # VOLUME BUDGET IMAGE
+  local size
+  size=$(quiet docker run --rm -v "$1:/v:ro" --entrypoint du "$3" -sb /v | cut -f1)
+  [ -n "$size" ] || return 0
+  [ "$size" -gt "$2" ] || return 0
+  if volume_in_use "$1"; then
+    echo "docker-task: $1 is over budget ($size > $2 bytes) but in use; left" >&2
+    return 0
+  fi
+  docker volume rm "$1" >/dev/null 2>&1 &&
+    echo "docker-task: $1 was over budget ($size > $2 bytes): removed, the next run starts it cold" >&2
+}
 
 ensure_volume() { # NAME SCOPE REPO
   if [ -z "$(quiet docker volume inspect -f '{{.Name}}' "$1")" ]; then
@@ -104,10 +142,34 @@ prune_images() { # IMAGE KEEP APPLY
   done
 }
 
+# A shared volume holding the soldr binary, at the version and SHA256
+# cmake/common/soldr.cmake pins, fetched once with the task image's curl.
+ensure_soldr_tools() { # IMAGE
+  local here soldr_cmake version arch triple sha vol
+  here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+  soldr_cmake="$here/../cmake/common/soldr.cmake"
+  version=$(sed -n 's/^set(OBS_SOLDR_VERSION \([0-9.]*\))$/\1/p' "$soldr_cmake")
+  arch=$(quiet docker info -f '{{.Architecture}}')
+  case $arch in aarch64 | arm64) triple=aarch64-unknown-linux-gnu ;; *) triple=x86_64-unknown-linux-gnu ;; esac
+  sha=$(sed -n "s/^set(_obs_soldr_sha256_$triple \([0-9a-f]*\))$/\1/p" "$soldr_cmake")
+  vol="docker-task-soldr-$version"
+  if [ -z "$(quiet docker volume inspect -f '{{.Name}}' "$vol")" ]; then
+    docker volume create --label "$label.scope=tools" "$vol" >/dev/null
+  fi
+  docker run --rm -v "$vol:/t" --entrypoint sh "$1" -c '
+    [ -x /t/soldr ] && exit 0
+    url=https://github.com/zackees/soldr/releases/download/v$0/soldr-v$0-$1.tar.zst
+    curl -fsSL "$url" -o /tmp/soldr.tar.zst &&
+      echo "$2  /tmp/soldr.tar.zst" | sha256sum -c - >/dev/null &&
+      tar --zstd -xf /tmp/soldr.tar.zst -C /t soldr' "$version" "$triple" "$sha" >&2 ||
+    echo "docker-task: could not fetch soldr $version for pruning" >&2
+  echo "$vol"
+}
+
 cmd_run() {
   local repo="" image="" dockerfile="" context="" source_mode=ro source_dest=/src
   local keep_images=3 clean=0 keep=0 wait=0
-  local -a build_args=() stack=() machine=() mounts=() envs=()
+  local -a build_args=() stack=() machine=() mounts=() envs=() budgets=() prune=()
   while [ $# -gt 0 ]; do
     case $1 in
     --name) task=$2; shift 2 ;;
@@ -123,6 +185,8 @@ cmd_run() {
     --machine-volume) machine+=("$2"); shift 2 ;;
     --mount) mounts+=("$2"); shift 2 ;;
     --env) envs+=("$2"); shift 2 ;;
+    --budget) budgets+=("$2"); shift 2 ;;
+    --prune-cargo) prune+=("$2"); shift 2 ;;
     --clean) clean=1; shift ;;
     --clean-all) clean=2; shift ;;
     --keep) keep=1; shift ;;
@@ -178,9 +242,11 @@ cmd_run() {
   [ "$keep" = 1 ] || args+=(--rm)
 
   local spec vol dest name
+  local -a volume_names=()
   for spec in ${stack[@]+"${stack[@]}"}; do
     IFS=: read -r vol dest name <<<"$spec"
     name=${name:-$task-$vol-$id}
+    volume_names+=("$vol=$name")
     [ "$clean" -ge 1 ] && remove_volume "$name"
     ensure_volume "$name" stack "$repo"
     args+=(-v "$name:$dest")
@@ -188,6 +254,7 @@ cmd_run() {
   for spec in ${machine[@]+"${machine[@]}"}; do
     IFS=: read -r vol dest <<<"$spec"
     name=$task-$vol
+    volume_names+=("$vol=$name")
     [ "$clean" -ge 2 ] && remove_volume "$name"
     ensure_volume "$name" machine ""
     args+=(-v "$name:$dest")
@@ -221,8 +288,35 @@ cmd_run() {
   }
   trap cleanup_overlay EXIT
 
+  # The prune runs in the same container, after the command, whatever its
+  # exit status; the command's status is kept.
+  if [ "${#prune[@]}" -gt 0 ]; then
+    local tools
+    tools=$(ensure_soldr_tools "$tag")
+    args+=(-v "$tools:/opt/docker-task-soldr:ro" -e "DOCKER_TASK_PRUNE=${prune[*]}")
+    set -- sh -c 'status=0; "$@" || status=$?
+for dir in $DOCKER_TASK_PRUNE; do
+  [ -d "$dir" ] || continue
+  for t in "$dir" "$dir"/*-*-*; do
+    [ -d "$t" ] || continue
+    /opt/docker-task-soldr/soldr cache prune-target --keep-latest --force --allow-unpinned --json "$t" 2>/dev/null |
+      sed -n "s/.*\"reclaimed_human\": *\"\([^\"]*\)\".*/docker-task: pruned \1 from ${t##*/}/p" >&2 || true
+  done
+done
+exit $status' docker-task-prune "$@"
+  fi
+
   local status=0
   docker run "${args[@]}" "$tag" "$@" || status=$?
+
+  # Budgets, after every run (a failed one grows the volumes too).
+  local budget entry
+  for budget in ${budgets[@]+"${budgets[@]}"}; do
+    vol=${budget%%=*}
+    for entry in ${volume_names[@]+"${volume_names[@]}"}; do
+      [ "${entry%%=*}" = "$vol" ] && enforce_budget "${entry#*=}" "$(to_bytes "${budget#*=}")" "$tag"
+    done
+  done
   return "$status"
 }
 

@@ -50,6 +50,8 @@ class Tier2VolumeTest(unittest.TestCase):
         shutil.copytree(TOOLS, dest)
         (repo / "ci").mkdir()
         shutil.copy(ROOT / "ci" / "docker-task.sh", repo / "ci" / "docker-task.sh")
+        (repo / "cmake" / "common").mkdir(parents=True)
+        shutil.copy(ROOT / "cmake" / "common" / "soldr.cmake", repo / "cmake" / "common" / "soldr.cmake")
         shutil.copy(ROOT / "rust-toolchain.toml", repo / "rust-toolchain.toml")
         for sub in ("plugins/obs-browser", "plugins/obs-websocket"):
             (repo / sub).mkdir(parents=True)
@@ -63,7 +65,9 @@ class Tier2VolumeTest(unittest.TestCase):
         env = {k: v for k, v in os.environ.items() if not k.startswith(("OBS_TIER2", "OBS_CCACHE"))}
         env.update(PATH=f"{self.bin}:{env['PATH']}", STUB_LOG=str(log), STUB_STATE="", **(extra_env or {}))
         subprocess.run(["bash", str(repo / "rust/tools/linux-validate/run.sh"), *getattr(self, "run_args", [])], env=env, check=True)
-        runs = [line.split() for line in log.read_text().splitlines() if line.startswith("run ")]
+        # The task's own run carries --name; helper runs (the soldr tools
+        # fetch, du for volume budgets) don't.
+        runs = [line.split() for line in log.read_text().splitlines() if line.startswith("run ") and " --name " in line]
         self.assertEqual(len(runs), 1, log.read_text())
         args = runs[0]
         mounts = {}
@@ -88,7 +92,7 @@ class Tier2VolumeTest(unittest.TestCase):
         nothing copies it (the rsync into /src is gone)."""
         repo = self.checkout("a")
         self.docker_run_mounts(repo)
-        run = [l for l in self.last_log.read_text().splitlines() if l.startswith("run ")][0]
+        run = [l for l in self.last_log.read_text().splitlines() if l.startswith("run ") and " --name " in l][0]
         self.assertIn(f"-v {repo}:/ro:ro", run)
         text = (ROOT / "rust/tools/linux-validate/validate.sh").read_text()
         self.assertNotIn("rsync", text)
@@ -100,7 +104,7 @@ class Tier2VolumeTest(unittest.TestCase):
         container per task and checkout, its name the singleton lock."""
         repo = self.checkout("a")
         self.docker_run_mounts(repo)
-        run = [l.split() for l in self.last_log.read_text().splitlines() if l.startswith("run ")][0]
+        run = [l.split() for l in self.last_log.read_text().splitlines() if l.startswith("run ") and " --name " in l][0]
         self.assertIn("--rm", run)
         name = run[run.index("--name") + 1]
         self.assertRegex(name, r"^obs-rust-linux-validate-[0-9a-f]{12}$")
@@ -117,7 +121,7 @@ class Tier2VolumeTest(unittest.TestCase):
         r, log = self.run_sh(self.checkout("a"), state="running")
         self.assertEqual(r.returncode, 75, r.stderr)
         self.assertIn("already running", r.stderr)
-        self.assertNotIn("\nrun ", "\n" + log)
+        self.assertNotIn(" --name ", log)
 
     def test_stopped_leftover_container_is_removed(self):
         r, log = self.run_sh(self.checkout("a"), state="exited")
@@ -129,13 +133,24 @@ class Tier2VolumeTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertRegex(log, r"(?m)^volume rm obs-rust-linux-validate-build-[0-9a-f]{12}$")
         self.assertNotRegex(log, r"(?m)^volume rm obs-rust-linux-validate-ccache$")
-        run = [l for l in log.splitlines() if l.startswith("run ")][0]
+        run = [l for l in log.splitlines() if l.startswith("run ") and " --name " in l][0]
         self.assertNotIn("--clean", run)  # run.sh's flag, not validate.sh's
 
     def test_image_is_tagged_by_content_hash(self):
         self.docker_run_mounts(self.checkout("a"))
         build = [l.split() for l in self.last_log.read_text().splitlines() if l.startswith("build ")][0]
         self.assertRegex(build[build.index("-t") + 1], r"^obs-rust-linux-validate:[0-9a-f]{16}$")
+
+    def test_volumes_have_budgets_and_cargo_targets_are_pruned(self):
+        r, log = self.run_sh(self.checkout("a"))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        run = [l for l in log.splitlines() if l.startswith("run ") and " --name " in l][0]
+        self.assertIn("DOCKER_TASK_PRUNE=/build/tree/cargo/build /build/tree-debug/cargo/build", run)
+        self.assertIn("CARGO_INCREMENTAL=0", run)
+        self.assertIn("prune-target --keep-latest --force", log)
+        self.assertRegex(run, r"-v docker-task-soldr-[0-9]+\.[0-9]+\.[0-9]+:/opt/docker-task-soldr:ro")
+        # One du per budgeted volume after the run.
+        self.assertEqual(sum(1 for l in log.splitlines() if "--entrypoint du" in l), 4, log)
 
     def test_crate_downloads_are_shared(self):
         a = self.docker_run_mounts(self.checkout("a"))
