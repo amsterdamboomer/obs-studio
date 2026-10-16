@@ -9,7 +9,7 @@
 FROM quay.io/pypa/manylinux_2_28_x86_64@sha256:4131ddd7acb9c6c966af02fe7e71edc51e078c2d41f475966697676430bfa2ae
 
 RUN dnf install -y --setopt=install_weak_deps=False \
-        which patchelf file desktop-file-utils squashfs-tools ccache \
+        which patchelf file desktop-file-utils squashfs-tools ccache zstd \
         libX11-devel libXext-devel libXfixes-devel libXrender-devel libXcomposite-devel \
         libXinerama-devel libXrandr-devel libXi-devel libXcursor-devel libxshmfence-devel libXScrnSaver-devel \
         libxcb-devel xcb-util-devel xcb-util-wm-devel xcb-util-image-devel xcb-util-keysyms-devel \
@@ -30,13 +30,14 @@ RUN /opt/python/cp312-cp312/bin/pip install --no-cache-dir ninja==1.11.1.4 swig=
  && ln -sf /opt/python/cp312-cp312/bin/ninja /usr/local/bin/ninja \
  && ln -sf /opt/python/cp312-cp312/bin/swig /usr/local/bin/swig
 
-# uv, pinned by version and checksum (as in ../Dockerfile).
+# uv, from obs-rust/obs-studio-libs (the first tool, since it runs the fetch of
+# the others), pinned by version and checksum.
 ARG UV_VERSION=0.12.13
-ARG UV_SHA256=745765a3b6e360ad76743599ae5c42e9278c7edf8bbff9fc76d05bf2623a04dd
-RUN curl -fsSLo /tmp/uv.tar.gz "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-x86_64-unknown-linux-gnu.tar.gz" \
- && echo "${UV_SHA256}  /tmp/uv.tar.gz" | sha256sum -c - \
- && tar -xzf /tmp/uv.tar.gz -C /usr/local/bin --strip-components=1 \
- && rm /tmp/uv.tar.gz
+ARG UV_SHA256=cd646b7421e5e14e749247b29657ae33a8fc4f31294c57b806555c1a7423dfe9
+RUN curl -fsSLo /tmp/uv.tar.zst "https://github.com/obs-rust/obs-studio-libs/releases/download/uv-${UV_VERSION}/uv-${UV_VERSION}-linux-x86_64.tar.zst" \
+ && echo "${UV_SHA256}  /tmp/uv.tar.zst" | sha256sum -c - \
+ && zstd -dc /tmp/uv.tar.zst | tar -xf - -C /usr/local/bin \
+ && rm /tmp/uv.tar.zst
 
 # The Rust toolchain pinned in rust-toolchain.toml.
 ENV RUSTUP_HOME=/usr/local/rustup CARGO_HOME=/usr/local/cargo

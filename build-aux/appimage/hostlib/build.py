@@ -131,7 +131,13 @@ def host_copy(soname: str) -> Path:
     raise SystemExit(f"hostlib: {soname} is not installed on the build host; implib-gen needs it")
 
 
+# The glibc 2.28 build image has Implib.so from obs-rust/obs-studio-libs (deps.lock.json).
+PREBUILT_IMPLIB = Path("/opt/obs-deps/implib/implib-gen.py")
+
+
 def implib(tmp: Path) -> Path:
+    if PREBUILT_IMPLIB.is_file():
+        return PREBUILT_IMPLIB
     archive = tmp / "implib.tar.gz"
     with urllib.request.urlopen(IMPLIB_URL, timeout=60) as r:
         archive.write_bytes(r.read())

@@ -129,7 +129,7 @@ build-aux/appimage/assemble-appdir.sh AppDir "${AVUTIL_LIB}"
 """
 
 APPIMAGE = r"""
-curl -fsSLo appimagetool "https://github.com/AppImage/appimagetool/releases/download/${APPIMAGETOOL_VERSION}/appimagetool-x86_64.AppImage"
+curl -fsSLo appimagetool "${APPIMAGETOOL_URL}"
 echo "${APPIMAGETOOL_SHA256}  appimagetool" | sha256sum -c -
 chmod +x appimagetool
 # Runners have no /dev/fuse: extract appimagetool instead of running it.
@@ -218,6 +218,11 @@ def plan(args: argparse.Namespace) -> list[Step]:
         }),
         "appimage": Step("appimage", "Create AppImage", APPIMAGE, {
             "APPIMAGETOOL_VERSION": APPIMAGETOOL_VERSION, "APPIMAGETOOL_SHA256": APPIMAGETOOL_SHA256,
+            # The glibc 2.28 image has it from obs-rust/obs-studio-libs (the same bytes, so the
+            # same sha256 check applies); the Ubuntu base downloads the release.
+            "APPIMAGETOOL_URL": "file:///opt/obs-deps/appimagetool/appimagetool-x86_64.AppImage"
+            if args.base == "manylinux" else
+            f"https://github.com/AppImage/appimagetool/releases/download/{APPIMAGETOOL_VERSION}/appimagetool-x86_64.AppImage",
             "PUBLISH_CONTINUOUS": args.publish_continuous, "GITHUB_REPOSITORY": args.repository,
         }),
     }

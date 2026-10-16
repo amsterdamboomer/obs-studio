@@ -66,6 +66,10 @@ class BuildScriptTest(unittest.TestCase):
                 expected = expected.replace("${{ inputs.publish_continuous }}", "${PUBLISH_CONTINUOUS}")
                 # The libavutil the AppDir gets is per base (#926).
                 expected = expected.replace("avutil-compat/libavutil.so.60", '"${AVUTIL_LIB}"')
+                # Where appimagetool comes from is per base too (#926).
+                expected = expected.replace(
+                    '"https://github.com/AppImage/appimagetool/releases/download/${APPIMAGETOOL_VERSION}/appimagetool-x86_64.AppImage"',
+                    '"${APPIMAGETOOL_URL}"')
                 self.assertEqual(step.script.strip("\n"), expected.strip("\n"))
 
     def test_workflow_calls_every_step_in_order(self):
