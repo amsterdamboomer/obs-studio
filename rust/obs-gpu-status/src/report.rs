@@ -18,6 +18,12 @@ pub struct Report {
     pub causes: Vec<String>,
     /// OBS log lines that explain the state (#944).
     pub log_lines: Vec<String>,
+    /// Locale key of `summary` (frontend/data/locale), filled with
+    /// `summary_args` as %1, %2, ... (#945).
+    pub summary_key: &'static str,
+    pub summary_args: Vec<String>,
+    /// Locale keys of `causes`, in order.
+    pub cause_keys: Vec<&'static str>,
 }
 
 const SOFTWARE_CAUSES: [&str; 3] = [
@@ -82,6 +88,9 @@ impl Report {
             summary,
             causes,
             log_lines: Vec::new(),
+            summary_key: todo!(),
+            summary_args: todo!(),
+            cause_keys: todo!(),
         }
     }
 
