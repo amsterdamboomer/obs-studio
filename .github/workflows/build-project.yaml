@@ -887,6 +887,11 @@ jobs:
   rust-linux-tier2:
     name: Rust Tier 2 Linux 🐧 (${{ matrix.mode }})
     runs-on: ubuntu-26.04
+    # A stock image, no Dockerfile or image build (#966): run directly on the
+    # runner, two group tests failed while passing in a container with the
+    # same libraries, compiler, flags and CPU (#982). Packages install below.
+    container:
+      image: ubuntu:26.04@sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7
     # A hung test held a runner for 4.5 h without this (#983); a normal run
     # is about 13 min.
     timeout-minutes: 30
@@ -900,6 +905,13 @@ jobs:
       run:
         shell: bash
     steps:
+      # checkout needs git for tags and submodules; sudo keeps the shared
+      # install step below the same as on a plain runner.
+      - name: Install Git 📦
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends git ca-certificates curl sudo
+
       # fetch-depth 0: versionconfig.cmake derives the OBS version from tags.
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:

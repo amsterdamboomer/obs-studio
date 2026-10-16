@@ -79,6 +79,13 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn("OBS_TIER2_SRC: ${{ github.workspace }}", self.job)
 
 
+class ContainerTest(unittest.TestCase):
+    def test_runs_in_a_digest_pinned_stock_image(self):
+        """No Dockerfile or image build, but the container environment the
+        tests pass in (#982)."""
+        self.assertRegex(tier2_job(), r"container:\n\s+image: ubuntu:26\.04@sha256:[0-9a-f]{64}")
+
+
 class TimeoutTest(unittest.TestCase):
     def test_tier2_jobs_time_out(self):
         """A hung Tier 2 test held a scarce ubuntu-26.04 runner for 4.5 h
