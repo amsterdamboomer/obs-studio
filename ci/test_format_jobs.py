@@ -32,7 +32,7 @@ def job(name: str) -> str:
 class FormatJobsTest(unittest.TestCase):
     def test_jobs_use_the_local_gate_not_brew(self):
         for name, check in (("clang-format", "clang-format"), ("gersemi", "gersemi")):
-            j = job(name)
+            j = "\n".join(l for l in job(name).splitlines() if not l.lstrip().startswith("#"))
             self.assertNotIn("brew", j, name)
             self.assertNotIn("./.github/actions/run-", j, name)
             self.assertIn(f"uv run ci/local_gate.py --only {check}", j, name)
