@@ -141,12 +141,17 @@ and cargo caches live in bosn volumes, and the AppImage lands in
 
 Tier 2 Linux in CI runs natively on the runner (#966): the
 `rust-linux-tier2` job installs `rust/tools/linux-validate/apt-packages.txt`
-and runs `validate.sh` directly, one job per `ENABLE_RUST_LIBOBS` mode. To run
-that same job locally, use bosn:
+and runs `validate.sh` directly, one job per `ENABLE_RUST_LIBOBS` mode. The
+intended local equivalent is bosn running that same job through act2:
 
 ```sh
 bosn ci run --workflow build-project.yaml --job rust-linux-tier2 --trigger pr --wait
 ```
+
+It does not run yet: act2 has no `ubuntu-26.04` runner, so bosn marks the
+job's `check-event` and `ci-mode` dependencies unsupported and skips Tier 2
+("some jobs need runners bosn cannot supervise"). Until it does, use
+`./unittest` (the Docker lane below) locally.
 
 Remaining gap: `rust/tools/linux-validate/run.sh` (the local gate's Tier 2
 lane, `./unittest`) still calls `docker build` and `docker run` directly, so
