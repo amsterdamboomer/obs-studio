@@ -125,7 +125,7 @@ ccache -s
 
 APPDIR = r"""
 DESTDIR="$PWD/AppDir" cmake --install build_ubuntu
-build-aux/appimage/assemble-appdir.sh AppDir avutil-compat/libavutil.so.60
+build-aux/appimage/assemble-appdir.sh AppDir "${AVUTIL_LIB}"
 """
 
 APPIMAGE = r"""
@@ -171,6 +171,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--steps", default=",".join(STEP_NAMES),
                    help=f"comma-separated subset of {','.join(STEP_NAMES)} (run in that order)")
     p.add_argument("--skip-deps", action="store_true", help="skip the build-dependency install (preinstalled image)")
+    p.add_argument("--base", choices=("ubuntu", "manylinux"), default="ubuntu",
+                   help="ubuntu: Ubuntu 26.04 with apt (bundles glibc); manylinux: the glibc 2.28 image "
+                        "build-aux/appimage/manylinux/Dockerfile, whose /opt/obs-deps holds every library "
+                        "(no deps or libavutil step; nothing of glibc is bundled, #926)")
     p.add_argument("--rust-libobs", type=bool_flag, default="true", help="ENABLE_RUST_LIBOBS (workflow input rust_libobs)")
     p.add_argument("--qsv", type=bool_flag, default="false", help="ENABLE_QSV11 (workflow input qsv)")
     p.add_argument("--rust-version", default="", help="OBS_RUST_VERSION to embed (workflow input rust_version)")
@@ -186,7 +190,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     unknown = sorted(set(steps) - set(STEP_NAMES))
     if unknown:
         p.error(f"unknown step(s): {', '.join(unknown)}")
-    args.steps = [s for s in STEP_NAMES if s in steps and not (args.skip_deps and s == "deps")]
+    skipped = {"deps"} if args.skip_deps else set()
+    if args.base == "manylinux":
+        skipped |= {"deps", "libavutil"}  # the image built them (and its own FFmpeg)
+    args.steps = [s for s in STEP_NAMES if s in steps and s not in skipped]
     if args.sha is None:
         args.sha = default_sha()
     return args
@@ -203,7 +210,10 @@ def plan(args: argparse.Namespace) -> list[Step]:
             "RUST_LIBOBS": args.rust_libobs, "QSV": args.qsv, "OBS_RUST_VERSION": args.rust_version,
         }),
         "build": Step("build", "Build", BUILD),
-        "appdir": Step("appdir", "Assemble AppDir", APPDIR),
+        "appdir": Step("appdir", "Assemble AppDir", APPDIR, {
+            "AVUTIL_LIB": "/opt/obs-deps/lib/libavutil.so.60" if args.base == "manylinux"
+            else "avutil-compat/libavutil.so.60",
+        }),
         "appimage": Step("appimage", "Create AppImage", APPIMAGE, {
             "APPIMAGETOOL_VERSION": APPIMAGETOOL_VERSION, "APPIMAGETOOL_SHA256": APPIMAGETOOL_SHA256,
             "PUBLISH_CONTINUOUS": args.publish_continuous, "GITHUB_REPOSITORY": args.repository,

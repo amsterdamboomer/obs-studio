@@ -64,6 +64,8 @@ class BuildScriptTest(unittest.TestCase):
                 expected = old_run_block(old.stdout, OLD_STEPS[step.name])
                 # The only expression in a script became an environment variable.
                 expected = expected.replace("${{ inputs.publish_continuous }}", "${PUBLISH_CONTINUOUS}")
+                # The libavutil the AppDir gets is per base (#926).
+                expected = expected.replace("avutil-compat/libavutil.so.60", '"${AVUTIL_LIB}"')
                 self.assertEqual(step.script.strip("\n"), expected.strip("\n"))
 
     def test_workflow_calls_every_step_in_order(self):
