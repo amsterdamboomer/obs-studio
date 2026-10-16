@@ -7,12 +7,6 @@
 
 #pragma once
 
-/* glibc extensions (pthread_setname_np, ...) that several sources request
- * with _GNU_SOURCE after other includes; C++ compilers define it already. */
-#if defined(__linux__) && !defined(_GNU_SOURCE)
-#define _GNU_SOURCE
-#endif
-
 /* M_PI and friends for MSVC's <math.h>; harmless elsewhere. */
 #ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES

@@ -12,13 +12,18 @@ option(ENABLE_PCH "Compile each target against one unified precompiled header" O
 
 set(_OBS_PCH_DIR "${CMAKE_CURRENT_LIST_DIR}/../pch")
 
-# Sources that #define a macro before their first #include (_GNU_SOURCE,
+# Sources that #define a feature macro the headers depend on (_GNU_SOURCE,
 # _FILE_OFFSET_BITS, WIN32_LEAN_AND_MEAN, ...). A force-included header would
-# be seen before that definition, so they compile without the PCH.
+# be seen before that definition, so they compile without the PCH. Defining
+# such a macro in the PCH instead is not equivalent: with glibc 2.43,
+# _GNU_SOURCE makes strstr() return const char * for a const argument
+# (librtmp's parseurl.c then fails with -Werror=discarded-qualifiers).
 set(
   _OBS_PCH_SKIP_SOURCES
+  libobs/obs-nix.c
   libobs/util/pipe-windows.c
   libobs/util/platform.c
+  libobs/util/threading-posix.c
   plugins/linux-v4l2/v4l2-output.c
   plugins/obs-outputs/librtmp/rtmp.c
   plugins/obs-outputs/net-if.c
