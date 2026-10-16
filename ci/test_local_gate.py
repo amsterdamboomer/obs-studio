@@ -98,9 +98,12 @@ class SelfTestTest(unittest.TestCase):
             local_gate.self_test()
         self.assertTrue(any("output of test_local_gate.py" in line for line in printed), printed)
 
-    def test_modules_run_concurrently(self):
-        # 164 s of serial self-tests made ./lint slow (#949).
-        self.assertGreater(local_gate.self_test_workers(), 1)
+    def test_workers_follow_usable_cpus_capped(self):
+        # 164 s of serial self-tests made ./lint slow (#949); a CPU-limited
+        # container must not start every file at once.
+        for usable, want in ((None, 1), (1, 1), (4, 4), (64, local_gate.SELF_TEST_MAX_WORKERS)):
+            with mock.patch.object(local_gate.os, "process_cpu_count", create=True, return_value=usable):
+                self.assertEqual(local_gate.self_test_workers(), want, usable)
 
 
 class EnvironmentHintTest(unittest.TestCase):
