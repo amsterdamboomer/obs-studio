@@ -297,7 +297,8 @@ def format_scope(files: list[str], changed: list[str] | None, ci: bool) -> list[
 
 def changed_since_master() -> list[str] | None:
     """Committed, staged, unstaged and untracked changes since the merge-base
-    with origin/master, or None when there is no merge-base."""
+    with origin/master, plus formatter configuration changed on master since
+    then; None when there is no merge-base."""
     def git(*args: str) -> subprocess.CompletedProcess:
         return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
 
@@ -309,6 +310,10 @@ def changed_since_master() -> list[str] | None:
     for args in (
         ("diff", "--name-only", sha),
         ("ls-files", "--others", "--exclude-standard"),
+        # Formatter configuration master changed after the branch point: an
+        # unrebased branch must not pass against the old rules.
+        ("diff", "--name-only", sha, "origin/master", "--", *FORMAT_CONFIG_PATHS,
+         *(f":(glob)**/{n}" for n in FORMAT_CONFIG_NAMES)),
     ):
         out = git(*args)
         if out.returncode:
