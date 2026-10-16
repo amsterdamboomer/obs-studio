@@ -318,9 +318,12 @@ fi
 LOADER_ARGS=()
 [ -d "$APPDIR/glibc" ] && LOADER_ARGS=(--library-path "$APPDIR/glibc")
 # The Text (FreeType 2) source's default face ships with it (obs-rust/obs-studio#1012).
+# Plugin data sits at $PACKAGE_DATA/obs-modules/core/<plugin>/; find it rather
+# than hard-code the layout.
+FT2_FONTS=$(find "$PACKAGE_DATA" -type d -path '*/text-freetype2/fonts' -print -quit)
 for f in JetBrainsMonoNerdFont-Regular.ttf JetBrainsMonoNerdFont-Bold.ttf \
     JetBrainsMonoNerdFont-Italic.ttf JetBrainsMonoNerdFont-BoldItalic.ttf OFL.txt; do
-    [ -f "$PACKAGE_DATA/obs-plugins/text-freetype2/fonts/$f" ] ||
+    [ -n "$FT2_FONTS" ] && [ -f "$FT2_FONTS/$f" ] ||
         fail "text-freetype2's bundled font file $f is missing"
 done
 # Which C library AppRun picked for this run, written by AppRun (bundled|host);
