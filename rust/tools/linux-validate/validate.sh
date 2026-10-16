@@ -35,14 +35,22 @@ if [ -n "$tests" ] && [ "$repeat" -eq 0 ]; then
   exit 2
 fi
 
-git config --global --add safe.directory /src
-mkdir -p /src
-rsync -a --delete --exclude /target /ro/ /src/
+# Roots: the container paths run.sh sets up, unless OBS_TIER2_SRC names a
+# checkout to build in place, as the CI job does on the runner (#966).
+SRC="${OBS_TIER2_SRC:-/src}"
+BUILD="${OBS_TIER2_BUILD:-/build}"
+EXPORTS="${OBS_TIER2_EXPORTS:-/exports}"
+if [ -z "${OBS_TIER2_SRC:-}" ]; then
+  git config --global --add safe.directory "$SRC"
+  mkdir -p "$SRC"
+  rsync -a --delete --exclude /target /ro/ "$SRC/"
+fi
+mkdir -p "$BUILD"
 # shellcheck source=stale-build.sh
-source /src/rust/tools/linux-validate/stale-build.sh
+source "$SRC"/rust/tools/linux-validate/stale-build.sh
 # rustc as rust-toolchain.toml selects it, which is what Corrosion configures.
-rustc_version=$(cd /src && rustc -V)
-cd /src
+rustc_version=$(cd "$SRC" && rustc -V)
+cd "$SRC"
 for sub in plugins/obs-browser plugins/obs-websocket; do
   if [ -z "$(ls -A "$sub" 2>/dev/null)" ]; then
     git submodule update --init --depth 1 "$sub"
@@ -53,8 +61,8 @@ done
 # mtimes differ, or a CI runner) from recompiling OBS. CCACHE_DIR defaults to
 # the build volume; run.sh points it at a host dir when OBS_CCACHE_DIR is set
 # (CI restores and saves that dir with actions/cache).
-export CCACHE_DIR="${CCACHE_DIR:-/build/ccache}"
-export CCACHE_BASEDIR=/src CCACHE_COMPRESS=1 CCACHE_MAXSIZE="${CCACHE_MAXSIZE:-2G}"
+export CCACHE_DIR="${CCACHE_DIR:-$BUILD/ccache}"
+export CCACHE_BASEDIR="$SRC" CCACHE_COMPRESS=1 CCACHE_MAXSIZE="${CCACHE_MAXSIZE:-2G}"
 export CCACHE_SLOPPINESS=time_macros,include_file_mtime,include_file_ctime
 ccache -z >/dev/null
 
@@ -64,7 +72,7 @@ ccache -z >/dev/null
 # files such as util/base-variadic.c have no NOT and are skipped. Paths stay
 # relative to libobs/ and are matched under libobs.dir/, because libobs also
 # links same-named files from deps (deps/libcaption/src/utf8.c).
-ported_objs=$(grep -hE 'ENABLE_RUST_LIBOBS' /src/libobs/CMakeLists.txt /src/libobs/cmake/os-linux.cmake |
+ported_objs=$(grep -hE 'ENABLE_RUST_LIBOBS' "$SRC"/libobs/CMakeLists.txt "$SRC"/libobs/cmake/os-linux.cmake |
   grep 'NOT:' | grep -oE ':[A-Za-z0-9_./-]+\.c>' | sed -E 's|^:||; s|>$||; s|$|.o|' | sort -u)
 if [ "$(wc -w <<<"$ported_objs")" -lt 20 ]; then
   echo "FAIL: derived only $(wc -w <<<"$ported_objs") ported objects from the ENABLE_RUST_LIBOBS guards"
@@ -82,10 +90,10 @@ done
 has_mode() { grep -qw "$1" <<<"$modes"; }
 
 for mode in $modes; do
-  build="/build/rust-$mode"
+  build="$BUILD/rust-$mode"
   reset_stale_build "$build" "$rustc_version"
   echo "== [$mode] configure + build"
-  cmake -S /src -B "$build" -G Ninja \
+  cmake -S "$SRC" -B "$build" -G Ninja \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DENABLE_UNIT_TESTS=ON \
     -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
@@ -100,7 +108,7 @@ for mode in $modes; do
   # -k 0: keep going after a failed target, so one run reports every compile
   # error (a warning ratchet otherwise took a round trip per file; #634).
   cmake --build "$build" --target libobs cmocka-tests decklink obs-nvenc -- -k 0 \
-    >"$build.build.log" 2>&1 || { /src/rust/tools/linux-validate/build-errors.sh "$build.build.log"; exit 1; }
+    >"$build.build.log" 2>&1 || { "$SRC"/rust/tools/linux-validate/build-errors.sh "$build.build.log"; exit 1; }
   if [ -n "${OBS_EXTRA_CFLAGS:-}" ]; then
     # Measuring extra flags: show what they report (#516).
     echo "== [$mode] warnings"
@@ -133,7 +141,7 @@ for mode in $modes; do
   fi
   [ "$ctest_status" -eq 0 ] || exit "$ctest_status"
   # A PipeWire test that skips for lack of a daemon is a hole, not a pass (#776).
-  /src/rust/tools/linux-validate/check-skips.sh "$build.ctest.log"
+  "$SRC"/rust/tools/linux-validate/check-skips.sh "$build.ctest.log"
 
   if [ "$repeat" -gt 0 ]; then
     echo "== [$mode] ctest --repeat until-fail:$repeat${tests:+ -R $tests}"
@@ -142,10 +150,11 @@ for mode in $modes; do
   fi
 
   lib=$(ls "$build"/libobs/libobs.so.* | head -1)
-  nm -D --defined-only "$lib" | awk '{print $3}' | sort >"/build/exports-$mode.txt"
-  # run.sh mounts OBS_TIER2_EXPORTS_DIR here so a CI job can hand the list on.
-  if [ -d /exports ]; then
-    cp "/build/exports-$mode.txt" /exports/
+  nm -D --defined-only "$lib" | awk '{print $3}' | sort >"$BUILD/exports-$mode.txt"
+  # $EXPORTS: run.sh mounts OBS_TIER2_EXPORTS_DIR there, or the CI job names a
+  # runner dir with OBS_TIER2_EXPORTS, so a job can hand the list on.
+  if [ -d "$EXPORTS" ]; then
+    cp "$BUILD/exports-$mode.txt" "$EXPORTS/"
   fi
 
   # Query the current Ninja build graph, not the filesystem: the /build volume
@@ -188,9 +197,9 @@ done
 # Configure-only check: inspect which archive the Debug link line uses.
 if has_mode ON; then
 echo "== [ON/Debug] Rust staticlib profile"
-dbg=/build/rust-ON-debug
+dbg="$BUILD/rust-ON-debug"
 reset_stale_build "$dbg" "$rustc_version"
-cmake -S /src -B "$dbg" -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+cmake -S "$SRC" -B "$dbg" -G Ninja -DCMAKE_BUILD_TYPE=Debug \
   -DENABLE_UNIT_TESTS=OFF -DENABLE_RUST_LIBOBS=ON \
   -DENABLE_FRONTEND=OFF -DENABLE_SCRIPTING=OFF -DENABLE_BROWSER=OFF \
   -DENABLE_WEBSOCKET=OFF -DENABLE_AJA=OFF -DENABLE_WEBRTC=OFF \
@@ -207,8 +216,8 @@ fi
 
 if has_mode OFF && has_mode ON; then
   echo "== libobs exported symbols, OFF vs ON"
-  diff /build/exports-OFF.txt /build/exports-ON.txt
-  echo "IDENTICAL ($(wc -l </build/exports-ON.txt) symbols)"
+  diff "$BUILD/exports-OFF.txt" "$BUILD/exports-ON.txt"
+  echo "IDENTICAL ($(wc -l <"$BUILD/exports-ON.txt") symbols)"
 fi
 
 echo "== ccache"

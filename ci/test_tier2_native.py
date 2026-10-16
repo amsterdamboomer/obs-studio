@@ -61,8 +61,10 @@ class WorkflowTest(unittest.TestCase):
         self.job = tier2_job()
 
     def test_no_docker_harness_in_ci(self):
-        self.assertNotIn("--lane tier2-linux", self.job)
-        self.assertNotIn("docker", self.job.lower())
+        code = "\n".join(l for l in self.job.splitlines() if not l.lstrip().startswith("#"))
+        self.assertNotIn("--lane tier2-linux", code)
+        self.assertNotIn("run.sh", code)
+        self.assertNotRegex(code, r"docker (build|run)")
 
     def test_installs_packages_natively(self):
         self.assertIn("apt-packages.txt", self.job)

@@ -914,23 +914,42 @@ jobs:
             tier2-ccache-linux-${{ matrix.mode }}-
             tier2-ccache-linux-
 
-      - name: Set Up uv 🐍
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      # Native on the runner, no Docker image built per job (#966): the
+      # package list is shared with the local Docker harness (run.sh), and
+      # `bosn ci run --workflow build-project.yaml --job rust-linux-tier2`
+      # runs this job locally through act2.
+      - name: Install Tier 2 Packages 📦
+        run: |
+          sudo apt-get update -qq
+          grep -v '^#' rust/tools/linux-validate/apt-packages.txt |
+            xargs "${GITHUB_WORKSPACE}/.github/scripts/retry" sudo apt-get install -y --no-install-recommends
 
-      # GATE-001 mirror (local-gate.toml): the local gate's tier2-linux lane,
-      # which runs rust/tools/linux-validate/run.sh (both modes in one go).
+      # The ENABLE_RUST_LIBOBS=ON build runs cargo through Corrosion; the
+      # shims put soldr's cargo/rustc (rust-toolchain.toml) on PATH.
+      - name: Set Up soldr 🦀
+        uses: zackees/setup-soldr@b782f606a2f3beadc35b9e3bf5b4565e005f52ed # v0.9.86
+        with:
+          version: 0.9.33
+          shims: true
+
+      # GATE-001 mirror (local-gate.toml): the same validate.sh the local
+      # gate's tier2-linux lane runs in Docker (both modes in one go).
       - name: Validate Tier 2 (ENABLE_RUST_LIBOBS=${{ matrix.mode }}) ✅
         env:
-          OBS_CCACHE_DIR: ${{ github.workspace }}/.tier2-ccache
+          OBS_TIER2_SRC: ${{ github.workspace }}
+          OBS_TIER2_BUILD: ${{ runner.temp }}/tier2
+          OBS_TIER2_EXPORTS: ${{ runner.temp }}/tier2-exports
+          CCACHE_DIR: ${{ github.workspace }}/.tier2-ccache
           OBS_TIER2_MODES: ${{ matrix.mode }}
-          OBS_TIER2_EXPORTS_DIR: ${{ runner.temp }}/tier2-exports
           # ccache already hits ~99.8%; the time is the ctest run, which
           # validate.sh orders longest-first from cached cost data (#931).
           # More than 4 jobs is not free: CPU-heavy timing tests
           # (test_encoder_join_keyframe's AV1 encode, test_media_gif_last_frame)
           # failed under -j8 while passing alone (#938).
           OBS_CTEST_JOBS: 4
-        run: uv run ci/local_gate.py --lane tier2-linux
+        run: |
+          mkdir -p "$OBS_TIER2_EXPORTS"
+          bash rust/tools/linux-validate/validate.sh
 
       - name: Upload Exports 🧾
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

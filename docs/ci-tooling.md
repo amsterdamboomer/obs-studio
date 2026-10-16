@@ -139,10 +139,19 @@ and cargo caches live in bosn volumes, and the AppImage lands in
 `build_appimage/` (#899). (`bosn ci run` can't run that job through act: its
 `ubuntu-26.04` label isn't supported there.)
 
-Remaining gap: `rust/tools/linux-validate/run.sh` (the Tier 2 lane) still
-calls `docker build` and `docker run` directly, so concurrent local gates
-from many agents run unmanaged. Moving the Tier 2 harness under bosn is the
-main open step.
+Tier 2 Linux in CI runs natively on the runner (#966): the
+`rust-linux-tier2` job installs `rust/tools/linux-validate/apt-packages.txt`
+and runs `validate.sh` directly, one job per `ENABLE_RUST_LIBOBS` mode. To run
+that same job locally, use bosn:
+
+```sh
+bosn ci run --workflow build-project.yaml --job rust-linux-tier2 --trigger pr --wait
+```
+
+Remaining gap: `rust/tools/linux-validate/run.sh` (the local gate's Tier 2
+lane, `./unittest`) still calls `docker build` and `docker run` directly, so
+concurrent local gates from many agents run unmanaged. It reads the same
+package list; moving it under bosn is the open step.
 
 ### act2: GitHub Actions, locally
 
