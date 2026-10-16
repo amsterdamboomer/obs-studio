@@ -141,12 +141,12 @@ enum OBSColorSpace {
 
 /* clang-format on */
 
-static inline bool stopping(struct flv_output *stream)
+static inline bool flv_stopping(struct flv_output *stream)
 {
 	return os_atomic_load_bool(&stream->stopping);
 }
 
-static inline bool active(struct flv_output *stream)
+static inline bool flv_active(struct flv_output *stream)
 {
 	return os_atomic_load_bool(&stream->active);
 }
@@ -530,7 +530,7 @@ static void flv_output_data(void *data, struct encoder_packet *packet)
 
 	pthread_mutex_lock(&stream->mutex);
 
-	if (!active(stream))
+	if (!flv_active(stream))
 		goto unlock;
 
 	if (!packet) {
@@ -538,7 +538,7 @@ static void flv_output_data(void *data, struct encoder_packet *packet)
 		goto unlock;
 	}
 
-	if (stopping(stream)) {
+	if (flv_stopping(stream)) {
 		if (packet->sys_dts_usec >= (int64_t)stream->stop_ts) {
 			flv_output_actual_stop(stream, 0);
 			goto unlock;
@@ -627,3 +627,6 @@ struct obs_output_info flv_output_info = {
 	.encoded_packet = flv_output_data,
 	.get_properties = flv_output_properties,
 };
+
+/* File-local macros: keep them out of the next source of a unity build. */
+#undef do_log

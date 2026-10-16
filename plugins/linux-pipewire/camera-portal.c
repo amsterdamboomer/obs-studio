@@ -1313,7 +1313,7 @@ static void on_registry_global_remove_cb(void *user_data, uint32_t id)
 	}
 }
 
-static const struct pw_registry_events registry_events = {
+static const struct pw_registry_events camera_registry_events = {
 	PW_VERSION_REGISTRY_EVENTS,
 	.global = on_registry_global_cb,
 	.global_remove = on_registry_global_remove_cb,
@@ -1353,7 +1353,7 @@ static void on_pipewire_remote_opened_cb(GObject *source, GAsyncResult *res, voi
 
 	/* The registry callbacks use connection->obs_pw, so listen only once
 	 * it is set (obsproject/obs-studio#13971). */
-	obs_pipewire_add_registry_listener(connection->obs_pw, &registry_events, connection);
+	obs_pipewire_add_registry_listener(connection->obs_pw, &camera_registry_events, connection);
 	obs_pipewire_roundtrip(connection->obs_pw);
 }
 

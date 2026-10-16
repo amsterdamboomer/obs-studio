@@ -227,7 +227,7 @@ static void CreateTransitionScene(OBSSource scene, const char *text, uint32_t co
 	obs_sceneitem_set_bounds_type(item, OBS_BOUNDS_SCALE_INNER);
 }
 
-static bool ConfirmReset(QWidget *parent)
+static bool ConfirmPropertiesReset(QWidget *parent)
 {
 	QMessageBox::StandardButton button;
 
@@ -239,7 +239,7 @@ static bool ConfirmReset(QWidget *parent)
 
 void OBSBasicProperties::restoreDefaultsClicked()
 {
-	if (!ConfirmReset(this)) {
+	if (!ConfirmPropertiesReset(this)) {
 		return;
 	}
 

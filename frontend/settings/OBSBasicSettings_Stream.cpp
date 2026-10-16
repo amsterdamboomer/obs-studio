@@ -78,7 +78,7 @@ extern QCef *cef;
 extern QCefCookieManager *panel_cookies;
 extern bool cef_js_avail;
 
-enum class ListOpt : int {
+enum class SettingsListOpt : int {
 	ShowAll = 1,
 	Custom,
 	WHIP,
@@ -91,12 +91,12 @@ enum class Section : int {
 
 bool OBSBasicSettings::IsCustomService() const
 {
-	return ui->service->currentData().toInt() == (int)ListOpt::Custom;
+	return ui->service->currentData().toInt() == (int)SettingsListOpt::Custom;
 }
 
 inline bool OBSBasicSettings::IsWHIP() const
 {
-	return ui->service->currentData().toInt() == (int)ListOpt::WHIP;
+	return ui->service->currentData().toInt() == (int)SettingsListOpt::WHIP;
 }
 
 void OBSBasicSettings::InitStreamPage()
@@ -571,15 +571,16 @@ void OBSBasicSettings::LoadServices(bool showAll)
 	}
 
 	if (obs_is_output_protocol_registered("WHIP")) {
-		ui->service->addItem(QTStr("WHIP"), QVariant((int)ListOpt::WHIP));
+		ui->service->addItem(QTStr("WHIP"), QVariant((int)SettingsListOpt::WHIP));
 	}
 
 	if (!showAll) {
 		ui->service->addItem(QTStr("Basic.AutoConfig.StreamPage.Service.ShowAll"),
-				     QVariant((int)ListOpt::ShowAll));
+				     QVariant((int)SettingsListOpt::ShowAll));
 	}
 
-	ui->service->insertItem(0, QTStr("Basic.AutoConfig.StreamPage.Service.Custom"), QVariant((int)ListOpt::Custom));
+	ui->service->insertItem(0, QTStr("Basic.AutoConfig.StreamPage.Service.Custom"),
+				QVariant((int)SettingsListOpt::Custom));
 
 	if (!lastService.isEmpty()) {
 		int idx = ui->service->findText(lastService);
@@ -664,7 +665,7 @@ void OBSBasicSettings::on_service_currentIndexChanged(int idx)
 	ops.param = &selection;
 	ops.is_show_all = [](void *param) {
 		auto *s = static_cast<Selection *>(param)->settings;
-		return s->ui->service->currentData().toInt() == (int)ListOpt::ShowAll;
+		return s->ui->service->currentData().toInt() == (int)SettingsListOpt::ShowAll;
 	};
 	ops.show_all = [](void *param) {
 		auto *s = static_cast<Selection *>(param)->settings;

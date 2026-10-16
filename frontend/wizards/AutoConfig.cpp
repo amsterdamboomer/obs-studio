@@ -19,11 +19,6 @@
 
 constexpr std::string_view OBSServiceFileName = "service.json";
 
-enum class ListOpt : int {
-	ShowAll = 1,
-	Custom,
-};
-
 static OBSData OpenServiceSettings(std::string &type)
 {
 	const OBSBasic *basic = OBSBasic::Get();

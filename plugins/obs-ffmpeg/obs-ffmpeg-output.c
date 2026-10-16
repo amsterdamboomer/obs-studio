@@ -630,7 +630,7 @@ fail:
 
 /* ------------------------------------------------------------------------- */
 
-static inline bool stopping(struct ffmpeg_output *output)
+static inline bool output_stopping(struct ffmpeg_output *output)
 {
 	return os_atomic_load_bool(&output->stopping);
 }
@@ -956,7 +956,7 @@ static int write_packet(struct ffmpeg_output *output, AVPacket *packet)
 {
 	int ret = 0;
 
-	if (stopping(output)) {
+	if (output_stopping(output)) {
 		uint64_t sys_ts = get_packet_sys_dts(output, packet);
 		if (sys_ts >= output->stop_ts) {
 			ret = 0;

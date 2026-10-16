@@ -844,3 +844,7 @@ struct obs_source_info window_capture_info = {
 	.icon_type = OBS_ICON_TYPE_WINDOW_CAPTURE,
 	.video_get_color_space = wc_get_color_space,
 };
+
+/* File-local macros: keep them out of the next source of a unity build. */
+#undef TEXT_METHOD
+#undef TEXT_METHOD_WGC

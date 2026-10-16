@@ -15,11 +15,6 @@
 
 #include "moc_AutoConfigStreamPage.cpp"
 
-enum class ListOpt : int {
-	ShowAll = 1,
-	Custom,
-};
-
 struct QCef;
 extern QCef *cef;
 

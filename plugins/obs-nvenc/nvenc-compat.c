@@ -100,7 +100,7 @@ static void *av1_nvenc_soft_create(obs_data_t *settings, obs_encoder_t *encoder)
 	return nvenc_reroute(CODEC_AV1, settings, encoder, false);
 }
 
-static void nvenc_defaults_base(enum codec_type codec, obs_data_t *settings)
+static void compat_nvenc_defaults_base(enum codec_type codec, obs_data_t *settings)
 {
 	/* Defaults from legacy FFmpeg encoder */
 	obs_data_set_default_int(settings, "bitrate", 2500);
@@ -118,24 +118,24 @@ static void nvenc_defaults_base(enum codec_type codec, obs_data_t *settings)
 	obs_data_set_default_bool(settings, "repeat_headers", false);
 }
 
-static void h264_nvenc_defaults(obs_data_t *settings)
+static void compat_h264_nvenc_defaults(obs_data_t *settings)
 {
-	nvenc_defaults_base(CODEC_H264, settings);
+	compat_nvenc_defaults_base(CODEC_H264, settings);
 }
 
 #ifdef ENABLE_HEVC
-static void hevc_nvenc_defaults(obs_data_t *settings)
+static void compat_hevc_nvenc_defaults(obs_data_t *settings)
 {
-	nvenc_defaults_base(CODEC_HEVC, settings);
+	compat_nvenc_defaults_base(CODEC_HEVC, settings);
 }
 #endif
 
-static void av1_nvenc_defaults(obs_data_t *settings)
+static void compat_av1_nvenc_defaults(obs_data_t *settings)
 {
-	nvenc_defaults_base(CODEC_AV1, settings);
+	compat_nvenc_defaults_base(CODEC_AV1, settings);
 }
 
-static bool rate_control_modified(obs_properties_t *ppts, obs_property_t *p, obs_data_t *settings)
+static bool compat_rate_control_modified(obs_properties_t *ppts, obs_property_t *p, obs_data_t *settings)
 {
 	const char *rc = obs_data_get_string(settings, "rate_control");
 	bool cqp = astrcmpi(rc, "CQP") == 0;
@@ -156,7 +156,7 @@ static bool rate_control_modified(obs_properties_t *ppts, obs_property_t *p, obs
 	return true;
 }
 
-static obs_properties_t *nvenc_properties_internal(enum codec_type codec)
+static obs_properties_t *compat_nvenc_properties_internal(enum codec_type codec)
 {
 	obs_properties_t *props = obs_properties_create();
 	obs_property_t *p;
@@ -168,7 +168,7 @@ static obs_properties_t *nvenc_properties_internal(enum codec_type codec)
 	obs_property_list_add_string(p, "VBR", "VBR");
 	obs_property_list_add_string(p, obs_module_text("Lossless"), "lossless");
 
-	obs_property_set_modified_callback(p, rate_control_modified);
+	obs_property_set_modified_callback(p, compat_rate_control_modified);
 
 	p = obs_properties_add_int(props, "bitrate", obs_module_text("Bitrate"), 50, 300000, 50);
 	obs_property_int_set_suffix(p, " Kbps");
@@ -243,24 +243,24 @@ static obs_properties_t *nvenc_properties_internal(enum codec_type codec)
 	return props;
 }
 
-static obs_properties_t *h264_nvenc_properties(void *unused)
+static obs_properties_t *compat_h264_nvenc_properties(void *unused)
 {
 	UNUSED_PARAMETER(unused);
-	return nvenc_properties_internal(CODEC_H264);
+	return compat_nvenc_properties_internal(CODEC_H264);
 }
 
 #ifdef ENABLE_HEVC
-static obs_properties_t *hevc_nvenc_properties(void *unused)
+static obs_properties_t *compat_hevc_nvenc_properties(void *unused)
 {
 	UNUSED_PARAMETER(unused);
-	return nvenc_properties_internal(CODEC_HEVC);
+	return compat_nvenc_properties_internal(CODEC_HEVC);
 }
 #endif
 
-static obs_properties_t *av1_nvenc_properties(void *unused)
+static obs_properties_t *compat_av1_nvenc_properties(void *unused)
 {
 	UNUSED_PARAMETER(unused);
-	return nvenc_properties_internal(CODEC_AV1);
+	return compat_nvenc_properties_internal(CODEC_AV1);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -305,8 +305,8 @@ struct obs_encoder_info compat_h264_nvenc_info = {
 	.create = h264_nvenc_create,
 	.destroy = fake_nvenc_destroy,
 	.encode_texture2 = fake_encode_tex2,
-	.get_defaults = h264_nvenc_defaults,
-	.get_properties = h264_nvenc_properties,
+	.get_defaults = compat_h264_nvenc_defaults,
+	.get_properties = compat_h264_nvenc_properties,
 };
 
 #ifdef ENABLE_HEVC
@@ -320,8 +320,8 @@ struct obs_encoder_info compat_hevc_nvenc_info = {
 	.create = hevc_nvenc_create,
 	.destroy = fake_nvenc_destroy,
 	.encode_texture2 = fake_encode_tex2,
-	.get_defaults = hevc_nvenc_defaults,
-	.get_properties = hevc_nvenc_properties,
+	.get_defaults = compat_hevc_nvenc_defaults,
+	.get_properties = compat_hevc_nvenc_properties,
 };
 #endif
 
@@ -335,8 +335,8 @@ struct obs_encoder_info compat_av1_nvenc_info = {
 	.create = av1_nvenc_create,
 	.destroy = fake_nvenc_destroy,
 	.encode_texture2 = fake_encode_tex2,
-	.get_defaults = av1_nvenc_defaults,
-	.get_properties = av1_nvenc_properties,
+	.get_defaults = compat_av1_nvenc_defaults,
+	.get_properties = compat_av1_nvenc_properties,
 };
 
 struct obs_encoder_info compat_h264_nvenc_soft_info = {
@@ -349,8 +349,8 @@ struct obs_encoder_info compat_h264_nvenc_soft_info = {
 	.create = h264_nvenc_soft_create,
 	.destroy = fake_nvenc_destroy,
 	.encode = fake_encode,
-	.get_defaults = h264_nvenc_defaults,
-	.get_properties = h264_nvenc_properties,
+	.get_defaults = compat_h264_nvenc_defaults,
+	.get_properties = compat_h264_nvenc_properties,
 };
 
 #ifdef ENABLE_HEVC
@@ -364,8 +364,8 @@ struct obs_encoder_info compat_hevc_nvenc_soft_info = {
 	.create = hevc_nvenc_soft_create,
 	.destroy = fake_nvenc_destroy,
 	.encode = fake_encode,
-	.get_defaults = hevc_nvenc_defaults,
-	.get_properties = hevc_nvenc_properties,
+	.get_defaults = compat_hevc_nvenc_defaults,
+	.get_properties = compat_hevc_nvenc_properties,
 };
 #endif
 
@@ -379,8 +379,8 @@ struct obs_encoder_info compat_av1_nvenc_soft_info = {
 	.create = av1_nvenc_soft_create,
 	.destroy = fake_nvenc_destroy,
 	.encode = fake_encode,
-	.get_defaults = av1_nvenc_defaults,
-	.get_properties = av1_nvenc_properties,
+	.get_defaults = compat_av1_nvenc_defaults,
+	.get_properties = compat_av1_nvenc_properties,
 };
 
 void register_compat_encoders(void)

@@ -865,3 +865,9 @@ struct obs_source_info duplicator_capture_info = {
 	.icon_type = OBS_ICON_TYPE_DESKTOP_CAPTURE,
 	.video_get_color_space = duplicator_capture_get_color_space,
 };
+
+/* File-local macros: keep them out of the next source of a unity build. */
+#undef TEXT_METHOD
+#undef TEXT_METHOD_WGC
+#undef do_log
+#undef warn
