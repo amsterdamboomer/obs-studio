@@ -148,7 +148,8 @@ intended local equivalent is bosn running that same job through act2:
 bosn ci run --workflow build-project.yaml --job rust-linux-tier2 --trigger pr --wait
 ```
 
-It does not run yet: act2 has no `ubuntu-26.04` runner, so bosn marks the
+It does not run yet: bosn accepts only the `ubuntu-latest`, `-24.04` and
+`-22.04` labels (zackees/bosn#642), so it marks the
 job's `check-event` and `ci-mode` dependencies unsupported and skips Tier 2
 ("some jobs need runners bosn cannot supervise"). Until it does, use
 `./unittest` (the Docker lane below) locally.
