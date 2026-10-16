@@ -32,10 +32,9 @@ cmake -S "$src" -B "$build" -G Ninja \
 
 # The distro Qt must not be what got linked (#992).
 grep -E "^-- Found Qt6|Qt6_DIR" "$build.configure.log" || true
-if ! grep -q "^Qt6_DIR:PATH=$qt/" "$build/CMakeCache.txt" 2>/dev/null &&
-  ! grep -q "^Qt6_DIR:PATH=$qt" "$build/CMakeCache.txt"; then
-  echo "Qt6_DIR is not the prebuilt prefix:" >&2
-  grep "^Qt6_DIR" "$build/CMakeCache.txt" >&2 || true
+if ! grep -q "^Qt6Widgets_DIR:PATH=$qt/" "$build/CMakeCache.txt"; then
+  echo "Qt6Widgets_DIR is not in the prebuilt prefix:" >&2
+  grep "^Qt6.*_DIR" "$build/CMakeCache.txt" >&2 || true
   exit 1
 fi
 
