@@ -24,7 +24,10 @@ pub unsafe extern "C" fn obs_gpu_status_log_line(line: *const c_char) {
     }
     // SAFETY: the caller passes a NUL-terminated string.
     let line = unsafe { CStr::from_ptr(line) }.to_string_lossy();
-    LOG.lock().unwrap_or_else(|e| e.into_inner()).push(&line);
+    // Every log line comes through here: filter before taking the lock.
+    if crate::is_graphics_log_line(&line) {
+        LOG.lock().unwrap_or_else(|e| e.into_inner()).push(&line);
+    }
 }
 
 /// The frame-time window [`obs_gpu_status_sample`] fills.

@@ -59,3 +59,39 @@ fn report_carries_the_lines_into_json() {
     let empty = Report::new(Some("NVIDIA GeForce RTX 3060"), vec![], None).to_json();
     assert!(empty.contains("\"logLines\":[]"), "{empty}");
 }
+
+#[test]
+fn the_lights_own_log_lines_are_not_quoted_back() {
+    // Review of #963: GpuStatus::Init() logs the causes, which mention EGL and
+    // the DRM render node, and do_log fed them straight back in.
+    let mut log = LogCapture::default();
+    log.push("==== GPU acceleration: YELLOW ====");
+    log.push("  possible cause: OBS runs in a sandbox ... EGL/GLX libraries ...");
+    log.push("  detected GPU: NVIDIA GeForce RTX 3060");
+    log.push("GPU acceleration: green: Rendering on NVIDIA.");
+    assert!(log.lines().is_empty(), "{:?}", log.lines());
+}
+
+#[test]
+fn egl_matches_whole_words_only() {
+    let mut log = LogCapture::default();
+    log.push("Scene collection 'Negligible' loaded");
+    log.push("Loaded plugin 'regleg-filter'");
+    assert!(log.lines().is_empty(), "{:?}", log.lines());
+    log.push("libEGL warning: egl: failed to create dri2 screen");
+    log.push("eglInitialize failed: EGL_NOT_INITIALIZED");
+    log.push("Failed to make context current: GLXBadDrawable");
+    assert_eq!(log.lines().len(), 3, "{:?}", log.lines());
+}
+
+#[test]
+fn the_latest_lines_win_when_full() {
+    let mut log = LogCapture::default();
+    for i in 0..25 {
+        log.push(&format!("EGL error {i}"));
+    }
+    let lines = log.lines();
+    assert_eq!(lines.len(), MAX_LOG_LINES);
+    assert_eq!(lines.first().map(String::as_str), Some("EGL error 15"));
+    assert_eq!(lines.last().map(String::as_str), Some("EGL error 24"));
+}
