@@ -106,7 +106,7 @@ enum {
 };
 /* -------------------------------------------------------- */
 
-static void expander_resize_env_buffer(struct expander_data *cd, size_t len)
+static void resize_env_buffer(struct expander_data *cd, size_t len)
 {
 	cd->envelope_buf_len = len;
 	for (int i = 0; i < MAX_AUDIO_CHANNELS; i++)
@@ -133,7 +133,7 @@ static void resize_gain_db_buffer(struct expander_data *cd, size_t len)
 		cd->gain_db[i] = brealloc(cd->gain_db[i], cd->gain_db_len * sizeof(float));
 }
 
-static inline float expander_gain_coefficient(uint32_t sample_rate, float time)
+static inline float gain_coefficient(uint32_t sample_rate, float time)
 {
 	return expf(-1.0f / (sample_rate * time));
 }
@@ -205,8 +205,8 @@ static void expander_update(void *data, obs_data_t *s)
 	cd->ratio = (float)obs_data_get_double(s, S_RATIO);
 
 	cd->threshold = (float)obs_data_get_double(s, S_FILTER_THRESHOLD);
-	cd->attack_gain = expander_gain_coefficient(sample_rate, attack_time_ms / MS_IN_S_F);
-	cd->release_gain = expander_gain_coefficient(sample_rate, release_time_ms / MS_IN_S_F);
+	cd->attack_gain = gain_coefficient(sample_rate, attack_time_ms / MS_IN_S_F);
+	cd->release_gain = gain_coefficient(sample_rate, release_time_ms / MS_IN_S_F);
 	cd->output_gain = db_to_mul(output_gain_db);
 	cd->num_channels = num_channels;
 	cd->sample_rate = sample_rate;
@@ -221,7 +221,7 @@ static void expander_update(void *data, obs_data_t *s)
 
 	size_t sample_len = sample_rate * DEFAULT_AUDIO_BUF_MS / MS_IN_S;
 	if (cd->envelope_buf_len == 0)
-		expander_resize_env_buffer(cd, sample_len);
+		resize_env_buffer(cd, sample_len);
 	if (cd->runaverage_len == 0)
 		resize_runaverage_buffer(cd, sample_len);
 	if (cd->env_in_len == 0)
@@ -272,10 +272,10 @@ static void expander_destroy(void *data)
 }
 
 // detection stage
-static void expander_analyze_envelope(struct expander_data *cd, float **samples, const uint32_t num_samples)
+static void analyze_envelope(struct expander_data *cd, float **samples, const uint32_t num_samples)
 {
 	if (cd->envelope_buf_len < num_samples)
-		expander_resize_env_buffer(cd, num_samples);
+		resize_env_buffer(cd, num_samples);
 	if (cd->runaverage_len < num_samples)
 		resize_runaverage_buffer(cd, num_samples);
 	if (cd->env_in_len < num_samples)
@@ -417,7 +417,7 @@ static struct obs_audio_data *expander_filter_audio(void *data, struct obs_audio
 
 	float **samples = (float **)audio->data;
 
-	expander_analyze_envelope(cd, samples, num_samples);
+	analyze_envelope(cd, samples, num_samples);
 	process_expansion(cd, samples, num_samples);
 	return audio;
 }
