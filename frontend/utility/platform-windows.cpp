@@ -22,6 +22,7 @@
 #include <QApplication>
 #include <QIcon>
 
+#include <util/dstr.h>
 #include <util/windows/ComPtr.hpp>
 #include <util/windows/WinHandle.hpp>
 #include <util/windows/win-version.h>

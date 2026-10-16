@@ -19,6 +19,7 @@
 
 #import <OBSApp.hpp>
 
+#import <util/dstr.h>
 #import <util/threading.h>
 
 #import <AVFoundation/AVFoundation.h>
