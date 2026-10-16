@@ -16,6 +16,8 @@ pub struct Report {
     pub summary: String,
     /// Likely causes to check, empty when there is nothing to fix.
     pub causes: Vec<String>,
+    /// OBS log lines that explain the state (#944).
+    pub log_lines: Vec<String>,
 }
 
 const SOFTWARE_CAUSES: [&str; 3] = [
@@ -79,7 +81,13 @@ impl Report {
             devices,
             summary,
             causes,
+            log_lines: Vec::new(),
         }
+    }
+
+    /// Attach the log lines that explain the state ([`crate::LogCapture`]).
+    pub fn with_log_lines(self, log_lines: Vec<String>) -> Self {
+        todo!("{log_lines:?} {self:?}")
     }
 
     /// The `gpuAcceleration` JSON object:

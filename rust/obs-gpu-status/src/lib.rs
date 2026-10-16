@@ -118,6 +118,33 @@ pub fn is_graphics_api_name(adapter: &str) -> bool {
     matches!(adapter.trim(), "OpenGL" | "Direct3D 11" | "Metal")
 }
 
+/// Most log lines [`LogCapture`] keeps.
+pub const MAX_LOG_LINES: usize = 10;
+/// Longest log line [`LogCapture`] keeps, in characters.
+pub const MAX_LOG_LINE_CHARS: usize = 300;
+
+/// The OBS log lines that explain the GPU state (graphics init, the
+/// adapter, DRM render nodes, EGL/GLX), for the dialog (#944).
+#[derive(Debug, Clone, Default)]
+pub struct LogCapture {
+    lines: Vec<String>,
+}
+
+impl LogCapture {
+    pub const fn new() -> Self {
+        Self { lines: Vec::new() }
+    }
+
+    /// Keep `line` if it is about graphics, once, up to [`MAX_LOG_LINES`].
+    pub fn push(&mut self, line: &str) {
+        todo!("{line}")
+    }
+
+    pub fn lines(&self) -> Vec<String> {
+        todo!()
+    }
+}
+
 /// Fewest one-second samples [`FrameStats::from_samples`] judges a window on.
 pub const MIN_FRAME_SAMPLES: usize = 5;
 
