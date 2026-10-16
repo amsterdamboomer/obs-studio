@@ -235,10 +235,15 @@ function(_obs_target_build_speed target)
   if(_imported OR NOT _source_dir)
     return()
   endif()
-  # Third-party code (deps/), the unchanged C tests (test/) and Corrosion's
-  # Cargo targets keep their own build.
+  # Third-party code (deps/), the unchanged C tests (test/), Corrosion's
+  # Cargo targets and the submodules (obs-browser, obs-websocket: their own
+  # upstreams, written for neither a shared header nor a shared translation
+  # unit) keep their own build.
   cmake_path(RELATIVE_PATH _source_dir BASE_DIRECTORY "${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE _relative)
-  if(_relative MATCHES "^(deps|test|rust)(/|$)" OR target MATCHES "^(_cargo|cargo-|corrosion)")
+  if(
+    _relative MATCHES "^(deps|test|rust|plugins/obs-browser|plugins/obs-websocket)(/|$)"
+    OR target MATCHES "^(_cargo|cargo-|corrosion)"
+  )
     return()
   endif()
   obs_target_pch(${target})
