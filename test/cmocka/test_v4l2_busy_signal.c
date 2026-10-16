@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <setjmp.h>
 #include <sys/mman.h>
@@ -169,8 +170,22 @@ static void run_ui_task(obs_task_t task, void *param, bool wait)
 
 /* ------------------------------------------------------------------------ */
 
+/* A slow holder's SIGTERM handler: let go of the device, then take a while
+ * to exit, holding open the window between closing its fds and becoming a
+ * reapable zombie that machine load opens in the plain holder (#953). */
+static int slow_holder_fd = -1;
+
+static void slow_holder_term(int sig)
+{
+	(void)sig;
+	close(slow_holder_fd);
+	struct timespec ts = {0, 300 * 1000000L};
+	nanosleep(&ts, NULL);
+	_exit(0);
+}
+
 /* A helper holding the device open, ready when this returns */
-static pid_t start_holder(bool ignore_term)
+static pid_t start_holder_ex(bool ignore_term, bool slow_exit)
 {
 	int ready[2];
 	assert_int_equal(pipe(ready), 0);
@@ -181,6 +196,10 @@ static pid_t start_holder(bool ignore_term)
 		if (ignore_term)
 			signal(SIGTERM, SIG_IGN);
 		int fd = open(camera_path, O_RDWR | O_NONBLOCK);
+		if (slow_exit) {
+			slow_holder_fd = fd;
+			signal(SIGTERM, slow_holder_term);
+		}
 		if (fd < 0 || write(ready[1], "r", 1) != 1)
 			_exit(2);
 		for (;;)
@@ -192,6 +211,11 @@ static pid_t start_holder(bool ignore_term)
 	close(ready[0]);
 	fake.holder = pid;
 	return pid;
+}
+
+static pid_t start_holder(bool ignore_term)
+{
+	return start_holder_ex(ignore_term, false);
 }
 
 static obs_source_t *create_camera(void)
@@ -302,6 +326,27 @@ static void force_camera_closes_the_holder_and_opens_the_camera(void **state)
 	obs_source_release(source);
 }
 
+/* The holder has closed the device but not finished exiting when the source
+ * reopens it: the device is free, so the reopen must succeed (#953). */
+static void force_camera_opens_while_the_holder_is_still_exiting(void **state)
+{
+	(void)state;
+	start_holder_ex(false, true);
+	obs_source_t *source = create_camera();
+	assert_int_equal(busy_signal.count, 1);
+	int opens_before = fake.opens;
+
+	calldata_t cd = {0};
+	assert_true(proc_handler_call(obs_source_get_proc_handler(source), "force_camera", &cd));
+	assert_true(calldata_bool(&cd, "released"));
+	calldata_free(&cd);
+
+	assert_int_equal(fake.holder, 0);
+	assert_true(fake.opens > opens_before);
+
+	obs_source_release(source);
+}
+
 static void force_camera_never_kills_a_holder_that_refuses(void **state)
 {
 	(void)state;
@@ -346,6 +391,7 @@ int main(void)
 	const struct CMUnitTest tests[] = {
 		cmocka_unit_test_setup_teardown(busy_camera_announces_its_holder_once, setup, teardown),
 		cmocka_unit_test_setup_teardown(force_camera_closes_the_holder_and_opens_the_camera, setup, teardown),
+		cmocka_unit_test_setup_teardown(force_camera_opens_while_the_holder_is_still_exiting, setup, teardown),
 		cmocka_unit_test_setup_teardown(force_camera_never_kills_a_holder_that_refuses, setup, teardown),
 		cmocka_unit_test_setup_teardown(camera_starts_when_the_holder_lets_go, setup, teardown),
 	};
