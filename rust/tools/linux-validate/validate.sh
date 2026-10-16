@@ -46,6 +46,22 @@ if [ -z "${OBS_TIER2_SRC:-}" ]; then
   rsync -a --delete --exclude /target /ro/ "$SRC/"
 fi
 mkdir -p "$BUILD"
+
+# The same environment in both harnesses (#982): the container gave the
+# tests root, /root and no locale; the native runner its `runner` user, a
+# lived-in HOME, C.UTF-8 and its own /usr/local/bin cmake. Pin what can be
+# pinned here, give ctest a fresh HOME (the build keeps the real one, which
+# holds rustup's and soldr's state), and print what's left to compare.
+export LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC
+export PATH="/usr/bin:/bin:$PATH"
+test_home="$BUILD/test-home"
+rm -rf "$test_home"
+mkdir -p "$test_home"
+test_env=(env HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config"
+  XDG_DATA_HOME="$test_home/.local/share" XDG_CACHE_HOME="$test_home/.cache")
+echo "== environment: user=$(id -un) nproc=$(nproc) locale=$LC_ALL" \
+  "cmake=$(cmake --version | head -1 | awk '{print $3}')" \
+  "cc=$(cc --version | head -1)" "kernel=$(uname -r)"
 # shellcheck source=stale-build.sh
 source "$SRC"/rust/tools/linux-validate/stale-build.sh
 # rustc as rust-toolchain.toml selects it, which is what Corrosion configures.
@@ -133,7 +149,7 @@ for mode in $modes; do
   # xvfb-run gives display tests an X server; the PipeWire tests start their
   # own private PipeWire daemon and D-Bus bus (#776).
   ctest_status=0
-  xvfb-run -a ctest --test-dir "$build" --output-on-failure -j "${OBS_CTEST_JOBS:-1}" 2>&1 | tee "$build.ctest.log" ||
+  "${test_env[@]}" xvfb-run -a ctest --test-dir "$build" --output-on-failure -j "${OBS_CTEST_JOBS:-1}" 2>&1 | tee "$build.ctest.log" ||
     ctest_status=$?
   # Keep the timings even when a test failed: they are still right.
   if [ -n "$cost_cache" ] && [ -s "$cost_file" ]; then
@@ -145,7 +161,7 @@ for mode in $modes; do
 
   if [ "$repeat" -gt 0 ]; then
     echo "== [$mode] ctest --repeat until-fail:$repeat${tests:+ -R $tests}"
-    xvfb-run -a ctest --test-dir "$build" --output-on-failure \
+    "${test_env[@]}" xvfb-run -a ctest --test-dir "$build" --output-on-failure \
       --repeat "until-fail:$repeat" ${tests:+-R "$tests"}
   fi
 
