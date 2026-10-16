@@ -339,6 +339,31 @@ class MainTest(unittest.TestCase):
         self.assertIn("--update", self.output)
 
 
+# libobs core files whose host code moved behind libobs/obs-host.h (#1051).
+FACADED = (
+    "libobs/obs.c",
+    "libobs/obs-display.c",
+    "libobs/obs-hotkey.c",
+    "libobs/obs-internal.h",
+    "libobs/obs-module.c",
+    "libobs/obs-source.c",
+    "libobs/obs-video.c",
+    "libobs/obs-video-gpu-encode.c",
+)
+
+
+class FacadeTest(unittest.TestCase):
+    def test_libobs_core_files_have_no_host_code(self):
+        for path in FACADED:
+            with self.subTest(path=path):
+                text = (r.ROOT / path).read_text(encoding="utf-8")
+                self.assertEqual(r.findings(path, text), [])
+
+    def test_facade_header_names_no_host(self):
+        text = (r.ROOT / "libobs/obs-host.h").read_text(encoding="utf-8")
+        self.assertEqual(r.findings("libobs/obs-host.h", text), [])
+
+
 class RepoBaselineTest(unittest.TestCase):
     def test_committed_baseline_matches_the_tree(self):
         """The committed baseline is the tree's real counts (run by ./lint)."""
