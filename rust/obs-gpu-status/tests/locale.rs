@@ -36,10 +36,21 @@ fn reports() -> Vec<Report> {
         name: Some("NVIDIA GeForce RTX 3060".into()),
         render_node: true,
     };
-    let slow = FrameStats { median_frame_ns: 95_000_000, interval_ns: 33_333_333 };
+    let slow = FrameStats {
+        median_frame_ns: 95_000_000,
+        interval_ns: 33_333_333,
+    };
     vec![
-        Report::new(Some("NVIDIA GeForce RTX 3060/PCIe/SSE2"), vec![gpu.clone()], None),
-        Report::new(Some("Mesa llvmpipe (LLVM 21.1.8, 256 bits)"), vec![gpu.clone()], None),
+        Report::new(
+            Some("NVIDIA GeForce RTX 3060/PCIe/SSE2"),
+            vec![gpu.clone()],
+            None,
+        ),
+        Report::new(
+            Some("Mesa llvmpipe (LLVM 21.1.8, 256 bits)"),
+            vec![gpu.clone()],
+            None,
+        ),
         Report::new(Some("Mesa llvmpipe (LLVM 21.1.8, 256 bits)"), vec![], None),
         Report::new(None, vec![gpu.clone()], None),
         Report::new(Some("NVIDIA GeForce RTX 3060"), vec![gpu], Some(slow)),
@@ -50,8 +61,15 @@ fn reports() -> Vec<Report> {
 fn every_summary_and_cause_has_an_en_us_string_matching_the_english_text() {
     let strings = en_us();
     for r in reports() {
-        let template = strings.get(r.summary_key).unwrap_or_else(|| panic!("missing {}", r.summary_key));
-        assert_eq!(render(template, &r.summary_args), r.summary, "{}", r.summary_key);
+        let template = strings
+            .get(r.summary_key)
+            .unwrap_or_else(|| panic!("missing {}", r.summary_key));
+        assert_eq!(
+            render(template, &r.summary_args),
+            r.summary,
+            "{}",
+            r.summary_key
+        );
         assert_eq!(r.cause_keys.len(), r.causes.len());
         for (key, english) in r.cause_keys.iter().zip(&r.causes) {
             let template = strings.get(*key).unwrap_or_else(|| panic!("missing {key}"));
@@ -64,7 +82,10 @@ fn every_summary_and_cause_has_an_en_us_string_matching_the_english_text() {
 fn json_carries_the_keys_and_args() {
     let r = Report::new(Some("Mesa llvmpipe"), vec![], None);
     let j = r.to_json();
-    assert!(j.contains("\"summaryKey\":\"Basic.StatusBar.GpuStatus.Summary.NoGpu\""), "{j}");
+    assert!(
+        j.contains("\"summaryKey\":\"Basic.StatusBar.GpuStatus.Summary.NoGpu\""),
+        "{j}"
+    );
     assert!(j.contains("\"summaryArgs\":[\"Mesa llvmpipe\"]"), "{j}");
     assert!(j.contains("\"causeKeys\":[\"Basic.StatusBar.GpuStatus.Cause.Driver\",\"Basic.StatusBar.GpuStatus.Cause.RenderNode\"]"), "{j}");
 }

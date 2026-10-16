@@ -26,6 +26,13 @@ pub struct Report {
     pub cause_keys: Vec<&'static str>,
 }
 
+/// Locale keys of [`SOFTWARE_CAUSES`], in the same order (#945).
+const SOFTWARE_CAUSE_KEYS: [&str; 3] = [
+    "Basic.StatusBar.GpuStatus.Cause.Sandbox",
+    "Basic.StatusBar.GpuStatus.Cause.Driver",
+    "Basic.StatusBar.GpuStatus.Cause.RenderNode",
+];
+
 const SOFTWARE_CAUSES: [&str; 3] = [
     "OBS runs in a sandbox or container (Flatpak, AppImage, a Nix FHS wrapper) \
      that is missing the vendor's EGL/GLX libraries or the egl-wayland \
@@ -40,30 +47,52 @@ impl Report {
     pub fn new(adapter: Option<&str>, devices: Vec<GpuDevice>, frames: Option<FrameStats>) -> Self {
         let state = classify(adapter, &devices, frames);
         let mut causes = Vec::new();
+        let mut cause_keys = Vec::new();
+        let (summary_key, summary_args): (&'static str, Vec<String>);
         let summary = match adapter {
-            None => "Graphics initialization failed, so OBS cannot render video. \
-                     Check the log for the graphics error."
-                .to_owned(),
+            None => {
+                (summary_key, summary_args) =
+                    ("Basic.StatusBar.GpuStatus.Summary.InitFailed", vec![]);
+                "Graphics initialization failed, so OBS cannot render video. \
+                 Check the log for the graphics error."
+                    .to_owned()
+            }
             Some(a) if frames.is_some_and(|f| f.median_frame_ns > f.interval_ns) => {
                 let f = frames.unwrap_or(FrameStats {
                     median_frame_ns: 0,
                     interval_ns: 0,
                 });
+                let (frame, budget) = (
+                    format!("{:.1}", ms(f.median_frame_ns)),
+                    format!("{:.1}", ms(f.interval_ns)),
+                );
+                (summary_key, summary_args) = (
+                    "Basic.StatusBar.GpuStatus.Summary.OverBudget",
+                    vec![frame.clone(), budget.clone(), a.to_owned()],
+                );
                 format!(
-                    "Frames take {:.1} ms to render against a {:.1} ms budget on {a}; \
-                     expect choppy video.",
-                    ms(f.median_frame_ns),
-                    ms(f.interval_ns)
+                    "Frames take {frame} ms to render against a {budget} ms budget on {a}; expect choppy video."
                 )
             }
             Some(a) => match state {
-                State::Green => format!("Rendering on {a}."),
+                State::Green => {
+                    (summary_key, summary_args) = (
+                        "Basic.StatusBar.GpuStatus.Summary.Green",
+                        vec![a.to_owned()],
+                    );
+                    format!("Rendering on {a}.")
+                }
                 State::Yellow => {
                     causes = SOFTWARE_CAUSES.iter().map(|c| (*c).to_owned()).collect();
+                    cause_keys = SOFTWARE_CAUSE_KEYS.to_vec();
                     let gpu = devices
                         .iter()
                         .find_map(|d| d.name.clone())
                         .unwrap_or_else(|| devices[0].vendor.display().to_owned());
+                    (summary_key, summary_args) = (
+                        "Basic.StatusBar.GpuStatus.Summary.Unused",
+                        vec![gpu.clone(), a.to_owned()],
+                    );
                     format!(
                         "Your GPU ({gpu}) was detected, but OBS is not using its driver. \
                          Rendering on the CPU ({a}); expect choppy video."
@@ -74,6 +103,11 @@ impl Report {
                         .iter()
                         .map(|c| (*c).to_owned())
                         .collect();
+                    cause_keys = SOFTWARE_CAUSE_KEYS[1..].to_vec();
+                    (summary_key, summary_args) = (
+                        "Basic.StatusBar.GpuStatus.Summary.NoGpu",
+                        vec![a.to_owned()],
+                    );
                     format!(
                         "No GPU was detected and OBS is rendering on the CPU ({a}); \
                          expect choppy video."
@@ -88,9 +122,9 @@ impl Report {
             summary,
             causes,
             log_lines: Vec::new(),
-            summary_key: todo!(),
-            summary_args: todo!(),
-            cause_keys: todo!(),
+            summary_key,
+            summary_args,
+            cause_keys,
         }
     }
 
@@ -134,6 +168,22 @@ impl Report {
                 j.push(',');
             }
             string(&mut j, Some(c));
+        }
+        j.push_str("],\"summaryKey\":");
+        string(&mut j, Some(self.summary_key));
+        j.push_str(",\"summaryArgs\":[");
+        for (i, a) in self.summary_args.iter().enumerate() {
+            if i > 0 {
+                j.push(',');
+            }
+            string(&mut j, Some(a));
+        }
+        j.push_str("],\"causeKeys\":[");
+        for (i, k) in self.cause_keys.iter().enumerate() {
+            if i > 0 {
+                j.push(',');
+            }
+            string(&mut j, Some(k));
         }
         j.push_str("],\"logLines\":[");
         for (i, line) in self.log_lines.iter().enumerate() {
