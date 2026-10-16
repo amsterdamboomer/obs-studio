@@ -87,10 +87,7 @@ fn frame_budget_overrun_is_red() {
     assert_eq!(classify(Some(SOFTWARE[0]), &[nv()], Some(over)), State::Red);
     assert_eq!(classify(Some(hw), &[nv()], Some(at)), State::Green);
     assert_eq!(classify(Some(hw), &[nv()], Some(fast)), State::Green);
-    assert_eq!(
-        classify(Some(SOFTWARE[0]), &[nv()], Some(fast)),
-        State::Red
-    );
+    assert_eq!(classify(Some(SOFTWARE[0]), &[nv()], Some(fast)), State::Red);
 }
 
 #[test]

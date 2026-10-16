@@ -82,7 +82,9 @@ impl Report {
                     );
                     format!("Rendering on {a}.")
                 }
-                State::Yellow => {
+                // Software rendering: the text follows the situation (a GPU
+                // OBS can't use, or no GPU at all), the color follows #1005.
+                _ if !devices.is_empty() => {
                     causes = SOFTWARE_CAUSES.iter().map(|c| (*c).to_owned()).collect();
                     cause_keys = SOFTWARE_CAUSE_KEYS.to_vec();
                     let gpu = devices
@@ -98,7 +100,7 @@ impl Report {
                          Rendering on the CPU ({a}); expect choppy video."
                     )
                 }
-                State::Red => {
+                _ => {
                     causes = SOFTWARE_CAUSES[1..]
                         .iter()
                         .map(|c| (*c).to_owned())
