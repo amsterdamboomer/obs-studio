@@ -56,12 +56,44 @@ static struct {
 	int busy_opens;
 } fake;
 
+/* Whether process `pid` still has the camera open, from /proc/<pid>/fd, the
+ * same view the plugin's holder scan has. */
+static bool holder_has_camera_open(pid_t pid)
+{
+	char dir[64];
+	snprintf(dir, sizeof(dir), "/proc/%d/fd", (int)pid);
+	os_dir_t *fds = os_opendir(dir);
+	if (!fds)
+		return false;
+
+	bool found = false;
+	struct os_dirent *ent;
+	while (!found && (ent = os_readdir(fds)) != NULL) {
+		char link[PATH_MAX], target[PATH_MAX];
+		snprintf(link, sizeof(link), "%s/%s", dir, ent->d_name);
+		ssize_t n = readlink(link, target, sizeof(target) - 1);
+		if (n <= 0)
+			continue;
+		target[n] = '\0';
+		found = strcmp(target, camera_path) == 0;
+	}
+	os_closedir(fds);
+	return found;
+}
+
+/* The device is busy while the holder has it open. A holder that has let go
+ * but not finished exiting (fds closed, not yet a zombie, a window machine
+ * load widens) no longer holds it: wait for it to exit and record how
+ * (#953). */
 static bool holder_alive(void)
 {
 	if (fake.holder <= 0)
 		return false;
-	if (waitpid(fake.holder, &fake.holder_status, WNOHANG) == 0)
-		return true;
+	if (waitpid(fake.holder, &fake.holder_status, WNOHANG) == 0) {
+		if (holder_has_camera_open(fake.holder))
+			return true;
+		waitpid(fake.holder, &fake.holder_status, 0);
+	}
 	fake.holder = 0;
 	return false;
 }
