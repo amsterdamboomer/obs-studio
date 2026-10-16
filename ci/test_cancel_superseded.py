@@ -50,28 +50,28 @@ class PrNumberTest(unittest.TestCase):
 class SupersededTest(unittest.TestCase):
     def setUp(self):
         self.cs = load()
-        self.current = run(10, f"{Q}970-new", "in_progress", "2026-10-16T04:05:00Z")
+        self.current = run(10, f"{Q}970-a1b2c3", "in_progress", "2026-10-16T04:05:00Z")
 
     def test_cancels_older_runs_for_the_same_pr(self):
         runs = [
             self.current,
-            run(9, f"{Q}970-old", "queued", "2026-10-16T04:01:00Z"),
-            run(8, f"{Q}970-older", "in_progress", "2026-10-16T03:40:00Z"),
+            run(9, f"{Q}970-b2c3d4", "queued", "2026-10-16T04:01:00Z"),
+            run(8, f"{Q}970-c3d4e5", "in_progress", "2026-10-16T03:40:00Z"),
         ]
         self.assertEqual(sorted(self.cs.superseded(runs, self.current)), [8, 9])
 
     def test_leaves_other_prs_alone(self):
-        runs = [self.current, run(7, f"{Q}936-x", "queued", "2026-10-16T04:01:00Z")]
+        runs = [self.current, run(7, f"{Q}936-d4e5f6", "queued", "2026-10-16T04:01:00Z")]
         self.assertEqual(self.cs.superseded(runs, self.current), [])
 
     def test_never_cancels_a_newer_run(self):
-        runs = [self.current, run(11, f"{Q}970-newer", "queued", "2026-10-16T04:09:00Z")]
+        runs = [self.current, run(11, f"{Q}970-e5f6a7", "queued", "2026-10-16T04:09:00Z")]
         self.assertEqual(self.cs.superseded(runs, self.current), [])
 
     def test_ignores_finished_runs_and_pr_branches(self):
         runs = [
             self.current,
-            run(6, f"{Q}970-done", "completed", "2026-10-16T04:00:00Z"),
+            run(6, f"{Q}970-f6a7b8", "completed", "2026-10-16T04:00:00Z"),
             run(5, "ci/970-branch", "queued", "2026-10-16T04:00:00Z"),
         ]
         self.assertEqual(self.cs.superseded(runs, self.current), [])
