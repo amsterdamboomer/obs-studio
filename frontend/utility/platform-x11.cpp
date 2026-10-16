@@ -27,9 +27,10 @@
 #include <QDBusConnection>
 #include <QDBusReply>
 
+#include <dlfcn.h>
+
 #if defined(__FreeBSD__) || defined(__DragonFly__)
 #include <condition_variable>
-#include <dlfcn.h>
 #include <mutex>
 #endif
 #include <sstream>
