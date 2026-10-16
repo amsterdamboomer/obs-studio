@@ -76,6 +76,25 @@ class Tier2VolumeTest(unittest.TestCase):
         repo = self.checkout("a")
         self.assertEqual(self.docker_run_mounts(repo)["/build"], self.docker_run_mounts(repo)["/build"])
 
+    def test_source_is_read_only_and_not_copied(self):
+        """The checkout is built out of source from the read-only mount;
+        nothing copies it (the rsync into /src is gone)."""
+        repo = self.checkout("a")
+        self.docker_run_mounts(repo)
+        run = [l for l in self.last_log.read_text().splitlines() if l.startswith("run ")][0]
+        self.assertIn(f"-v {repo}:/ro:ro", run)
+        text = (ROOT / "rust/tools/linux-validate/validate.sh").read_text()
+        self.assertNotIn("rsync", text)
+        self.assertIn('SRC="${OBS_TIER2_SRC:-/ro}"', text)
+        self.assertIn("-DOBS_BUILD_NUMBER=1", text)
+
+    def test_crate_downloads_are_shared(self):
+        a = self.docker_run_mounts(self.checkout("a"))
+        b = self.docker_run_mounts(self.checkout("b"))
+        self.assertEqual(a["/root/.cargo/registry"], "obs-rust-linux-validate-cargo-registry")
+        self.assertEqual(a["/root/.cargo/registry"], b["/root/.cargo/registry"])
+        self.assertEqual(a["/root/.cargo/git"], "obs-rust-linux-validate-cargo-git")
+
     def test_ccache_is_shared(self):
         a = self.docker_run_mounts(self.checkout("a"))
         b = self.docker_run_mounts(self.checkout("b"))
