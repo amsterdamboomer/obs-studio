@@ -325,6 +325,23 @@ jobs:
           # Only an ENABLE_RUST_LIBOBS build names itself OBS-Studio-Rust (#112).
           [[ "${version}" == OBS-Studio-Rust* ]]
 
+      - name: Set Up uv 🐍
+        if: matrix.rust == 'ON'
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+
+      # The GPU status light must not call llvmpipe green (#846, #940). The
+      # runner has no GPU, so OBS renders on llvmpipe; the check also forces
+      # it. Installed into /usr, the prefix the Rust build is configured for,
+      # so OBS finds its data and plugins.
+      - name: Tier 4 GPU Acceleration Check 🎮
+        if: matrix.rust == 'ON'
+        timeout-minutes: 10
+        run: |
+          : Tier 4 GPU Acceleration Check 🎮
+          sudo cmake --install build_ubuntu --config ${{ needs.check-event.outputs.config }} > /dev/null
+          command -v xvfb-run > /dev/null || sudo apt-get install -y --no-install-recommends xvfb
+          uv run --with websockets==13.1 test/websocket-tier4/run_tier4.py --only gpu --obs /usr/bin/obs-studio-rust-gui
+
       - name: Package OBS Studio 📀
         uses: ./.github/actions/package-obs
         if: ${{ fromJSON(needs.check-event.outputs.package) }}
