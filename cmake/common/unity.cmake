@@ -3,24 +3,32 @@
 # With ENABLE_UNITY_BUILD, each target compiles its sources in batches of
 # OBS_UNITY_BUILD_BATCH_SIZE concatenated translation units. File-local names
 # (static functions and variables, file-scope macros) must then be unique
-# across a target; targets not yet cleaned set OBS_DISABLE_UNITY_BUILD.
+# across a target. cmake/cross builds Windows' and macOS' platform-only
+# sources the same way from Linux; targets whose sources can't share a
+# translation unit (graphics-hook: one Direct3D version per source) set
+# OBS_DISABLE_UNITY_BUILD.
 # obs_target_unity runs with obs_target_pch for every first-party target.
 
 include_guard(GLOBAL)
 
-# On by default where every target's file-local names are unique (Linux);
-# Windows and macOS sources still have collisions to rename.
-if(OS_LINUX)
-  option(ENABLE_UNITY_BUILD "Compile each target as batches of concatenated sources" ON)
-else()
-  option(ENABLE_UNITY_BUILD "Compile each target as batches of concatenated sources" OFF)
-endif()
+option(ENABLE_UNITY_BUILD "Compile each target as batches of concatenated sources" ON)
 set(OBS_UNITY_BUILD_BATCH_SIZE 8 CACHE STRING "Sources per unity translation unit")
 
 # Sources that duplicate another source of the same target wholesale (an
-# alternative backend, a kept legacy version): they compile on their own
+# alternative backend, a kept legacy version, a fork: window-capture.c next to
+# duplicator-monitor-capture.c, obs-nix-wayland.c next to obs-nix-x11.c,
+# obs-ffmpeg-mpegts.c next to obs-ffmpeg-output.c, media-playback cache.c next to
+# media.c): they compile on their own
 # rather than being renamed symbol by symbol.
-set(_OBS_UNITY_SKIP_SOURCES libobs-opengl/gl-wayland-egl.c plugins/image-source/obs-slideshow.c)
+set(
+  _OBS_UNITY_SKIP_SOURCES
+  libobs-opengl/gl-wayland-egl.c
+  plugins/image-source/obs-slideshow.c
+  plugins/win-capture/window-capture.c
+  libobs/obs-nix-wayland.c
+  plugins/obs-ffmpeg/obs-ffmpeg-mpegts.c
+  shared/media-playback/media-playback/cache.c
+)
 
 # obs_target_unity: turn on unity builds for <target>.
 function(obs_target_unity target)
