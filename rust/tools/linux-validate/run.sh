@@ -6,10 +6,14 @@
 #   --tests REGEX  limit the repeat run to tests matching REGEX (ctest -R)
 # e.g. run.sh --repeat 100 --tests 'test_threading|test_task'
 #
-# Each checkout builds in its own Docker volume,
-# obs-rust-linux-validate-build-<hash of the checkout path> (override with
-# OBS_TIER2_VOLUME); the ccache volume obs-rust-linux-validate-ccache is
-# shared. List or remove old ones with:
+# The checkout is mounted read-only at /ro and built out of source; volumes
+# hold everything written, so a rerun only redoes what changed:
+#   obs-rust-linux-validate-build-<id>  build trees: CMake, objects, cargo's
+#                                       target dir (override: OBS_TIER2_VOLUME)
+#   obs-rust-linux-validate-ccache      shared compiler cache
+#   obs-rust-linux-validate-cargo-registry, -cargo-git
+#                                       shared crate downloads
+# <id> is a hash of the checkout path. List or remove old ones with:
 #   docker volume ls --filter name=obs-rust-linux-validate-
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
@@ -95,6 +99,8 @@ fi
 run+=(
   -v "$here/validate.sh:/validate.sh:ro"
   -v "$build_volume:/build"
+  -v obs-rust-linux-validate-cargo-registry:/root/.cargo/registry
+  -v obs-rust-linux-validate-cargo-git:/root/.cargo/git
   obs-rust-linux-validate /validate.sh "$@"
 )
 "${run[@]}"

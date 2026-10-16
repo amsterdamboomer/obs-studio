@@ -74,7 +74,6 @@ set(OBS_BETA 0)
 configure_file("${OBS_SOURCE_ROOT}/libobs/obsconfig.h.in" "${CMAKE_BINARY_DIR}/config/obsconfig.h" @ONLY)
 
 set(ENABLE_HEVC ON)
-set(ENABLE_RUST_LIBOBS OFF)
 include("${OBS_SOURCE_ROOT}/libobs/cmake/sources.cmake")
 
 function(_obs_cross_object_library name)

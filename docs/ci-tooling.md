@@ -161,7 +161,7 @@ and cargo caches live in bosn volumes, and the AppImage lands in
 
 Tier 2 Linux in CI runs natively on the runner (#966): the
 `rust-linux-tier2` job installs `rust/tools/linux-validate/apt-packages.txt`
-and runs `validate.sh` directly, one job per `ENABLE_RUST_LIBOBS` mode. The
+and runs `validate.sh` directly: one build, then one job per libobs (C or with Rust) and shard. The
 intended local equivalent is bosn running that same job through act2:
 
 ```sh
@@ -222,7 +222,7 @@ the paths that select them, so a change only triggers the tests it can affect.
   - `cross`: clippy, dylint, and a link of every test binary
     (`test --no-run`) for the Windows and macOS targets, cross-compiled from
     Linux with soldr;
-  - `tier2-linux`: the cmocka suite with `ENABLE_RUST_LIBOBS` OFF and ON, in
+  - `tier2-linux`: the cmocka suite against libobs and libobs-with-rust, in
     Docker.
 - **`ci/ci_scope.py`** maps changed paths to jobs, by path alone (#897). Linux
   Rust tests and Tier 2 always run. A changed file that belongs to a platform
