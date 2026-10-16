@@ -35,6 +35,18 @@ if(ENABLE_GPU_STATUS AND COMMAND corrosion_import_crate)
     CRATE_TYPES staticlib
     PROFILE release
   )
+  if(OS_MACOS)
+    # Same as libobs/cmake/rust.cmake (#777): let the linker use the selected
+    # Xcode SDK, not the CLT SDK Corrosion injects.
+    get_target_property(_obs_gpu_status_link_dirs obs_gpu_status_frontend-static INTERFACE_LINK_DIRECTORIES)
+    if(_obs_gpu_status_link_dirs)
+      list(REMOVE_ITEM _obs_gpu_status_link_dirs "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib")
+      set_property(
+        TARGET obs_gpu_status_frontend-static
+        PROPERTY INTERFACE_LINK_DIRECTORIES "${_obs_gpu_status_link_dirs}"
+      )
+    endif()
+  endif()
   target_link_libraries(obs-studio PRIVATE obs_gpu_status_frontend-static)
   target_sources(obs-studio PRIVATE utility/obs-gpu-status.h)
   target_enable_feature(obs-studio "GPU acceleration status light" OBS_GPU_STATUS)
