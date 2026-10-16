@@ -140,18 +140,53 @@ def toolchain_gcc_ld() -> str:
 SOLDR_SELF_TESTS = "test_local_gate_probe.py"
 
 
+def self_test_workers() -> int:
+    return os.cpu_count() or 4
+
+
 def self_test() -> None:
     """The gate's and the repo layout's unit tests: every ci/test_*.py.
 
     CI runs them in their own ubuntu-latest job (ci-self-test) and sets
     OBS_GATE_SKIP_SELF_TEST=1 for the lint step on the scarce ubuntu-26.04
-    runner (#427); locally they always run."""
+    runner (#427); locally they always run.
+
+    One process per file, run in parallel: run serially they took about
+    164 s of ./lint (#949). A failing file's output is printed in full.
+    """
     if os.environ.get("OBS_GATE_SKIP_SELF_TEST") == "1":
         # Only the tests that need this runner's soldr; the rest run in ci-self-test.
         print("+ ci/ self-tests: soldr-dependent only (OBS_GATE_SKIP_SELF_TEST=1; ci-self-test runs the rest)", flush=True)
         run([sys.executable, "-m", "unittest", "discover", "-s", "ci", "-p", SOLDR_SELF_TESTS])
         return
-    run([sys.executable, "-m", "unittest", "discover", "-s", "ci", "-p", "test_*.py"])
+    files = sorted((ROOT / "ci").glob("test_*.py"))
+
+    def one(path: Path) -> tuple[str, int, str, float]:
+        start = time.monotonic()
+        result = subprocess.run(
+            [sys.executable, "-m", "unittest", "discover", "-s", "ci", "-p", path.name],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            errors="replace",
+        )
+        # 5: the file has no tests (as the old single discover allowed).
+        code = 0 if result.returncode == 5 else result.returncode
+        return path.name, code, result.stdout + result.stderr, time.monotonic() - start
+
+    print(f"+ unittest: {len(files)} ci/test_*.py files, {self_test_workers()} at a time", flush=True)
+    with ThreadPoolExecutor(max_workers=self_test_workers()) as pool:
+        results = list(pool.map(one, files))
+    failed = []
+    for name, code, output, secs in sorted(results, key=lambda r: -r[3]):
+        print(f"  {'ok  ' if code == 0 else 'FAIL'} {secs:6.1f}s {name}", flush=True)
+        if code:
+            failed.append(name)
+            print(output, flush=True)
+            for hint in hints_for(output):
+                print(hint, flush=True)
+    if failed:
+        raise subprocess.CalledProcessError(1, ["unittest", *failed])
 
 
 def platform_ifdef_ratchet() -> None:
