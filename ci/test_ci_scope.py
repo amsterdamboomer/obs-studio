@@ -48,7 +48,8 @@ class CiScopeTest(unittest.TestCase):
         self.check(["libobs/util/platform-cocoa.m"], core=True, macos=True)
         self.check(["libobs/util/apple/cfstring-utils.h"], core=True, macos=True)
         self.check(["cmake/macos/compilerconfig.cmake"], macos=True)
-        self.check(["plugins/coreaudio-encoder/encoder.cpp"], macos=True)
+        # coreaudio-encoder builds on Windows too (PLATFORMS WINDOWS MACOS, #1051).
+        self.check(["plugins/coreaudio-encoder/encoder.cpp"], macos=True, windows=True)
         self.check(["libobs/audio-monitoring/osx/coreaudio-output.c"], core=True, macos=True)
 
     def test_posix_code_reaches_macos(self):
@@ -160,6 +161,18 @@ class PlatformPathsTest(unittest.TestCase):
         self.assertEqual(platforms("plugins/coreaudio-encoder/encoder.cpp"), {MACOS, WINDOWS})
         self.assertEqual(platforms("plugins/coreaudio-encoder/windows-imports.h"), {WINDOWS})
         self.assertEqual(platforms("plugins/obs-text/gdiplus/obs-text.cpp"), {WINDOWS})
+
+    def test_windows_only_directories(self):
+        for path in (
+            "frontend/updater/updater.cpp",
+            "plugins/obs-ffmpeg/obs-amf-test/obs-amf-test.cpp",
+            "plugins/obs-qsv11/obs-qsv-test/obs-qsv-test.cpp",
+            "shared/obs-inject-library/inject-library.c",
+            "shared/obs-shared-memory-queue/shared-memory-queue.c",
+        ):
+            self.assertEqual(platforms(path), {WINDOWS}, path)
+        self.assertIsNone(platforms("plugins/obs-ffmpeg/obs-ffmpeg.c"))
+        self.assertIsNone(platforms("plugins/obs-qsv11/obs-qsv11.c"))
 
 
 LIBOBS_RUST = """[package]

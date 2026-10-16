@@ -143,6 +143,7 @@ class PathTest(unittest.TestCase):
             "plugins/obs-browser/x.cpp",
             "plugins/obs-outputs/librtmp/rtmp.c",
             "plugins/obs-filters/rnnoise/src/arch.h",
+            "plugins/decklink/mac/decklink-sdk/DeckLinkAPI.h",
             "cmake/x.c",
             "test/cmocka/x.c",
             "rust/obs-c-oracle/legacy/x.c",
