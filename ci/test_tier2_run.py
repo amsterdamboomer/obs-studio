@@ -63,7 +63,7 @@ class Tier2VolumeTest(unittest.TestCase):
         log = self.tmp / f"{repo.name}-{self.calls}.log"
         self.last_log = log
         env = {k: v for k, v in os.environ.items() if not k.startswith(("OBS_TIER2", "OBS_CCACHE"))}
-        env.update(PATH=f"{self.bin}:{env['PATH']}", STUB_LOG=str(log), STUB_STATE="", **(extra_env or {}))
+        env.update(PATH=f"{self.bin}:{env['PATH']}", STUB_LOG=str(log), STUB_STATE="", XDG_STATE_HOME=str(self.tmp / "state"), **(extra_env or {}))
         subprocess.run(["bash", str(repo / "rust/tools/linux-validate/run.sh"), *getattr(self, "run_args", [])], env=env, check=True)
         # The task's own run carries --name; helper runs (the soldr tools
         # fetch, du for volume budgets) don't.
@@ -113,7 +113,7 @@ class Tier2VolumeTest(unittest.TestCase):
     def run_sh(self, repo, *args, state=""):
         log = self.tmp / f"{repo.name}-direct.log"
         env = {k: v for k, v in os.environ.items() if not k.startswith(("OBS_TIER2", "OBS_CCACHE"))}
-        env.update(PATH=f"{self.bin}:{env['PATH']}", STUB_LOG=str(log), STUB_STATE=state)
+        env.update(PATH=f"{self.bin}:{env['PATH']}", STUB_LOG=str(log), STUB_STATE=state, XDG_STATE_HOME=str(self.tmp / "state"))
         r = subprocess.run(["bash", str(repo / "rust/tools/linux-validate/run.sh"), *args], env=env, capture_output=True, text=True)
         return r, log.read_text() if log.exists() else ""
 
@@ -149,8 +149,12 @@ class Tier2VolumeTest(unittest.TestCase):
         self.assertNotIn("CARGO_INCREMENTAL=0", run)  # incremental stays on; the prune bounds it
         self.assertIn("prune-target --keep-latest --force", log)
         self.assertRegex(run, r"-v docker-task-soldr-[0-9]+\.[0-9]+\.[0-9]+:/opt/docker-task-soldr:ro")
-        # One du per budgeted volume after the run.
+        # One du per budgeted volume after the run...
         self.assertEqual(sum(1 for l in log.splitlines() if "--entrypoint du" in l), 4, log)
+        # ...and none again within the hour (DOCKER_TASK_BUDGET_SECS).
+        (self.tmp / "a-direct.log").unlink()
+        r, log = self.run_sh(self.tmp / "a")
+        self.assertEqual(sum(1 for l in log.splitlines() if "--entrypoint du" in l), 0, log)
 
     def test_crate_downloads_are_shared(self):
         a = self.docker_run_mounts(self.checkout("a"))

@@ -43,7 +43,9 @@
 #                           K, M or G): after every run, a volume over its budget
 #                           is removed, so the next run starts it cold. Bounds
 #                           what would otherwise only ever grow (cargo targets,
-#                           compiler caches).
+#                           compiler caches). Measured at most once an hour per
+#                           volume (DOCKER_TASK_BUDGET_SECS, default 3600), all
+#                           due volumes at once, so most runs pay nothing.
 #   --clean                 remove this checkout's stack volumes first
 #   --clean-all             also remove the machine volumes
 #   --keep                  keep the container after the run (no --rm)
@@ -282,9 +284,12 @@ cmd_run() {
   cleanup_overlay() {
     [ -n "$overlay_vol" ] || return 0
     docker volume rm "$overlay_vol" >/dev/null 2>&1 || true
-    # The container wrote the upper layer as root: clear it from a container.
-    docker run --rm -v "$overlay_dir:/overlay" --entrypoint rm "$tag" -rf /overlay/upper /overlay/work >/dev/null 2>&1 || true
-    rmdir "$overlay_dir" 2>/dev/null || true
+    # The container wrote the upper layer as root: clear it from a container,
+    # in the background so the caller doesn't wait for it.
+    (
+      docker run --rm -v "$overlay_dir:/overlay" --entrypoint rm "$tag" -rf /overlay/upper /overlay/work >/dev/null 2>&1 || true
+      rmdir "$overlay_dir" 2>/dev/null || true
+    ) </dev/null >/dev/null 2>&1 &
   }
   trap cleanup_overlay EXIT
 
@@ -309,14 +314,25 @@ exit $status' docker-task-prune "$@"
   local status=0
   docker run "${args[@]}" "$tag" "$@" || status=$?
 
-  # Budgets, after every run (a failed one grows the volumes too).
-  local budget entry
+  # Budgets, after any run (a failed one grows the volumes too), at most
+  # once per DOCKER_TASK_BUDGET_SECS per volume; due volumes in parallel.
+  local budget entry stamp now state
+  state="${XDG_STATE_HOME:-$HOME/.local/state}/docker-task"
+  mkdir -p "$state"
+  now=$(date +%s)
   for budget in ${budgets[@]+"${budgets[@]}"}; do
     vol=${budget%%=*}
     for entry in ${volume_names[@]+"${volume_names[@]}"}; do
-      [ "${entry%%=*}" = "$vol" ] && enforce_budget "${entry#*=}" "$(to_bytes "${budget#*=}")" "$tag"
+      [ "${entry%%=*}" = "$vol" ] || continue
+      stamp="$state/${entry#*=}.budget-checked"
+      if [ -f "$stamp" ] && [ $((now - $(cat "$stamp"))) -lt "${DOCKER_TASK_BUDGET_SECS:-3600}" ]; then
+        continue
+      fi
+      echo "$now" >"$stamp"
+      enforce_budget "${entry#*=}" "$(to_bytes "${budget#*=}")" "$tag" &
     done
   done
+  wait
   return "$status"
 }
 

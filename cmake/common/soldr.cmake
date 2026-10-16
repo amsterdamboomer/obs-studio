@@ -240,5 +240,9 @@ function(obs_soldr_cross_toolchain alias toolchain_file)
   endif()
   string(APPEND content "set(CMAKE_FIND_ROOT_PATH \"${sysroot}\")\n")
   string(APPEND content "set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)\n")
-  file(WRITE "${toolchain_file}" "${content}")
+  # Only touch the file when its content changes: rewriting it unchanged
+  # (its mtime) kept CMake resetting the cache of an existing build tree.
+  file(WRITE "${toolchain_file}.new" "${content}")
+  file(COPY_FILE "${toolchain_file}.new" "${toolchain_file}" ONLY_IF_DIFFERENT)
+  file(REMOVE "${toolchain_file}.new")
 endfunction()
