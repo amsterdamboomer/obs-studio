@@ -44,14 +44,25 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn('OBS_GATE_SKIP_SELF_TEST: "1"', step)
 
 
+def gate_soldr_tests() -> str:
+    import importlib
+
+    return importlib.import_module("local_gate").SOLDR_SELF_TESTS
+
+
 class GateTest(unittest.TestCase):
-    def test_env_var_skips_the_self_test(self):
+    def test_env_var_runs_only_the_soldr_tests(self):
         import importlib
 
         gate = importlib.import_module("local_gate")
         with mock.patch.object(gate, "run") as run, mock.patch.dict(os.environ, {"OBS_GATE_SKIP_SELF_TEST": "1"}):
             gate.self_test()
-        run.assert_not_called()
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[0][-1], gate.SOLDR_SELF_TESTS)
+
+    def test_soldr_tests_skip_without_soldr(self):
+        text = (ROOT / "ci" / gate_soldr_tests()).read_text(encoding="utf-8")
+        self.assertIn('@unittest.skipUnless(shutil.which("soldr")', text)
 
     def test_self_test_runs_by_default(self):
         import importlib
