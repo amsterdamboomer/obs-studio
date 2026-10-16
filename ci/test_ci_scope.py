@@ -140,6 +140,27 @@ class PlatformPathsTest(unittest.TestCase):
         self.assertEqual(platforms("libobs/util/platform-nix.c"), {LINUX, MACOS})
         self.assertEqual(platforms("plugins/linux-v4l2/v4l2-input.c"), {LINUX})
 
+    def test_modules_follow_their_cmake_platforms(self):
+        """A plugin's OSes are its PLATFORMS in plugins/CMakeLists.txt, also
+        when its name doesn't say them (#1051)."""
+        import re
+        from pathlib import Path
+
+        names = {"WINDOWS": WINDOWS, "MACOS": MACOS, "LINUX": LINUX, "FREEBSD": LINUX, "OPENBSD": LINUX}
+        every = {LINUX, MACOS, WINDOWS}
+        text = (Path(__file__).resolve().parent.parent / "plugins" / "CMakeLists.txt").read_text()
+        rows = re.findall(r"add_\w+\((\S+)\s+PLATFORMS\s+([A-Z ]+)", text)
+        self.assertGreater(len(rows), 10)
+        for module, declared in rows:
+            with self.subTest(module=module):
+                got = platforms(f"plugins/{module}/x.c") or every
+                self.assertEqual(set(got), {names[d] for d in declared.split() if d in names})
+
+    def test_file_name_inside_a_module_still_narrows(self):
+        self.assertEqual(platforms("plugins/coreaudio-encoder/encoder.cpp"), {MACOS, WINDOWS})
+        self.assertEqual(platforms("plugins/coreaudio-encoder/windows-imports.h"), {WINDOWS})
+        self.assertEqual(platforms("plugins/obs-text/gdiplus/obs-text.cpp"), {WINDOWS})
+
 
 LIBOBS_RUST = """[package]
 name = "libobs-rust"
