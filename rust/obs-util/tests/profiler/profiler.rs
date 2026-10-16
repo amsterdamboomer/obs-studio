@@ -36,7 +36,7 @@ static ROOT_NAME: &CStr = c"test_root";
 static CHILD_NAME: &CStr = c"test_child";
 static OTHER_NAME: &CStr = c"test_other";
 
-static TEST_LOCK: Mutex<()> = Mutex::new(());
+pub(crate) static TEST_LOCK: Mutex<()> = Mutex::new(());
 
 fn name_of(entry: &SnapshotEntry) -> &str {
     assert!(!entry.name.is_null());

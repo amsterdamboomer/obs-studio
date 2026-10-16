@@ -39,7 +39,7 @@ enum Op {
 }
 
 /// Oracle statics, the scripted clock, and the Rust profiler are process-global.
-static PARITY_LOCK: Mutex<()> = Mutex::new(());
+pub(crate) static PARITY_LOCK: Mutex<()> = Mutex::new(());
 
 fn name(id: u8) -> *const c_char {
     match id % 3 {
