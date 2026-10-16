@@ -29,6 +29,7 @@
 
 #if defined(__FreeBSD__) || defined(__DragonFly__)
 #include <condition_variable>
+#include <dlfcn.h>
 #include <mutex>
 #endif
 #include <sstream>
@@ -283,6 +284,28 @@ bool SetDisplayAffinitySupported(void)
 // Not implemented yet
 void TaskbarOverlayInit() {}
 void TaskbarOverlaySetStatus(TaskbarOverlayStatus) {}
+
+void *GetGlGetStringProc()
+{
+	/* EGL (X11 and Wayland): eglGetProcAddress returns core functions on
+	 * Mesa and NVIDIA. GLVND's libOpenGL and libGL dispatch to the current
+	 * context as well. */
+	if (void *egl = dlopen("libEGL.so.1", RTLD_LAZY | RTLD_NOLOAD)) {
+		typedef void *(*EglGetProcAddressFn)(const char *);
+		auto getProc = reinterpret_cast<EglGetProcAddressFn>(dlsym(egl, "eglGetProcAddress"));
+		if (void *fn = getProc ? getProc("glGetString") : nullptr) {
+			return fn;
+		}
+	}
+	for (const char *lib : {"libOpenGL.so.0", "libGL.so.1"}) {
+		if (void *gl = dlopen(lib, RTLD_LAZY)) {
+			if (void *fn = dlsym(gl, "glGetString")) {
+				return fn;
+			}
+		}
+	}
+	return nullptr;
+}
 
 bool HighContrastEnabled()
 {

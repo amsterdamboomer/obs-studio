@@ -86,19 +86,24 @@ impl FrameStats {
         if interval_ns == 0 || samples.len() < MIN_FRAME_SAMPLES {
             return None;
         }
-        let mut sorted = samples.to_vec();
-        sorted.sort_unstable();
-        let mid = sorted.len() / 2;
-        let median_frame_ns = if sorted.len() % 2 == 1 {
-            sorted[mid]
-        } else {
-            // Sorted, so this cannot overflow.
-            sorted[mid - 1] + (sorted[mid] - sorted[mid - 1]) / 2
-        };
         Some(Self {
-            median_frame_ns,
+            median_frame_ns: median(samples)?,
             interval_ns,
         })
+    }
+}
+
+/// The median of `values`, or `None` when it is empty. An even count gives
+/// the midpoint of the two middle values, rounded down; `u64::midpoint`
+/// computes it without overflowing.
+pub fn median(values: &[u64]) -> Option<u64> {
+    let mut sorted = values.to_vec();
+    sorted.sort_unstable();
+    let mid = sorted.len() / 2;
+    match sorted.len() {
+        0 => None,
+        n if n % 2 == 1 => Some(sorted[mid]),
+        _ => Some(sorted[mid - 1].midpoint(sorted[mid])),
     }
 }
 

@@ -1,4 +1,5 @@
 #include "GpuStatus.hpp"
+#include "platform.hpp"
 
 #ifdef OBS_GPU_STATUS
 #include "obs-gpu-status.h"
@@ -13,12 +14,6 @@
 #include <deque>
 #include <mutex>
 #include <vector>
-
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
 
 namespace GpuStatus {
 
@@ -69,38 +64,6 @@ typedef const unsigned char *(*GlGetStringFn)(unsigned int);
 static constexpr unsigned int GL_VENDOR_ENUM = 0x1F00;
 static constexpr unsigned int GL_RENDERER_ENUM = 0x1F01;
 
-/* glGetString from the GL library libobs-opengl already uses; the frontend
- * does not link GL itself. */
-static GlGetStringFn LoadGlGetString()
-{
-#if defined(_WIN32)
-	HMODULE gl = GetModuleHandleW(L"opengl32.dll");
-	return gl ? reinterpret_cast<GlGetStringFn>(GetProcAddress(gl, "glGetString")) : nullptr;
-#elif defined(__APPLE__)
-	void *gl = dlopen("/System/Library/Frameworks/OpenGL.framework/OpenGL", RTLD_LAZY);
-	return gl ? reinterpret_cast<GlGetStringFn>(dlsym(gl, "glGetString")) : nullptr;
-#else
-	/* EGL (X11 and Wayland): eglGetProcAddress returns core functions on
-	 * Mesa and NVIDIA. GLVND's libOpenGL and libGL dispatch to the current
-	 * context as well. */
-	if (void *egl = dlopen("libEGL.so.1", RTLD_LAZY | RTLD_NOLOAD)) {
-		typedef void *(*EglGetProcAddressFn)(const char *);
-		auto getProc = reinterpret_cast<EglGetProcAddressFn>(dlsym(egl, "eglGetProcAddress"));
-		if (void *fn = getProc ? getProc("glGetString") : nullptr) {
-			return reinterpret_cast<GlGetStringFn>(fn);
-		}
-	}
-	for (const char *lib : {"libOpenGL.so.0", "libGL.so.1"}) {
-		if (void *gl = dlopen(lib, RTLD_LAZY)) {
-			if (void *fn = dlsym(gl, "glGetString")) {
-				return reinterpret_cast<GlGetStringFn>(fn);
-			}
-		}
-	}
-	return nullptr;
-#endif
-}
-
 struct AdapterSearch {
 	uint32_t id;
 	std::string name;
@@ -122,7 +85,7 @@ static bool FindAdapter(void *param, const char *name, uint32_t id)
 static std::string ActiveAdapterName()
 {
 	if (gs_get_device_type() == GS_DEVICE_OPENGL) {
-		static GlGetStringFn glGetStringFn = LoadGlGetString();
+		static auto glGetStringFn = reinterpret_cast<GlGetStringFn>(GetGlGetStringProc());
 		if (glGetStringFn) {
 			const char *vendor = reinterpret_cast<const char *>(glGetStringFn(GL_VENDOR_ENUM));
 			const char *renderer = reinterpret_cast<const char *>(glGetStringFn(GL_RENDERER_ENUM));

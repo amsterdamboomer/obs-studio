@@ -9,7 +9,13 @@ fn report_round_trip() {
     let mut state: c_int = -1;
     // SAFETY: a literal C string and a local int.
     let json = unsafe {
-        obs_gpu_status_report(c"Microsoft Basic Render Driver".as_ptr(), std::ptr::null(), 0, 0, &mut state)
+        obs_gpu_status_report(
+            c"Microsoft Basic Render Driver".as_ptr(),
+            std::ptr::null(),
+            0,
+            0,
+            &mut state,
+        )
     };
     assert!(!json.is_null());
     // SAFETY: the returned string is NUL-terminated and still owned by us.
@@ -28,7 +34,8 @@ fn report_round_trip() {
 fn init_failure_and_overrun() {
     let mut state: c_int = -1;
     // SAFETY: null adapter and a local int.
-    let json = unsafe { obs_gpu_status_report(std::ptr::null(), std::ptr::null(), 0, 0, &mut state) };
+    let json =
+        unsafe { obs_gpu_status_report(std::ptr::null(), std::ptr::null(), 0, 0, &mut state) };
     assert_eq!(state, 2);
     // SAFETY: as above.
     unsafe { obs_gpu_status_free(json) };
