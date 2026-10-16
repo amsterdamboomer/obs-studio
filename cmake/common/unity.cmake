@@ -11,14 +11,7 @@
 
 include_guard(GLOBAL)
 
-# On by default where every target is verified (Linux). Windows and macOS
-# still have collisions in targets cmake/cross doesn't build (libobs-d3d11,
-# obs-browser, nv-filters, ...): pass -DENABLE_UNITY_BUILD=ON to try them.
-if(OS_LINUX)
-  option(ENABLE_UNITY_BUILD "Compile each target as batches of concatenated sources" ON)
-else()
-  option(ENABLE_UNITY_BUILD "Compile each target as batches of concatenated sources" OFF)
-endif()
+option(ENABLE_UNITY_BUILD "Compile each target as batches of concatenated sources" ON)
 set(OBS_UNITY_BUILD_BATCH_SIZE 8 CACHE STRING "Sources per unity translation unit")
 
 # Sources that duplicate another source of the same target wholesale (an
@@ -32,6 +25,9 @@ set(OBS_UNITY_BUILD_BATCH_SIZE 8 CACHE STRING "Sources per unity translation uni
 # an earlier source may have included it with WIN32_LEAN_AND_MEAN (on Windows
 # arm64, util/sse-intrin.h leaves that defined), making its own include a
 # no-op.
+#
+# The SAPI caption sources include <sapi.h>, whose `byte` is ambiguous next to
+# frontend-tools' `using namespace std` (std::byte) in the same batch.
 set(
   _OBS_UNITY_SKIP_SOURCES
   libobs-opengl/gl-wayland-egl.c
@@ -41,7 +37,14 @@ set(
   plugins/obs-ffmpeg/obs-ffmpeg-mpegts.c
   shared/media-playback/media-playback/cache.c
   libobs/util/platform-windows.c
+  plugins/frontend-tools/captions.cpp
+  plugins/frontend-tools/captions-mssapi.cpp
+  plugins/frontend-tools/captions-mssapi-stream.cpp
 )
+
+# Submodules (obs-browser, obs-websocket) follow their own upstreams; unity
+# collisions there would mean patching code we don't own in this repo.
+set(_OBS_UNITY_SKIP_DIRS plugins/obs-browser plugins/obs-websocket)
 
 # obs_target_unity: turn on unity builds for <target>.
 function(obs_target_unity target)
@@ -56,6 +59,13 @@ function(obs_target_unity target)
   if(_disabled)
     return()
   endif()
+  get_target_property(_source_dir ${target} SOURCE_DIR)
+  cmake_path(RELATIVE_PATH _source_dir BASE_DIRECTORY "${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE _relative)
+  foreach(_dir IN LISTS _OBS_UNITY_SKIP_DIRS)
+    if(_relative STREQUAL _dir OR _relative MATCHES "^${_dir}/")
+      return()
+    endif()
+  endforeach()
 
   set_target_properties(
     ${target}
