@@ -104,6 +104,49 @@ function(obs_target_pch target)
   if(_skipped)
     set_source_files_properties(${_skipped} TARGET_DIRECTORY ${target} PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
   endif()
+
+  _obs_pch_ccache(${target})
+endfunction()
+
+# _obs_pch_ccache: keep ccache caching sources compiled against a precompiled
+# header. ccache refuses them unless sloppiness includes pch_defines and
+# time_macros (and, for GCC, the compiler gets -fpch-preprocess), so a
+# ccache launcher is wrapped to add those to whatever sloppiness is
+# configured already.
+function(_obs_pch_ccache target)
+  foreach(_lang IN ITEMS C CXX)
+    get_target_property(_launcher ${target} ${_lang}_COMPILER_LAUNCHER)
+    if(NOT _launcher OR NOT _launcher MATCHES "(^|/|;)ccache(\\.exe)?$" OR _launcher MATCHES "CCACHE_SLOPPINESS")
+      continue()
+    endif()
+    if(NOT DEFINED _OBS_PCH_CCACHE_SLOPPINESS)
+      list(GET _launcher -1 _ccache)
+      execute_process(
+        COMMAND "${_ccache}" --get-config sloppiness
+        OUTPUT_VARIABLE _configured
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+      )
+      string(REPLACE "," ";" _sloppiness "${_configured},$ENV{CCACHE_SLOPPINESS},pch_defines,time_macros")
+      list(REMOVE_ITEM _sloppiness "")
+      list(REMOVE_DUPLICATES _sloppiness)
+      list(JOIN _sloppiness "," _OBS_PCH_CCACHE_SLOPPINESS)
+      set(_OBS_PCH_CCACHE_SLOPPINESS "${_OBS_PCH_CCACHE_SLOPPINESS}" CACHE INTERNAL "")
+    endif()
+    set_property(
+      TARGET ${target}
+      PROPERTY
+        ${_lang}_COMPILER_LAUNCHER
+          "${CMAKE_COMMAND}"
+          -E
+          env
+          "CCACHE_SLOPPINESS=${_OBS_PCH_CCACHE_SLOPPINESS}"
+          ${_launcher}
+    )
+    if(CMAKE_${_lang}_COMPILER_ID STREQUAL "GNU")
+      target_compile_options(${target} PRIVATE "$<$<COMPILE_LANGUAGE:${_lang}>:-fpch-preprocess>")
+    endif()
+  endforeach()
 endfunction()
 
 # _obs_target_sources_matching: absolute paths of <target>'s sources that end
