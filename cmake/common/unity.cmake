@@ -53,6 +53,13 @@ function(obs_target_unity target)
   # be the first thing their translation unit sees; the duplicates above
   # can't share one. Keep both out of batches.
   _obs_target_sources_matching(${target} _skipped ${_OBS_PCH_SKIP_SOURCES} ${_OBS_UNITY_SKIP_SOURCES})
+  # Third-party sources (deps/, e.g. libdshowcapture through its INTERFACE
+  # library) aren't written to share a translation unit with ours. Nor are
+  # Objective-C sources: without the OBJC language enabled CMake files .m
+  # under C, and Xcode would then compile them inside a C batch.
+  _obs_target_sources_where(${target} _third_party "^${CMAKE_SOURCE_DIR}/deps/")
+  _obs_target_sources_where(${target} _objc "\\.(m|mm)$")
+  list(APPEND _skipped ${_third_party} ${_objc})
   if(_skipped)
     set_source_files_properties(${_skipped} TARGET_DIRECTORY ${target} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
   endif()

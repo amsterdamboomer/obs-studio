@@ -121,6 +121,10 @@ function(obs_target_pch target)
   endif()
 
   _obs_target_sources_matching(${target} _skipped ${_OBS_PCH_SKIP_SOURCES})
+  # Third-party sources (deps/) that reach a first-party target compile as
+  # their authors wrote them, without the force-included header.
+  _obs_target_sources_where(${target} _third_party "^${CMAKE_SOURCE_DIR}/deps/")
+  list(APPEND _skipped ${_third_party})
   if(_skipped)
     set_source_files_properties(${_skipped} TARGET_DIRECTORY ${target} PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
   endif()
@@ -173,11 +177,11 @@ endfunction()
 # in one of the given repository-relative paths. Sources added through
 # generator expressions ($<$<BOOL:...>:file.c>) are matched by the file names
 # inside them.
-function(_obs_target_sources_matching target out)
+function(_obs_target_all_sources target out)
   get_target_property(_sources ${target} SOURCES)
   get_target_property(_source_dir ${target} SOURCE_DIR)
-  # INTERFACE libraries (media-playback, ...) hand their sources to the targets
-  # that link them; those compile as this target's sources too.
+  # INTERFACE libraries (media-playback, libdshowcapture, ...) hand their
+  # sources to the targets that link them; those compile as this target's.
   get_target_property(_links ${target} LINK_LIBRARIES)
   foreach(_link IN LISTS _links)
     if(TARGET "${_link}")
@@ -187,17 +191,39 @@ function(_obs_target_sources_matching target out)
       endif()
     endif()
   endforeach()
-  set(_matches "")
+  set(_all "")
   foreach(_source IN LISTS _sources)
     string(REGEX MATCHALL "[^:<>$,;]+\\.(c|cpp|cc|m|mm)" _files "${_source}")
     foreach(_file IN LISTS _files)
       cmake_path(ABSOLUTE_PATH _file BASE_DIRECTORY "${_source_dir}" NORMALIZE OUTPUT_VARIABLE _absolute)
-      foreach(_wanted IN LISTS ARGN)
-        if(_absolute MATCHES "/${_wanted}$")
-          list(APPEND _matches "${_absolute}")
-        endif()
-      endforeach()
+      list(APPEND _all "${_absolute}")
     endforeach()
+  endforeach()
+  set(${out} ${_all} PARENT_SCOPE)
+endfunction()
+
+function(_obs_target_sources_matching target out)
+  _obs_target_all_sources(${target} _all)
+  set(_matches "")
+  foreach(_absolute IN LISTS _all)
+    foreach(_wanted IN LISTS ARGN)
+      if(_absolute MATCHES "/${_wanted}$")
+        list(APPEND _matches "${_absolute}")
+      endif()
+    endforeach()
+  endforeach()
+  set(${out} ${_matches} PARENT_SCOPE)
+endfunction()
+
+# _obs_target_sources_where: absolute paths of <target>'s sources (its own and
+# those INTERFACE libraries hand it) whose path matches <regex>.
+function(_obs_target_sources_where target out regex)
+  _obs_target_all_sources(${target} _all)
+  set(_matches "")
+  foreach(_absolute IN LISTS _all)
+    if(_absolute MATCHES "${regex}")
+      list(APPEND _matches "${_absolute}")
+    endif()
   endforeach()
   set(${out} ${_matches} PARENT_SCOPE)
 endfunction()
