@@ -42,10 +42,6 @@ set(
   plugins/frontend-tools/captions-mssapi-stream.cpp
 )
 
-# Submodules (obs-browser, obs-websocket) follow their own upstreams; unity
-# collisions there would mean patching code we don't own in this repo.
-set(_OBS_UNITY_SKIP_DIRS plugins/obs-browser plugins/obs-websocket)
-
 # obs_target_unity: turn on unity builds for <target>.
 function(obs_target_unity target)
   if(NOT ENABLE_UNITY_BUILD)
@@ -59,13 +55,6 @@ function(obs_target_unity target)
   if(_disabled)
     return()
   endif()
-  get_target_property(_source_dir ${target} SOURCE_DIR)
-  cmake_path(RELATIVE_PATH _source_dir BASE_DIRECTORY "${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE _relative)
-  foreach(_dir IN LISTS _OBS_UNITY_SKIP_DIRS)
-    if(_relative STREQUAL _dir OR _relative MATCHES "^${_dir}/")
-      return()
-    endif()
-  endforeach()
 
   set_target_properties(
     ${target}
