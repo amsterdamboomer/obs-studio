@@ -887,6 +887,9 @@ jobs:
   rust-linux-tier2:
     name: Rust Tier 2 Linux 🐧 (${{ matrix.mode }})
     runs-on: ubuntu-26.04
+    # A hung test held a runner for 4.5 h without this (#983); a normal run
+    # is about 13 min.
+    timeout-minutes: 30
     needs: [check-event, ci-mode, lane-proofs]
     if: needs.ci-mode.outputs.skip_rust-linux-tier2 != 'true' && needs.lane-proofs.outputs.tier2-linux_hit != 'true'
     strategy:

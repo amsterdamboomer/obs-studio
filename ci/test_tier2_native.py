@@ -79,6 +79,15 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn("OBS_TIER2_SRC: ${{ github.workspace }}", self.job)
 
 
+class TimeoutTest(unittest.TestCase):
+    def test_tier2_jobs_time_out(self):
+        """A hung Tier 2 test held a scarce ubuntu-26.04 runner for 4.5 h
+        until cancelled (#983); GitHub's default is 6 h."""
+        m = re.search(r"timeout-minutes:\s*(\d+)", tier2_job())
+        self.assertIsNotNone(m)
+        self.assertLessEqual(int(m.group(1)), 45)
+
+
 class DocsTest(unittest.TestCase):
     def test_ci_tooling_names_the_local_bosn_run(self):
         text = (ROOT / "docs" / "ci-tooling.md").read_text(encoding="utf-8")
