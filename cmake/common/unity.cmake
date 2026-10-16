@@ -20,6 +20,11 @@ set(OBS_UNITY_BUILD_BATCH_SIZE 8 CACHE STRING "Sources per unity translation uni
 # obs-ffmpeg-mpegts.c next to obs-ffmpeg-output.c, media-playback cache.c next to
 # media.c): they compile on their own
 # rather than being renamed symbol by symbol.
+#
+# platform-windows.c needs the full <windows.h> (NTSTATUS, ...): in a batch
+# an earlier source may have included it with WIN32_LEAN_AND_MEAN (on Windows
+# arm64, util/sse-intrin.h leaves that defined), making its own include a
+# no-op.
 set(
   _OBS_UNITY_SKIP_SOURCES
   libobs-opengl/gl-wayland-egl.c
@@ -28,6 +33,7 @@ set(
   libobs/obs-nix-wayland.c
   plugins/obs-ffmpeg/obs-ffmpeg-mpegts.c
   shared/media-playback/media-playback/cache.c
+  libobs/util/platform-windows.c
 )
 
 # obs_target_unity: turn on unity builds for <target>.
