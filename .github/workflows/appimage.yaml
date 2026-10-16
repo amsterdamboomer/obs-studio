@@ -308,7 +308,8 @@ jobs:
           build-aux/appimage/verify-recording.sh --self-test
           # (test-appimage.sh allows a run without the test producers only on
           # Ubuntu 22.04, and fails anywhere else)
-          for scenario in saved-profile saved-profile-custom saved-profile-existing; do
+          for scenario in ${{ matrix.scenarios }}; do
+            case "$scenario" in saved-profile*) ;; *) continue ;; esac # only these record
             if [ -f "results/$scenario/recording-skipped.txt" ]; then
               echo "::notice::no recording on ${{ matrix.image }} ($scenario): $(cat "results/$scenario/recording-skipped.txt")"
             else
