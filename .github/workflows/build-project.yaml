@@ -16,6 +16,9 @@ jobs:
   check-event:
     name: Event Data 🔎
     runs-on: ubuntu-26.04
+    permissions:
+      actions: write
+      contents: read
     defaults:
       run:
         shell: bash
@@ -36,6 +39,11 @@ jobs:
           fetch-depth: 0
       - name: Set Up uv 🐍
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - name: Cancel Stale Merge Queue Run 🛑
+        if: github.event_name == 'merge_group'
+        run: uv run ci/merge_queue_stale.py
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Check Event Data ☑️
         id: setup
@@ -143,6 +151,9 @@ jobs:
       fail-fast: false
       matrix:
         target: [arm64, x86_64]
+    permissions:
+      actions: write
+      contents: read
     defaults:
       run:
         shell: zsh --no-rcs --errexit --pipefail {0}
@@ -151,6 +162,14 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+      - name: Set Up uv For Queue Guard 🐍
+        if: github.event_name == 'merge_group'
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - name: Cancel Stale Merge Queue Run 🛑
+        if: github.event_name == 'merge_group'
+        run: uv run ci/merge_queue_stale.py
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Set Up Environment 🔧
         id: setup
@@ -569,6 +588,9 @@ jobs:
     # OBS app builds are release-gating (#436): release gate, tags, schedule,
     # dispatch and ci-full only.
     if: fromJSON(needs.check-event.outputs.full)
+    permissions:
+      actions: write
+      contents: read
     defaults:
       run:
         shell: pwsh
@@ -577,6 +599,14 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+      - name: Set Up uv For Queue Guard 🐍
+        if: github.event_name == 'merge_group'
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - name: Cancel Stale Merge Queue Run 🛑
+        if: github.event_name == 'merge_group'
+        run: uv run ci/merge_queue_stale.py
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       # Compiler cache: ccache masquerading as cl.exe through MSBuild's
       # CLToolExe (cmake/windows/compilerconfig.cmake, ENABLE_CCACHE in the
@@ -755,11 +785,22 @@ jobs:
     runs-on: ubuntu-26.04
     needs: [check-event, ci-mode, lane-proofs]
     if: needs.ci-mode.outputs.skip_rust-tests-linux != 'true'
+    permissions:
+      actions: write
+      contents: read
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Set Up uv For Queue Guard 🐍
+        if: github.event_name == 'merge_group'
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - name: Cancel Stale Merge Queue Run 🛑
+        if: github.event_name == 'merge_group'
+        run: uv run ci/merge_queue_stale.py
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       # platform-nix.c includes uuid/uuid.h. This runner does not ship it.
       # The oracle compile and the Rust libuuid link both need the package.
@@ -855,11 +896,22 @@ jobs:
         os: ${{ fromJSON(needs.check-event.outputs.platform_os) }}
     runs-on: ${{ matrix.os }}
     needs: check-event
+    permissions:
+      actions: write
+      contents: read
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Set Up uv For Queue Guard 🐍
+        if: github.event_name == 'merge_group'
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - name: Cancel Stale Merge Queue Run 🛑
+        if: github.event_name == 'merge_group'
+        run: uv run ci/merge_queue_stale.py
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       # Same soldr-wrapped commands as docs/rust-port/testing-policy.md.
       # setup-soldr provisions the toolchain (with the clippy/rustfmt

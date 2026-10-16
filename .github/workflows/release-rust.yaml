@@ -435,7 +435,7 @@ jobs:
       full: true
     secrets: inherit
     permissions:
-      actions: read
+      actions: write
       contents: read
 
   release:
