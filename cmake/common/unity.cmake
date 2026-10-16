@@ -11,7 +11,14 @@
 
 include_guard(GLOBAL)
 
-option(ENABLE_UNITY_BUILD "Compile each target as batches of concatenated sources" ON)
+# On by default where every target is verified (Linux). Windows and macOS
+# still have collisions in targets cmake/cross doesn't build (libobs-d3d11,
+# obs-browser, nv-filters, ...): pass -DENABLE_UNITY_BUILD=ON to try them.
+if(OS_LINUX)
+  option(ENABLE_UNITY_BUILD "Compile each target as batches of concatenated sources" ON)
+else()
+  option(ENABLE_UNITY_BUILD "Compile each target as batches of concatenated sources" OFF)
+endif()
 set(OBS_UNITY_BUILD_BATCH_SIZE 8 CACHE STRING "Sources per unity translation unit")
 
 # Sources that duplicate another source of the same target wholesale (an
