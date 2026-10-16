@@ -1612,7 +1612,7 @@ static void mix_audio_with_buf(float *p_out, float *p_in, float *buf_in, size_t 
 		*(out++) += *(in++) * *(buf++);
 }
 
-static inline void mix_audio(float *p_out, float *p_in, size_t pos, size_t count)
+static inline void scene_mix_audio(float *p_out, float *p_in, size_t pos, size_t count)
 {
 	register float *out = p_out + pos;
 	register float *in = p_in;
@@ -1722,7 +1722,7 @@ static bool scene_audio_render(void *data, uint64_t *ts_out, struct obs_source_a
 					if (apply_buf)
 						mix_audio_with_buf(out, in, buf, pos, count);
 					else
-						mix_audio(out, in, pos, count);
+						scene_mix_audio(out, in, pos, count);
 				}
 			}
 		}

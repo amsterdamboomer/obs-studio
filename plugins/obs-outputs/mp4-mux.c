@@ -2829,7 +2829,7 @@ static inline void add_chapter_track(struct mp4_mux *mux)
 	mux->chapter_track->track_id = ++mux->track_ctr;
 }
 
-static inline void free_packets(struct deque *dq)
+static inline void mp4_free_packets(struct deque *dq)
 {
 	size_t num = dq->size / sizeof(struct encoder_packet);
 
@@ -2847,7 +2847,7 @@ static inline void free_track(struct mp4_track *track)
 
 	obs_encoder_release(track->encoder);
 
-	free_packets(&track->packets);
+	mp4_free_packets(&track->packets);
 	deque_free(&track->packets);
 
 	da_free(track->sample_sizes);

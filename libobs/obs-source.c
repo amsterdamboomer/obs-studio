@@ -2966,7 +2966,7 @@ static const char *get_type_format(enum obs_source_type type)
 }
 #endif
 
-static inline void render_video(obs_source_t *source)
+static inline void source_render_video(obs_source_t *source)
 {
 	if (source->info.type != OBS_SOURCE_TYPE_FILTER && (source->info.output_flags & OBS_SOURCE_VIDEO) == 0) {
 		if (source->filter_parent)
@@ -3015,7 +3015,7 @@ void obs_source_video_render(obs_source_t *source)
 
 	source = obs_source_get_ref(source);
 	if (source) {
-		render_video(source);
+		source_render_video(source);
 		obs_source_release(source);
 	}
 }

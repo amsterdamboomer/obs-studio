@@ -46,56 +46,56 @@ static void *nvenc_reroute(enum codec_type codec, obs_data_t *settings, obs_enco
 
 /* ------------------------------------------------------------------------- */
 
-static const char *h264_nvenc_get_name(void *type_data)
+static const char *compat_h264_nvenc_get_name(void *type_data)
 {
 	UNUSED_PARAMETER(type_data);
 	return "NVIDIA NVENC H.264";
 }
 
 #ifdef ENABLE_HEVC
-static const char *hevc_nvenc_get_name(void *type_data)
+static const char *compat_hevc_nvenc_get_name(void *type_data)
 {
 	UNUSED_PARAMETER(type_data);
 	return "NVIDIA NVENC HEVC";
 }
 #endif
 
-static const char *av1_nvenc_get_name(void *type_data)
+static const char *compat_av1_nvenc_get_name(void *type_data)
 {
 	UNUSED_PARAMETER(type_data);
 	return "NVIDIA NVENC AV1";
 }
 
-static void *h264_nvenc_create(obs_data_t *settings, obs_encoder_t *encoder)
+static void *compat_h264_nvenc_create(obs_data_t *settings, obs_encoder_t *encoder)
 {
 	return nvenc_reroute(CODEC_H264, settings, encoder, true);
 }
 
 #ifdef ENABLE_HEVC
-static void *hevc_nvenc_create(obs_data_t *settings, obs_encoder_t *encoder)
+static void *compat_hevc_nvenc_create(obs_data_t *settings, obs_encoder_t *encoder)
 {
 	return nvenc_reroute(CODEC_HEVC, settings, encoder, true);
 }
 #endif
 
-static void *av1_nvenc_create(obs_data_t *settings, obs_encoder_t *encoder)
+static void *compat_av1_nvenc_create(obs_data_t *settings, obs_encoder_t *encoder)
 {
 	return nvenc_reroute(CODEC_AV1, settings, encoder, true);
 }
 
-static void *h264_nvenc_soft_create(obs_data_t *settings, obs_encoder_t *encoder)
+static void *compat_h264_nvenc_soft_create(obs_data_t *settings, obs_encoder_t *encoder)
 {
 	return nvenc_reroute(CODEC_H264, settings, encoder, false);
 }
 
 #ifdef ENABLE_HEVC
-static void *hevc_nvenc_soft_create(obs_data_t *settings, obs_encoder_t *encoder)
+static void *compat_hevc_nvenc_soft_create(obs_data_t *settings, obs_encoder_t *encoder)
 {
 	return nvenc_reroute(CODEC_HEVC, settings, encoder, false);
 }
 #endif
 
-static void *av1_nvenc_soft_create(obs_data_t *settings, obs_encoder_t *encoder)
+static void *compat_av1_nvenc_soft_create(obs_data_t *settings, obs_encoder_t *encoder)
 {
 	return nvenc_reroute(CODEC_AV1, settings, encoder, false);
 }
@@ -301,8 +301,8 @@ struct obs_encoder_info compat_h264_nvenc_info = {
 	.type = OBS_ENCODER_VIDEO,
 	.caps = OBS_ENCODER_CAP_PASS_TEXTURE | OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_MULTITRACK_DYN_BITRATE |
 		OBS_ENCODER_CAP_ROI | OBS_ENCODER_CAP_DEPRECATED,
-	.get_name = h264_nvenc_get_name,
-	.create = h264_nvenc_create,
+	.get_name = compat_h264_nvenc_get_name,
+	.create = compat_h264_nvenc_create,
 	.destroy = fake_nvenc_destroy,
 	.encode_texture2 = fake_encode_tex2,
 	.get_defaults = compat_h264_nvenc_defaults,
@@ -316,8 +316,8 @@ struct obs_encoder_info compat_hevc_nvenc_info = {
 	.type = OBS_ENCODER_VIDEO,
 	.caps = OBS_ENCODER_CAP_PASS_TEXTURE | OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_MULTITRACK_DYN_BITRATE |
 		OBS_ENCODER_CAP_ROI | OBS_ENCODER_CAP_DEPRECATED,
-	.get_name = hevc_nvenc_get_name,
-	.create = hevc_nvenc_create,
+	.get_name = compat_hevc_nvenc_get_name,
+	.create = compat_hevc_nvenc_create,
 	.destroy = fake_nvenc_destroy,
 	.encode_texture2 = fake_encode_tex2,
 	.get_defaults = compat_hevc_nvenc_defaults,
@@ -331,8 +331,8 @@ struct obs_encoder_info compat_av1_nvenc_info = {
 	.type = OBS_ENCODER_VIDEO,
 	.caps = OBS_ENCODER_CAP_PASS_TEXTURE | OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_MULTITRACK_DYN_BITRATE |
 		OBS_ENCODER_CAP_ROI | OBS_ENCODER_CAP_DEPRECATED,
-	.get_name = av1_nvenc_get_name,
-	.create = av1_nvenc_create,
+	.get_name = compat_av1_nvenc_get_name,
+	.create = compat_av1_nvenc_create,
 	.destroy = fake_nvenc_destroy,
 	.encode_texture2 = fake_encode_tex2,
 	.get_defaults = compat_av1_nvenc_defaults,
@@ -345,8 +345,8 @@ struct obs_encoder_info compat_h264_nvenc_soft_info = {
 	.type = OBS_ENCODER_VIDEO,
 	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_MULTITRACK_DYN_BITRATE | OBS_ENCODER_CAP_ROI |
 		OBS_ENCODER_CAP_DEPRECATED,
-	.get_name = h264_nvenc_get_name,
-	.create = h264_nvenc_soft_create,
+	.get_name = compat_h264_nvenc_get_name,
+	.create = compat_h264_nvenc_soft_create,
 	.destroy = fake_nvenc_destroy,
 	.encode = fake_encode,
 	.get_defaults = compat_h264_nvenc_defaults,
@@ -360,8 +360,8 @@ struct obs_encoder_info compat_hevc_nvenc_soft_info = {
 	.type = OBS_ENCODER_VIDEO,
 	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_MULTITRACK_DYN_BITRATE | OBS_ENCODER_CAP_ROI |
 		OBS_ENCODER_CAP_DEPRECATED,
-	.get_name = hevc_nvenc_get_name,
-	.create = hevc_nvenc_soft_create,
+	.get_name = compat_hevc_nvenc_get_name,
+	.create = compat_hevc_nvenc_soft_create,
 	.destroy = fake_nvenc_destroy,
 	.encode = fake_encode,
 	.get_defaults = compat_hevc_nvenc_defaults,
@@ -375,8 +375,8 @@ struct obs_encoder_info compat_av1_nvenc_soft_info = {
 	.type = OBS_ENCODER_VIDEO,
 	.caps = OBS_ENCODER_CAP_DYN_BITRATE | OBS_ENCODER_CAP_MULTITRACK_DYN_BITRATE | OBS_ENCODER_CAP_ROI |
 		OBS_ENCODER_CAP_DEPRECATED,
-	.get_name = av1_nvenc_get_name,
-	.create = av1_nvenc_soft_create,
+	.get_name = compat_av1_nvenc_get_name,
+	.create = compat_av1_nvenc_soft_create,
 	.destroy = fake_nvenc_destroy,
 	.encode = fake_encode,
 	.get_defaults = compat_av1_nvenc_defaults,

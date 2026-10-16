@@ -67,7 +67,7 @@ fail:
 	return NULL;
 }
 
-static bool process_packet(struct ffmpeg_muxer *stream)
+static bool hls_process_packet(struct ffmpeg_muxer *stream)
 {
 	struct encoder_packet packet;
 	bool has_packet = false;
@@ -97,7 +97,7 @@ static void *hls_write_thread(void *data)
 		if (os_event_try(stream->stop_event) == 0)
 			return NULL;
 
-		if (!process_packet(stream))
+		if (!hls_process_packet(stream))
 			break;
 	}
 

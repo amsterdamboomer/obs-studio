@@ -1543,7 +1543,7 @@ static inline bool service_supports_encoder(const char **codecs, const char *enc
 	return service_supports_codec(codecs, codec);
 }
 
-static bool return_first_id(void *data, const char *id)
+static bool settings_return_first_id(void *data, const char *id)
 {
 	const char **output = (const char **)data;
 
@@ -1574,7 +1574,7 @@ bool OBSBasicSettings::ServiceAndVCodecCompatible()
 		const char *output = nullptr;
 		char **output_codecs;
 
-		obs_enum_output_types_with_protocol(QT_TO_UTF8(protocol), &output, return_first_id);
+		obs_enum_output_types_with_protocol(QT_TO_UTF8(protocol), &output, settings_return_first_id);
 
 		output_codecs = strlist_split(obs_get_output_supported_video_codecs(output), ';', false);
 
@@ -1609,7 +1609,7 @@ bool OBSBasicSettings::ServiceAndACodecCompatible()
 		const char *output = nullptr;
 		char **output_codecs;
 
-		obs_enum_output_types_with_protocol(QT_TO_UTF8(protocol), &output, return_first_id);
+		obs_enum_output_types_with_protocol(QT_TO_UTF8(protocol), &output, settings_return_first_id);
 		output_codecs = strlist_split(obs_get_output_supported_audio_codecs(output), ';', false);
 
 		ret = service_supports_codec((const char **)output_codecs, QT_TO_UTF8(codec));
@@ -1777,7 +1777,7 @@ void OBSBasicSettings::ResetEncoders(bool streamOnly)
 	if (!vcodecs || IsCustomService()) {
 		const char *output = nullptr;
 
-		obs_enum_output_types_with_protocol(QT_TO_UTF8(protocol), &output, return_first_id);
+		obs_enum_output_types_with_protocol(QT_TO_UTF8(protocol), &output, settings_return_first_id);
 		output_vcodecs = strlist_split(obs_get_output_supported_video_codecs(output), ';', false);
 		vcodecs = (const char **)output_vcodecs.Get();
 	}
@@ -1785,7 +1785,7 @@ void OBSBasicSettings::ResetEncoders(bool streamOnly)
 	if (!acodecs || IsCustomService()) {
 		const char *output = nullptr;
 
-		obs_enum_output_types_with_protocol(QT_TO_UTF8(protocol), &output, return_first_id);
+		obs_enum_output_types_with_protocol(QT_TO_UTF8(protocol), &output, settings_return_first_id);
 		output_acodecs = strlist_split(obs_get_output_supported_audio_codecs(output), ';', false);
 		acodecs = (const char **)output_acodecs.Get();
 	}

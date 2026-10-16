@@ -983,7 +983,7 @@ static void transition_process_audio(obs_source_t *transition, obs_source_t *chi
 	}
 }
 
-static inline uint64_t calc_min_ts(obs_source_t *sources[2])
+static inline uint64_t transition_calc_min_ts(obs_source_t *sources[2])
 {
 	uint64_t min_ts = 0;
 
@@ -998,7 +998,7 @@ static inline uint64_t calc_min_ts(obs_source_t *sources[2])
 	return min_ts;
 }
 
-static inline bool stop_audio(obs_source_t *transition)
+static inline bool transition_stop_audio(obs_source_t *transition)
 {
 	transition->transitioning_audio = false;
 	if (!transition->transitioning_video) {
@@ -1033,22 +1033,22 @@ bool obs_transition_audio_render(obs_source_t *transition, uint64_t *ts_out, str
 	if (sources[1] && obs_source_removed(sources[1]))
 		sources[1] = NULL;
 
-	min_ts = calc_min_ts(sources);
+	min_ts = transition_calc_min_ts(sources);
 
 	if (min_ts) {
 		t = calc_time(transition, min_ts);
 
 		if (t >= 1.0f && transition->transitioning_audio)
-			stopped = stop_audio(transition);
+			stopped = transition_stop_audio(transition);
 
 		sources[0] = transition->transition_sources[0];
 		sources[1] = transition->transition_sources[1];
-		min_ts = calc_min_ts(sources);
+		min_ts = transition_calc_min_ts(sources);
 		if (min_ts)
 			copy_transition_state(transition, &state);
 
 	} else if (!transition->transitioning_video && transition->transitioning_audio) {
-		stopped = stop_audio(transition);
+		stopped = transition_stop_audio(transition);
 	}
 
 	unlock_transition(transition);

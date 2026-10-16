@@ -150,7 +150,7 @@ static void limiter_analyze_envelope(struct limiter_data *cd, float **samples, c
 	cd->envelope = cd->envelope_buf[num_samples - 1];
 }
 
-static inline void process_compression(const struct limiter_data *cd, float **samples, uint32_t num_samples)
+static inline void limiter_process_compression(const struct limiter_data *cd, float **samples, uint32_t num_samples)
 {
 	for (size_t i = 0; i < num_samples; ++i) {
 		const float env_db = mul_to_db(cd->envelope_buf[i]);
@@ -175,7 +175,7 @@ static struct obs_audio_data *limiter_filter_audio(void *data, struct obs_audio_
 
 	float **samples = (float **)audio->data;
 	limiter_analyze_envelope(cd, samples, num_samples);
-	process_compression(cd, samples, num_samples);
+	limiter_process_compression(cd, samples, num_samples);
 	return audio;
 }
 
