@@ -31,7 +31,6 @@ endif()
 #   against it by pointing the loader at that directory. Built whenever cargo is
 #   available (the Flatpak sandbox has none).
 add_library(libobs-objects OBJECT)
-obs_target_pch_deferred(libobs-objects)
 add_library(libobs SHARED)
 add_library(OBS::libobs ALIAS libobs)
 

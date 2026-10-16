@@ -8,11 +8,7 @@
 
 #pragma once
 
-#include "obs-cxx-std.hpp"
-
-#include <QtCore>
-#include <QtGui>
-#include <QtWidgets>
+#include "obs-cxx-qt-std.hpp"
 
 #include <util/c99defs.h>
 #include <util/base.h>

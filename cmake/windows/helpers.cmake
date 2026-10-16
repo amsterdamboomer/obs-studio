@@ -15,8 +15,6 @@ function(set_target_properties_obs target)
 
   message(DEBUG "Setting additional properties for target ${target}...")
 
-  obs_target_pch_deferred(${target})
-
   while(_STPO_PROPERTIES)
     list(POP_FRONT _STPO_PROPERTIES key value)
     set_property(TARGET ${target} PROPERTY ${key} "${value}")
