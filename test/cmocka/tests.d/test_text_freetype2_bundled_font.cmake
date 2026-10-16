@@ -7,9 +7,16 @@ if(OS_LINUX AND TARGET OBS::text-freetype2)
     "${CMAKE_SOURCE_DIR}/plugins/text-freetype2/find-font-unix.c"
     "${CMAKE_SOURCE_DIR}/plugins/text-freetype2/text-freetype2-host-posix.c"
   )
+  # No <dir> entries: the host's installed fonts stay invisible (#1076).
+  file(
+    WRITE "${CMAKE_CURRENT_BINARY_DIR}/ft2-isolated-fonts.conf"
+    "<?xml version=\"1.0\"?>\n<fontconfig><cachedir>${CMAKE_CURRENT_BINARY_DIR}/ft2-isolated-fonts-cache</cachedir></fontconfig>\n"
+  )
   target_compile_definitions(
     test_text_freetype2_bundled_font
-    PRIVATE BUNDLED_FONT_DIR="${CMAKE_SOURCE_DIR}/plugins/text-freetype2/data/fonts"
+    PRIVATE
+      BUNDLED_FONT_DIR="${CMAKE_SOURCE_DIR}/plugins/text-freetype2/data/fonts"
+      ISOLATED_FONTCONFIG="${CMAKE_CURRENT_BINARY_DIR}/ft2-isolated-fonts.conf"
   )
   target_include_directories(
     test_text_freetype2_bundled_font
@@ -26,15 +33,9 @@ if(OS_LINUX AND TARGET OBS::text-freetype2)
   # the same binary under a fontconfig whose system font directory holds a
   # copy of the face. The default face must still resolve to the bundled files.
   set(ft2_host_fonts "${CMAKE_CURRENT_BINARY_DIR}/ft2-host-fonts")
+  file(CREATE_LINK "${CMAKE_SOURCE_DIR}/plugins/text-freetype2/data/fonts" "${ft2_host_fonts}" SYMBOLIC)
   file(
-    CREATE_LINK
-    "${CMAKE_SOURCE_DIR}/plugins/text-freetype2/data/fonts"
-    "${ft2_host_fonts}"
-    SYMBOLIC
-  )
-  file(
-    WRITE
-    "${CMAKE_CURRENT_BINARY_DIR}/ft2-host-fonts.conf"
+    WRITE "${CMAKE_CURRENT_BINARY_DIR}/ft2-host-fonts.conf"
     "<?xml version=\"1.0\"?>\n<fontconfig><dir>${ft2_host_fonts}</dir><cachedir>${CMAKE_CURRENT_BINARY_DIR}/ft2-host-fonts-cache</cachedir></fontconfig>\n"
   )
   add_test(
