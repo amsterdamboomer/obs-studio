@@ -39,7 +39,7 @@ class ValidateStagesTest(unittest.TestCase):
 
     def test_build_stage_packs_the_tree_without_objects(self):
         self.assertIn("OBS_TIER2_PACK", self.text)
-        self.assertRegex(self.text, r"tar\b[^\n]*--exclude='\*\.o'")
+        self.assertRegex(self.text, r"tar --zstd -cf[\s\S]{0,200}--exclude='\*\.o'")
 
     def test_test_stage_runs_a_shard(self):
         self.assertIn("OBS_CTEST_SHARD", self.text)
@@ -57,7 +57,8 @@ class WorkflowTest(unittest.TestCase):
         b = job("rust-linux-tier2-build")
         self.assertIn("OBS_TIER2_STAGE: build", b)
         self.assertIn('OBS_TIER2_MODES: "OFF ON"', b)
-        self.assertIn("name: tier2-tree-${{ matrix.mode }}", b) if "matrix" in b else self.assertIn("tier2-tree-", b)
+        self.assertIn("name: tier2-tree-OFF", b)
+        self.assertIn("name: tier2-tree-ON", b)
 
     def test_test_jobs_are_a_mode_by_shard_matrix(self):
         t = job("rust-linux-tier2")
