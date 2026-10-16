@@ -52,5 +52,4 @@ exec bash "$repo/ci/docker-task.sh" run --name obs-cross --repo "$repo" \
   --machine-volume soldr:/root/.soldr \
   --machine-volume deps:/src/.deps \
   --budget build=6G --budget soldr=12G --budget deps=2G \
-  --env CARGO_INCREMENTAL=0 \
   ${task[@]+"${task[@]}"} -- bash -c "$script" cross "${aliases[@]}"

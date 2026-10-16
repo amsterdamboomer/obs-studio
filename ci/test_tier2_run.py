@@ -146,7 +146,7 @@ class Tier2VolumeTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         run = [l for l in log.splitlines() if l.startswith("run ") and " --name " in l][0]
         self.assertIn("DOCKER_TASK_PRUNE=/build/tree/cargo/build /build/tree-debug/cargo/build", run)
-        self.assertIn("CARGO_INCREMENTAL=0", run)
+        self.assertNotIn("CARGO_INCREMENTAL=0", run)  # incremental stays on; the prune bounds it
         self.assertIn("prune-target --keep-latest --force", log)
         self.assertRegex(run, r"-v docker-task-soldr-[0-9]+\.[0-9]+\.[0-9]+:/opt/docker-task-soldr:ro")
         # One du per budgeted volume after the run.

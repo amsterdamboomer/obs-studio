@@ -25,7 +25,8 @@
 # volume has a size budget (build 8G, ccache 3G, crates 2G each): one over it
 # after a run is removed, so the next run starts it cold instead of growing.
 # After every run, Corrosion's cargo target dirs keep only their newest
-# artifacts (soldr cache prune-target --keep-latest).
+# artifacts (soldr cache prune-target --keep-latest); incremental compilation
+# stays on (the prune keeps each crate's newest incremental data).
 # <id> is a hash of the checkout path. Volumes of deleted checkouts:
 #   ci/docker-task.sh gc --name obs-rust-linux-validate --image obs-rust-linux-validate [--apply]
 set -euo pipefail
@@ -116,6 +117,5 @@ exec bash "$repo/ci/docker-task.sh" run --name obs-rust-linux-validate --repo "$
   --machine-volume cargo-registry:/root/.cargo/registry \
   --machine-volume cargo-git:/root/.cargo/git \
   --budget build=8G --budget ccache=3G --budget cargo-registry=2G --budget cargo-git=2G \
-  --env CARGO_INCREMENTAL=0 \
   --prune-cargo /build/tree/cargo/build --prune-cargo /build/tree-debug/cargo/build \
   "${task[@]}" -- /validate.sh ${args[@]+"${args[@]}"}
