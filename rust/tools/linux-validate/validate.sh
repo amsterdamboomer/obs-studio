@@ -77,7 +77,12 @@ build_number=(-DOBS_BUILD_NUMBER=1)
 # pinned here, give ctest a fresh HOME (the build keeps the real one, which
 # holds rustup's and soldr's state), and print what's left to compare.
 export LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC
-export PATH="/usr/bin:/bin:$PATH"
+# OBS_TIER2_KEEP_PATH=1 keeps the caller's PATH: a host run in a Nix shell
+# (rust/tools/sanitize/shell.nix) has its tools there, and NixOS's /usr/bin
+# (envfs) would shadow them with a cmake that can't find its modules.
+if [ -z "${OBS_TIER2_KEEP_PATH:-}" ]; then
+  export PATH="/usr/bin:/bin:$PATH"
+fi
 test_home="$BUILD/test-home"
 rm -rf "$test_home"
 mkdir -p "$test_home"

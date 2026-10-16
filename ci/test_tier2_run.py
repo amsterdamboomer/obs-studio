@@ -19,8 +19,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TOOLS = ROOT / "rust" / "tools" / "linux-validate"
 
+# STUB_STATE: what `docker container inspect` reports for the task's
+# container (empty: no such container).
 STUB = """#!/bin/sh
 printf '%s\\n' "$*" >> "$STUB_LOG"
+case "$*" in
+"container inspect"*) [ -n "$STUB_STATE" ] && printf '%s\\n' "$STUB_STATE" ;;
+esac
 exit 0
 """
 
@@ -43,6 +48,8 @@ class Tier2VolumeTest(unittest.TestCase):
         repo = self.tmp / name
         dest = repo / "rust" / "tools" / "linux-validate"
         shutil.copytree(TOOLS, dest)
+        (repo / "ci").mkdir()
+        shutil.copy(ROOT / "ci" / "docker-task.sh", repo / "ci" / "docker-task.sh")
         shutil.copy(ROOT / "rust-toolchain.toml", repo / "rust-toolchain.toml")
         for sub in ("plugins/obs-browser", "plugins/obs-websocket"):
             (repo / sub).mkdir(parents=True)
@@ -54,8 +61,8 @@ class Tier2VolumeTest(unittest.TestCase):
         log = self.tmp / f"{repo.name}-{self.calls}.log"
         self.last_log = log
         env = {k: v for k, v in os.environ.items() if not k.startswith(("OBS_TIER2", "OBS_CCACHE"))}
-        env.update(PATH=f"{self.bin}:{env['PATH']}", STUB_LOG=str(log), **(extra_env or {}))
-        subprocess.run(["bash", str(repo / "rust/tools/linux-validate/run.sh")], env=env, check=True)
+        env.update(PATH=f"{self.bin}:{env['PATH']}", STUB_LOG=str(log), STUB_STATE="", **(extra_env or {}))
+        subprocess.run(["bash", str(repo / "rust/tools/linux-validate/run.sh"), *getattr(self, "run_args", [])], env=env, check=True)
         runs = [line.split() for line in log.read_text().splitlines() if line.startswith("run ")]
         self.assertEqual(len(runs), 1, log.read_text())
         args = runs[0]
@@ -87,6 +94,48 @@ class Tier2VolumeTest(unittest.TestCase):
         self.assertNotIn("rsync", text)
         self.assertIn('SRC="${OBS_TIER2_SRC:-/ro}"', text)
         self.assertIn("-DOBS_BUILD_NUMBER=1", text)
+
+    def test_container_is_named_per_checkout_and_removed_after(self):
+        """zackees/bosn#666, emulated by ci/docker-task.sh: one ephemeral
+        container per task and checkout, its name the singleton lock."""
+        repo = self.checkout("a")
+        self.docker_run_mounts(repo)
+        run = [l.split() for l in self.last_log.read_text().splitlines() if l.startswith("run ")][0]
+        self.assertIn("--rm", run)
+        name = run[run.index("--name") + 1]
+        self.assertRegex(name, r"^obs-rust-linux-validate-[0-9a-f]{12}$")
+        self.assertTrue(self.docker_run_mounts(repo)["/build"].endswith(name.rsplit("-", 1)[1]))
+
+    def run_sh(self, repo, *args, state=""):
+        log = self.tmp / f"{repo.name}-direct.log"
+        env = {k: v for k, v in os.environ.items() if not k.startswith(("OBS_TIER2", "OBS_CCACHE"))}
+        env.update(PATH=f"{self.bin}:{env['PATH']}", STUB_LOG=str(log), STUB_STATE=state)
+        r = subprocess.run(["bash", str(repo / "rust/tools/linux-validate/run.sh"), *args], env=env, capture_output=True, text=True)
+        return r, log.read_text() if log.exists() else ""
+
+    def test_second_run_of_a_checkout_refuses_while_one_runs(self):
+        r, log = self.run_sh(self.checkout("a"), state="running")
+        self.assertEqual(r.returncode, 75, r.stderr)
+        self.assertIn("already running", r.stderr)
+        self.assertNotIn("\nrun ", "\n" + log)
+
+    def test_stopped_leftover_container_is_removed(self):
+        r, log = self.run_sh(self.checkout("a"), state="exited")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertRegex(log, r"(?m)^rm -f obs-rust-linux-validate-[0-9a-f]{12}$")
+
+    def test_clean_starts_the_build_volume_over(self):
+        r, log = self.run_sh(self.checkout("a"), "--clean")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertRegex(log, r"(?m)^volume rm obs-rust-linux-validate-build-[0-9a-f]{12}$")
+        self.assertNotRegex(log, r"(?m)^volume rm obs-rust-linux-validate-ccache$")
+        run = [l for l in log.splitlines() if l.startswith("run ")][0]
+        self.assertNotIn("--clean", run)  # run.sh's flag, not validate.sh's
+
+    def test_image_is_tagged_by_content_hash(self):
+        self.docker_run_mounts(self.checkout("a"))
+        build = [l.split() for l in self.last_log.read_text().splitlines() if l.startswith("build ")][0]
+        self.assertRegex(build[build.index("-t") + 1], r"^obs-rust-linux-validate:[0-9a-f]{16}$")
 
     def test_crate_downloads_are_shared(self):
         a = self.docker_run_mounts(self.checkout("a"))
