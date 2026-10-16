@@ -45,6 +45,14 @@ pkg-config --modversion libavcodec
 
 # Qt-linked tests: tests.d fragments that find Qt6.
 tests=$(grep -l "Qt6" "$src"/test/cmocka/tests.d/*.cmake | xargs -n1 basename | sed 's/\.cmake$//' | tr '\n' ' ')
+# A fragment can skip its target when a Qt module is missing from the prebuilt
+# archive (Qt6::Test is: test_hotkey_capture_mnemonic is not built, #992).
+have=$(ninja -C "$build" -t targets all | sed -n 's/^\([A-Za-z0-9_]*\): phony$/\1/p;s/^\([A-Za-z0-9_]*\): CXX_EXECUTABLE_LINKER.*/\1/p')
+built=""
+for t in $tests; do
+  if grep -qx "$t" <<<"$have"; then built="$built $t"; else echo "== skipped (no target, missing Qt module?): $t"; fi
+done
+tests=${built# }
 echo "== Qt-linked tests: $tests"
 
 # shellcheck disable=SC2086
