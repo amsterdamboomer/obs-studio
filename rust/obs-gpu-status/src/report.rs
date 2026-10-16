@@ -87,7 +87,7 @@ impl Report {
 
     /// Attach the log lines that explain the state ([`crate::LogCapture`]).
     pub fn with_log_lines(self, log_lines: Vec<String>) -> Self {
-        todo!("{log_lines:?} {self:?}")
+        Self { log_lines, ..self }
     }
 
     /// The `gpuAcceleration` JSON object:
@@ -125,6 +125,13 @@ impl Report {
                 j.push(',');
             }
             string(&mut j, Some(c));
+        }
+        j.push_str("],\"logLines\":[");
+        for (i, line) in self.log_lines.iter().enumerate() {
+            if i > 0 {
+                j.push(',');
+            }
+            string(&mut j, Some(line));
         }
         j.push_str("]}");
         j

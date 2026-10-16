@@ -137,12 +137,34 @@ impl LogCapture {
 
     /// Keep `line` if it is about graphics, once, up to [`MAX_LOG_LINES`].
     pub fn push(&mut self, line: &str) {
-        todo!("{line}")
+        if self.lines.len() >= MAX_LOG_LINES || !is_graphics_log_line(line) {
+            return;
+        }
+        let line: String = line.trim_end().chars().take(MAX_LOG_LINE_CHARS).collect();
+        if !self.lines.contains(&line) {
+            self.lines.push(line);
+        }
     }
 
     pub fn lines(&self) -> Vec<String> {
-        todo!()
+        self.lines.clone()
     }
+}
+
+/// Log lines about graphics init, the adapter, DRM render nodes and the
+/// EGL/GLX platforms, matched case-insensitively.
+fn is_graphics_log_line(line: &str) -> bool {
+    const MARKERS: [&str; 7] = [
+        "loading up opengl",
+        "loading up direct3d",
+        "drm render node",
+        "egl",
+        "glx",
+        "failed to initialize video",
+        "graphics module",
+    ];
+    let line = line.to_ascii_lowercase();
+    MARKERS.iter().any(|m| line.contains(m))
 }
 
 /// Fewest one-second samples [`FrameStats::from_samples`] judges a window on.

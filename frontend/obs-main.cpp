@@ -22,6 +22,7 @@
 #include <dialogs/OBSPermissions.hpp>
 #endif
 #include <utility/BaseLexer.hpp>
+#include <utility/GpuStatus.hpp>
 #include <utility/OBSTranslator.hpp>
 #include <utility/platform.hpp>
 
@@ -207,6 +208,7 @@ static void do_log(int log_level, const char *msg, va_list args, void *param)
 #endif
 
 	vsnprintf(str, sizeof(str), msg, args);
+	GpuStatus::OnLogLine(str);
 
 #ifdef _WIN32
 	if (IsDebuggerPresent()) {
