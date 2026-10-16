@@ -85,25 +85,37 @@ pub struct FrameWindow {
 }
 
 impl FrameWindow {
+    pub const fn new() -> Self {
+        Self {
+            samples: std::collections::VecDeque::new(),
+        }
+    }
+
     /// Record one sample; 0 (no frame rendered yet) is skipped.
     pub fn push(&mut self, frame_ns: u64) {
-        todo!("{frame_ns}")
+        if frame_ns == 0 {
+            return;
+        }
+        if self.samples.len() == FRAME_WINDOW {
+            self.samples.pop_front();
+        }
+        self.samples.push_back(frame_ns);
     }
 
     pub fn samples(&self) -> Vec<u64> {
-        todo!()
+        self.samples.iter().copied().collect()
     }
 
     /// [`FrameStats::from_samples`] over the window.
     pub fn stats(&self, interval_ns: u64) -> Option<FrameStats> {
-        todo!("{interval_ns}")
+        FrameStats::from_samples(&self.samples(), interval_ns)
     }
 }
 
 /// Whether `adapter` is a graphics API name (`gs_get_device_name()`), not an
 /// adapter: the frontend then failed to read the real one (#929, #943).
 pub fn is_graphics_api_name(adapter: &str) -> bool {
-    todo!("{adapter}")
+    matches!(adapter.trim(), "OpenGL" | "Direct3D 11" | "Metal")
 }
 
 /// Fewest one-second samples [`FrameStats::from_samples`] judges a window on.
