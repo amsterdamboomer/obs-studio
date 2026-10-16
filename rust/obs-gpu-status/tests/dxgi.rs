@@ -88,3 +88,18 @@ fn trailing_spaces_and_nuls_are_trimmed_from_names() {
     let got = devices_from_dxgi(&[adapter("Intel(R) Arc(TM) A770  \0\0", 0x8086, 0x56a0, 0)]);
     assert_eq!(got[0].name.as_deref(), Some("Intel(R) Arc(TM) A770"));
 }
+
+#[test]
+fn nvidia_smi_does_not_duplicate_a_named_dxgi_gpu() {
+    // Review of #958: DXGI names every GPU, and merge_devices only merged
+    // into unnamed entries, so nvidia-smi added the RTX 3060 a second time.
+    let mut devices = devices_from_dxgi(&[adapter("NVIDIA GeForce RTX 3060", 0x10de, 0x2504, 0)]);
+    obs_gpu_status::merge_devices(
+        &mut devices,
+        obs_gpu_status::parse_nvidia_smi(
+            "NVIDIA GeForce RTX 3060, 0x250410DE\nNVIDIA GeForce RTX 2080 Ti, 0x1E0410DE",
+        ),
+    );
+    assert_eq!(devices.len(), 2, "{devices:?}");
+    assert_eq!(devices[1].device_id.as_deref(), Some("1e04"));
+}

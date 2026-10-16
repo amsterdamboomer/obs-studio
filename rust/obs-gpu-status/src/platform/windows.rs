@@ -42,6 +42,10 @@ struct AdapterDesc1 {
     flags: u32,
 }
 
+// `sizeof(DXGI_ADAPTER_DESC1)` from dxgi.h on 64-bit Windows.
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(std::mem::size_of::<AdapterDesc1>() == 312);
+
 // Vtable slots: IUnknown 0-2, IDXGIObject 3-6, IDXGIFactory 7-11,
 // IDXGIFactory1 12-13; IDXGIAdapter 7-9, IDXGIAdapter1 10.
 const SLOT_RELEASE: usize = 2;
