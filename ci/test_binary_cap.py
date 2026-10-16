@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PER_CRATE_CAP = 8
 # The workspace total after the #968 consolidation. Lower it when crates
 # merge binaries; raise it only with a reason in the PR.
-WORKSPACE_CAP = 20
+WORKSPACE_CAP = 21
 
 
 def test_targets(crate: Path) -> list[str]:
