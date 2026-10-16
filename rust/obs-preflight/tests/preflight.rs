@@ -434,7 +434,7 @@ fn cli_rejects_invalid_window_and_malformed_json_without_json_output() {
         .stdin
         .take()
         .expect("stdin")
-        .write_all(CLEAN.as_bytes())
+        .write_all(CLEAN.repeat(64).as_bytes())
         .expect("write trace");
     let output = invalid_window.wait_with_output().expect("wait for CLI");
     assert!(!output.status.success());
