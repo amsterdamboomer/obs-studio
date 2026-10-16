@@ -319,6 +319,11 @@ void build_font_path_info(FT_Face face, FT_Long idx, const char *path)
 	da_free(family_names);
 }
 
+void load_bundled_fonts(const char *dir)
+{
+	(void)dir;
+}
+
 void free_os_font_list(void)
 {
 	for (size_t i = 0; i < font_list.num; i++)

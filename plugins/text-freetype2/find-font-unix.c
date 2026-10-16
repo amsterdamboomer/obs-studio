@@ -24,6 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 void free_os_font_list(void) {}
 
+void load_bundled_fonts(const char *dir)
+{
+	(void)dir;
+}
+
 bool load_cached_os_font_list(void)
 {
 	return true;
