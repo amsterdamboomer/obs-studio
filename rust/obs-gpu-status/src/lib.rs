@@ -74,6 +74,38 @@ pub struct FrameStats {
     pub interval_ns: u64,
 }
 
+/// One-second samples [`FrameWindow`] keeps (the last 15 seconds).
+pub const FRAME_WINDOW: usize = 15;
+
+/// The last [`FRAME_WINDOW`] one-second frame-time averages
+/// (`obs_get_average_frame_time_ns`, sampled once a second).
+#[derive(Debug, Clone, Default)]
+pub struct FrameWindow {
+    samples: std::collections::VecDeque<u64>,
+}
+
+impl FrameWindow {
+    /// Record one sample; 0 (no frame rendered yet) is skipped.
+    pub fn push(&mut self, frame_ns: u64) {
+        todo!("{frame_ns}")
+    }
+
+    pub fn samples(&self) -> Vec<u64> {
+        todo!()
+    }
+
+    /// [`FrameStats::from_samples`] over the window.
+    pub fn stats(&self, interval_ns: u64) -> Option<FrameStats> {
+        todo!("{interval_ns}")
+    }
+}
+
+/// Whether `adapter` is a graphics API name (`gs_get_device_name()`), not an
+/// adapter: the frontend then failed to read the real one (#929, #943).
+pub fn is_graphics_api_name(adapter: &str) -> bool {
+    todo!("{adapter}")
+}
+
 /// Fewest one-second samples [`FrameStats::from_samples`] judges a window on.
 pub const MIN_FRAME_SAMPLES: usize = 5;
 
