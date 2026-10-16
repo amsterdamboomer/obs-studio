@@ -18,6 +18,11 @@ list(APPEND CMAKE_MODULE_PATH "${OBS_SOURCE_ROOT}/cmake/common")
 include(soldr)
 
 set(OBS_CROSS_TARGET "" CACHE STRING "Cross target alias: win-x64, mac-arm64 or mac-x64")
+# Also from the environment: when the toolchain changes the compiler, CMake
+# resets the cache and reconfigures without the -D options it was given.
+if(NOT OBS_CROSS_TARGET AND DEFINED ENV{OBS_CROSS_TARGET})
+  set(OBS_CROSS_TARGET "$ENV{OBS_CROSS_TARGET}" CACHE STRING "Cross target alias" FORCE)
+endif()
 if(NOT OBS_CROSS_TARGET)
   string(REPLACE ";" ", " _aliases "${OBS_CROSS_ALIASES}")
   message(FATAL_ERROR "Set -DOBS_CROSS_TARGET=<alias> (${_aliases})")

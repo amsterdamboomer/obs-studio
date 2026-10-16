@@ -39,9 +39,9 @@ script='set -e; cd /src
 for alias in "$@"; do
   echo "== cross $alias"
   # soldr itself is downloaded once into the shared soldr volume, not per alias.
-  cmake -S cmake/cross -B "/build/$alias" -G Ninja -DOBS_CROSS_TARGET="$alias" \
+  OBS_CROSS_TARGET="$alias" cmake -S cmake/cross -B "/build/$alias" -G Ninja -DOBS_CROSS_TARGET="$alias" \
     -DOBS_SOLDR_DOWNLOAD_DIR="/root/.soldr/obs-bootstrap/$SOLDR_VERSION"
-  cmake --build "/build/$alias" -- -k 0
+  OBS_CROSS_TARGET="$alias" cmake --build "/build/$alias" -- -k 0
 done'
 
 # The image only needs cmake, ninja, git and curl: the Tier 2 one has them.
