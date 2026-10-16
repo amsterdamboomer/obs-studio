@@ -228,6 +228,19 @@ class LaneTableTest(unittest.TestCase):
         got = self.sc(".github/workflows/build-project.yaml")
         self.assertFalse(got.macos or got.windows or got.qt or got.tier2)
 
+    def test_libobs_os_cmake_starts_only_its_os(self):
+        # libobs/cmake/os-<os>.cmake picks one OS's sources (#1051).
+        win = self.sc("libobs/cmake/os-windows.cmake")
+        self.assertEqual((win.windows, win.macos, win.tier2), (True, False, False))
+        mac = self.sc("libobs/cmake/os-macos.cmake")
+        self.assertEqual((mac.windows, mac.macos, mac.tier2), (False, True, False))
+        for path in ("libobs/cmake/os-linux.cmake", "libobs/cmake/os-freebsd.cmake"):
+            got = self.sc(path)
+            self.assertEqual((got.windows, got.macos, got.tier2), (False, False, True), path)
+        # Every other libobs/cmake file stays shared.
+        got = self.sc("libobs/cmake/rust.cmake")
+        self.assertEqual((got.windows, got.macos, got.tier2), (True, True, True))
+
     def test_platform_only_libobs_file_skips_linux_tier2(self):
         self.assertFalse(self.sc("libobs/util/platform-windows.c").tier2)
         self.assertFalse(self.sc("libobs/util/platform-cocoa.m").tier2)
