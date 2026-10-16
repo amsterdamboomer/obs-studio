@@ -263,6 +263,10 @@ if(TARGET libobs-with-rust)
     BUILD_WITH_INSTALL_NAME_DIR
   )
     get_target_property(value libobs ${property})
+    if(property STREQUAL "OUTPUT_NAME" AND value MATCHES "-NOTFOUND$")
+      # No OUTPUT_NAME (macOS): the file name is the target name, libobs.
+      set(value libobs)
+    endif()
     if(NOT value MATCHES "-NOTFOUND$")
       set_property(TARGET libobs-with-rust PROPERTY ${property} "${value}")
     endif()
