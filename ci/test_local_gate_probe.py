@@ -16,6 +16,16 @@ local_gate = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(local_gate)
 
 
+CROSS_TARGET = "x86_64-pc-windows-gnu"
+
+
+def is_cross_step(cmd: list[str]) -> bool:
+    """The rust-test lane's windows-gnu link check (#291, #925). The probe
+    skips it: the scratch crate has no windows-gnu std on CI (#971), and the
+    real rust-test lane checks the cross link on the full workspace."""
+    return CROSS_TARGET in cmd
+
+
 class RustSourceProbeTest(unittest.TestCase):
     def test_changed_source_fails_the_rust_test_lane(self):
         scratch_root = local_gate.ROOT / "target"
@@ -35,6 +45,8 @@ class RustSourceProbeTest(unittest.TestCase):
         output = []
 
         def run_in_scratch(cmd, **kw):
+            if is_cross_step(cmd):
+                return
             result = subprocess.run(
                 cmd, cwd=scratch, env=kw.get("env"), capture_output=True, text=True, timeout=90, check=False
             )
