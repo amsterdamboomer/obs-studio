@@ -772,7 +772,7 @@ jobs:
       # cache and cargo registry; it saves them only outside pull_request
       # (save-cache: auto), i.e. from master pushes.
       - name: Set Up soldr 🦀
-        uses: zackees/setup-soldr@0f223ac68e97fccaaeab026ef1861e5bf73639ac # v0.9.85
+        uses: zackees/setup-soldr@b782f606a2f3beadc35b9e3bf5b4565e005f52ed # v0.9.86
         with:
           # soldr 0.9.33 embeds zccache 1.15.4 (has zackees/zccache#1937).
           version: 0.9.33
@@ -821,7 +821,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set Up soldr 🦀
-        uses: zackees/setup-soldr@0f223ac68e97fccaaeab026ef1861e5bf73639ac # v0.9.85
+        uses: zackees/setup-soldr@b782f606a2f3beadc35b9e3bf5b4565e005f52ed # v0.9.86
         with:
           version: 0.9.33
 
@@ -867,7 +867,7 @@ jobs:
       # cache and cargo registry; it saves them only outside pull_request
       # (save-cache: auto), i.e. from master pushes.
       - name: Set Up soldr 🦀
-        uses: zackees/setup-soldr@0f223ac68e97fccaaeab026ef1861e5bf73639ac # v0.9.85
+        uses: zackees/setup-soldr@b782f606a2f3beadc35b9e3bf5b4565e005f52ed # v0.9.86
         with:
           # soldr 0.9.33 embeds zccache 1.15.4 (has zackees/zccache#1937).
           version: 0.9.33
@@ -958,7 +958,7 @@ jobs:
       # The ENABLE_RUST_LIBOBS=ON build runs cargo through Corrosion; the
       # shims route it through soldr so its compiles hit zccache.
       - name: Set Up soldr 🦀
-        uses: zackees/setup-soldr@0f223ac68e97fccaaeab026ef1861e5bf73639ac # v0.9.85
+        uses: zackees/setup-soldr@b782f606a2f3beadc35b9e3bf5b4565e005f52ed # v0.9.86
         with:
           # soldr 0.9.33 embeds zccache 1.15.4, which names MSVC staticlib
           # outputs <crate>-<hash>.lib (zackees/zccache#1937).
