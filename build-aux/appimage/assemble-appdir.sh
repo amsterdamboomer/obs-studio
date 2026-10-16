@@ -177,6 +177,11 @@ while [ -n "$queue" ]; do
     queue="$(echo "$next" | sed '/^$/d')"
 done
 
+# --- host libraries: shims for optional ones, the preflight for required ones (#959)
+# After the closure (the shims replace DT_NEEDED entries it found) and before the
+# RPATHs are set (set-runpaths.sh then covers the shims and obs-hostlib-check).
+uv run --no-project "$HERE/hostlib/build.py" "$APPDIR"
+
 if [ "$BUNDLE_GLIBC" = 1 ]; then
 # --- the rest of glibc ------------------------------------------------------
 # The closure holds only the parts of glibc that OBS links. The host's GPU drivers

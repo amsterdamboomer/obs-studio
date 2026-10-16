@@ -25,6 +25,7 @@ cannot type, stops it.
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import hashlib
 import json
 import os
@@ -37,6 +38,50 @@ import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+
+
+@dataclass(frozen=True)
+class Install:
+    debian: str
+    fedora: str
+    arch: str
+    suse: str
+    nixos: str
+
+
+@dataclass(frozen=True)
+class HostLib:
+    """One entry of host-libs.json, parsed eagerly and strictly (no dictionaries past parse_host_libs)."""
+
+    name: str
+    kind: str  # required | optional
+    feature: str
+    sonames: tuple[str, ...]
+    symbols: tuple[str, ...]
+    header: str
+    install: Install
+
+
+def parse_host_libs(path: Path) -> tuple[HostLib, ...]:
+    doc = json.loads(path.read_text())
+    if not isinstance(doc, dict) or set(doc) - {"_comment", "libraries"}:
+        raise SystemExit(f"{path}: expected an object with 'libraries'")
+    out = []
+    for i, raw in enumerate(doc["libraries"]):
+        where = f"{path.name}: libraries[{i}]"
+        keys = {"name", "kind", "feature", "sonames", "symbols", "header", "install"}
+        if not isinstance(raw, dict) or set(raw) - keys or {"name", "kind", "feature", "sonames", "symbols",
+                                                             "install"} - set(raw):
+            raise SystemExit(f"{where}: needs exactly {sorted(keys)} (header only for optional libraries)")
+        inst = raw["install"]
+        if not isinstance(inst, dict) or set(inst) != {"debian", "fedora", "arch", "suse", "nixos"}:
+            raise SystemExit(f"{where}.install: needs debian, fedora, arch, suse and nixos")
+        lib = HostLib(raw["name"], raw["kind"], raw["feature"], tuple(raw["sonames"]), tuple(raw["symbols"]),
+                      raw.get("header", ""), Install(**inst))
+        if lib.kind not in ("required", "optional") or (lib.kind == "optional" and not lib.header):
+            raise SystemExit(f"{where}: kind must be required or optional, and optional needs a header")
+        out.append(lib)
+    return tuple(out)
 IMPLIB_COMMIT = "a3e167cf978a5b8a38ec0f710d8c4331e8dcdd9a"
 IMPLIB_SHA256 = "c4fdcae8a6a7db45eb636e5b862be3da914e666d66a803944aedbeeefe0c70aa"
 IMPLIB_URL = f"https://github.com/yugr/Implib.so/archive/{IMPLIB_COMMIT}.tar.gz"
@@ -102,10 +147,10 @@ def c_array(name: str, items: list[str]) -> str:
     return f"static const char *const {name}[] = {{" + "".join(f'"{x}", ' for x in items) + "NULL};\n"
 
 
-def spec_decl(lib: dict, ident: str) -> tuple[str, str]:
+def spec_decl(lib: HostLib, ident: str) -> tuple[str, str]:
     """(array declarations, initializer) for a hostlib_spec; valid C and C++."""
-    arrays = c_array(f"{ident}_sonames", lib["sonames"]) + c_array(f"{ident}_symbols", lib["symbols"])
-    return arrays, f'{{"{lib["name"]}", "{lib["feature"]}", {ident}_sonames, {ident}_symbols}}'
+    arrays = c_array(f"{ident}_sonames", list(lib.sonames)) + c_array(f"{ident}_symbols", list(lib.symbols))
+    return arrays, f'{{"{lib.name}", "{lib.feature}", {ident}_sonames, {ident}_symbols}}'
 
 
 def shim_soname(soname: str, name: str) -> str:
@@ -123,7 +168,7 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     appdir = args.appdir.resolve()
     libdir = appdir / "usr/lib"
-    libs = json.loads((HERE / "host-libs.json").read_text())["libraries"]
+    libs = parse_host_libs(HERE / "host-libs.json")
 
     elves = [f for f in (appdir / "usr").rglob("*") if f.is_file() and not f.is_symlink() and is_elf(f)]
     deps = {f: needed(f) for f in elves}
@@ -131,8 +176,8 @@ def main(argv: list[str] | None = None) -> int:
     with tempfile.TemporaryDirectory(prefix="hostlib-") as tmp_s:
         tmp = Path(tmp_s)
         gen = None
-        for lib in (l for l in libs if l["kind"] == "optional"):
-            for soname in lib["sonames"]:
+        for lib in (x for x in libs if x.kind == "optional"):
+            for soname in lib.sonames:
                 consumers = [f for f, n in deps.items() if soname in n]
                 if not consumers:
                     print(f"hostlib: nothing links {soname}; no shim")
@@ -143,7 +188,7 @@ def main(argv: list[str] | None = None) -> int:
                 imported = sorted(set().union(*(undefined_symbols(c) for c in consumers)) & provided)
                 if not imported:
                     raise SystemExit(f"hostlib: {soname} is linked but nothing from it is imported")
-                work = tmp / lib["name"]
+                work = tmp / lib.name
                 work.mkdir()
                 (work / "symbols.txt").write_text("\n".join(imported) + "\n")
                 run(sys.executable, gen, "--target", "x86_64", "--lazy-load", "--outdir", work,
@@ -151,10 +196,10 @@ def main(argv: list[str] | None = None) -> int:
                     "--symbol-list", work / "symbols.txt", "--library-load-name", soname, real)
                 arrays, init = spec_decl(lib, "spec")
                 (work / "spec.h").write_text(arrays + f"static const struct hostlib_spec HOSTLIB_SPEC = {init};\n")
-                (work / "decls.h").write_text(f"#include <{lib['header']}>\n")
+                (work / "decls.h").write_text(f"#include <{lib.header}>\n")
                 (work / "stubs.h").write_text("".join(f"HOSTLIB_STUB({s})\n" for s in imported))
-                target = shim_soname(soname, lib["name"])
-                status_fn = "obs_hostlib_" + lib["name"].replace("-", "_") + "_available"
+                target = shim_soname(soname, lib.name)
+                status_fn = "obs_hostlib_" + lib.name.replace("-", "_") + "_available"
                 objs = []
                 for src in sorted(work.glob("*.S")) + sorted(work.glob("*.c")):
                     obj = work / (src.name + ".o")
@@ -179,14 +224,14 @@ def main(argv: list[str] | None = None) -> int:
                             run("patchelf", "--clear-symbol-version", s, c)
                 print(f"hostlib: {soname} -> {target} ({len(imported)} symbols, {len(consumers)} consumers)")
 
-        req = [l for l in libs if l["kind"] == "required"]
+        req = [x for x in libs if x.kind == "required"]
         header = tmp / "required.h"
         decls, rows = [], []
         for n, l in enumerate(req):
             arrays, init = spec_decl(l, f"req{n}")
             decls.append(arrays)
-            i = l["install"]
-            rows.append(f'  {{{init}, "{i["debian"]}", "{i["fedora"]}", "{i["arch"]}", "{i["suse"]}", "{i["nixos"]}"}},\n')
+            i = l.install
+            rows.append(f'  {{{init}, "{i.debian}", "{i.fedora}", "{i.arch}", "{i.suse}", "{i.nixos}"}},\n')
         header.write_text("".join(decls) + "static const struct required_lib required[] = {\n" + "".join(rows) + "};\n")
         check = appdir / "usr/bin/obs-hostlib-check"
         run(args.cc, "-std=c11", "-O2", f"-I{HERE}", f'-DHOSTLIB_REQUIRED_HEADER="{header}"',

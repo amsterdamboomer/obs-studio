@@ -182,6 +182,13 @@ if [ -n "$OBS_APPIMAGE_DEBUG" ]; then
     echo "gdb not found; install it to get a backtrace" >&2
 fi
 
+# The libraries OBS cannot start without come from the host (#959): say which
+# is missing, and how to get it, instead of the dynamic loader's one-line error
+# in a terminal nobody has open. (Optional ones are loaded on first use.)
+if [ -x "$HERE/usr/bin/obs-hostlib-check" ] && [ -z "${OBS_HOSTLIB_SKIP_CHECK:-}" ]; then
+    "$HERE/usr/bin/obs-hostlib-check" || exit $?
+fi
+
 # Run OBS as a child (not exec) so that a crash can be reported instead of
 # vanishing as a bare "exited with status 11" from the desktop's launcher.
 started="$(date +%s)"
