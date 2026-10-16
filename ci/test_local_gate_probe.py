@@ -18,9 +18,10 @@ _SPEC.loader.exec_module(local_gate)
 
 class RustSourceProbeTest(unittest.TestCase):
     def test_changed_source_fails_the_rust_test_lane(self):
-        scratch_root = local_gate.ROOT / "target"
-        scratch_root.mkdir(exist_ok=True)
-        scratch_dir = tempfile.TemporaryDirectory(prefix="obs-gate-probe-", dir=scratch_root)
+        # Outside the repo: CI restores a large cargo cache into target/, and
+        # a probe crate built inside that tree failed the windows-gnu link
+        # on every run with the cache (exit 101), turning the lint lane red.
+        scratch_dir = tempfile.TemporaryDirectory(prefix="obs-gate-probe-")
         self.addCleanup(scratch_dir.cleanup)
         scratch = Path(scratch_dir.name)
         (scratch / "src").mkdir()
