@@ -53,5 +53,17 @@ class RustSourceProbeTest(unittest.TestCase):
         self.assertIn("GATE-SOURCE-PROBE", output[-1])
 
 
+class ProbeScopeTest(unittest.TestCase):
+    """The probe checks change detection on the host; it must not depend on
+    the runner having the windows-gnu std, which the scratch crate lacked on
+    CI (#971). The real rust-test lane checks the cross link."""
+
+    def test_cross_steps_are_skipped_in_the_scratch_crate(self):
+        self.assertTrue(is_cross_step(["soldr", "rustup", "target", "add", "x86_64-pc-windows-gnu"]))
+        self.assertTrue(is_cross_step(
+            ["soldr", "cargo", "test", "--workspace", "--locked", "--no-run", "--target", "x86_64-pc-windows-gnu"]))
+        self.assertFalse(is_cross_step(["soldr", "cargo", "test", "--workspace", "--locked"]))
+
+
 if __name__ == "__main__":
     unittest.main()
