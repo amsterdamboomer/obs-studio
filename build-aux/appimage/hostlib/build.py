@@ -58,7 +58,7 @@ class HostLib:
     feature: str
     sonames: tuple[str, ...]
     symbols: tuple[str, ...]
-    header: str
+    headers: tuple[str, ...]
     install: Install
 
 
@@ -69,17 +69,17 @@ def parse_host_libs(path: Path) -> tuple[HostLib, ...]:
     out = []
     for i, raw in enumerate(doc["libraries"]):
         where = f"{path.name}: libraries[{i}]"
-        keys = {"name", "kind", "feature", "sonames", "symbols", "header", "install"}
+        keys = {"name", "kind", "feature", "sonames", "symbols", "headers", "install"}
         if not isinstance(raw, dict) or set(raw) - keys or {"name", "kind", "feature", "sonames", "symbols",
                                                              "install"} - set(raw):
-            raise SystemExit(f"{where}: needs exactly {sorted(keys)} (header only for optional libraries)")
+            raise SystemExit(f"{where}: needs exactly {sorted(keys)} (headers only for optional libraries)")
         inst = raw["install"]
         if not isinstance(inst, dict) or set(inst) != {"debian", "fedora", "arch", "suse", "nixos"}:
             raise SystemExit(f"{where}.install: needs debian, fedora, arch, suse and nixos")
         lib = HostLib(raw["name"], raw["kind"], raw["feature"], tuple(raw["sonames"]), tuple(raw["symbols"]),
-                      raw.get("header", ""), Install(**inst))
-        if lib.kind not in ("required", "optional") or (lib.kind == "optional" and not lib.header):
-            raise SystemExit(f"{where}: kind must be required or optional, and optional needs a header")
+                      tuple(raw.get("headers", ())), Install(**inst))
+        if lib.kind not in ("required", "optional") or (lib.kind == "optional" and not lib.headers):
+            raise SystemExit(f"{where}: kind must be required or optional, and optional needs headers")
         out.append(lib)
     return tuple(out)
 IMPLIB_COMMIT = "a3e167cf978a5b8a38ec0f710d8c4331e8dcdd9a"
@@ -196,7 +196,7 @@ def main(argv: list[str] | None = None) -> int:
                     "--symbol-list", work / "symbols.txt", "--library-load-name", soname, real)
                 arrays, init = spec_decl(lib, "spec")
                 (work / "spec.h").write_text(arrays + f"static const struct hostlib_spec HOSTLIB_SPEC = {init};\n")
-                (work / "decls.h").write_text(f"#include <{lib.header}>\n")
+                (work / "decls.h").write_text("".join(f"#include <{h}>\n" for h in lib.headers))
                 (work / "stubs.h").write_text("".join(f"HOSTLIB_STUB({s})\n" for s in imported))
                 target = shim_soname(soname, lib.name)
                 status_fn = "obs_hostlib_" + lib.name.replace("-", "_") + "_available"
@@ -234,7 +234,7 @@ def main(argv: list[str] | None = None) -> int:
             rows.append(f'  {{{init}, "{i.debian}", "{i.fedora}", "{i.arch}", "{i.suse}", "{i.nixos}"}},\n')
         header.write_text("".join(decls) + "static const struct required_lib required[] = {\n" + "".join(rows) + "};\n")
         check = appdir / "usr/bin/obs-hostlib-check"
-        run(args.cc, "-std=c11", "-O2", f"-I{HERE}", f'-DHOSTLIB_REQUIRED_HEADER="{header}"',
+        run(args.cc, "-std=c11", "-O2", "-fPIE", "-pie", f"-I{HERE}", f'-DHOSTLIB_REQUIRED_HEADER="{header}"',
             HERE / "hostlib-check.c", HERE / "hostlib.c", "-o", check, "-ldl")
         print(f"hostlib: {check.relative_to(appdir)} checks {len(req)} required libraries")
     return 0

@@ -53,4 +53,6 @@ build = { scope = "stack", destination = "/src/build_ubuntu" }
 # `bosn run --task appimage-228`: the AppImage on the glibc 2.28 base (#926).
 [task.appimage-228]
 stack = "appimage-228"
-cmd = "uv run build-aux/appimage/build.py --base manylinux --output-dir build_appimage"
+# The build directory is a persistent volume: drop CMake's cache so a changed
+# dependency (a newer prebuilt library) is found again, as a fresh CI checkout would.
+cmd = "sh -c 'rm -f build_ubuntu/CMakeCache.txt && uv run build-aux/appimage/build.py --base manylinux --output-dir build_appimage'"

@@ -211,7 +211,7 @@ def plan(args: argparse.Namespace) -> list[Step]:
         }),
         "build": Step("build", "Build", BUILD),
         "appdir": Step("appdir", "Assemble AppDir", APPDIR, {
-            "AVUTIL_LIB": "/opt/obs-deps/lib/libavutil.so.60" if args.base == "manylinux"
+            "AVUTIL_LIB": "/opt/obs-deps/ffmpeg/lib/libavutil.so.60" if args.base == "manylinux"
             else "avutil-compat/libavutil.so.60",
         }),
         "appimage": Step("appimage", "Create AppImage", APPIMAGE, {
@@ -250,6 +250,14 @@ def main(argv: list[str] | None = None) -> int:
             print(step.script.strip("\n"))
         return 0
 
+    if args.base == "manylinux":
+        # The exact glibc OBS is linked against: the digest-pinned manylinux_2_28
+        # image's (#926). Anything else would silently move the AppImage's floor.
+        libc = os.confstr("CS_GNU_LIBC_VERSION") or ""
+        if libc != "glibc 2.28":
+            print(f"==> refusing to build: {libc or 'unknown libc'}, expected exactly glibc 2.28 "
+                  "(build-aux/appimage/manylinux/Dockerfile)", file=sys.stderr)
+            return 1
     shim = SUDO_SHIM if needs_sudo_shim() else ""
     # The deps step creates the apt archive dir that later steps' apt-get
     # calls use; with --skip-deps nothing else would.

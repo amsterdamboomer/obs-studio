@@ -79,8 +79,20 @@ mkdir -p "$LIBDIR"
 # bundled is not "found on the host instead": it is silently missing, or - worse, when
 # the host's Qt differs - loaded from the host and crashing (QIcon -> libqsvgicon.so).
 OBS_DEPS="${OBS_DEPS:-/opt/obs-deps}" # the manylinux base's source-built libraries
-QT_PLUGINS="$SYSLIB/qt6/plugins"
-[ -d "$QT_PLUGINS" ] || QT_PLUGINS="$(dirname "$(find /usr/lib /usr/lib64 "$OBS_DEPS" -path '*/plugins/platforms/libqxcb.so' 2>/dev/null | head -1)")/.."
+# Ask the Qt we built against where its plugins are; never search the file
+# system for them (a system Qt 5 in /usr/lib64/qt5/plugins matched first once,
+# and Qt 5 plugins next to Qt 6 libraries would crash at load).
+QT_PLUGINS=""
+for qtpaths in "$OBS_DEPS/qt6/bin/qtpaths6" "$OBS_DEPS/qt6/bin/qtpaths" qtpaths6; do
+    if command -v "$qtpaths" >/dev/null 2>&1; then
+        QT_PLUGINS="$("$qtpaths" --query QT_INSTALL_PLUGINS 2>/dev/null)" && break
+    fi
+done
+[ -d "$QT_PLUGINS" ] || QT_PLUGINS="$SYSLIB/qt6/plugins"
+[ -f "$QT_PLUGINS/platforms/libqxcb.so" ] || {
+    echo "::error::no Qt 6 plugins (looked at $QT_PLUGINS)" >&2
+    exit 1
+}
 echo "Qt plugins from: $(realpath "$QT_PLUGINS")"
 mkdir -p "$LIBDIR/qt6/plugins"
 for d in platforms platforminputcontexts platformthemes imageformats iconengines styles generic \
@@ -92,7 +104,7 @@ done
 # the package put them somewhere unexpected, and fail the build if they do not exist.
 for need in platforms/libqxcb.so imageformats/libqsvg.so iconengines/libqsvgicon.so; do
     if [ ! -e "$LIBDIR/qt6/plugins/$need" ]; then
-        found="$(find /usr/lib /usr/lib64 "$OBS_DEPS" -path "*/$need" 2>/dev/null | head -1)"
+        found="$(find "$QT_PLUGINS/.." /usr/lib/*/qt6 /usr/lib64/qt6 -path "*/$need" 2>/dev/null | head -1)"
         if [ -n "$found" ]; then
             mkdir -p "$LIBDIR/qt6/plugins/$(dirname "$need")"
             cp -aL "$found" "$LIBDIR/qt6/plugins/$need"
@@ -103,6 +115,9 @@ for need in platforms/libqxcb.so imageformats/libqsvg.so iconengines/libqsvgicon
         fi
     fi
 done
+# Qt's GTK 3 platform theme would pull GTK 3 into the bundle; OBS brings its own
+# themes and Qt keeps the xdg-desktop-portal one. (The Ubuntu Qt never had it.)
+rm -f "$LIBDIR/qt6/plugins/platformthemes/libqgtk3.so"
 find "$LIBDIR/qt6/plugins" -name '*.so' | sed "s|$LIBDIR/||" | sort
 
 # Qt must only ever look at the bundled plugins (see AppRun).
@@ -147,7 +162,9 @@ find "$MODULE_ROOT" -name '*.so' -printf '%f\n' | sort >"$DATA_ROOT/appimage-mod
 # Install the source-built version first, so closure discovery uses it and
 # cannot replace it with the build host's library requiring a newer VA API.
 install -m 644 "$COMPAT_LIB" "$LIBDIR/libavutil.so.60"
-export LD_LIBRARY_PATH="$LIBDIR"
+# Prepend: on the glibc 2.28 base the prebuilt libraries (/opt/obs-deps/<tool>/lib)
+# are only on the image's LD_LIBRARY_PATH, and the closure must find them to bundle them.
+export LD_LIBRARY_PATH="$LIBDIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 is_elf() { [ "$(head -c4 "$1" 2>/dev/null | od -An -c | tr -d ' ')" = '177ELF' ]; }
 

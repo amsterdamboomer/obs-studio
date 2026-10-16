@@ -47,7 +47,7 @@
       "feature": "VA-API hardware encoding and decoding",
       "sonames": ["libva.so.2"],
       "symbols": ["vaInitialize", "vaCreateSurfaces", "vaExportSurfaceHandle"],
-      "header": "va/va.h",
+      "headers": ["va/va.h", "va/va_str.h"],
       "install": {"debian": "libva2", "fedora": "libva", "arch": "libva", "suse": "libva2", "nixos": "hardware.graphics.enable = true"}
     },
     {
@@ -56,7 +56,7 @@
       "feature": "VA-API hardware encoding and decoding",
       "sonames": ["libva-drm.so.2"],
       "symbols": ["vaGetDisplayDRM"],
-      "header": "va/va_drm.h",
+      "headers": ["va/va.h", "va/va_drm.h"],
       "install": {"debian": "libva-drm2", "fedora": "libva", "arch": "libva", "suse": "libva-drm2", "nixos": "hardware.graphics.enable = true"}
     },
     {
@@ -65,7 +65,7 @@
       "feature": "VA-API hardware encoding and decoding",
       "sonames": ["libva-x11.so.2"],
       "symbols": ["vaGetDisplay"],
-      "header": "va/va_x11.h",
+      "headers": ["va/va.h", "va/va_x11.h"],
       "install": {"debian": "libva-x11-2", "fedora": "libva", "arch": "libva", "suse": "libva-x11-2", "nixos": "hardware.graphics.enable = true"}
     }
   ]
