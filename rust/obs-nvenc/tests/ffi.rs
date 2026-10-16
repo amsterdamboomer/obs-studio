@@ -173,11 +173,14 @@ fn plugin_cmake_builds_the_c_loader_and_a_rust_twin() {
         "the installed plugin must build cuda-load.c"
     );
     assert!(
-        cmake.contains("add_library(obs-nvenc-with-rust MODULE ${_obs_nvenc_sources} cuda-load-rust.c)"),
+        cmake.contains(
+            "add_library(obs-nvenc-with-rust MODULE ${_obs_nvenc_sources} cuda-load-rust.c)"
+        ),
         "the Rust twin must build cuda-load-rust.c"
     );
     assert!(
-        cmake.contains("target_link_libraries(obs-nvenc-with-rust PRIVATE obs_nvenc_plugin-static)"),
+        cmake
+            .contains("target_link_libraries(obs-nvenc-with-rust PRIVATE obs_nvenc_plugin-static)"),
         "only the Rust twin links the obs-nvenc-plugin staticlib"
     );
 }
