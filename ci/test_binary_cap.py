@@ -18,9 +18,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PER_CRATE_CAP = 8
-# The workspace total after the #968 consolidation. Lower it when crates
-# merge binaries; raise it only with a reason in the PR.
-WORKSPACE_CAP = 21
+# The workspace total after the #968 consolidation, plus obs-preflight's one
+# binary (#814). Lower it when crates merge binaries; raise it only with a
+# reason in the PR.
+WORKSPACE_CAP = 22
 
 
 def test_targets(crate: Path) -> list[str]:
