@@ -139,6 +139,23 @@ pub fn configure_libobs_variant(
     }
 }
 
+pub fn configure_module(target: &str, library: &mut crate::SharedLibrary) -> Result<(), String> {
+    if target.contains("linux") {
+        library.file_name = Some(format!("{}.so", library.name));
+        library.compile_options.extend(
+            ["-std=gnu17", "-fno-strict-aliasing", "-fvisibility=hidden"].map(String::from),
+        );
+        library
+            .link_options
+            .extend(["-lm", "-pthread"].map(String::from));
+        Ok(())
+    } else {
+        Err(format!(
+            "native OBS module graph for {target} is not implemented yet"
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -98,3 +98,26 @@ The same 51 unchanged C
 executables pass against both newly built variants with their loaded library
 paths checked. The rest of the complete application/platform/test/packaging
 requirements above remain outstanding.
+
+
+## Linux transitions and filters checkpoint
+
+`plugins::build_transitions` and `plugins::build_filters` build actual OBS
+modules through the native engine and link them to the shared C library.
+The filters options preserve independent SpeexDSP and RNNoise switches. The
+bundled RNNoise fallback uses a canonical JSON C source list shared with CMake;
+the CMake target retains the same 18 source/header entries.
+
+The opt-in integration test loads these modules through `obs_open_module` and
+`obs_init_module`, then verifies transition/filter registration against both
+libobs variants. Each variant runs in a separate process: the shared SONAME
+allows plugin dependencies to retain a previous libobs instance if both variants
+are tested in the same process. This matches existing C test isolation and normal
+OBS execution. These checks do not yet exercise rendering or audio processing.
+
+
+All four SpeexDSP/RNNoise combinations pass module registration against both
+variants, as does disabled HEVC with the default modules. The actual CMake
+RNNoise fallback target also compiles all seven objects after the canonical-list
+migration; Clippy, gersemi and the build-group/platform guards pass. System
+RNNoise discovery is implemented, but this host exercises the bundled fallback.

@@ -3,7 +3,21 @@ use obs_build::{NativeBuild, libobs, plugins};
 use std::{ffi::c_void, path::PathBuf};
 
 #[test]
-fn c_and_rust_twins_preserve_the_public_data_and_lifecycle_apis() {
+fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
+    if let Some(path) = std::env::var_os("OBS_BUILD_TEST_CORE") {
+        let modules: Vec<(PathBuf, PathBuf)> =
+            serde_json::from_str(&std::env::var("OBS_BUILD_TEST_MODULES").unwrap()).unwrap();
+        let modules: Vec<_> = modules
+            .into_iter()
+            .map(|(library, data)| plugins::Module { library, data })
+            .collect();
+        exercise(
+            &PathBuf::from(path),
+            &modules,
+            std::env::var_os("OBS_BUILD_DISABLE_HEVC").is_none(),
+        );
+        return;
+    }
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let archive = PathBuf::from(
         std::env::var_os("OBS_BUILD_RUST_ARCHIVE")
@@ -24,109 +38,132 @@ fn c_and_rust_twins_preserve_the_public_data_and_lifecycle_apis() {
     let libraries = libobs::build_pair(&build, &root, &options, &archive).unwrap();
     assert_ne!(libraries.reference, libraries.with_rust);
     assert_eq!(exports(&libraries.reference), exports(&libraries.with_rust));
+    let filters = plugins::FiltersOptions {
+        speexdsp: std::env::var_os("OBS_BUILD_DISABLE_SPEEXDSP").is_none(),
+        rnnoise: std::env::var_os("OBS_BUILD_DISABLE_RNNOISE").is_none(),
+    };
     let modules = [
         plugins::build_transitions(&build, &root, &libraries.reference).unwrap(),
-        plugins::build_filters(
-            &build,
-            &root,
-            &libraries.reference,
-            &plugins::FiltersOptions::default(),
-        )
-        .unwrap(),
+        plugins::build_filters(&build, &root, &libraries.reference, &filters).unwrap(),
     ];
+    // libobs twins intentionally share one SONAME. Loading both in one process
+    // can retain a prior plugin's dependency and bind it to the wrong OBS state.
+    // Run each variant in the same fresh-process isolation as the C tests.
+    let modules: Vec<_> = modules
+        .iter()
+        .map(|module| (&module.library, &module.data))
+        .collect();
+    let serialized = serde_json::to_string(&modules).unwrap();
     for path in [&libraries.reference, &libraries.with_rust] {
-        // SAFETY: these signatures come from the unchanged obs.h/obs-data.h.
-        // Symbols are called only while their library is loaded, data handles
-        // are released, and each library owns its complete startup/shutdown.
-        unsafe {
-            let library = libloading::Library::new(path).unwrap();
-            for symbol in [
-                b"obs_hevc_keyframe".as_slice(),
-                b"obs_parse_hevc_packet".as_slice(),
-                b"obs_parse_hevc_packet_priority".as_slice(),
-                b"obs_extract_hevc_headers".as_slice(),
-            ] {
-                assert_eq!(
-                    library.get::<unsafe extern "C" fn()>(symbol).is_ok(),
-                    options.hevc
-                );
-            }
-            let startup = library
-                .get::<unsafe extern "C" fn(
-                    *const std::ffi::c_char,
-                    *const std::ffi::c_char,
-                    *mut c_void,
-                ) -> bool>(b"obs_startup")
-                .unwrap();
-            let shutdown = library
-                .get::<unsafe extern "C" fn()>(b"obs_shutdown")
-                .unwrap();
-            let create = library
-                .get::<unsafe extern "C" fn() -> *mut c_void>(b"obs_data_create")
-                .unwrap();
-            let set = library
-                .get::<unsafe extern "C" fn(*mut c_void, *const std::ffi::c_char, i64)>(
-                    b"obs_data_set_int",
-                )
-                .unwrap();
-            let get = library
-                .get::<unsafe extern "C" fn(*mut c_void, *const std::ffi::c_char) -> i64>(
-                    b"obs_data_get_int",
-                )
-                .unwrap();
-            let release = library
-                .get::<unsafe extern "C" fn(*mut c_void)>(b"obs_data_release")
-                .unwrap();
-            assert!(startup(
-                c"en-US".as_ptr(),
-                std::ptr::null(),
-                std::ptr::null_mut()
-            ));
-            let open = library
-                .get::<unsafe extern "C" fn(
-                    *mut *mut c_void,
-                    *const std::ffi::c_char,
-                    *const std::ffi::c_char,
-                ) -> i32>(b"obs_open_module")
-                .unwrap();
-            let init = library
-                .get::<unsafe extern "C" fn(*mut c_void) -> bool>(b"obs_init_module")
-                .unwrap();
-            for module in &modules {
-                let binary = std::ffi::CString::new(module.library.to_str().unwrap()).unwrap();
-                let data_path = std::ffi::CString::new(module.data.to_str().unwrap()).unwrap();
-                let mut handle = std::ptr::null_mut();
-                assert_eq!(open(&mut handle, binary.as_ptr(), data_path.as_ptr()), 0);
-                assert!(init(handle));
-            }
-            for (symbol, expected) in [
-                (b"obs_enum_transition_types".as_slice(), "fade_transition"),
-                (b"obs_enum_filter_types".as_slice(), "noise_suppress_filter"),
-                (b"obs_enum_filter_types".as_slice(), "gain_filter"),
-            ] {
-                let enumerate = library
-                    .get::<unsafe extern "C" fn(usize, *mut *const std::ffi::c_char) -> bool>(
-                        symbol,
-                    )
-                    .unwrap();
-                let mut found = false;
-                for index in 0..1024 {
-                    let mut name = std::ptr::null();
-                    if !enumerate(index, &mut name) {
-                        break;
-                    }
-                    assert!(!name.is_null());
-                    found |= std::ffi::CStr::from_ptr(name).to_str().unwrap() == expected;
-                }
-                assert!(found, "{expected} was not registered");
-            }
-            let data = create();
-            assert!(!data.is_null());
-            set(data, c"value".as_ptr(), -9223372036854775807);
-            assert_eq!(get(data, c"value".as_ptr()), -9223372036854775807);
-            release(data);
-            shutdown();
+        let run = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis",
+                "--nocapture",
+            ])
+            .env("OBS_BUILD_TEST_CORE", path)
+            .env("OBS_BUILD_TEST_MODULES", &serialized)
+            .output()
+            .unwrap();
+        assert!(
+            run.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&run.stdout),
+            String::from_utf8_lossy(&run.stderr)
+        );
+    }
+}
+
+fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
+    // SAFETY: these signatures come from the unchanged obs.h/obs-data.h.
+    // Symbols are called only while their library is loaded, data handles
+    // are released, and each library owns its complete startup/shutdown.
+    unsafe {
+        let library = libloading::Library::new(path).unwrap();
+        for symbol in [
+            b"obs_hevc_keyframe".as_slice(),
+            b"obs_parse_hevc_packet".as_slice(),
+            b"obs_parse_hevc_packet_priority".as_slice(),
+            b"obs_extract_hevc_headers".as_slice(),
+        ] {
+            assert_eq!(library.get::<unsafe extern "C" fn()>(symbol).is_ok(), hevc);
         }
+        let startup = library
+            .get::<unsafe extern "C" fn(
+                *const std::ffi::c_char,
+                *const std::ffi::c_char,
+                *mut c_void,
+            ) -> bool>(b"obs_startup")
+            .unwrap();
+        let shutdown = library
+            .get::<unsafe extern "C" fn()>(b"obs_shutdown")
+            .unwrap();
+        let create = library
+            .get::<unsafe extern "C" fn() -> *mut c_void>(b"obs_data_create")
+            .unwrap();
+        let set = library
+            .get::<unsafe extern "C" fn(*mut c_void, *const std::ffi::c_char, i64)>(
+                b"obs_data_set_int",
+            )
+            .unwrap();
+        let get = library
+            .get::<unsafe extern "C" fn(*mut c_void, *const std::ffi::c_char) -> i64>(
+                b"obs_data_get_int",
+            )
+            .unwrap();
+        let release = library
+            .get::<unsafe extern "C" fn(*mut c_void)>(b"obs_data_release")
+            .unwrap();
+        assert!(startup(
+            c"en-US".as_ptr(),
+            std::ptr::null(),
+            std::ptr::null_mut()
+        ));
+        let open = library
+            .get::<unsafe extern "C" fn(
+                *mut *mut c_void,
+                *const std::ffi::c_char,
+                *const std::ffi::c_char,
+            ) -> i32>(b"obs_open_module")
+            .unwrap();
+        let init = library
+            .get::<unsafe extern "C" fn(*mut c_void) -> bool>(b"obs_init_module")
+            .unwrap();
+        for module in modules {
+            let binary = std::ffi::CString::new(module.library.to_str().unwrap()).unwrap();
+            let data_path = std::ffi::CString::new(module.data.to_str().unwrap()).unwrap();
+            let mut handle = std::ptr::null_mut();
+            assert_eq!(open(&mut handle, binary.as_ptr(), data_path.as_ptr()), 0);
+            assert!(init(handle));
+        }
+        for (symbol, expected) in [
+            (b"obs_enum_transition_types".as_slice(), "fade_transition"),
+            (b"obs_enum_filter_types".as_slice(), "noise_suppress_filter"),
+            (b"obs_enum_filter_types".as_slice(), "gain_filter"),
+        ] {
+            let enumerate = library
+                .get::<unsafe extern "C" fn(usize, *mut *const std::ffi::c_char) -> bool>(symbol)
+                .unwrap();
+            let mut found = false;
+            for index in 0..1024 {
+                let mut name = std::ptr::null();
+                if !enumerate(index, &mut name) {
+                    break;
+                }
+                assert!(!name.is_null());
+                found |= std::ffi::CStr::from_ptr(name).to_str().unwrap() == expected;
+            }
+            let enabled = expected != "noise_suppress_filter"
+                || std::env::var_os("OBS_BUILD_DISABLE_SPEEXDSP").is_none()
+                || std::env::var_os("OBS_BUILD_DISABLE_RNNOISE").is_none();
+            assert_eq!(found, enabled, "unexpected registration of {expected}");
+        }
+        let data = create();
+        assert!(!data.is_null());
+        set(data, c"value".as_ptr(), -9223372036854775807);
+        assert_eq!(get(data, c"value".as_ptr()), -9223372036854775807);
+        release(data);
+        shutdown();
     }
 }
 
