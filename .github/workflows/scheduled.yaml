@@ -83,7 +83,7 @@ jobs:
   # Explicit security scans belong to nightly/manual runs, never PR/merge_group.
   codeql:
     name: Nightly CodeQL (${{ matrix.language }})
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && (github.event_name != 'schedule' || github.repository == 'obs-rust/obs-studio')
     runs-on: ubuntu-24.04
     permissions:
       contents: read
