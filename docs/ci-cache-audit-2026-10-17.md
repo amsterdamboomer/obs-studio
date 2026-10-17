@@ -129,6 +129,20 @@ the compiler archive and compiled all 783 units cold (290-second build step,
 395-second job). Source and runner differences prevent a matched timing
 attribution. Family isolation alone has not established durable retention.
 
+That product-code queue run completed successfully in 843 seconds from run
+creation to required-gate completion. Its Fast Gate job (209 seconds) ran
+entirely within the Tier 2 build job (395 seconds), verifying 209 seconds
+of actual overlap on a code change. OFF/ON each registered 293 tests with
+zero failures; CTest times were 316.03/316.71 seconds. Their concurrent job
+phase took 390 seconds and consumed 772 runner-seconds. All non-skipped
+jobs together consumed 1,499 runner-seconds; these are observed job durations,
+not a monetary billing calculation. The older code-queue baseline median
+was 954 seconds across eight samples, with different source, test counts
+and runner conditions. One new sample does not establish a causal speedup
+or replace the required representative-day comparison.
+[Raw critical-path observations](ci-evidence/2026-10-17-code-queue-critical-path.json)
+include the independent OFF/ON results and coverage caveats.
+
 ### Native Rust profile verification
 
 Master [39063249804](https://github.com/obs-rust/obs-studio/actions/runs/39063249804)
