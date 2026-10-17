@@ -48,6 +48,20 @@ class AptCacheTest(unittest.TestCase):
             install_git = j[j.index("Install Git"):j.index("actions/checkout@")]
             self.assertIn("zstd", install_git, name)
 
+    def test_scoped_target_lane_reuses_the_existing_apt_archive(self):
+        text = WORKFLOW.read_text()
+        restore = text.index('- name: Restore Touched Target apt Downloads')
+        build = text.index('- name: Build Touched Linux Targets')
+        self.assertLess(restore, build)
+        block = text[restore:build]
+        self.assertIn('actions/cache/restore@', block)
+        self.assertIn('path: /var/cache/apt/archives', block)
+        self.assertIn("key: tier2-apt-ubuntu2604-f144425f-${{ hashFiles('rust/tools/linux-validate/apt-packages.txt') }}", block)
+        self.assertIn('needs.check-event.outputs.linux_targets', block)
+        prepare = text[text.index('- name: Prepare Touched Target apt Directory'):restore]
+        self.assertIn('sudo chown', prepare)
+        self.assertNotIn('actions/cache/save@', text[restore:build])
+
     def test_only_master_build_job_saves(self):
         # Every PR and queue run saved its own 323 MB entry and pushed the
         # repo past its 10 GB cache limit, evicting the ccache.
