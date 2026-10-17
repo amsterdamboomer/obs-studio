@@ -24,6 +24,8 @@ pub struct SharedLibrary {
     pub unity: bool,
     pub definitions: Vec<(String, Option<String>)>,
     pub compile_options: Vec<String>,
+    pub c_compile_options: Vec<String>,
+    pub cpp_compile_options: Vec<String>,
     pub link_options: Vec<String>,
     pub file_name: Option<String>,
 }

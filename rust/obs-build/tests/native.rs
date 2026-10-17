@@ -183,3 +183,31 @@ fn deploying_mux_helper_in_place_preserves_its_contents() {
     assert_eq!(artifacts.deploy_muxer(directory.path()).unwrap(), helper);
     assert_eq!(std::fs::read(helper).unwrap(), b"existing executable");
 }
+
+#[test]
+fn mixed_c_and_cpp_use_independent_flags_and_the_cpp_linker() {
+    let directory = tempfile::tempdir().unwrap();
+    let c_source = directory.path().join("helper.c");
+    let cpp_source = directory.path().join("main.cpp");
+    std::fs::write(&c_source, "#if !defined(C_ONLY) || defined(CPP_ONLY)\n#error wrong C flags\n#endif\nint helper(void) { return 42; }\n").unwrap();
+    std::fs::write(&cpp_source, "#include <vector>\n#if !defined(CPP_ONLY) || defined(C_ONLY)\n#error wrong C++ flags\n#endif\nextern \"C\" int helper(void);\nint main() { std::vector<int> values{helper()}; return values.at(0) == 42 ? 0 : 1; }\n").unwrap();
+    let target = SharedLibrary {
+        name: "mixed-native".into(),
+        sources: vec![c_source, cpp_source],
+        c_compile_options: vec!["-DC_ONLY".into()],
+        cpp_compile_options: vec!["-DCPP_ONLY".into()],
+        ..SharedLibrary::default()
+    };
+    let build = NativeBuild {
+        host: env!("OBS_BUILD_HOST").into(),
+        target: env!("OBS_BUILD_TARGET").into(),
+        output: directory.path().join("out"),
+    };
+    let artifact = build.executable(&target).unwrap();
+    assert!(
+        std::process::Command::new(artifact)
+            .status()
+            .unwrap()
+            .success()
+    );
+}
