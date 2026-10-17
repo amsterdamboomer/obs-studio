@@ -537,6 +537,20 @@ pub enum Utilization {
 /// `gpu_busy_percent` file of the `card<n>` under `root`'s
 /// `sys/class/drm` whose PCI address is `pci` (from [`render_adapter`]).
 /// The cheapest AMD source; a fallback when fdinfo has no engine times.
-pub fn amdgpu_busy_percent(_root: &Path, _pci: &str) -> Utilization {
-    Utilization::Unavailable
+pub fn amdgpu_busy_percent(root: &Path, pci: &str) -> Utilization {
+    let Ok(entries) = std::fs::read_dir(root.join("sys/class/drm")) else {
+        return Utilization::Unavailable;
+    };
+    entries
+        .flatten()
+        .filter(|e| {
+            e.file_name()
+                .to_str()
+                .is_some_and(|n| is_drm_name(n, "card"))
+        })
+        .find(|e| pci_address_of(&e.path()).as_deref() == Some(pci))
+        .and_then(|e| std::fs::read_to_string(e.path().join("device/gpu_busy_percent")).ok())
+        .and_then(|s| s.trim().parse::<u8>().ok())
+        .filter(|&p| p <= 100)
+        .map_or(Utilization::Unavailable, Utilization::Percent)
 }
