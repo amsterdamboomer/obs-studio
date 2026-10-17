@@ -48,6 +48,23 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         plugins::build_transitions(&build, &root, &libraries.reference).unwrap(),
         plugins::build_filters(&build, &root, &libraries.reference, &filters).unwrap(),
     ];
+    if std::env::var_os("OBS_BUILD_SOURCES").is_some() {
+        for source in [
+            plugins::SourceModule::Image,
+            plugins::SourceModule::Text,
+            plugins::SourceModule::PulseAudio,
+            plugins::SourceModule::Alsa,
+            plugins::SourceModule::V4l2 {
+                udev: std::env::var_os("OBS_BUILD_DISABLE_UDEV").is_none(),
+            },
+            plugins::SourceModule::X11Capture,
+            // Offline smoke tests must not start the update service.
+            plugins::SourceModule::RtmpServices { updates: false },
+        ] {
+            modules
+                .push(plugins::build_source(&build, &root, &libraries.reference, source).unwrap());
+        }
+    }
     let mut ffmpeg = None;
     if std::env::var_os("OBS_BUILD_RECORD").is_some() {
         modules.push(plugins::build_x264(&build, &root, &libraries.reference).unwrap());
@@ -79,7 +96,8 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         std::env::current_exe().unwrap()
     };
     let wants_graphics = std::env::var_os("OBS_BUILD_RENDER").is_some()
-        || std::env::var_os("OBS_BUILD_RECORD").is_some();
+        || std::env::var_os("OBS_BUILD_RECORD").is_some()
+        || std::env::var_os("OBS_BUILD_SOURCES").is_some();
     let renderer = wants_graphics
         .then(|| graphics::build_opengl(&build, &root, &libraries.reference, &options).unwrap());
     let probe = renderer
@@ -252,6 +270,23 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
                 1,
                 "exactly one SRT shared library must be loaded"
             );
+        }
+        if std::env::var_os("OBS_BUILD_SOURCES").is_some() {
+            expected_types.extend([
+                (b"obs_enum_input_types".as_slice(), "image_source"),
+                (b"obs_enum_input_types".as_slice(), "color_source"),
+                (b"obs_enum_input_types".as_slice(), "slideshow"),
+                (b"obs_enum_input_types".as_slice(), "text_ft2_source"),
+                (b"obs_enum_input_types".as_slice(), "pulse_input_capture"),
+                (b"obs_enum_input_types".as_slice(), "pulse_output_capture"),
+                (b"obs_enum_input_types".as_slice(), "alsa_input_capture"),
+                (b"obs_enum_input_types".as_slice(), "v4l2_input"),
+                (b"obs_enum_input_types".as_slice(), "xshm_input"),
+                (b"obs_enum_input_types".as_slice(), "xcomposite_input"),
+                (b"obs_enum_output_types".as_slice(), "virtualcam_output"),
+                (b"obs_enum_service_types".as_slice(), "rtmp_common"),
+                (b"obs_enum_service_types".as_slice(), "rtmp_custom"),
+            ]);
         }
         for (symbol, expected) in expected_types {
             let enumerate = library

@@ -323,3 +323,24 @@ fn shared_archive(build: &NativeBuild, root: &Path, name: &str) -> Result<PathBu
     add_package(&mut library, &build.target, "simde")?;
     build.static_library(&library)
 }
+
+/// Built-in source and service modules with independent optional features.
+#[derive(Clone, Copy, Debug)]
+pub enum SourceModule {
+    Image,
+    Text,
+    PulseAudio,
+    Alsa,
+    V4l2 { udev: bool },
+    X11Capture,
+    RtmpServices { updates: bool },
+}
+
+pub fn build_source(
+    _build: &NativeBuild,
+    _root: &Path,
+    _core: &Path,
+    _source: SourceModule,
+) -> Result<Module, String> {
+    Err("source module graph is not implemented".into())
+}
