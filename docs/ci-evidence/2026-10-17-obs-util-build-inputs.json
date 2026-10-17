@@ -96,5 +96,41 @@
     "old_ns": 1792262706251336821,
     "hydrated_ns": 1792262706251000000
   },
-  "green": null
+  "green": {
+    "soldr": "0.9.35",
+    "wrapper": "none",
+    "observations": [
+      {
+        "label": "build-new-input-policy",
+        "returncode": 0,
+        "seconds": 7.302,
+        "compiled_obs_util": true,
+        "precalculated_changed": true
+      },
+      {
+        "label": "save-new-input-policy",
+        "returncode": 0,
+        "seconds": 12.62,
+        "compiled_obs_util": false,
+        "precalculated_changed": false
+      },
+      {
+        "label": "restore-new-input-policy",
+        "returncode": 0,
+        "seconds": 16.628,
+        "compiled_obs_util": false,
+        "precalculated_changed": false
+      },
+      {
+        "label": "restored-new-input-policy",
+        "returncode": 0,
+        "seconds": 0.816,
+        "compiled_obs_util": false,
+        "precalculated_changed": false
+      }
+    ],
+    "source_timestamp_edits": false,
+    "fresh_after_hydrate": true,
+    "scope": "Linux obs-util compile-only test products; no test execution speedup claimed; Windows C input declarations require native validation."
+  }
 }
