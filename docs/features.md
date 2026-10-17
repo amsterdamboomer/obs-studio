@@ -823,7 +823,8 @@ area.
   list cannot be downloaded no longer stalls 3 s before connecting (5 s in
   the Auto-Configuration Wizard): the wait ends as soon as the download
   fails. *All*, 2026-10-17. Issue
-  [#1347](https://github.com/obs-rust/obs-studio/issues/1347).
+  [#1347](https://github.com/obs-rust/obs-studio/issues/1347), PR
+  [#1353](https://github.com/obs-rust/obs-studio/pull/1353).
 
 ### Sources and filters
 
