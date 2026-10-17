@@ -172,3 +172,21 @@ metadata, without adding another API request to the gate.
 Post-change measurements must use a separate window and preserve these
 cohort/coverage distinctions. The day-long post-change comparison remains
 open until the configuration changes have landed and that window exists.
+
+## Unused gate compiler-cache layer
+
+Master run [39056485478](https://github.com/obs-rust/obs-studio/actions/runs/39056485478),
+Fast Gate job 117465447413, restored a 1.2 KB build-cache archive (four
+files, 1.8 KB inflated) in 0.7 s. Its final session counters were zero
+hits, misses and compilations; post-job save skipped the zero-compile
+delta. The local gate explicitly bypasses this Rust compiler cache for
+lint, tests and cross checks because of the verified correctness blocker.
+
+Disable this layer in Fast Gate and the two cross-lint jobs, retaining
+cook dependency snapshots and the registry. Keep compiler caching in native
+Rust test and static-library jobs, where the commands use it. This removes
+a measured cache-service operation; it is not a claim of a large CI gain.
+Cold cook may lose potential compiler-cache reuse after a lock change, but
+the currently restored archive contains no compiled artifacts to supply it.
+Verify the disabled layer and total setup time in live runs; do not sum
+concurrent action phase times as if they were sequential wall time.
