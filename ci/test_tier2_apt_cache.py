@@ -61,6 +61,9 @@ class AptCacheTest(unittest.TestCase):
         prepare = text[text.index('- name: Prepare Touched Target apt Directory'):restore]
         self.assertIn('sudo chown', prepare)
         self.assertNotIn('actions/cache/save@', text[restore:build])
+        install = text[build:text.index('- name: Save Touched Target ccache', build)]
+        self.assertLess(install.index('ci/apt_cache_layout.py'), install.index('sudo apt-get update'))
+        self.assertIn('targets-docker-clean.disabled', install)
 
     def test_only_master_build_job_saves(self):
         # Every PR and queue run saved its own 323 MB entry and pushed the

@@ -914,8 +914,16 @@ jobs:
           TARGETS: ${{ needs.check-event.outputs.linux_targets }}
           CCACHE_DIR: ${{ github.workspace }}/.targets-ccache
         run: |
+          uv run ci/apt_cache_layout.py
+          # Keep restored .debs through apt's metadata refresh, as Tier 2 does.
+          if [ -f /etc/apt/apt.conf.d/docker-clean ]; then
+            sudo mv /etc/apt/apt.conf.d/docker-clean "${RUNNER_TEMP}/targets-docker-clean.disabled"
+          fi
           git submodule update --init --recursive -q
           sudo apt-get update -qq
+          shopt -s nullglob
+          packages=(/var/cache/apt/archives/*.deb)
+          echo "apt archives after metadata refresh: ${#packages[@]}"
           # Distro Qt headers only so configure passes: plugins/frontend-tools is a
           # core module that calls find_package(Qt6 REQUIRED). Nothing Qt is built
           # or tested here (only the touched targets); that is the Qt lane's job.
