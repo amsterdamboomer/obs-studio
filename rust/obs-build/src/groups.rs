@@ -5,6 +5,39 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub(crate) fn headers(
+    root: &Path,
+    sources: &[PathBuf],
+) -> Result<Vec<crate::PrecompiledHeader>, String> {
+    let mut headers = std::collections::BTreeMap::<PathBuf, Vec<PathBuf>>::new();
+    for source in sources {
+        let content =
+            fs::read_to_string(source).map_err(|e| format!("read {}: {e}", source.display()))?;
+        let first = content.lines().map(str::trim).find(|line| {
+            !line.is_empty()
+                && !line.starts_with("/*")
+                && !line.starts_with('*')
+                && !line.starts_with("//")
+        });
+        let Some(include) = first
+            .and_then(|line| line.strip_prefix("#include \""))
+            .and_then(|line| line.strip_suffix('"'))
+        else {
+            continue;
+        };
+        if !(include.ends_with(".pch.h") || include.ends_with(".pch.hpp")) {
+            continue;
+        }
+        let header =
+            dunce::canonicalize(root.join(include)).map_err(|e| format!("PCH {include}: {e}"))?;
+        headers.entry(header).or_default().push(source.clone());
+    }
+    Ok(headers
+        .into_iter()
+        .map(|(header, sources)| crate::PrecompiledHeader { header, sources })
+        .collect())
+}
+
 pub(crate) fn separate(
     root: &Path,
     output: &Path,

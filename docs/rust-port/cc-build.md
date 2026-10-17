@@ -564,8 +564,10 @@ absent from the selected executable dependencies. This is the selected
 targets and their platform/feature conditions still require conversion.
 
 PR CI on `ca331a93d` completed successfully, including the repaired Linux
-Tier 2 build and both C/Rust test modes. The subsequent VLC and native-test
-builder commits require their own remote verification.
+Tier 2 build and both C/Rust test modes. Run `39078605291` on `4369949a7`
+also completed successfully after the VLC and native-test builder changes,
+including both Linux test modes and the selected Windows/macOS checks.
+These jobs do not automatically exercise the opt-in native application driver.
 
 ## Linux VLC media source
 
@@ -593,3 +595,72 @@ unregistered, retain the loaded plugin and exit normally. Process maps must
 confirm the runtime is absent; a discovered system installation fails this
 fixture rather than weakening the check. This does not establish packaging
 of VLC, every codec/playlist mode or actual audio-device output.
+
+## Optional compiled PCH for Linux cores
+
+`libobs::Options::pch` defaults to false and is independent of `unity`.
+Set `OBS_BUILD_PCH=1` in the native integration driver to compile the explicit
+group headers with GCC or Clang on Linux. This currently covers libobs;
+other targets and Windows/macOS PCH remain required work.
+
+The native engine accepts explicit `PrecompiledHeader` source assignments.
+It compiles each header through the same `cc::Tool` and flags as its consumers,
+keeping C and C++ settings separate. Artifact directories distinguish host,
+target, header path, language, compiler command and environment. Compiler
+invocations retain the soldr wrapper. GCC rejects invalid PCH and uses an error
+header to detect fallback; Clang consumes an explicit PCH artifact. Requested
+PCH therefore cannot silently fall back to parsing a normal header.
+
+Compilation batches preserve source order, including interleaved assignments
+to different headers. A regression fixture caught constructor order changing
+from 123 to 213 when assignments were initially sorted; ordered batches pass
+with unity enabled and disabled. Mixed C/C++ fixtures also verify direct and
+transitive header edits and language-specific flag changes affect the loaded
+result. GCC 15.2.0 passes
+all nine native contracts; Clang 21.1.8 passes both PCH contracts.
+The real Clang core pair with unity and PCH enabled also passes the lifecycle,
+public data, module registration and exact C/Rust export comparisons. The
+Clang run does not include the C-test executable or GUI matrices.
+
+The real GCC core pair passes export/lifecycle checks and all 102 selected
+C-test runs with PCH enabled, with unity enabled and disabled. PCH artifacts
+are currently requested on every direct native build; repeated invocations
+depend on compiler-cache behavior. These checks establish correctness for the
+tested configurations, not a speedup or complete Cargo invalidation coverage.
+
+The combined browser-disabled Linux GUI passes against both individual-source,
+PCH-built cores with VLC, frontend Tools, Lua/Python, websocket and NVENC enabled.
+It exercises the saved white scene, VLC playback controls, dialog and wire
+checks, frontend hardware recordings and four API recordings, then normal
+shutdown. The complete build/validation invocation took 571.94 seconds; this
+includes native compilation and runtime checks and is not a build benchmark.
+
+### Scoped core build measurements
+
+Local GCC measurements used four compilation jobs, fixed opt-level 2 with debug
+information, one fresh output directory per mode and three repeated builds.
+The interval covers the C/Rust core pair and caption, excluding plugin builds,
+GUI checks and Cargo startup. The host and compiler cache were shared; no cache
+was reset. Fresh output is therefore not a cold-cache measurement. Trials ran
+in the table's order, so these observations are not an isolated benchmark.
+The integration driver writes the interval and selected options to
+`core-build-timing.json` under `OBS_BUILD_TEST_OUTPUT`; repeat the same invocation
+with that output directory to collect additional samples.
+
+| Unity | Compiled PCH | Fresh output | Repeat median | Repeat range |
+| --- | --- | ---: | ---: | ---: |
+| On | Off | 15.65 s | 1.98 s | 1.91–2.08 s |
+| On | On | 33.30 s | 6.90 s | 4.59–8.64 s |
+| Off | Off | 11.66 s | 3.35 s | 3.28–4.56 s |
+| Off | On | 25.62 s | 7.01 s | 6.81–8.71 s |
+
+The final repeat in each mode reported zero compiler-cache misses. Two earlier
+repeat invocations lacked usable soldr summary statistics; their elapsed times
+remain recorded, without an inferred hit count. Cache summaries cover the
+whole integration invocation, not just the timed core pair.
+
+PCH does not improve these measured runs. Unity remains enabled and PCH disabled
+by default. PCH preparation and its per-header compilation batches still need
+performance work before recommending it. These results do not establish full
+application build time, clean-cache performance, a CMake comparison or Cargo
+no-op behavior.

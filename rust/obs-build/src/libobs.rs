@@ -10,6 +10,8 @@ use std::{
 pub struct Options {
     /// Keep explicit BUILD.md unity groups; false compiles their members separately.
     pub unity: bool,
+    /// Compile the explicit group headers; independent of the unity option.
+    pub pch: bool,
     pub hevc: bool,
     pub wayland: bool,
     pub pulseaudio: bool,
@@ -21,6 +23,7 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             unity: true,
+            pch: false,
             hevc: true,
             wayland: true,
             pulseaudio: true,
@@ -138,6 +141,9 @@ fn prepare(build: &NativeBuild, root: &Path, options: &Options) -> Result<Plan, 
     if !options.unity {
         library.sources = build.separate_group_sources(&root, &library.sources)?;
     }
+    if options.pch {
+        library.precompiled_headers = crate::groups::headers(&root, &library.sources)?;
+    }
     Ok(Plan {
         common: library,
         root,
@@ -175,6 +181,9 @@ fn add_variant(
     crate::platform::configure_libobs_variant(build, root, options, sets, library, rust_archive)?;
     if !options.unity {
         library.sources = build.separate_group_sources(root, &library.sources)?;
+    }
+    if options.pch {
+        library.precompiled_headers = crate::groups::headers(root, &library.sources)?;
     }
     Ok(())
 }
@@ -300,6 +309,7 @@ pub fn build_pair(
     common.name = "obs-common".into();
     let (_, _, objects) = build.objects(&common)?;
     common.sources.clear();
+    common.precompiled_headers.clear();
     common.precompiled_objects = objects;
     let mut reference = common.clone();
     reference.name = "obs".into();

@@ -42,6 +42,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             .unwrap_or_else(|| output.path().into()),
     };
     let mut options = libobs::Options {
+        pch: std::env::var_os("OBS_BUILD_PCH").is_some(),
         unity: std::env::var_os("OBS_BUILD_DISABLE_CORE_UNITY").is_none(),
         hevc: std::env::var_os("OBS_BUILD_DISABLE_HEVC").is_none(),
         core_modules: if enabled("OBS_BUILD_APP_GUI") {
@@ -98,7 +99,18 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     {
         options.core_modules.push("native-frontend-probe".into());
     }
+    let core_started = std::time::Instant::now();
     let libraries = libobs::build_pair(&build, &root, &options, &archive).unwrap();
+    let core_wall_seconds = core_started.elapsed().as_secs_f64();
+    std::fs::write(
+        build.output.join("core-build-timing.json"),
+        serde_json::to_vec_pretty(
+            &serde_json::json!({"unity":options.unity,"pch":options.pch,"hevc":options.hevc,
+            "target":build.target,"wall_seconds":core_wall_seconds}),
+        )
+        .unwrap(),
+    )
+    .unwrap();
     assert_ne!(libraries.reference, libraries.with_rust);
     assert_eq!(exports(&libraries.reference), exports(&libraries.with_rust));
     if std::env::var_os("OBS_BUILD_C_TESTS").is_some() {

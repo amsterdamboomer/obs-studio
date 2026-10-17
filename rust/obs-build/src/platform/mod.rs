@@ -8,6 +8,24 @@ use std::{
 
 mod libobs_linux;
 
+pub(crate) enum PchKind {
+    Gnu,
+    Clang,
+}
+
+pub(crate) fn pch_kind(target: &str, compiler: &cc::Tool) -> Result<PchKind, String> {
+    if !target.contains("linux") {
+        return Err(format!("compiled PCH for {target} is not implemented yet"));
+    }
+    if compiler.is_like_clang() && !compiler.is_like_msvc() {
+        Ok(PchKind::Clang)
+    } else if compiler.is_like_gnu() {
+        Ok(PchKind::Gnu)
+    } else {
+        Err("compiled PCH requires Linux GCC or Clang".into())
+    }
+}
+
 pub fn configure_libobs(
     target: &str,
     root: &Path,
