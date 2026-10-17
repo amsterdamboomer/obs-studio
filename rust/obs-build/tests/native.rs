@@ -117,9 +117,15 @@ fn executable_runs_against_its_shared_core_dependency() {
     let dir = tempfile::tempdir().unwrap();
     let core_source = dir.path().join("core.c");
     let executable_source = dir.path().join("main.c");
+    let helper_source = dir.path().join("helper.c");
+    fs::write(
+        &helper_source,
+        "int fixture_private_value(void) { return 42; }",
+    )
+    .unwrap();
     fs::write(
         &core_source,
-        format!("{EXPORT} int fixture_value(void) {{ return 42; }}"),
+        format!("extern int fixture_private_value(void); {EXPORT} int fixture_value(void) {{ return fixture_private_value(); }}"),
     )
     .unwrap();
     fs::write(
@@ -132,8 +138,11 @@ fn executable_runs_against_its_shared_core_dependency() {
         target: env!("OBS_BUILD_TARGET").into(),
         output: dir.path().join("artifacts"),
     };
+    let helper = build
+        .static_library(&target("fixture-helper", &helper_source, vec![]))
+        .unwrap();
     let core = build
-        .shared_library(&target("fixture-core", &core_source, vec![]))
+        .shared_library(&target("fixture-core", &core_source, vec![helper]))
         .unwrap();
     let executable = build
         .executable(&target(

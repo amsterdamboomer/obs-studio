@@ -45,7 +45,7 @@ pub fn configure_shared_link(
     if target.contains("windows") {
         if msvc {
             command.arg("/LD").args(objects);
-            command.args(dependencies.iter().map(|p| p.with_extension("lib")));
+            command.args(dependencies.iter().map(|p| dependency_link_name(p, true)));
             command
                 .arg("/link")
                 .arg(format!("/OUT:{}", artifact.display()))
@@ -55,7 +55,7 @@ pub fn configure_shared_link(
                 ));
         } else {
             command.arg("-shared").args(objects);
-            command.args(dependencies.iter().map(|p| p.with_extension("dll.a")));
+            command.args(dependencies.iter().map(|p| dependency_link_name(p, false)));
             command.arg("-o").arg(artifact).arg(format!(
                 "-Wl,--out-implib,{}",
                 artifact.with_extension("dll.a").display()
@@ -200,6 +200,66 @@ pub fn configure_glad(
             "native GL loader graph for {target} is not implemented yet"
         ))
     }
+}
+
+fn dependency_link_name(path: &Path, msvc: bool) -> PathBuf {
+    if path
+        .extension()
+        .and_then(|s| s.to_str())
+        .is_some_and(|s| s.eq_ignore_ascii_case("dll"))
+    {
+        path.with_extension(if msvc { "lib" } else { "dll.a" })
+    } else {
+        // Static archives already name linker inputs; they are not DLLs.
+        path.into()
+    }
+}
+
+pub fn executable_filename(target: &str, name: &str) -> String {
+    if target.contains("windows") {
+        format!("{name}.exe")
+    } else {
+        name.into()
+    }
+}
+
+pub fn configure_executable_link(
+    target: &str,
+    command: &mut Command,
+    artifact: &Path,
+    objects: &[PathBuf],
+    dependencies: &[PathBuf],
+    msvc: bool,
+) -> Result<(), String> {
+    command.args(objects);
+    if target.contains("windows") {
+        command.args(
+            dependencies
+                .iter()
+                .map(|path| dependency_link_name(path, msvc)),
+        );
+        if msvc {
+            command
+                .arg("/link")
+                .arg(format!("/OUT:{}", artifact.display()));
+        } else {
+            command.arg("-o").arg(artifact);
+        }
+    } else {
+        command.args(dependencies).arg("-o").arg(artifact);
+        command.arg(if target.contains("apple") {
+            "-Wl,-rpath,@executable_path"
+        } else {
+            "-Wl,-rpath,$ORIGIN"
+        });
+        for dependency in dependencies {
+            let parent = dependency
+                .parent()
+                .ok_or("dependency has no parent directory")?;
+            command.arg(format!("-Wl,-rpath,{}", parent.display()));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

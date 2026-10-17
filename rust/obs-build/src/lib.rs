@@ -71,8 +71,39 @@ impl NativeBuild {
     }
 
     /// Compile and link an executable with the native shared dependencies.
-    pub fn executable(&self, _target: &SharedLibrary) -> Result<PathBuf, String> {
-        Err("native executable linking is not implemented".into())
+    pub fn executable(&self, target: &SharedLibrary) -> Result<PathBuf, String> {
+        let (output, cpp, mut objects) = self.objects(target)?;
+        objects.extend(target.precompiled_objects.iter().cloned());
+        let artifact = output.join(
+            target
+                .file_name
+                .clone()
+                .unwrap_or_else(|| platform::executable_filename(&self.target, &target.name)),
+        );
+        let compiler = self.compiler(target, &output, cpp).get_compiler();
+        let mut command = compiler.to_command();
+        platform::configure_executable_link(
+            &self.target,
+            &mut command,
+            &artifact,
+            &objects,
+            &target.dependencies,
+            compiler.is_like_msvc(),
+        )?;
+        command.args(&target.link_options);
+        let result = command
+            .output()
+            .map_err(|e| format!("execute linker {command:?}: {e}"))?;
+        if !result.status.success() {
+            return Err(format!(
+                "link executable {} failed ({})\n{}\n{}",
+                target.name,
+                result.status,
+                String::from_utf8_lossy(&result.stdout),
+                String::from_utf8_lossy(&result.stderr)
+            ));
+        }
+        Ok(artifact)
     }
 
     /// Build an archive with the same compiler, flags and source grouping.
