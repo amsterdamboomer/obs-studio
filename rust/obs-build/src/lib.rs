@@ -17,6 +17,12 @@ pub mod qt;
 pub mod scripting;
 pub mod validation;
 
+#[derive(Clone, Debug)]
+pub struct PrecompiledHeader {
+    pub header: PathBuf,
+    pub sources: Vec<PathBuf>,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct SharedLibrary {
     pub name: String,
@@ -26,6 +32,8 @@ pub struct SharedLibrary {
     pub include_dirs: Vec<PathBuf>,
     pub dependencies: Vec<PathBuf>,
     pub unity: bool,
+    /// Explicit source-to-header assignments; empty disables compiled PCH.
+    pub precompiled_headers: Vec<PrecompiledHeader>,
     pub definitions: Vec<(String, Option<String>)>,
     pub compile_options: Vec<String>,
     pub c_compile_options: Vec<String>,
@@ -132,6 +140,9 @@ impl NativeBuild {
     }
 
     fn objects(&self, library: &SharedLibrary) -> Result<(PathBuf, bool, Vec<PathBuf>), String> {
+        if !library.precompiled_headers.is_empty() {
+            return Err("compiled precompiled headers are not implemented".into());
+        }
         if library.name.is_empty()
             || !library
                 .name

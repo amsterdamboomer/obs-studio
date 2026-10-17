@@ -169,6 +169,50 @@ fn executable_runs_against_its_shared_core_dependency() {
 const EXPORT: &str = "\n#if defined(_WIN32)\n__declspec(dllexport)\n#endif\n";
 
 #[test]
+fn pch_preserves_mixed_languages_unity_and_header_flag_invalidation() {
+    if !env!("OBS_BUILD_TARGET").contains("linux") {
+        eprintln!("compiled PCH integration currently covers Linux GCC and Clang");
+        return;
+    }
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    let header = root.join("common.h");
+    let write_header = |value| fs::write(&header, format!("#pragma once\n#define HEADER_VALUE {value}\n#ifdef __cplusplus\n#include <vector>\n#else\n#include <stdint.h>\n#endif\n")).unwrap();
+    let c = root.join("part.c");
+    let cpp = root.join("part.cpp");
+    fs::write(&c, "#include \"common.h\"\n#ifdef FIXTURE_CPP\n#error C++ flags leaked into C\n#endif\nint fixture_c(void) { return HEADER_VALUE + FIXTURE_C; }\n").unwrap();
+    fs::write(&cpp, "#include \"common.h\"\n#ifdef FIXTURE_C\n#error C flags leaked into C++\n#endif\nextern \"C\" int fixture_c(void);\nextern \"C\" int obs_fixture_pch(void) { std::vector<int> values{HEADER_VALUE, FIXTURE_CPP}; return fixture_c() + values[0] + values[1]; }\n").unwrap();
+    for unity in [false, true] {
+        write_header(17);
+        let build = NativeBuild {
+            host: env!("OBS_BUILD_HOST").into(),
+            target: env!("OBS_BUILD_TARGET").into(),
+            output: root.join(format!("output-{unity}")),
+        };
+        let mut library = target("fixture-pch", &c, vec![]);
+        library.sources.push(cpp.clone());
+        library.include_dirs.push(root.into());
+        library.unity = unity;
+        library.c_compile_options.push("-DFIXTURE_C=3".into());
+        library.cpp_compile_options.push("-DFIXTURE_CPP=5".into());
+        library.precompiled_headers.push(obs_build::PrecompiledHeader {
+            header: header.clone(), sources: vec![c.clone(), cpp.clone()],
+        });
+        let artifact = build.shared_library(&library).unwrap();
+        // SAFETY: the fixture defines this no-argument C ABI function.
+        assert_eq!(unsafe { answer(&artifact, b"obs_fixture_pch", &[]) }, 42);
+        write_header(37);
+        let artifact = build.shared_library(&library).unwrap();
+        // SAFETY: the edited header preserves the function ABI.
+        assert_eq!(unsafe { answer(&artifact, b"obs_fixture_pch", &[]) }, 82);
+        library.c_compile_options = vec!["-DFIXTURE_C=7".into()];
+        let artifact = build.shared_library(&library).unwrap();
+        // SAFETY: changing the compiler macro preserves the function ABI.
+        assert_eq!(unsafe { answer(&artifact, b"obs_fixture_pch", &[]) }, 86);
+    }
+}
+
+#[test]
 fn explicit_groups_compile_as_individual_sources_and_observe_member_edits() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
