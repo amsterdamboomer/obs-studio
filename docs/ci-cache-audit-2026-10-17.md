@@ -430,6 +430,17 @@ startup failure to the same cause.
 
 ### Remaining acceptance work
 
+The pinned janitor's global-budget behavior is now checked directly:
+`cache/ops.py::janitor` plans family/stale/finding cleanup and applies
+newest-entry/grace protection, without a global trim against `[cache].budget`.
+A [read-only synthetic executor probe](ci-evidence/2026-10-17-janitor-global-budget-probe.json)
+kept two current 6 GiB entries when their individual limits were 6 GiB,
+despite a 10 GiB global budget. That fixture intentionally has invalid
+aggregate declarations; it is not a live inventory or a claim that static
+budget checks accept it. Lowering the global budget field alone would not
+create retention headroom. Whole-budget allocation and writer-burst policy
+remain tracked in #1269; family isolation is insufficient by itself.
+
 Keep the merged queue policy, Rust correctness safeguard, bounded useful
 compiler caches and parallel OFF/ON runners. Validate the observed host-package
 benefit over real traffic; an archive HIT alone is not a throughput result.
