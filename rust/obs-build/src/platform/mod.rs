@@ -156,6 +156,52 @@ pub fn configure_module(target: &str, library: &mut crate::SharedLibrary) -> Res
     }
 }
 
+pub fn configure_opengl(
+    target: &str,
+    root: &Path,
+    options: &crate::libobs::Options,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    if !target.contains("linux") {
+        return Err(format!(
+            "native OpenGL graph for {target} is not implemented yet"
+        ));
+    }
+    configure_module(target, library)?;
+    library.file_name = Some("libobs-opengl.so.33".into());
+    library
+        .sources
+        .push(root.join("libobs-opengl/build/opengl.nix+.h.c"));
+    for package in ["simde", "libdrm", "gl", "egl", "x11", "x11-xcb", "xcb"] {
+        crate::libobs::add_package(library, target, package)?;
+    }
+    if options.wayland {
+        library
+            .sources
+            .push(root.join("libobs-opengl/build/opengl.nix-wayland+.h.c"));
+        for package in ["wayland-egl", "wayland-client"] {
+            crate::libobs::add_package(library, target, package)?;
+        }
+    }
+    library.link_options.push("-ldl".into());
+    Ok(())
+}
+
+pub fn configure_glad(
+    target: &str,
+    root: &Path,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    if target.contains("linux") {
+        library.sources.push(root.join("deps/glad/src/glad_egl.c"));
+        Ok(())
+    } else {
+        Err(format!(
+            "native GL loader graph for {target} is not implemented yet"
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

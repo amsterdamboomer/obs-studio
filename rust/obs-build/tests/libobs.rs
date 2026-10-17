@@ -1,6 +1,8 @@
 //! Opt-in integration against real native dependencies and libobs-rust.
 use obs_build::{NativeBuild, graphics, libobs, plugins};
 use std::{ffi::c_void, path::PathBuf};
+#[path = "libobs/render.rs"]
+mod render;
 
 #[test]
 fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
@@ -48,6 +50,9 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     ];
     let renderer = std::env::var_os("OBS_BUILD_RENDER")
         .map(|_| graphics::build_opengl(&build, &root, &libraries.reference, &options).unwrap());
+    let probe = renderer
+        .as_ref()
+        .map(|_| render::build(&build, &root, &libraries.reference));
     // libobs twins intentionally share one SONAME. Loading both in one process
     // can retain a prior plugin's dependency and bind it to the wrong OBS state.
     // Run each variant in the same fresh-process isolation as the C tests.
@@ -60,6 +65,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         let mut command = std::process::Command::new(std::env::current_exe().unwrap());
         if let Some(renderer) = &renderer {
             command.env("OBS_BUILD_TEST_RENDERER", renderer);
+            command.env("OBS_BUILD_TEST_PROBE", probe.as_ref().unwrap());
         }
         let run = command
             .args([
@@ -71,9 +77,15 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             .env("OBS_BUILD_TEST_MODULES", &serialized)
             .output()
             .unwrap();
+        for line in String::from_utf8_lossy(&run.stdout).lines().filter(|line| {
+            line.contains("Loading up OpenGL") || line.contains("cc::Build graphics device")
+        }) {
+            println!("{}: {line}", path.display());
+        }
         assert!(
             run.status.success(),
-            "{}\n{}",
+            "{}\n{}\n{}",
+            run.status,
             String::from_utf8_lossy(&run.stdout),
             String::from_utf8_lossy(&run.stderr)
         );
@@ -93,6 +105,14 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
             b"obs_extract_hevc_headers".as_slice(),
         ] {
             assert_eq!(library.get::<unsafe extern "C" fn()>(symbol).is_ok(), hevc);
+        }
+        let probe = std::env::var_os("OBS_BUILD_TEST_PROBE")
+            .map(|path| libloading::Library::new(path).unwrap());
+        if let Some(probe) = &probe {
+            let open = probe
+                .get::<unsafe extern "C" fn() -> bool>(b"obs_fixture_open_display")
+                .unwrap();
+            assert!(open(), "isolated X11 display could not be opened");
         }
         let startup = library
             .get::<unsafe extern "C" fn(
@@ -164,12 +184,32 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
                 || std::env::var_os("OBS_BUILD_DISABLE_RNNOISE").is_none();
             assert_eq!(found, enabled, "unexpected registration of {expected}");
         }
+        if let Some(probe) = &probe {
+            let renderer =
+                std::ffi::CString::new(std::env::var("OBS_BUILD_TEST_RENDERER").unwrap()).unwrap();
+            let data_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../libobs/data")
+                .canonicalize()
+                .unwrap();
+            let data_path = std::ffi::CString::new(format!("{}/", data_path.display())).unwrap();
+            let render = probe.get::<unsafe extern "C" fn(*const std::ffi::c_char, *const std::ffi::c_char) -> i32>(b"obs_fixture_render").unwrap();
+            assert_eq!(
+                render(renderer.as_ptr(), data_path.as_ptr()),
+                0,
+                "graphics/frame rendering failed"
+            );
+        }
         let data = create();
         assert!(!data.is_null());
         set(data, c"value".as_ptr(), -9223372036854775807);
         assert_eq!(get(data, c"value".as_ptr()), -9223372036854775807);
         release(data);
         shutdown();
+        if let Some(probe) = &probe {
+            probe
+                .get::<unsafe extern "C" fn()>(b"obs_fixture_close_display")
+                .unwrap()();
+        }
     }
 }
 

@@ -121,3 +121,25 @@ variants, as does disabled HEVC with the default modules. The actual CMake
 RNNoise fallback target also compiles all seven objects after the canonical-list
 migration; Clippy, gersemi and the build-group/platform guards pass. System
 RNNoise discovery is implemented, but this host exercises the bundled fallback.
+
+
+## Linux OpenGL checkpoint
+
+`graphics::build_opengl` compiles the original OpenGL unity groups and GLAD loader,
+links the shared backend, and creates its unversioned lookup name. It consumes the
+same libobs options and generated configuration as the core. The Linux graph
+includes X11/EGL and optional Wayland support; other platforms remain unfinished.
+
+With an isolated X server available through DISPLAY, set `OBS_BUILD_RENDER=1` on
+the opt-in integration test to exercise real graphics. Local verification used an
+owned Xvfb process allocated via `-displayfd`, with `LIBGL_ALWAYS_SOFTWARE=1` and
+`GALLIUM_DRIVER=llvmpipe`. Both variants initialize Mesa OpenGL 4.6, create a scene,
+and receive at least three 64x64 NV12 frames through the public raw-video callback
+API. The callback verifies a valid row and the expected black Y sample (16).
+The probe uses the unchanged C headers for video configuration and callbacks;
+shutdown and display cleanup happen before its shared libraries unload.
+
+This demonstrates the native renderer and basic frame delivery. It does not yet
+validate the full Qt application, recording, capture sources, all plugins,
+Wayland runtime behavior or packaged artifacts. The prototype OpenGL version
+number remains tied to the current OBS 33 configuration.
