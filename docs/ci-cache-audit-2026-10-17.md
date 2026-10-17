@@ -190,3 +190,23 @@ Cold cook may lose potential compiler-cache reuse after a lock change, but
 the currently restored archive contains no compiled artifacts to supply it.
 Verify the disabled layer and total setup time in live runs; do not sum
 concurrent action phase times as if they were sequential wall time.
+
+## Additional cache inventory: CodeQL overlays
+
+The cache API snapshot at 2026-10-17 18:39 UTC contained 43 entries totaling
+4,389,323,635 bytes (below the 10 GB repository budget). This is a live
+snapshot, not historical baseline occupancy. Qt's newest entry was
+1,114,881,014 bytes, reinforcing the pending sizing correction.
+
+GitHub's default CodeQL setup writes `codeql-overlay-base-database-*`
+entries outside the repository's explicit workflows. The snapshot included
+a 131,294,279-byte C++ base and Python bases around 11 MB. These keys have
+no matching declared family, so the janitor treats them as unknown after
+the grace window. They are consumed: PR run 39057119695, C++ job
+117467259478, restored the master overlay in about 3.7 s (18:13:17.924 to
+18:13:21.606). Master run 39057995138 saved a new base in about 5.1 s.
+
+A bounded retention family merits evaluation; blanket deletion discards
+observed reuse, but these logs alone do not measure the analysis speedup
+against a cold run. Keep this separate from compiler-cache hit rates and
+from the required merge gate, which does not wait for CodeQL.
