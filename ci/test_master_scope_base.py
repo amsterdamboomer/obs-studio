@@ -12,6 +12,18 @@ class MasterScopeBaseTest(unittest.TestCase):
         self.assertIn('--status', run.call_args_list[0].args[0])
         self.assertIn('success', run.call_args_list[0].args[0])
 
+    def test_legacy_coalesced_success_does_not_advance_baseline(self):
+        legacy, safe = 'b' * 40, 'a' * 40
+        run = Mock(side_effect=[
+            subprocess.CompletedProcess([], 0, '[{"headSha":"'+legacy+'"},{"headSha":"'+safe+'"}]'),
+            subprocess.CompletedProcess([], 0),
+            subprocess.CompletedProcess([], 0, 'group: push-build-master'),
+            subprocess.CompletedProcess([], 0, '# legacy helper without bootstrap protection'),
+            subprocess.CompletedProcess([], 0),
+            subprocess.CompletedProcess([], 0, '# before master coalescing'),
+        ])
+        self.assertEqual(scope_base(run), safe)
+
     def test_nonancestor_is_ignored_and_empty_tree_is_safe_fallback(self):
         run = Mock(side_effect=[subprocess.CompletedProcess([], 0, '[{"headSha":"'+'b'*40+'"}]'), subprocess.CompletedProcess([], 1)])
         self.assertEqual(scope_base(run), 'ALL')
