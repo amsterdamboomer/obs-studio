@@ -243,6 +243,31 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
             std::ptr::null(),
             std::ptr::null_mut()
         ));
+        if let Some(probe) = &probe {
+            let renderer =
+                std::ffi::CString::new(std::env::var("OBS_BUILD_TEST_RENDERER").unwrap()).unwrap();
+            let data_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../libobs/data")
+                .canonicalize()
+                .unwrap();
+            let data_path = std::ffi::CString::new(format!("{}/", data_path.display())).unwrap();
+            let initialize =
+                probe
+                    .get::<unsafe extern "C" fn(
+                        *const std::ffi::c_char,
+                        *const std::ffi::c_char,
+                        bool,
+                    ) -> i32>(b"obs_fixture_initialize")
+                    .unwrap();
+            assert_eq!(
+                initialize(
+                    renderer.as_ptr(),
+                    data_path.as_ptr(),
+                    std::env::var_os("OBS_BUILD_RECORD").is_some()
+                ),
+                0
+            );
+        }
         let open = library
             .get::<unsafe extern "C" fn(
                 *mut *mut c_void,
@@ -320,17 +345,8 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
             assert_eq!(found, enabled, "unexpected registration of {expected}");
         }
         if let Some(probe) = &probe {
-            let renderer =
-                std::ffi::CString::new(std::env::var("OBS_BUILD_TEST_RENDERER").unwrap()).unwrap();
-            let data_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../../libobs/data")
-                .canonicalize()
-                .unwrap();
-            let data_path = std::ffi::CString::new(format!("{}/", data_path.display())).unwrap();
             let render = probe
                 .get::<unsafe extern "C" fn(
-                    *const std::ffi::c_char,
-                    *const std::ffi::c_char,
                     *const std::ffi::c_char,
                     *const std::ffi::c_char,
                 ) -> i32>(b"obs_fixture_render")
@@ -344,8 +360,6 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
             .unwrap();
             assert_eq!(
                 render(
-                    renderer.as_ptr(),
-                    data_path.as_ptr(),
                     recording
                         .as_ref()
                         .map_or(std::ptr::null(), |path| path.as_ptr()),

@@ -121,10 +121,10 @@ cleanup:
     return status;
 }
 
-EXPORT int obs_fixture_render(const char *renderer, const char *data_path, const char *record_path, const char *output_id)
+EXPORT int obs_fixture_initialize(const char *renderer, const char *data_path, bool audio_enabled)
 {
     obs_add_data_path(data_path);
-    if (record_path) {
+    if (audio_enabled) {
         struct obs_audio_info audio = { .samples_per_sec = 48000, .speakers = SPEAKERS_STEREO };
         if (!obs_reset_audio(&audio))
             return 84;
@@ -141,8 +141,11 @@ EXPORT int obs_fixture_render(const char *renderer, const char *data_path, const
         .scale_type = OBS_SCALE_BICUBIC,
     };
     int result = obs_reset_video(&video);
-    if (result != OBS_VIDEO_SUCCESS)
-        return result;
+    return result;
+}
+
+EXPORT int obs_fixture_render(const char *record_path, const char *output_id)
+{
     obs_enter_graphics();
     blog(LOG_INFO, "cc::Build graphics device: %s", gs_get_device_name());
     obs_leave_graphics();

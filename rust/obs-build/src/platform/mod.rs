@@ -320,32 +320,6 @@ pub fn configure_ffmpeg(
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn shared_dependency_wins_over_an_earlier_static_archive() {
-        let dir = tempfile::tempdir().unwrap();
-        let archive_dir = dir.path().join("static");
-        let shared_dir = dir.path().join("shared");
-        std::fs::create_dir_all(&archive_dir).unwrap();
-        std::fs::create_dir_all(&shared_dir).unwrap();
-        std::fs::write(archive_dir.join("libz.a"), []).unwrap();
-        let shared = shared_dir.join("libz.so");
-        std::fs::write(&shared, []).unwrap();
-        let paths = [archive_dir, shared_dir];
-        assert_eq!(
-            package_shared_library("x86_64-unknown-linux-gnu", &paths, "z"),
-            Some(shared)
-        );
-        assert_eq!(
-            package_shared_library("x86_64-unknown-linux-gnu", &paths, "missing"),
-            None
-        );
-    }
-}
-
 pub fn configure_source(
     target: &str,
     root: &Path,
@@ -353,16 +327,13 @@ pub fn configure_source(
     library: &mut crate::SharedLibrary,
 ) -> Result<(), String> {
     use crate::{libobs::add_package, plugins::SourceModule};
-    if matches!(source, SourceModule::PipeWire) {
-        return Err("PipeWire module graph is not implemented".into());
-    }
     if !target.contains("linux") {
         return Err(format!(
             "source module graph for {target} is not implemented yet"
         ));
     }
     let groups: &[&str] = match source {
-        SourceModule::PipeWire => unreachable!(),
+        SourceModule::PipeWire => &["nix"],
         SourceModule::Image => &["core", "slideshow", "posix"],
         SourceModule::Text => &["core", "nix"],
         SourceModule::PulseAudio | SourceModule::Alsa | SourceModule::X11Capture => &["nix"],
@@ -376,7 +347,7 @@ pub fn configure_source(
             .map(|group| root.join(format!("plugins/{0}/build/{0}.{group}+.h.c", source.name()))),
     );
     let packages: &[&str] = match source {
-        SourceModule::PipeWire => unreachable!(),
+        SourceModule::PipeWire => &["libpipewire-0.3", "gio-unix-2.0", "libdrm"],
         SourceModule::Image => &[],
         SourceModule::Text => &["freetype2", "fontconfig"],
         SourceModule::PulseAudio => &["libpulse"],
@@ -398,6 +369,29 @@ pub fn configure_source(
         add_package(library, target, package)?;
     }
     match source {
+        SourceModule::PipeWire => {
+            pkg_config::Config::new()
+                .cargo_metadata(false)
+                .atleast_version("2.76")
+                .probe("gio-2.0")
+                .map_err(|e| e.to_string())?;
+            pkg_config::Config::new()
+                .cargo_metadata(false)
+                .atleast_version("0.3.33")
+                .probe("libpipewire-0.3")
+                .map_err(|e| e.to_string())?;
+            if pkg_config::Config::new()
+                .cargo_metadata(false)
+                .atleast_version("0.3.60")
+                .probe("libpipewire-0.3")
+                .is_ok()
+            {
+                library
+                    .sources
+                    .push(root.join("plugins/linux-pipewire/build/linux-pipewire.nix-camera+.h.c"));
+            }
+            library.include_dirs.push(root.join("deps/glad/include"));
+        }
         SourceModule::V4l2 { udev: true } => {
             add_package(library, target, "libudev")?;
             library.definitions.push(("HAVE_UDEV".into(), None));
@@ -423,4 +417,30 @@ pub fn configure_source(
         _ => {}
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shared_dependency_wins_over_an_earlier_static_archive() {
+        let dir = tempfile::tempdir().unwrap();
+        let archive_dir = dir.path().join("static");
+        let shared_dir = dir.path().join("shared");
+        std::fs::create_dir_all(&archive_dir).unwrap();
+        std::fs::create_dir_all(&shared_dir).unwrap();
+        std::fs::write(archive_dir.join("libz.a"), []).unwrap();
+        let shared = shared_dir.join("libz.so");
+        std::fs::write(&shared, []).unwrap();
+        let paths = [archive_dir, shared_dir];
+        assert_eq!(
+            package_shared_library("x86_64-unknown-linux-gnu", &paths, "z"),
+            Some(shared)
+        );
+        assert_eq!(
+            package_shared_library("x86_64-unknown-linux-gnu", &paths, "missing"),
+            None
+        );
+    }
 }

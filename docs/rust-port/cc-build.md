@@ -195,3 +195,14 @@ Disabled UDEV also passes registration and rendering against both cores.
 The test does not open camera or microphone devices. Hardware capture, text
 rasterization, streaming and service-update behavior remain to be validated with
 the full application and packaged artifact tests.
+
+## Linux PipeWire checkpoint
+
+`SourceModule::PipeWire` builds the original Linux PipeWire unity group and
+includes the camera group when the discovered PipeWire version is at least
+0.3.60. It enforces CMake's PipeWire 0.3.33 and Gio 2.76 minimums and uses the
+shared GLAD archive. Enable its opt-in build/load check with
+`OBS_BUILD_PIPEWIRE=1`. Both cores load and initialize the module after graphics
+initialization, then render and shut down. Portal availability, camera
+permissions and actual screen/camera capture remain unverified; module load alone
+does not establish those capabilities.

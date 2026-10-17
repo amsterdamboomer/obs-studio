@@ -358,14 +358,11 @@ pub fn build_source(
     core: &Path,
     source: SourceModule,
 ) -> Result<Module, String> {
-    if matches!(source, SourceModule::PipeWire) {
-        return Err("PipeWire module graph is not implemented".into());
-    }
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let mut library = module(build, &root, core, source.name())?;
     library.sources.clear();
     crate::platform::configure_source(&build.target, &root, source, &mut library)?;
-    if matches!(source, SourceModule::X11Capture) {
+    if matches!(source, SourceModule::X11Capture | SourceModule::PipeWire) {
         library
             .dependencies
             .push(crate::graphics::build_glad(build, &root)?);
