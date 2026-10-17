@@ -163,5 +163,8 @@
   "LIBOBS_LINUX_PORTED_SOURCES": [
     "build/libobs.ported-posix+.h.c",
     "build/libobs.ported-posix-threading+.h.c"
+  ],
+  "LIBOBS_HEVC_PORTED_SOURCES": [
+    "build/libobs.ported-hevc+.h.c"
   ]
 }

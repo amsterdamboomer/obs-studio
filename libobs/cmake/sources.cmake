@@ -38,7 +38,7 @@ endforeach()
 
 if(ENABLE_HEVC)
   list(APPEND LIBOBS_SOURCES obs-hevc.h)
-  list(APPEND LIBOBS_PORTED_SOURCES build/libobs.ported-hevc+.h.c)
+  list(APPEND LIBOBS_PORTED_SOURCES ${LIBOBS_HEVC_PORTED_SOURCES})
 endif()
 
 # Adds a host's lists (libobs/CMakeLists.txt): its sources to the

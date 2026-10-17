@@ -163,9 +163,7 @@ fn add_variant(
     } else {
         append_sources(sets, "LIBOBS_PORTED_SOURCES", root, library)?;
         if options.hevc {
-            library
-                .sources
-                .push(root.join("libobs/build/libobs.ported-hevc+.h.c"));
+            append_sources(sets, "LIBOBS_HEVC_PORTED_SOURCES", root, library)?;
         }
     }
     crate::platform::configure_libobs_variant(build, root, options, sets, library, rust_archive)
