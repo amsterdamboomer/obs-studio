@@ -199,6 +199,16 @@ counts above. Step medians are not additive totals, and historical lane/shard
 names remain separate. Missing/skipped step times do not become zero samples.
 The collector now emits `lane_cohorts` so the same method applies after rollout.
 
+A [post-nightly inventory snapshot](ci-evidence/2026-10-17-post-nightly-cache-inventory.json)
+records both cache APIs with collection timestamps. The itemized listing
+contained 41 entries / 8,951,159,430 bytes; the usage endpoint reported 49 /
+10,617,481,983 bytes. The pinned contract interprets `10GB` as 10 GiB
+(10,737,418,240 bytes). These endpoints were asynchronous during concurrent
+writers and janitor cleanup; their totals are not combined, and neither is
+presented as steady-state headroom. An earlier listing peaked near 10.70 GB.
+Nightly app archives dominate the transient footprint; useful queue caches
+must remain warm through the full representative-day comparison.
+
 The final after window must cover at least a full day of representative code
 PR and queue traffic following rollout. It has not elapsed. Plugin warming
 and host apt-cache runtime validation, the nightly integrity failure (#1334),
