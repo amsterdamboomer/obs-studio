@@ -9,6 +9,7 @@ fn target(name: &str, source: &Path, dependencies: Vec<std::path::PathBuf>) -> S
         include_dirs: vec![],
         dependencies,
         unity: true,
+        ..SharedLibrary::default()
     }
 }
 

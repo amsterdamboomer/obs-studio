@@ -428,6 +428,8 @@ version = "0.1.0"
 dependencies = [
  "cc",
  "libloading",
+ "pkg-config",
+ "serde_json",
  "tempfile",
 ]
 
@@ -558,6 +560,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "obs-sys"
+version = "0.1.0"
+dependencies = [
+ "obs-build",
+]
+
+[[package]]
 name = "obs-util"
 version = "0.1.0"
 dependencies = [
@@ -588,6 +597,12 @@ dependencies = [
  "libc",
  "winapi",
 ]
+
+[[package]]
+name = "pkg-config"
+version = "0.3.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 
 [[package]]
 name = "ppv-lite86"

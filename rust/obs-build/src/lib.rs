@@ -6,15 +6,20 @@
 
 use std::{fs, path::PathBuf};
 
+pub mod libobs;
 mod platform;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct SharedLibrary {
     pub name: String,
     pub sources: Vec<PathBuf>,
     pub include_dirs: Vec<PathBuf>,
     pub dependencies: Vec<PathBuf>,
     pub unity: bool,
+    pub definitions: Vec<(String, Option<String>)>,
+    pub compile_options: Vec<String>,
+    pub link_options: Vec<String>,
+    pub file_name: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -91,7 +96,12 @@ impl NativeBuild {
                     .map_err(|e| e.to_string())?,
             );
         }
-        let artifact = output.join(platform::shared_filename(&self.target, &library.name));
+        let artifact = output.join(
+            library
+                .file_name
+                .clone()
+                .unwrap_or_else(|| platform::shared_filename(&self.target, &library.name)),
+        );
         let compiler = self.compiler(library, &output, cpp_link).get_compiler();
         let mut command = compiler.to_command();
         platform::configure_shared_link(
@@ -102,6 +112,7 @@ impl NativeBuild {
             &library.dependencies,
             compiler.is_like_msvc(),
         )?;
+        command.args(&library.link_options);
         let result = command
             .output()
             .map_err(|e| format!("execute linker {command:?}: {e}"))?;
@@ -129,6 +140,10 @@ impl NativeBuild {
             .cpp(cpp)
             .cargo_metadata(false)
             .includes(&library.include_dirs);
+        for (name, value) in &library.definitions {
+            compiler.define(name, value.as_deref());
+        }
+        compiler.flags(&library.compile_options);
         compiler
     }
 }
