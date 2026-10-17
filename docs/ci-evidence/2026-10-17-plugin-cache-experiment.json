@@ -1,13 +1,32 @@
 {
   "issue": 1286,
   "target": "linux-v4l2",
-  "stage": "cold/warm CI validation pending",
+  "stage": "Cold PR measured; trusted seed and warm PR validation pending",
   "reference_commit": "01a48dce31676d020754c4fa6e943bf48686144b",
   "input_tree_fingerprint_sha256": "c6c646db3a1a93b7228aeb2584669938724bde126f6c05520a0eab7a824c40c0",
   "fingerprint_scope": "Git tree rows for plugin/libobs/shared/deps/cmake/rust/root build inputs, excluding Markdown. Generated Git version metadata can still differ.",
   "cache_prefix": "targets-ccache-linux-",
   "configuration": "Existing Fast Gate scoped target CMake configuration; trusted master saves, PRs restore.",
-  "measurements": [],
+  "measurements": [
+    {
+      "kind": "cold-pr",
+      "run_id": 39061809157,
+      "job_id": 117481364969,
+      "event": "pull_request",
+      "pr_head": "5479130371b0df85dff4d080bbd53cc634bd548c",
+      "checkout_merge_sha": "2981c28f525fd31a5156617b70e7f306ad7e04cb",
+      "conclusion": "success",
+      "job_seconds": 153,
+      "target_build_step_seconds": 57,
+      "target_step_scope": "Includes dependency installation, CMake configure, compiler work and cache reporting.",
+      "cache_restore": "miss",
+      "cacheable_calls": 41,
+      "compiler_hits": 0,
+      "compiler_misses": 41,
+      "remote_save": "skipped on PR",
+      "runner_name": "GitHub Actions 1000043239"
+    }
+  ],
   "notes": [
     "Capture real compiler hits and full job/step durations; no archive HIT inference.",
     "Keep the original compiler outputs/caches; do not clear the cache to manufacture a cold sample.",
