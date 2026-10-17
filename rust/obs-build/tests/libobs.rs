@@ -1,5 +1,5 @@
 //! Opt-in integration against real native dependencies and libobs-rust.
-use obs_build::{NativeBuild, frontend, graphics, libobs, plugins};
+use obs_build::{NativeBuild, frontend, graphics, libobs, plugins, scripting};
 use std::{ffi::c_void, path::PathBuf};
 #[path = "libobs/application.rs"]
 mod application;
@@ -104,6 +104,16 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         speexdsp: std::env::var_os("OBS_BUILD_DISABLE_SPEEXDSP").is_none(),
         rnnoise: std::env::var_os("OBS_BUILD_DISABLE_RNNOISE").is_none(),
     };
+    if std::env::var_os("OBS_BUILD_SCRIPTING").is_some() {
+        scripting::build(
+            &build,
+            &root,
+            &libraries.reference,
+            None,
+            &scripting::Options::default(),
+        )
+        .unwrap();
+    }
     let mut modules = vec![
         plugins::build_transitions(&build, &root, &libraries.reference).unwrap(),
         plugins::build_filters(&build, &root, &libraries.reference, &filters).unwrap(),
