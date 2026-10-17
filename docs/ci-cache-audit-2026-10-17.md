@@ -70,7 +70,9 @@ scenarios executed. Their environmental coverage remains a stated limitation.
    toolchain safeguards. Do not trade stale-output protection for headline hits.
 4. Preserve one active master warming build and the latest pending snapshot.
    Catch-up scope must retain paths from superseded pushes; #1328 implements
-   that after the plugin seed exposed a lost-path case.
+   that after the plugin seed exposed a lost-path case. Follow-up #1330
+   protects the rollout baseline from older coalesced successes that did not
+   cover replaced pending pushes.
 5. Keep independent OFF/ON test runners and publish the extra runner cost.
    Keep all applicable test coverage; no test sharding was introduced.
 
