@@ -618,13 +618,15 @@ extern "C" void InitScripts()
 	if (PYTHON_UI && frontend_tools_host_python_ui()) {
 		config_t *config = obs_frontend_get_user_config();
 		const char *python_path = config_get_string(config, "Python", "Path" ARCH_NAME);
+		/* Outlives the block below: python_path may point into it. */
+		std::string _temp;
 
 		if (python_path && *python_path) {
 			std::string _python_path(python_path);
 			std::size_t pos = frontend_tools_host_python_path_len(python_path);
 
 			if (pos != _python_path.size()) {
-				std::string _temp = _python_path.substr(0, pos);
+				_temp = _python_path.substr(0, pos);
 				config_set_string(config, "Python", "Path" ARCH_NAME, _temp.c_str());
 				config_save(config);
 				python_path = _temp.c_str();
