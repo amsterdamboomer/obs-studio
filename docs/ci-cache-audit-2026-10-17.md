@@ -56,6 +56,13 @@ verify profile use and successful consumers. Compiler-wrapper session counters
 were zero in both jobs; these are separate from dependency-cook reuse. The
 full workflow is still running, and this is not a matched speed comparison.
 
+Windows native Tier 2 also passed in this master run, using `--release` for
+the static-library consumer and recording **304/305 cacheable ccache hits**,
+one miss. It saved `windows-tier2-ccache-6d7b7f7a...`. These C/C++ counters
+are independent of the zero embedded zccache session counters printed by
+setup-soldr. [Job timings and counters](ci-evidence/2026-10-17-windows-tier2-cache-rollout.json)
+confirm that useful native compiler reuse survived the changes.
+
 ### What still dominates test time
 
 The [serial-test profile](ci-evidence/2026-10-17-tier2-serial-profile.json)
