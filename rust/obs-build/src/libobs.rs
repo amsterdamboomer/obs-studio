@@ -220,3 +220,20 @@ fn write_if_changed(path: &Path, text: &str) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// Both ABI-compatible variants; only the C reference is installed.
+#[derive(Debug)]
+pub struct Libraries {
+    pub reference: PathBuf,
+    pub with_rust: PathBuf,
+}
+
+/// Compile common native sources once, then link C and Rust implementation twins.
+pub fn build_pair(
+    _build: &NativeBuild,
+    _root: &Path,
+    _options: &Options,
+    _rust_archive: &Path,
+) -> Result<Libraries, String> {
+    Err("the native Rust implementation twin is not implemented".into())
+}
