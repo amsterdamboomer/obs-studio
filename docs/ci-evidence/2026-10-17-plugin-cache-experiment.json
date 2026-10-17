@@ -1,7 +1,7 @@
 {
   "issue": 1286,
   "target": "linux-v4l2",
-  "stage": "Compiler reuse and bounded trusted host apt seed verified; warm host-archive runtime pending.",
+  "stage": "Trusted compiler and image-specific host apt seeds consumed successfully by a PR; first total-runtime improvement observed.",
   "reference_commit": "01a48dce31676d020754c4fa6e943bf48686144b",
   "input_tree_fingerprint_sha256": "c6c646db3a1a93b7228aeb2584669938724bde126f6c05520a0eab7a824c40c0",
   "fingerprint_scope": "Git tree rows for plugin/libobs/shared/deps/cmake/rust/root build inputs, excluding Markdown. Generated Git version metadata can still differ.",
@@ -134,6 +134,29 @@
       "conclusion": "success",
       "scope": "Cold host-package archive; not a warm apt runtime result.",
       "target_build_step_seconds": 57.0
+    },
+    {
+      "kind": "host-specific-apt-warm",
+      "run_id": 39068106135,
+      "job_id": 117500138917,
+      "head": "6cda8dc9032712957ce29e44bd4c60ab6e557ca4",
+      "runner_image": "20261012.163.1",
+      "conclusion": "success",
+      "job_seconds": 148.0,
+      "target_build_step_seconds": 39.0,
+      "compiler_restore_seconds": 2.0,
+      "apt_restore_seconds": 2.0,
+      "apt_available_packages": 323,
+      "apt_retained_packages": 323,
+      "apt_download_bytes": 0,
+      "apt_download_log": [
+        "Need to get 0 B/147 MB of archives.",
+        "Need to get 0 B/773 kB of archives."
+      ],
+      "compiler_hits": 41,
+      "compiler_misses": 0,
+      "cacheable_calls": 41,
+      "comparison": "Host cold sample: job 165 s / target 57 s / apt 147 MB in 21 s; both samples have 41 compiler hits and same runner image. Single-run observational comparison, not a general queue-throughput claim."
     }
   ],
   "notes": [

@@ -134,6 +134,8 @@ not used as proof of reuse.
 | Warm compiler archive | 41/41 | 70 s | 169 s | 147 MB / 30 s |
 | Shared apt archive, wrong layout | 41/41 | 70 s | 190 s | 147 MB / 28 s |
 | Shared apt archive, layout normalized | 41/41 | 46 s | 145 s | 142 MB / 13 s |
+| Host-specific apt, cold | 41/41 | 57 s | 165 s | 147 MB / 21 s |
+| Host-specific apt, warm | 41/41 | 39 s | 148 s | 0 bytes |
 
 Compiler work fell from about 12 s to half a second, but this alone did not
 make the first warm job faster. Package download/install overhead dominated.
@@ -143,8 +145,13 @@ is therefore rejected. Merged #1335 instead uses a host-specific archive, with i
 an enforced 200 MiB producer cap from #1339. Trusted master has now saved
 147,542,391 bytes for image `20261012.163.1`. Its tracked compiler-input
 fingerprint matches the prepared report PR. The cold host run retained 323
-packages and took 165 s (57 s target step, 41/41 compiler hits); warm host
-package download/runtime benefit is the next measurement.
+packages and took 165 s (57 s target step, 41/41 compiler hits). The subsequent
+PR restored all 323 packages in 2 s and downloaded zero package bytes, with
+41/41 compiler hits. Its target step took 39 s and full job 148 s: observed
+reductions of 18 s (31.6%) and 17 s (10.3%) respectively versus the host cold
+sample. Both used runner image `20261012.163.1` and the compiler inputs match
+the trusted seed. This is one cold/warm pair, with network/runner variance;
+it is not the representative-day queue-throughput result.
 These are individual unmatched runs, with network and runner variation;
 145 versus 153 s is not claimed as a robust causal improvement.
 
@@ -233,7 +240,7 @@ macOS integrity failure separately through #1334 (proposed fix #1338).
 | 1. Match cook profiles and measure consumers | Explicit profiles landed in #1318; local dev/release/no-cook experiment and native consumers recorded. Representative post-rollout comparison remains pending. |
 | 2. Rust cache correctness | Reproduction still fails on pinned soldr; safeguard retained in #1290, upstream zccache#1943 linked. |
 | 3. Remove unused overhead | Deferred Fast Gate layer removed in #1315; 13 Ubuntu restore/purge events fixed by #1337. Live Ubuntu reuse and budget behavior remain to verify. |
-| 4. Warm scoped plugin builds | Trusted seed and 41/41 PR compiler hits observed. Bounded host apt seed from #1335/#1339 is verified; warm runtime proof remains. |
+| 4. Warm scoped plugin builds | Trusted seed and 41/41 PR compiler hits observed. Trusted seeds consumed by a PR: 41/41 compiler hits, 323 packages, zero package bytes downloaded; job 165 → 148 s in the first host cold/warm pair. Day-scale validation remains. |
 | 5. Persist test timing | Nonempty OFF/ON producer, save, later restore and CTest consumption verified across master runs (#1288/#1311). |
 | 6. Match remote save policy | All seven setup-soldr consumers use master-only remote saves; PR/queue/local-save behavior verified (#1291). |
 | 7. Bound Qt cache | 1.2 GB compiler bound, 1.3 GB family, actual high hit rates and restore/save times verified (#1309). Overall repository headroom still needs the full-day view. |
@@ -243,7 +250,7 @@ macOS integrity failure separately through #1334 (proposed fix #1338).
 | 11. Durable before/after comparison | Full-day baseline and cohort-separated per-step collector ready. At least one full representative post-rollout day remains outstanding. |
 
 This checkpoint preserves the original scope. #1286 remains open while the
-host warm run, Ubuntu app reuse, stable budget behavior and representative-day
+Ubuntu app reuse, stable budget behavior and representative-day
 comparison are unverified. A green isolated job is not substituted for a
 full workflow, and configuration/docs traffic is not substituted for code PRs.
 
