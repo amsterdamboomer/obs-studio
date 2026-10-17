@@ -81,7 +81,12 @@ async def verify(runtime: Path, recording: bool) -> None:
         unknown = await client.request("NativeMissingRequest")
         assert unknown["d"]["requestStatus"]["code"] == 204
         if os.environ.get("OBS_BUILD_VLC"):
-            await verify_vlc(runtime, request)
+            kinds = await request("GetInputKindList")
+            if os.environ.get("OBS_BUILD_VLC_ABSENT"):
+                assert "vlc_source" not in kinds["inputKinds"], "VLC source registered without its runtime"
+            else:
+                assert "vlc_source" in kinds["inputKinds"], "VLC runtime did not register its source"
+                await verify_vlc(runtime, request)
         if recording:
             await request("StartRecord")
             deadline = asyncio.get_running_loop().time() + 5

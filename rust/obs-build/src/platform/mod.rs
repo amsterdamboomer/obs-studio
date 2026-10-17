@@ -345,7 +345,7 @@ pub fn configure_source(
         ));
     }
     let groups: &[&str] = match source {
-        SourceModule::Vlc => &[],
+        SourceModule::Vlc => &["core", "posix"],
         SourceModule::PipeWire => &["nix"],
         SourceModule::Image => &["core", "slideshow", "posix"],
         SourceModule::Text => &["core", "nix"],
@@ -383,6 +383,36 @@ pub fn configure_source(
         add_package(library, target, package)?;
     }
     match source {
+        SourceModule::Vlc => {
+            // Upstream loads libVLC at runtime and gracefully disables this
+            // source when it is absent. Consume headers without a link edge.
+            let headers = pkg_config::Config::new()
+                .cargo_metadata(false)
+                .probe("libvlc")
+                .ok();
+            for variable in ["OBS_VLC_INCLUDE_DIR", "VLC_PATH"] {
+                println!("cargo:rerun-if-env-changed={variable}");
+            }
+            let mut includes = Vec::new();
+            if let Some(path) = std::env::var_os("OBS_VLC_INCLUDE_DIR") {
+                includes.push(std::path::PathBuf::from(path));
+            }
+            if let Some(path) = std::env::var_os("VLC_PATH") {
+                includes.push(std::path::PathBuf::from(path).join("include"));
+            }
+            if let Some(headers) = headers {
+                includes.extend(headers.include_paths);
+                library.definitions.extend(headers.defines);
+            }
+            includes.extend(["/usr/include".into(), "/usr/local/include".into()]);
+            if !includes
+                .iter()
+                .any(|path| path.join("vlc/libvlc.h").is_file())
+            {
+                return Err("VLC headers not found; set OBS_VLC_INCLUDE_DIR or VLC_PATH".into());
+            }
+            library.include_dirs.extend(includes);
+        }
         SourceModule::PipeWire => {
             pkg_config::Config::new()
                 .cargo_metadata(false)

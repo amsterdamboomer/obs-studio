@@ -530,3 +530,30 @@ unlike the local Docker image, both Tier 2 jobs start from stock Ubuntu. The
 existing build and test jobs now provision the same pinned uv before invoking
 validation. No workflow files or jobs were added; remote verification remains
 required.
+
+## Linux VLC media source
+
+`SourceModule::Vlc` builds the original VLC core and POSIX host groups.
+It discovers headers through pkg-config, `OBS_VLC_INCLUDE_DIR`, `VLC_PATH`
+or standard include directories. Header discovery adds no libVLC link edge:
+the original plugin still loads the optional runtime dynamically. The native
+check inspects the ELF dependency list to enforce that distinction.
+
+Set `OBS_BUILD_VLC=1` with the staged GUI and websocket checks. The real app
+creates a VLC playlist source, decodes a six-second local H.264 clip, returns
+a white source screenshot, reports its duration and handles pause/play/restart.
+Normal shutdown saves the playlist path in the scene collection. Process maps
+must contain the staged plugin and dynamically loaded libVLC.
+
+Both cores pass those checks, frontend recording and the four API recordings.
+The combined VLC, Tools, Lua/Python, websocket and NVENC application also passes
+with individual-source libobs compilation: 18 production modules plus the
+test-only Qt probe. That run uses an explicit include directory with libVLC's
+pkg-config lookup disabled, exercising header discovery independently.
+
+`OBS_BUILD_VLC_ABSENT=1` selects the runtime-absence check. In an environment
+without libVLC, both cores log that the source is disabled, leave `vlc_source`
+unregistered, retain the loaded plugin and exit normally. Process maps must
+confirm the runtime is absent; a discovered system installation fails this
+fixture rather than weakening the check. This does not establish packaging
+of VLC, every codec/playlist mode or actual audio-device output.

@@ -137,6 +137,12 @@ def main() -> None:
             assert str(runtime / "lib64" / name) in maps, f"staged {name} was not loaded"
         for name in json.loads((runtime / "expected-modules.json").read_text()):
             assert str(runtime / "lib64/obs-modules/core" / (name + ".so")) in maps, f"module {name} was not loaded"
+        if os.environ.get("OBS_BUILD_VLC"):
+            if os.environ.get("OBS_BUILD_VLC_ABSENT"):
+                assert "libvlc.so.5" not in maps, "VLC absence fixture found a runtime"
+                assert b"VLC video source disabled" in log, "missing VLC was not handled gracefully"
+            else:
+                assert "libvlc.so.5" in maps, "VLC runtime was not loaded dynamically"
         if os.environ.get("OBS_BUILD_NVENC"):
             assert str(runtime / "lib64/obs-modules/core/obs-nvenc.so") in maps, "staged NVENC was not loaded"
         if scripting:
@@ -172,6 +178,9 @@ def main() -> None:
         assert b"==== Shutting down" in log, "frontend did not enter normal shutdown"
         saved = json.loads((config / "basic/scenes/NativeSmoke.json").read_text())
         assert any(source.get("name") == "Native white" for source in saved["sources"]), "saved scene was lost"
+        if os.environ.get("OBS_BUILD_VLC") and not os.environ.get("OBS_BUILD_VLC_ABSENT"):
+            source = next(source for source in saved["sources"] if source.get("name") == "Native VLC")
+            assert source["settings"]["playlist"][0]["value"] == str(runtime / "vlc-white.mkv"), "VLC playlist was not saved"
         if scripting:
             scripts = saved["modules"]["scripts-tool"]
             assert len(scripts) == len(scripting["languages"]), "saved script list changed"

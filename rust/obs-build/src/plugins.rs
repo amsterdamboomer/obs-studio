@@ -422,9 +422,6 @@ pub fn build_source(
     source: SourceModule,
 ) -> Result<Module, String> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
-    if matches!(source, SourceModule::Vlc) {
-        return Err("native VLC graph is not implemented".into());
-    }
     let mut library = module(build, &root, core, source.name())?;
     library.sources.clear();
     crate::platform::configure_source(&build.target, &root, source, &mut library)?;
