@@ -11,6 +11,7 @@ panic) match neither, so #814's ON build showed just
 
 from __future__ import annotations
 
+import os
 import subprocess
 import tempfile
 import unittest
@@ -40,6 +41,42 @@ warning: unused variable: `x`
 
 
 class BuildErrorsTest(unittest.TestCase):
+    def test_recovery_preserves_first_failure_and_keeps_one_retry(self):
+        source = (SCRIPT.parent / 'validate.sh').read_text()
+        recovery = source.split('  tier2_targets=', 1)[1].split('  if [ -n "${OBS_EXTRA_CFLAGS:-}"', 1)[0]
+        recovery = 'tier2_targets=' + recovery
+        # Run the same helper through bash on hosts without /bin/bash.
+        recovery = recovery.replace('"$SRC"/rust/tools/linux-validate/build-errors.sh',
+                                    'bash "$SRC"/rust/tools/linux-validate/build-errors.sh')
+        for retry_status in (0, 1):
+            with self.subTest(retry_status=retry_status), tempfile.TemporaryDirectory() as directory:
+                prefix = '''
+cmake() {
+  if [ ! -f "$build.calls" ]; then
+    echo 1 > "$build.calls"
+    echo 'FAILED: [code=125] first.o'
+    echo 'zccache[err][D]: original daemon failure'
+    return 1
+  fi
+  echo 2 > "$build.calls"
+  echo 'FAILED: [code=1] second.o'
+  return "$retry_status"
+}
+zccache() { echo "daemon diagnostic: $*"; return 1; }
+'''
+                result = subprocess.run(
+                    ['bash', '-eu', '-c', prefix + recovery],
+                    env={**os.environ, 'SRC': str(ROOT),
+                         'build': directory + '/build', 'retry_status': str(retry_status)},
+                    capture_output=True, text=True)
+                self.assertEqual(result.returncode, retry_status)
+                self.assertEqual(Path(directory, 'build.calls').read_text().strip(), '2')
+                self.assertIn('original daemon failure', result.stdout)
+                self.assertIn('daemon diagnostic: status', result.stdout)
+                self.assertIn('daemon diagnostic: stop', result.stdout)
+                self.assertIn('original daemon failure',
+                              Path(directory, 'build.build-first-failure.log').read_text())
+
     def run_script(self, log: str):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "build.log"
