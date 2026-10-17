@@ -522,12 +522,6 @@ their scopes differ. Archive messages can repeat and must not be summed
 as network transfer totals. Stratify compiler-version rollouts and cold
 cache seeds before comparing warm lane performance.
 
-AppImage portability and packaged-app runtime validation run through the
-existing nightly `release-rust.yaml` pipeline (and explicit manual/tag runs).
-PRs changing packaging files still run ordinary integrity checks, but do not
-launch the AppImage build or wait on it in `CI Gate`. Nightly release admission
-continues to require successful packaged-app validation before publishing.
-
 Master build coalescing retains changed paths since the latest successful
 ancestor Push run, rather than only the latest push's parent. A replaced pending
 master build therefore cannot drop plugin/platform cache warming. If no recent
