@@ -739,7 +739,9 @@ if [ "$SCENARIO" = probes ]; then
     # updater, service plugins), trusting only what the host trusts: a test CA,
     # added the distribution's own way, signs a local TLS server's certificate.
     # Debian, Ubuntu and Arch keep the bundle at /etc/ssl/certs/ca-certificates.crt,
-    # Fedora and RHEL at /etc/pki/tls/certs/ca-bundle.crt. A libcurl with the
+    # RHEL 8 at /etc/pki/tls/certs/ca-bundle.crt, Fedora at
+    # /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem (Fedora 44 no longer has
+    # /etc/pki/tls/certs/ca-bundle.crt). A libcurl with the
     # build host's CA path compiled in failed on every host that lacks that
     # path (obs-rust/obs-studio#1085).
     echo "::group::3b. HTTPS through the AppImage's libcurl, trusting the host's CA bundle"
@@ -768,7 +770,7 @@ if [ "$SCENARIO" = probes ]; then
     fedora)
         cp "$TLS/ca.crt" /etc/pki/ca-trust/source/anchors/obs-appimage-test-ca.crt
         update-ca-trust extract
-        HOST_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt
+        HOST_BUNDLE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
         ;;
     arch)
         cp "$TLS/ca.crt" /etc/ca-certificates/trust-source/anchors/obs-appimage-test-ca.crt
@@ -776,7 +778,7 @@ if [ "$SCENARIO" = probes ]; then
         HOST_BUNDLE=/etc/ssl/certs/ca-certificates.crt
         ;;
     esac
-    grep -q "$(sed -n 2p "$TLS/ca.crt")" "$HOST_BUNDLE" || fail "the test CA is not in $HOST_BUNDLE"
+    openssl verify -CAfile "$HOST_BUNDLE" "$TLS/server.crt" >/dev/null || fail "the test CA is not trusted through $HOST_BUNDLE"
     openssl s_server -quiet -accept 127.0.0.1:18443 -cert "$TLS/server.crt" -key "$TLS/server.key" -www \
         >"$OUT/tls-server.log" 2>&1 &
     OWN_PIDS+=($!)
