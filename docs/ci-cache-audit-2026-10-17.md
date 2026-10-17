@@ -270,3 +270,30 @@ post-job saves. A measurement assertion initially expected Cargo to label
 a forced rebuild only “Checking”; Cargo correctly used “Compiling”. The
 assertion was corrected, that attempt's logs were preserved, and only the
 remaining unrecorded trials resumed. All published trials passed.
+
+
+## Dylint setup-soldr feature audit
+
+Fast Gate currently invokes `soldr cargo dylint` after stable-profile
+clippy. In master run 39056485478, job 117465447413, catalogued Dylint
+tools/driver downloaded from 18:05:40.654 to 18:05:41.944. Nightly
+`rustc-dev`, `rust-src` and `llvm-tools` preparation then lasted until
+18:06:06.119, roughly 24 seconds. The repo plugin pins
+`nightly-2026-05-28`; caching that foundation is a plausible opportunity.
+
+However, pinned setup-soldr b782f606a2f3beadc35b9e3bf5b4565e005f52ed
+[resolve-setup.ts](https://github.com/zackees/setup-soldr/blob/b782f606a2f3beadc35b9e3bf5b4565e005f52ed/src/lib/resolve-setup.ts)
+forcibly sets `inputs.prebuildDeps = "none"` whenever `dylint: true`,
+including explicit cook inputs. That mode assumes a Dylint-only job; it
+is not a drop-in improvement for this mixed stable-check/test/Dylint job.
+Its foundation cache also owns exact nightly paths, while legacy
+`dylint-cache: true` alone does not include those paths by default.
+
+**Decision:** retain the current mixed-job mode and ordinary cook reuse.
+Do not enable `dylint: true` indiscriminately to maximize feature count.
+The measured post-job cook benefit would be lost, and the network/restore
+tradeoff of a separate foundation has not yet been measured. A dedicated
+Dylint lane or an explicit mixed-job foundation implementation would need
+its own setup/restore/consumer/save benchmark, required-gate integration,
+nightly/target identity checks and bounded retention before adoption.
+No workflow or cache family was added for this rejected rollout.
