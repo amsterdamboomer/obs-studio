@@ -1,7 +1,7 @@
 {
   "issue": 1286,
   "target": "linux-v4l2",
-  "stage": "Cold PR measured; trusted seed and warm PR validation pending",
+  "stage": "Trusted master seed verified; subsequent PR compiler-hit validation pending",
   "reference_commit": "01a48dce31676d020754c4fa6e943bf48686144b",
   "input_tree_fingerprint_sha256": "c6c646db3a1a93b7228aeb2584669938724bde126f6c05520a0eab7a824c40c0",
   "fingerprint_scope": "Git tree rows for plugin/libobs/shared/deps/cmake/rust/root build inputs, excluding Markdown. Generated Git version metadata can still differ.",
@@ -25,11 +25,31 @@
       "compiler_misses": 41,
       "remote_save": "skipped on PR",
       "runner_name": "GitHub Actions 1000043239"
+    },
+    {
+      "kind": "trusted-master-seed",
+      "run_id": 39064132902,
+      "job_id": 117489628892,
+      "source": "713ceb3bfd3a13114c6a8c9a9d38ffd0a59e2d89",
+      "cache_id": 9099784287,
+      "cache_key": "targets-ccache-linux-713ceb3bfd3a13114c6a8c9a9d38ffd0a59e2d89",
+      "cache_bytes": 25761103,
+      "created_at": "2026-10-17T20:00:06.252258Z",
+      "cache_ref": "refs/heads/master",
+      "target_build_step": "success",
+      "save_step": "success",
+      "full_job": "still running when cache save was verified",
+      "compiler_counters": "awaiting completed job log; do not infer hits from archive creation"
     }
   ],
   "notes": [
     "Capture real compiler hits and full job/step durations; no archive HIT inference.",
     "Keep the original compiler outputs/caches; do not clear the cache to manufacture a cold sample.",
     "This JSON accompanies developer build notes so the existing master Push paths-ignore for Markdown does not suppress trusted warming."
-  ]
+  ],
+  "seed_and_warm_pr_inputs": {
+    "method": "SHA256 of git ls-tree -r rows for plugins/libobs/shared/deps/cmake/rust/CMakeLists.txt/CMakePresets.json/buildspec.json, excluding .md; newline terminated. Excludes generated version metadata.",
+    "seed": "3020959b637cd21aa18357e6259cc1a797660d086c90a5cc60306c40ad4587ce",
+    "prepared_warm_pr": "3020959b637cd21aa18357e6259cc1a797660d086c90a5cc60306c40ad4587ce"
+  }
 }

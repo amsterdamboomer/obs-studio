@@ -115,6 +115,16 @@ remains disabled. [Per-language results](ci-evidence/2026-10-17-nightly-codeql-v
 record durations and job IDs. This proves nightly/manual scanning works; the
 full nightly build workflow is still running and is not claimed complete.
 
+Trusted scoped-plugin warming is now observed: master run
+[39064132902](https://github.com/obs-rust/obs-studio/actions/runs/39064132902)
+saved `targets-ccache-linux-713ceb3b...`, a 25,761,103-byte archive on master.
+The touched-target build and save steps succeeded. The prepared measurement
+PR selects only `linux-v4l2`; its tracked compiler-input fingerprint matches
+the seed revision, excluding Markdown and generated version metadata.
+[Experiment records](ci-evidence/2026-10-17-plugin-cache-experiment.json)
+retain the cold sample and trusted save. Actual PR compiler hits and runtime
+remain pending; archive creation alone is not proof of reuse.
+
 ### Measurement status and limits
 
 The before window is 2026-10-16 17:00 through 2026-10-17 17:00 UTC: 473 listed
