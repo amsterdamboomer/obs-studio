@@ -139,8 +139,26 @@ pub struct FfmpegArtifacts {
 
 impl FfmpegArtifacts {
     /// Deploy the mux helper beside the executable that loads the module.
-    pub fn deploy_muxer(&self, _bin_dir: &Path) -> Result<PathBuf, String> {
-        Err("FFmpeg helper deployment is not implemented".into())
+    pub fn deploy_muxer(&self, bin_dir: &Path) -> Result<PathBuf, String> {
+        let name = self
+            .muxer
+            .file_name()
+            .ok_or("FFmpeg helper has no filename")?;
+        std::fs::create_dir_all(bin_dir)
+            .map_err(|e| format!("create {}: {e}", bin_dir.display()))?;
+        let destination = bin_dir.join(name);
+        let source = self.muxer.canonicalize().map_err(|e| e.to_string())?;
+        if destination.canonicalize().ok().as_ref() == Some(&source) {
+            return Ok(destination);
+        }
+        std::fs::copy(&self.muxer, &destination).map_err(|e| {
+            format!(
+                "deploy {} to {}: {e}",
+                self.muxer.display(),
+                destination.display()
+            )
+        })?;
+        Ok(destination)
     }
 }
 

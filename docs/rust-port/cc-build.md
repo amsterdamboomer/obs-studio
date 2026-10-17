@@ -168,8 +168,9 @@ down OBS, and validates tracks, dimensions, decoded-frame counts and duration
 with ffprobe. Local recordings each contain 18 H.264 frames at 64x64 and AAC
 audio, duration 0.6 seconds. They contain no desktop or device capture.
 
-This checkpoint exercises mp4_output. `ffmpeg_muxer` requires its helper beside
-the running app; the returned helper artifact still needs deployment and runtime
-validation through that output. The full Qt application, capture sources, other
+`FfmpegArtifacts::deploy_muxer` places the helper beside the running app. The
+integration stages its runner with that helper, selects the same libobs variant
+for helper subprocesses, and also records through `ffmpeg_muxer` to Matroska.
+All four files (MP4 and Matroska, C and Rust cores) pass the same ffprobe checks. The full Qt application, capture sources, other
 modules/platforms, complete test battery, packaging and controlled performance
 measurements remain required. Do not treat this checkpoint as a CMake retirement.

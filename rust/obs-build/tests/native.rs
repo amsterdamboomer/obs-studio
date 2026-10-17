@@ -167,3 +167,19 @@ fn executable_runs_against_its_shared_core_dependency() {
 }
 
 const EXPORT: &str = "\n#if defined(_WIN32)\n__declspec(dllexport)\n#endif\n";
+
+#[test]
+fn deploying_mux_helper_in_place_preserves_its_contents() {
+    let directory = tempfile::tempdir().unwrap();
+    let helper = directory.path().join("obs-ffmpeg-mux");
+    std::fs::write(&helper, b"existing executable").unwrap();
+    let artifacts = obs_build::plugins::FfmpegArtifacts {
+        module: obs_build::plugins::Module {
+            library: std::path::PathBuf::new(),
+            data: std::path::PathBuf::new(),
+        },
+        muxer: helper.clone(),
+    };
+    assert_eq!(artifacts.deploy_muxer(directory.path()).unwrap(), helper);
+    assert_eq!(std::fs::read(helper).unwrap(), b"existing executable");
+}
