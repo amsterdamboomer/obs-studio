@@ -59,6 +59,7 @@ cmake() {
     return 1
   fi
   echo 2 > "$build.calls"
+  echo "retry cache bypass: ${ZCCACHE_DISABLE:-unset}"
   echo 'FAILED: [code=1] second.o'
   return "$retry_status"
 }
@@ -74,6 +75,8 @@ zccache() { echo "daemon diagnostic: $*"; return 1; }
                 self.assertIn('original daemon failure', result.stdout)
                 self.assertIn('daemon diagnostic: status', result.stdout)
                 self.assertIn('daemon diagnostic: stop', result.stdout)
+                self.assertIn('retry cache bypass: 1',
+                              Path(directory, 'build.build.log').read_text())
                 self.assertIn('original daemon failure',
                               Path(directory, 'build.build-first-failure.log').read_text())
 
