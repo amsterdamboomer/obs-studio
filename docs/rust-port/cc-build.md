@@ -226,3 +226,13 @@ Enable `OBS_BUILD_QT=1` to build the real VST module and frontend API. Both core
 load the VST module and expose its filter; the frontend API's no-callback defaults
 are callable. VST editor/audio behavior, the full Qt application and resources,
 other platforms and packaging remain outstanding.
+
+## Mixed native languages checkpoint
+
+Native targets now accept common compiler options plus separate C and C++ option
+vectors. OBS modules use C17 for C sources and C++17/hidden inline visibility for
+C++ sources. Mixed targets compile each language independently and link with the
+C++ driver. The regression builds and executes a C++ standard-library program
+that calls a C helper; each translation unit rejects flags intended for the other
+language. All five native integration tests pass, as does the combined
+core/source/Qt/PipeWire/MP4/Matroska check with frontend export comparison.

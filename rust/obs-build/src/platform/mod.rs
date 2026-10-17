@@ -142,7 +142,14 @@ pub fn configure_libobs_variant(
 pub fn configure_module(target: &str, library: &mut crate::SharedLibrary) -> Result<(), String> {
     if target.contains("linux") {
         library.file_name = Some(format!("{}.so", library.name));
-        for flag in ["-std=gnu17", "-fno-strict-aliasing", "-fvisibility=hidden"] {
+        if !library
+            .c_compile_options
+            .iter()
+            .any(|option| option == "-std=gnu17")
+        {
+            library.c_compile_options.push("-std=gnu17".into());
+        }
+        for flag in ["-fno-strict-aliasing", "-fvisibility=hidden"] {
             if !library.compile_options.iter().any(|option| option == flag) {
                 library.compile_options.push(flag.into());
             }
@@ -429,10 +436,7 @@ pub fn configure_cpp_module(
 ) -> Result<(), String> {
     configure_module(target, library)?;
     library
-        .compile_options
-        .retain(|flag| !flag.starts_with("-std="));
-    library
-        .compile_options
+        .cpp_compile_options
         .extend(["-std=gnu++17", "-fvisibility-inlines-hidden"].map(String::from));
     Ok(())
 }

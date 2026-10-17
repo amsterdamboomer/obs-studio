@@ -205,6 +205,11 @@ impl NativeBuild {
             compiler.define(name, value.as_deref());
         }
         compiler.flags(&library.compile_options);
+        compiler.flags(if cpp {
+            &library.cpp_compile_options
+        } else {
+            &library.c_compile_options
+        });
         compiler
     }
 }
