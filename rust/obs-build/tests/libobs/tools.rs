@@ -64,6 +64,8 @@ const SOURCE: &str = r#"
 #include <QListWidget>
 #include <QSpinBox>
 #include <QLabel>
+#include <QPushButton>
+#include <QImage>
 #include <QTimer>
 #include <QEventLoop>
 #include <QPointer>
@@ -72,7 +74,7 @@ const SOURCE: &str = r#"
 
 OBS_DECLARE_MODULE()
 
-static bool open_dialog(QMenu *menu, const char *label, const char *type, const char *image, int scripts = -1)
+static bool open_dialog(QMenu *menu, const char *label, const char *type, const char *image, int scripts = -1, bool websocket = false)
 {
     QAction *selected = nullptr;
     for (QAction *action : menu->actions()) {
@@ -119,6 +121,32 @@ static bool open_dialog(QMenu *menu, const char *label, const char *type, const 
                     }
                 }
             }
+            if (websocket) {
+                QPushButton *button = dialog->findChild<QPushButton *>("showConnectInfoButton");
+                if (!button || obs_video_active()) {
+                    blog(LOG_ERROR, "cc::Build websocket connection dialog requires idle output and its button");
+                    valid = false;
+                } else {
+                    button->click();
+                    QApplication::processEvents();
+                    QPointer<QWidget> info;
+                    for (QWidget *widget : QApplication::topLevelWidgets())
+                        if (widget->inherits("ConnectInfo") && widget->isVisible()) { info = widget; break; }
+                    QLabel *code = info ? info->findChild<QLabel *>("qrCodeLabel") : nullptr;
+                    const QImage qr = code ? code->pixmap().toImage() : QImage();
+                    bool black = false, white = false;
+                    for (int y = 0; y < qr.height(); ++y)
+                        for (int x = 0; x < qr.width(); ++x) {
+                            int value = qr.pixelColor(x, y).lightness();
+                            black = black || value < 32; white = white || value > 223;
+                        }
+                    const char *directory = std::getenv("OBS_BUILD_GUI_EVIDENCE");
+                    valid = valid && info && black && white && directory &&
+                        info->grab().save(QString::fromUtf8(directory) + "/websocket-connect-info.png");
+                    if (info) info->close();
+                    if (!valid) blog(LOG_ERROR, "cc::Build websocket connection QR dialog failed");
+                }
+            }
             const char *directory = std::getenv("OBS_BUILD_GUI_EVIDENCE");
             bool saved = directory && dialog->grab().save(QString::fromUtf8(directory) + "/" + image);
             bool closed = dialog->close();
@@ -143,16 +171,20 @@ static void verify_dialogs()
         if (text == "Tools") tools = action->menu();
     }
     if (!tools) { blog(LOG_ERROR, "cc::Build Tools menu missing"); return; }
-    if (!open_dialog(tools, "Automatic Scene Switcher", "SceneSwitcher", "tools-scene-switcher.png")) return;
-    if (!open_dialog(tools, "Output Timer", "OutputTimer", "tools-output-timer.png")) return;
-    const char *count = std::getenv("OBS_BUILD_GUI_SCRIPT_COUNT");
-    if (count && std::atoi(count) >= 0 && !open_dialog(tools, "Scripts", "ScriptsTool", "tools-scripts.png", std::atoi(count))) return;
-    if (!count || std::atoi(count) < 0) {
-        for (QAction *action : tools->actions()) {
-            QString text = action->text(); text.remove('&');
-            if (text == "Scripts") { blog(LOG_ERROR, "cc::Build disabled Scripts action is present"); return; }
+    if (std::getenv("OBS_BUILD_FRONTEND_TOOLS")) {
+        if (!open_dialog(tools, "Automatic Scene Switcher", "SceneSwitcher", "tools-scene-switcher.png")) return;
+        if (!open_dialog(tools, "Output Timer", "OutputTimer", "tools-output-timer.png")) return;
+        const char *count = std::getenv("OBS_BUILD_GUI_SCRIPT_COUNT");
+        if (count && std::atoi(count) >= 0 && !open_dialog(tools, "Scripts", "ScriptsTool", "tools-scripts.png", std::atoi(count))) return;
+        if (!count || std::atoi(count) < 0) {
+            for (QAction *action : tools->actions()) {
+                QString text = action->text(); text.remove('&');
+                if (text == "Scripts") { blog(LOG_ERROR, "cc::Build disabled Scripts action is present"); return; }
+            }
         }
     }
+    if (std::getenv("OBS_BUILD_WEBSOCKET") &&
+        !open_dialog(tools, "WebSocket Server Settings", "SettingsDialog", "websocket-settings.png", -1, true)) return;
     blog(LOG_INFO, "cc::Build frontend Tools dialogs verified");
 }
 

@@ -444,3 +444,52 @@ cleanup, not a zero-allocation shutdown log or portal capture support.
 
 Windows/macOS Tools, remaining modules, full application/capture coverage and
 release packaging are still required.
+
+## Linux websocket server and protocol checks
+
+`plugins::build_websocket` compiles the pinned original obs-websocket 5.7.5
+server, its 52 C++ sources, generated moc/UI inputs and resources. Dependencies
+include Qt Widgets/Svg/Network, Asio, nlohmann-json, websocketpp and qrcodegencpp.
+Header/library overrides support dependencies outside the system prefixes.
+The submodule source and pin are unchanged.
+
+Enable `OBS_BUILD_WEBSOCKET=1` with `OBS_BUILD_APP_GUI=1`. The staged application
+loads the server with each core, rejects a wrong password, authenticates a real
+client and exercises scenes, inputs, settings, events, batches, errors and a
+decoded white source screenshot. With `OBS_BUILD_APP_RECORD=1`, the wire client
+starts recording after those checks; the retained H.264/AAC recording is then
+decoded and checked. A Qt probe opens Server Settings and Connect Info, checks
+that the QR image contains dark and light pixels, and captures both dialogs.
+
+`OBS_BUILD_DISABLE_WEBSOCKET_UNITY=1` compiles the 52 separate C++ sources.
+Both modes pass the GUI, wire and recording checks against both cores. Their
+11 public `obs_module*` entry points agree; incidental exported C++ template
+symbols differ. This toggle does not yet expand the core's explicit unity
+groups into individual sources.
+
+The existing `test/websocket-tier4` suite also passes against both staged cores:
+193/193 checks and 147/147 documented request types. The external fixture
+adapter aliases its private `obs-studio` configuration directory to the renamed
+product's `obs-studio-rust` directory; protocol assertions remain unchanged.
+The combined websocket, Tools, Lua/Python and NVENC application passes with
+17 production modules plus the test-only Qt probe. Settings/Connect Info
+screenshots from both cores were visually inspected.
+
+These are functional checks, not controlled build-speed measurements. Browser,
+remaining plugins, real capture profiles, Windows/macOS native graphs,
+production packaging and the full configurable unity/PCH path remain required.
+
+## Shared source inventory and Linux Tier 2
+
+`rust/tools/ported_sources.py` reads `libobs/build/source-sets.json` and expands
+the selected unity groups for Tier 2's native-object exclusion checks. CMake
+and Cargo share the optional HEVC group in that manifest. The reader matches
+the actual CMake inventory exactly: 46 Linux objects with HEVC and 45 without.
+The existing minimum inventory size and Ninja graph checks remain in force.
+The local validation image includes pinned uv and checks offline system-Python
+startup while building the image, matching the repository's Python policy.
+
+This fixes the CI reader that found only one object after the source lists
+moved out of CMake. The complete Linux Tier 2 CI result still needs verification
+on the updated branch; local source parity and HEVC on/off lifecycle/symbol
+checks pass (1766/1762 exports respectively, identical between cores).

@@ -57,7 +57,7 @@ async def verify(runtime: Path, recording: bool) -> None:
         settings = await request("GetInputSettings", {"inputName": "Native white"})
         assert settings["inputSettings"]["color"] == 0xFFFFFFFF
         status = await request("GetRecordStatus")
-        assert status["outputActive"] is recording
+        assert status["outputActive"] is False, "fixture unexpectedly started recording"
         image = await request("GetSourceScreenshot", {
             "sourceName": "Native white", "imageFormat": "png",
             "imageWidth": 64, "imageHeight": 64,
@@ -79,6 +79,15 @@ async def verify(runtime: Path, recording: bool) -> None:
         assert all(item["requestStatus"]["code"] == 100 for item in batch["d"]["results"])
         unknown = await client.request("NativeMissingRequest")
         assert unknown["d"]["requestStatus"]["code"] == 204
+        if recording:
+            await request("StartRecord")
+            deadline = asyncio.get_running_loop().time() + 5
+            while True:
+                status = await request("GetRecordStatus")
+                if status["outputActive"]:
+                    break
+                assert asyncio.get_running_loop().time() < deadline, "wire recording did not start"
+                await asyncio.sleep(0.05)
         evidence["authentication"] = "wrong password rejected; correct password accepted"
         evidence["scene_event_and_batch"] = True
         (runtime / "websocket-evidence.json").write_text(json.dumps(evidence, indent=2))

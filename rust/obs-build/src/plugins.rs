@@ -2,7 +2,9 @@
 use crate::{NativeBuild, SharedLibrary, deps::shared_archive, libobs::add_package};
 use std::path::{Path, PathBuf};
 mod frontend_tools;
+mod websocket;
 pub use frontend_tools::build as build_frontend_tools;
+pub use websocket::{Options as WebsocketOptions, build as build_websocket};
 
 #[derive(Debug)]
 pub struct Module {
@@ -444,15 +446,4 @@ pub fn build_vst(build: &NativeBuild, root: &Path, core: &Path) -> Result<Module
         &build.output.join("obs-vst/qt/moc_VSTPlugin.cpp"),
     )?;
     finish(build, &root, library)
-}
-
-
-/// Build the original obs-websocket frontend plugin.
-pub fn build_websocket(
-    _build: &NativeBuild,
-    _root: &Path,
-    _core: &Path,
-    _api: &Path,
-) -> Result<Module, String> {
-    Err("obs-websocket native graph is not implemented".into())
 }

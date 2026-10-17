@@ -76,13 +76,19 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             std::env::var_os("OBS_BUILD_APP_GUI").is_some(),
             "frontend Tools test requires OBS_BUILD_APP_GUI=1"
         );
-        options
-            .core_modules
-            .extend(["frontend-tools".into(), "native-frontend-probe".into()]);
+        options.core_modules.push("frontend-tools".into());
     }
     if std::env::var_os("OBS_BUILD_WEBSOCKET").is_some() {
-        assert!(enabled("OBS_BUILD_APP_GUI"), "websocket test requires the GUI");
+        assert!(
+            enabled("OBS_BUILD_APP_GUI"),
+            "websocket test requires the GUI"
+        );
         options.core_modules.push("obs-websocket".into());
+    }
+    if std::env::var_os("OBS_BUILD_FRONTEND_TOOLS").is_some()
+        || std::env::var_os("OBS_BUILD_WEBSOCKET").is_some()
+    {
+        options.core_modules.push("native-frontend-probe".into());
     }
     let libraries = libobs::build_pair(&build, &root, &options, &archive).unwrap();
     assert_ne!(libraries.reference, libraries.with_rust);
@@ -207,8 +213,14 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             &build,
             &root,
             &libraries.reference,
-            frontend.as_deref().expect("websocket requires the frontend API"),
-        ).unwrap()
+            frontend
+                .as_deref()
+                .expect("websocket requires the frontend API"),
+            &plugins::WebsocketOptions {
+                unity: std::env::var_os("OBS_BUILD_DISABLE_WEBSOCKET_UNITY").is_none(),
+            },
+        )
+        .unwrap()
     });
     if let (Some(frontend), Some(reference)) =
         (&frontend, std::env::var_os("OBS_BUILD_FRONTEND_REFERENCE"))
@@ -293,7 +305,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         .as_ref()
         .map(|_| render::build(&build, &root, &libraries.reference));
     if enabled("OBS_BUILD_APP_GUI") {
-        let gui_probe = frontend_tools.as_ref().map(|_| {
+        let gui_probe = (frontend_tools.is_some() || websocket.is_some()).then(|| {
             tools::build(
                 &build,
                 &root,

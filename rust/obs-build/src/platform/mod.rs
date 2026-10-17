@@ -633,6 +633,58 @@ pub fn configure_application(
     Ok(())
 }
 
+pub fn configure_websocket(target: &str, library: &mut crate::SharedLibrary) -> Result<(), String> {
+    configure_cpp_module(target, library)?;
+    fn include(variable: &str, header: &str) -> Result<PathBuf, String> {
+        println!("cargo:rerun-if-env-changed={variable}");
+        let candidates = match std::env::var_os(variable) {
+            Some(path) => vec![PathBuf::from(path)],
+            None => vec![
+                PathBuf::from("/usr/include"),
+                PathBuf::from("/usr/local/include"),
+                PathBuf::from("/usr/include/qrcodegen"),
+                PathBuf::from("/usr/local/include/qrcodegen"),
+            ],
+        };
+        candidates
+            .into_iter()
+            .find(|path| path.join(header).is_file())
+            .ok_or_else(|| {
+                format!("obs-websocket requires {header}; set {variable} to its include directory")
+            })
+    }
+    let websocket = include("OBS_WEBSOCKETPP_INCLUDE_DIR", "websocketpp/version.hpp")?;
+    let version_path = websocket.join("websocketpp/version.hpp");
+    println!("cargo:rerun-if-changed={}", version_path.display());
+    let header = std::fs::read_to_string(&version_path).map_err(|e| e.to_string())?;
+    let version = |name: &str| -> Result<u32, String> {
+        header
+            .lines()
+            .find(|line| line.contains(name))
+            .and_then(|line| line.split('=').nth(1))
+            .and_then(|value| value.trim().trim_end_matches(';').parse().ok())
+            .ok_or_else(|| format!("cannot read WebSocket++ {name}"))
+    };
+    if (version("major_version")?, version("minor_version")?) < (0, 8) {
+        return Err("obs-websocket requires WebSocket++ >=0.8".into());
+    }
+    library.include_dirs.push(websocket);
+    library
+        .include_dirs
+        .push(include("OBS_QRCODEGEN_INCLUDE_DIR", "qrcodegen.hpp")?);
+    println!("cargo:rerun-if-env-changed=OBS_QRCODEGEN_LIBRARY");
+    if let Some(path) = std::env::var_os("OBS_QRCODEGEN_LIBRARY") {
+        library.dependencies.push(
+            PathBuf::from(path)
+                .canonicalize()
+                .map_err(|e| e.to_string())?,
+        );
+    } else {
+        library.link_options.push("-lqrcodegencpp".into());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

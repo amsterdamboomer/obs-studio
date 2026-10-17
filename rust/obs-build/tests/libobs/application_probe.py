@@ -105,7 +105,10 @@ def main() -> None:
         assert (runtime / "bin/obs-nvenc-test").is_file(), "NVENC capability helper was not staged"
     command = [str(runtime / "bin/obs-studio-rust"), "--multi", "--only-bundled-plugins",
                "--disable-shutdown-check", "--disable-updater", "--disable-missing-files-check", "--unfiltered_log"]
-    if recording:
+    # The wire probe starts recording after its other protocol checks, keeping
+    # dependency setup and network checks outside the timed recording interval.
+    wire_recording = recording and bool(os.environ.get("OBS_BUILD_WEBSOCKET"))
+    if recording and not wire_recording:
         command.append("--startrecording")
     app = subprocess.Popen(command, env=env, cwd=runtime, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     log = bytearray()
@@ -120,8 +123,8 @@ def main() -> None:
                 chunk = os.read(app.stdout.fileno(), 65536)
                 log.extend(chunk)
                 (runtime / "application.log").write_bytes(log)
-            tools_ready = not os.environ.get("OBS_BUILD_FRONTEND_TOOLS") or b"cc::Build frontend Tools dialogs verified" in log
-            if b"==== Startup complete" in log and tools_ready and (not recording or b"==== Recording Start" in log):
+            tools_ready = not (os.environ.get("OBS_BUILD_FRONTEND_TOOLS") or os.environ.get("OBS_BUILD_WEBSOCKET")) or b"cc::Build frontend Tools dialogs verified" in log
+            if b"==== Startup complete" in log and tools_ready and (not recording or wire_recording or b"==== Recording Start" in log):
                 found = subprocess.run([str(args.inspector), "find", str(app.pid)], env=env, capture_output=True)
                 if found.returncode == 0:
                     ready = True
@@ -145,6 +148,8 @@ def main() -> None:
             for name in ["tools-scene-switcher.png", "tools-output-timer.png", *(["tools-scripts.png"] if scripting else [])]:
                 assert (runtime / name).is_file(), f"missing Tools dialog evidence: {name}"
         if os.environ.get("OBS_BUILD_WEBSOCKET"):
+            for name in ["websocket-settings.png", "websocket-connect-info.png"]:
+                assert (runtime / name).is_file(), f"missing websocket dialog evidence: {name}"
             wire = ["uv", "run", "--no-project", str(Path(__file__).with_name("websocket_probe.py")),
                     "--runtime", str(runtime)]
             if recording:
