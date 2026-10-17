@@ -40,6 +40,15 @@ pub struct NativeBuild {
 }
 
 impl NativeBuild {
+    /// Expand explicit BUILD.md groups into individual translation units.
+    pub fn separate_group_sources(
+        &self,
+        _root: &std::path::Path,
+        _sources: &[PathBuf],
+    ) -> Result<Vec<PathBuf>, String> {
+        Err("individual BUILD.md source compilation is not implemented".into())
+    }
+
     /// Compile through cc::Build, then link a native shared library.
     pub fn shared_library(&self, library: &SharedLibrary) -> Result<PathBuf, String> {
         let (output, cpp_link, mut objects) = self.objects(library)?;
