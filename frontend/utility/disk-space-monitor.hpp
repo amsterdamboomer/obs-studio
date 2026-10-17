@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <thread>
 
 /* Free disk space, queried off the UI thread (obs-rust/obs-studio#1282).
  *
@@ -22,7 +23,7 @@
 
 struct DiskSpaceSample {
 	uint64_t bytes = 0;
-	/* steady clock, nanoseconds, when the query finished */
+	/* os_gettime_ns() when the query finished */
 	uint64_t timestamp_ns = 0;
 	/* false until a query for this path has finished */
 	bool valid = false;
@@ -50,4 +51,5 @@ public:
 
 private:
 	std::shared_ptr<State> state;
+	std::thread worker;
 };

@@ -11,6 +11,6 @@
 #include <util/platform.h>
 
 #include <chrono>
+#include <memory>
 #include <condition_variable>
 #include <mutex>
-#include <thread>
