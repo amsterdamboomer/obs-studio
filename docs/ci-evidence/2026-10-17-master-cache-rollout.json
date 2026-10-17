@@ -107,7 +107,7 @@
         }
       }
     },
-    "scope": "Full workflow now completed successfully, including 286 tests in each implementation."
+    "scope": "Full workflow completed successfully; each mode had 286 registered tests, 283 passed and 3 skipped."
   },
   "parallel_tier2_master_rollout": {
     "run_id": 39061960882,
@@ -122,7 +122,14 @@
         "job_seconds": 327.0,
         "tests": 286,
         "failed": 0,
-        "ctest_seconds": 257.61
+        "ctest_seconds": 257.61,
+        "passed": 283,
+        "skipped": 3,
+        "skipped_tests": [
+          "test_pulse_monitor_device",
+          "test_pulse_stream_restart",
+          "test_pulse_two_sources"
+        ]
       },
       "ON": {
         "job_id": 117483314246,
@@ -132,7 +139,14 @@
         "job_seconds": 315.0,
         "tests": 286,
         "failed": 0,
-        "ctest_seconds": 248.03
+        "ctest_seconds": 248.03,
+        "passed": 283,
+        "skipped": 3,
+        "skipped_tests": [
+          "test_pulse_monitor_device",
+          "test_pulse_stream_restart",
+          "test_pulse_two_sources"
+        ]
       }
     },
     "phase_wall_seconds": 327.0,

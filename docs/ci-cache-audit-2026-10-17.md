@@ -26,19 +26,36 @@ completed successfully with the following results:
 | --- | --- | --- |
 | Linux Tier 2 | 774/775 compilations cached; build step 53 s; complete build job 162 s | Keep the working compiler cache |
 | Qt frontend | 295/297 cacheable hits; restore 10 s, build/tests 55 s, save 6 s | Keep the 1.2 GB cache bound and realistic retention allowance |
-| OFF/ON tests | 286 passed per mode; concurrent phase 327 s wall / 642 runner-seconds | Keep both implementations and parallelize independent modes |
+| OFF/ON tests | 286 registered per mode: 283 passed, 3 skipped, 0 failed; concurrent phase 327 s wall / 642 runner-seconds | Keep both implementations and parallelize independent modes |
 | Scheduling | Fast Gate 234 s; 3 s to build start; build 162 s; 3 s to test runners | Continue measuring runner waits as well as commands |
 | Rust compiler correctness | Pinned soldr 0.9.35 still returns a stale success in the nested-source probe | Retain the wrapper bypass pending the upstream fix |
 
 The earlier serial test job took 578 s for 283 tests per implementation; the
 first parallel trial spanned 366 s and consumed 715 runner-seconds. The newer
-327-second phase above covers 286 tests per mode. These are **unmatched phase
+327-second phase above registered 286 tests per mode (283 passed, three
+PulseAudio device tests skipped). These are **unmatched phase
 observations**, not proof of overall queue throughput improvement. Source,
 runner placement and compiler-cache rollout conditions differ.
 
 [Machine-readable rollout results](ci-evidence/2026-10-17-master-cache-rollout.json)
 include job IDs, phase times and independent compiler counters. The isolated
 libobs results below remain separate from whole-app and CI build timings.
+
+### What still dominates test time
+
+The [serial-test profile](ci-evidence/2026-10-17-tier2-serial-profile.json)
+identifies eight `RUN_SERIAL` tests totaling 174.47 s OFF and 165.17 s ON,
+against CTest wall times of 257.61 s and 248.03 s. The longest are async audio
+delay (~59 s), PipeWire resume (~39 s), VLC pacing (~35 s), and audio clock
+drift (23.52 s OFF / 14.55 s ON). The independent mode runners are balanced
+within 12 s of job wall time; dividing tests evenly by count would not balance
+these durations. No test sharding or removal of serial isolation was shipped.
+A future experiment can isolate long suites in separate environments, measuring
+extra runner/setup cost and timing stability before changing their scheduling.
+
+Both modes skipped `test_pulse_monitor_device`, `test_pulse_stream_restart`
+and `test_pulse_two_sources`; a green workflow is not evidence those device
+scenarios executed. Their environmental coverage remains a stated limitation.
 
 ### Queue admission and operating strategy
 
