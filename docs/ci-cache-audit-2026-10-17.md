@@ -430,6 +430,15 @@ startup failure to the same cause.
 
 ### Remaining acceptance work
 
+The follow-up fixes also incurred iteration cost. Across eight completed
+runs on only the #1362/#1365 branches, canceled runs consumed 44.07 observed
+runner-minutes and failed runs 58.08. Two active corrected runs are excluded
+from this snapshot. [Per-run observations](ci-evidence/2026-10-17-followup-iteration-cost.json)
+keep this separate from steady-state gains, billing and total #1286 rollout
+cost. Failures included cache-daemon availability, startup and the new test
+interposer; superseded runs also consumed work before cancellation completed.
+These costs must not be hidden by reporting only successful final runs.
+
 The pinned janitor's global-budget behavior is now checked directly:
 `cache/ops.py::janitor` plans family/stale/finding cleanup and applies
 newest-entry/grace protection, without a global trim against `[cache].budget`.
