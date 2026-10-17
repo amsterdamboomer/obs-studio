@@ -1,5 +1,5 @@
 //! Opt-in integration against real native dependencies and libobs-rust.
-use obs_build::{NativeBuild, libobs, plugins};
+use obs_build::{NativeBuild, graphics, libobs, plugins};
 use std::{ffi::c_void, path::PathBuf};
 
 #[test]
@@ -46,6 +46,8 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         plugins::build_transitions(&build, &root, &libraries.reference).unwrap(),
         plugins::build_filters(&build, &root, &libraries.reference, &filters).unwrap(),
     ];
+    let renderer = std::env::var_os("OBS_BUILD_RENDER")
+        .map(|_| graphics::build_opengl(&build, &root, &libraries.reference, &options).unwrap());
     // libobs twins intentionally share one SONAME. Loading both in one process
     // can retain a prior plugin's dependency and bind it to the wrong OBS state.
     // Run each variant in the same fresh-process isolation as the C tests.
@@ -55,7 +57,11 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         .collect();
     let serialized = serde_json::to_string(&modules).unwrap();
     for path in [&libraries.reference, &libraries.with_rust] {
-        let run = std::process::Command::new(std::env::current_exe().unwrap())
+        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+        if let Some(renderer) = &renderer {
+            command.env("OBS_BUILD_TEST_RENDERER", renderer);
+        }
+        let run = command
             .args([
                 "--exact",
                 "c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis",
