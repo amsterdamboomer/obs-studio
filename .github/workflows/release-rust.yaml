@@ -266,9 +266,9 @@ jobs:
             cp "$symbols" "pkg/OBS-Studio-Rust-$VERSION-windows-$TARGET-symbols.zip"
           fi
 
-          # The package ships the C libobs (#1065, #1086); the Rust ports are
-          # linked into its never-installed twin, libobs-with-rust, which
-          # must have been built with them.
+          # Rust must actually be linked into libobs-with-rust, the
+          # never-installed twin of libobs: the package ships the C libobs
+          # (#1065, #1086).
           lib=$(find build_* -path '*libobs-with-rust/*' \( -name obs.dll -o -name 'libobs.so*' -o -path '*libobs.framework/Versions/A/libobs' \) -type f | head -1)
           echo "libobs-with-rust: $lib"
           [ -n "$lib" ] || { echo "::error::libobs-with-rust was not built"; exit 1; }
