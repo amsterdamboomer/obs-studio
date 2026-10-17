@@ -1,10 +1,10 @@
 //! Opt-in integration against real native dependencies and libobs-rust.
 use obs_build::{NativeBuild, frontend, graphics, libobs, plugins};
 use std::{ffi::c_void, path::PathBuf};
-#[path = "libobs/qt.rs"]
-mod qt;
 #[path = "libobs/application.rs"]
 mod application;
+#[path = "libobs/qt.rs"]
+mod qt;
 #[path = "libobs/render.rs"]
 mod render;
 
@@ -25,9 +25,6 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         return;
     }
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-    if std::env::var_os("OBS_BUILD_APP_GUI").is_some() {
-        application::exercise(&root).unwrap();
-    }
     let archive = PathBuf::from(
         std::env::var_os("OBS_BUILD_RUST_ARCHIVE")
             .expect("build libobs-rust in release mode, then set OBS_BUILD_RUST_ARCHIVE"),
@@ -42,6 +39,29 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     };
     let options = libobs::Options {
         hevc: std::env::var_os("OBS_BUILD_DISABLE_HEVC").is_none(),
+        core_modules: if enabled("OBS_BUILD_APP_GUI") {
+            [
+                "obs-transitions",
+                "obs-filters",
+                "image-source",
+                "text-freetype2",
+                "linux-pulseaudio",
+                "linux-alsa",
+                "linux-v4l2",
+                "linux-capture",
+                "rtmp-services",
+                "linux-pipewire",
+                "obs-vst",
+                "obs-x264",
+                "obs-outputs",
+                "obs-ffmpeg",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect()
+        } else {
+            vec![]
+        },
         ..libobs::Options::default()
     };
     let libraries = libobs::build_pair(&build, &root, &options, &archive).unwrap();
@@ -55,7 +75,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         plugins::build_transitions(&build, &root, &libraries.reference).unwrap(),
         plugins::build_filters(&build, &root, &libraries.reference, &filters).unwrap(),
     ];
-    if std::env::var_os("OBS_BUILD_SOURCES").is_some() {
+    if enabled("OBS_BUILD_SOURCES") {
         for source in [
             plugins::SourceModule::Image,
             plugins::SourceModule::Text,
@@ -72,7 +92,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
                 .push(plugins::build_source(&build, &root, &libraries.reference, source).unwrap());
         }
     }
-    if std::env::var_os("OBS_BUILD_PIPEWIRE").is_some() {
+    if enabled("OBS_BUILD_PIPEWIRE") {
         modules.push(
             plugins::build_source(
                 &build,
@@ -83,9 +103,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             .unwrap(),
         );
     }
-    let frontend = (std::env::var_os("OBS_BUILD_QT").is_some()
-        || std::env::var_os("OBS_BUILD_APP").is_some())
-    .then(|| {
+    let frontend = (enabled("OBS_BUILD_QT") || enabled("OBS_BUILD_APP")).then(|| {
         qt::exercise(&build, &root);
         modules.push(plugins::build_vst(&build, &root, &libraries.reference).unwrap());
         frontend::build_api(&build, &root, &libraries.reference).unwrap()
@@ -95,7 +113,8 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     {
         assert_eq!(exports(frontend), exports(&PathBuf::from(reference)));
     }
-    if std::env::var_os("OBS_BUILD_APP").is_some() {
+    let mut application = None;
+    if enabled("OBS_BUILD_APP") {
         let gpu_archive = PathBuf::from(
             std::env::var_os("OBS_BUILD_GPU_ARCHIVE")
                 .expect("build obs-gpu-status-frontend in release mode first"),
@@ -123,9 +142,10 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             "OBS application version: {}",
             String::from_utf8_lossy(&output.stdout).trim()
         );
+        application = Some(executable);
     }
     let mut ffmpeg = None;
-    if std::env::var_os("OBS_BUILD_RECORD").is_some() {
+    if enabled("OBS_BUILD_RECORD") {
         modules.push(plugins::build_x264(&build, &root, &libraries.reference).unwrap());
         modules
             .push(plugins::build_outputs(&build, &root, &libraries.reference, &options).unwrap());
@@ -154,15 +174,30 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     } else {
         std::env::current_exe().unwrap()
     };
-    let wants_graphics = std::env::var_os("OBS_BUILD_RENDER").is_some()
-        || std::env::var_os("OBS_BUILD_RECORD").is_some()
-        || std::env::var_os("OBS_BUILD_SOURCES").is_some()
-        || std::env::var_os("OBS_BUILD_PIPEWIRE").is_some();
+    let wants_graphics = enabled("OBS_BUILD_RENDER")
+        || enabled("OBS_BUILD_RECORD")
+        || enabled("OBS_BUILD_SOURCES")
+        || enabled("OBS_BUILD_PIPEWIRE");
     let renderer = wants_graphics
         .then(|| graphics::build_opengl(&build, &root, &libraries.reference, &options).unwrap());
     let probe = renderer
         .as_ref()
         .map(|_| render::build(&build, &root, &libraries.reference));
+    if enabled("OBS_BUILD_APP_GUI") {
+        application::exercise(
+            application::Inputs {
+                root: &root,
+                build: &build,
+                executable: application.as_ref().unwrap(),
+                api: frontend.as_ref().unwrap(),
+                renderer: renderer.as_ref().unwrap(),
+                ffmpeg: ffmpeg.as_ref().unwrap(),
+                modules: &modules,
+            },
+            &[&libraries.reference, &libraries.with_rust],
+        )
+        .unwrap();
+    }
     // libobs twins intentionally share one SONAME. Loading both in one process
     // can retain a prior plugin's dependency and bind it to the wrong OBS state.
     // Run each variant in the same fresh-process isolation as the C tests.
@@ -195,7 +230,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             command.env("OBS_BUILD_TEST_RENDERER", renderer);
             command.env("OBS_BUILD_TEST_PROBE", probe.as_ref().unwrap());
         }
-        let recording = std::env::var_os("OBS_BUILD_RECORD").map(|_| {
+        let recording = enabled("OBS_BUILD_RECORD").then(|| {
             let variant = path
                 .parent()
                 .unwrap()
@@ -327,7 +362,7 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
                 initialize(
                     renderer.as_ptr(),
                     data_path.as_ptr(),
-                    std::env::var_os("OBS_BUILD_RECORD").is_some()
+                    enabled("OBS_BUILD_RECORD")
                 ),
                 0
             );
@@ -354,7 +389,7 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
             (b"obs_enum_filter_types".as_slice(), "noise_suppress_filter"),
             (b"obs_enum_filter_types".as_slice(), "gain_filter"),
         ];
-        if std::env::var_os("OBS_BUILD_RECORD").is_some() {
+        if enabled("OBS_BUILD_RECORD") {
             expected_types.extend([
                 (b"obs_enum_encoder_types".as_slice(), "obs_x264"),
                 (b"obs_enum_encoder_types".as_slice(), "ffmpeg_aac"),
@@ -373,7 +408,7 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
                 "exactly one SRT shared library must be loaded"
             );
         }
-        if std::env::var_os("OBS_BUILD_SOURCES").is_some() {
+        if enabled("OBS_BUILD_SOURCES") {
             expected_types.extend([
                 (b"obs_enum_input_types".as_slice(), "image_source"),
                 (b"obs_enum_input_types".as_slice(), "color_source"),
@@ -390,7 +425,7 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
                 (b"obs_enum_service_types".as_slice(), "rtmp_custom"),
             ]);
         }
-        if std::env::var_os("OBS_BUILD_QT").is_some() {
+        if enabled("OBS_BUILD_QT") {
             expected_types.push((b"obs_enum_filter_types".as_slice(), "vst_filter"));
         }
         for (symbol, expected) in expected_types {
@@ -526,4 +561,8 @@ fn verify_recording(path: &std::path::Path) {
             >= 0.2
     );
     println!("validated recording: {}", path.display());
+}
+
+fn enabled(name: &str) -> bool {
+    std::env::var_os(name).is_some() || std::env::var_os("OBS_BUILD_APP_GUI").is_some()
 }

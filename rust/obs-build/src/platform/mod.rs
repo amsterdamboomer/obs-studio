@@ -519,7 +519,7 @@ pub fn configure_application(
         ("OBS_PLATFORM_DATA_PATH", "share/"),
         (
             "OBS_PLATFORM_PLUGIN_MODULE_PATH",
-            "/usr/local/lib64/obs-plugins/plugins",
+            "/usr/local/lib64/obs-modules/plugins",
         ),
         (
             "OBS_PLATFORM_PLUGIN_DATA_PATH",

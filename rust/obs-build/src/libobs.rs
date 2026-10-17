@@ -201,9 +201,11 @@ pub(crate) fn add_package(
         .probe(package)
         .map_err(|e| format!("native dependency {package}: {e}"))?;
     library.include_dirs.extend(dependency.include_paths);
-    for (name, value) in dependency.defines {
-        library.definitions.push((name, value));
-    }
+    // pkg-config stores these in a randomly seeded HashMap. Stable command
+    // ordering prevents equivalent definitions from changing compiler cache keys.
+    let mut definitions: Vec<_> = dependency.defines.into_iter().collect();
+    definitions.sort();
+    library.definitions.extend(definitions);
     for path in &dependency.link_paths {
         library.link_options.push(format!("-L{}", path.display()));
         library

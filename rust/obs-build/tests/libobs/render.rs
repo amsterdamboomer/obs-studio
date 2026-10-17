@@ -160,7 +160,7 @@ EXPORT int obs_fixture_render(const char *record_path, const char *output_id)
         os_sleep_ms(10);
     obs_remove_raw_video_callback(receive_frame, NULL);
     int source_status = 0;
-    if (getenv("OBS_BUILD_SOURCES")) {
+    if (getenv("OBS_BUILD_SOURCES") || getenv("OBS_BUILD_APP_GUI")) {
         obs_data_t *settings = obs_data_create();
         obs_data_set_int(settings, "width", 64);
         obs_data_set_int(settings, "height", 64);

@@ -277,3 +277,30 @@ complete Qt types without changing original headers or requiring precompilation.
 Compiler include paths and identical definitions are deduplicated while retaining
 order. Build/profile/version/install settings are still prototype defaults, and
 controlled performance measurements have not been completed.
+
+## Linux staged GUI runtime checkpoint
+
+Set `OBS_BUILD_APP_GUI=1` with `OBS_BUILD_GPU_ARCHIVE`, native dependencies,
+an isolated X display and an EWMH window manager to run the complete current
+Linux graph. This implies the frontend, Qt widget probe, fourteen implemented
+modules, OpenGL, source rendering and the MP4/Matroska API recording checks.
+
+The GUI test stages the executable, selected core, frontend API, renderer,
+modules, shaders, application/plugin data and FFmpeg helper under a retained
+`app-runtime-*` directory in the native output tree. Each core starts in a fresh
+process with its own saved profile and white color-source scene. The test checks
+startup, a mapped normal main window, the staged library and module paths in
+the process map, restored source, screenshot, normal window-close shutdown and
+persisted scene. Logs, process maps and screenshots remain in that runtime.
+Both C and Rust cores pass these checks locally; both screenshots show the
+restored white preview. The combined run also validates four H.264/AAC files
+(MP4 and Matroska for each core). This is runtime evidence, not a controlled
+build-performance comparison.
+
+The isolated test clears desktop-session Qt plugin paths and themes so a host
+desktop built with another Qt installation cannot override the linked Qt's
+platform plugins. It retains the linked Qt's default plugin discovery and uses
+Fusion styling. System native dependencies remain installed on the host; this
+development layout does not establish portable release packaging. Hardware
+capture, GUI recording, browser/websocket features, remaining modules/platforms,
+full test tiers and controlled performance measurements are still required.
