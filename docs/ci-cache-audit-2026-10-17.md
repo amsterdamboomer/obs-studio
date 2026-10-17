@@ -63,6 +63,16 @@ are independent of the zero embedded zccache session counters printed by
 setup-soldr. [Job timings and counters](ci-evidence/2026-10-17-windows-tier2-cache-rollout.json)
 confirm that useful native compiler reuse survived the changes.
 
+macOS native Tier 2 passed both implementation runs too: 161 registered,
+160 passed and one `test_svt_av1` skip each, with CTest times 96.45/101.15 s.
+Its release-profile consumer succeeded and saved `macos-tier2-xcas-6d7b7f7a...`.
+The embedded compiler session recorded 22 hits and zero misses; this does not
+establish an Xcode compilation-cache hit rate.
+[Native macOS observations](ci-evidence/2026-10-17-macos-tier2-cache-rollout.json)
+keep these independent scopes explicit. The obsolete master workflow was
+canceled after its native jobs and cache writers completed; it is not claimed
+as a full-workflow success. Full nightly verification remains separate.
+
 ### What still dominates test time
 
 The [serial-test profile](ci-evidence/2026-10-17-tier2-serial-profile.json)
