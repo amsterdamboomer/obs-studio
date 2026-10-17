@@ -113,9 +113,23 @@ static unsigned long udev_monitor_loop(int fd, int stop_fd, os_event_t *stop, vo
 		fds[0].revents = 0;
 		fds[1].fd = stop_fd;
 		fds[1].events = POLLIN;
+		fds[1].revents = 0;
 
-		if (poll(fds, 2, 1000) <= 0)
+		int ret = poll(fds, 2, 1000);
+		if (ret < 0 && errno != EINTR) {
+			blog(LOG_WARNING, "v4l2: udev poll failed (errno %d), stopping hot-plug updates", errno);
+			break;
+		}
+		if (ret <= 0)
 			continue;
+
+		for (int i = 0; i < 2; i++) {
+			if (fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+				blog(LOG_WARNING, "v4l2: udev %s fd reported revents 0x%x, stopping hot-plug updates",
+				     i == 0 ? "monitor" : "stop", (unsigned)fds[i].revents);
+				return iterations;
+			}
+		}
 
 		if (!(fds[0].revents & POLLIN))
 			continue;
