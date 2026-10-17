@@ -102,26 +102,93 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     assert_ne!(libraries.reference, libraries.with_rust);
     assert_eq!(exports(&libraries.reference), exports(&libraries.with_rust));
     if std::env::var_os("OBS_BUILD_C_TESTS").is_some() {
-        let executables = obs_build::validation::build_c_tests(&build, &root, &libraries.reference, options.hevc).unwrap();
+        let executables = obs_build::validation::build_c_tests(
+            &build,
+            &root,
+            &libraries.reference,
+            &obs_build::validation::Options {
+                hevc: options.hevc,
+                per_target_sanitizers: std::env::var_os("OBS_BUILD_DISABLE_C_TEST_SANITIZERS")
+                    .is_none(),
+            },
+        )
+        .unwrap();
         assert_eq!(executables.len(), if options.hevc { 51 } else { 50 });
         let mut results = Vec::new();
         for core in [&libraries.reference, &libraries.with_rust] {
-            let variant = core.parent().unwrap().file_name().unwrap().to_string_lossy();
+            let variant = core
+                .parent()
+                .unwrap()
+                .file_name()
+                .unwrap()
+                .to_string_lossy();
             for test in &executables {
-                let directory = build.output.join("c-test-runs").join(variant.as_ref()).join(&test.name);
+                let directory = build
+                    .output
+                    .join("c-test-runs")
+                    .join(variant.as_ref())
+                    .join(&test.name);
                 std::fs::create_dir_all(&directory).unwrap();
-                let paths = std::env::join_paths(std::iter::once(core.parent().unwrap().to_path_buf()).chain(std::env::split_paths(&std::env::var_os("LD_LIBRARY_PATH").unwrap_or_default()))).unwrap();
-                let resolution = std::process::Command::new("ldd").arg(&test.path).env("LD_LIBRARY_PATH", &paths).output().unwrap();
+                let home = directory.join("home");
+                std::fs::create_dir_all(&home).unwrap();
+                let paths = std::env::join_paths(
+                    std::iter::once(core.parent().unwrap().to_path_buf()).chain(
+                        std::env::split_paths(
+                            &std::env::var_os("LD_LIBRARY_PATH").unwrap_or_default(),
+                        ),
+                    ),
+                )
+                .unwrap();
+                let resolution = std::process::Command::new("ldd")
+                    .arg(&test.path)
+                    .env("LD_LIBRARY_PATH", &paths)
+                    .output()
+                    .unwrap();
                 assert!(resolution.status.success());
-                assert!(String::from_utf8_lossy(&resolution.stdout).contains(core.to_str().unwrap()), "{} did not resolve the selected core", test.name);
-                let output = std::process::Command::new(&test.path).current_dir(&directory).env("LD_LIBRARY_PATH", paths).output().unwrap();
-                std::fs::write(directory.join("stdout.log"), &output.stdout).unwrap();
-                std::fs::write(directory.join("stderr.log"), &output.stderr).unwrap();
-                assert!(output.status.success(), "{} against {variant} failed: {}", test.name, String::from_utf8_lossy(&output.stderr));
-                results.push(serde_json::json!({"variant": variant, "test":test.name, "exit":output.status.code()}));
+                assert!(
+                    String::from_utf8_lossy(&resolution.stdout).contains(core.to_str().unwrap()),
+                    "{} did not resolve the selected core",
+                    test.name
+                );
+                let mut child = std::process::Command::new(&test.path)
+                    .current_dir(&directory)
+                    .env("LD_LIBRARY_PATH", paths)
+                    .env("HOME", &home)
+                    .env("XDG_CONFIG_HOME", home.join(".config"))
+                    .env("XDG_DATA_HOME", home.join(".local/share"))
+                    .env("XDG_CACHE_HOME", home.join(".cache"))
+                    .stdout(std::fs::File::create(directory.join("stdout.log")).unwrap())
+                    .stderr(std::fs::File::create(directory.join("stderr.log")).unwrap())
+                    .spawn()
+                    .unwrap();
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+                let status = loop {
+                    if let Some(status) = child.try_wait().unwrap() {
+                        break status;
+                    }
+                    if std::time::Instant::now() >= deadline {
+                        child.kill().unwrap();
+                        child.wait().unwrap();
+                        panic!("{} against {variant} exceeded 60 seconds", test.name);
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                };
+                assert!(
+                    status.success(),
+                    "{} against {variant} failed: {}",
+                    test.name,
+                    std::fs::read_to_string(directory.join("stderr.log")).unwrap()
+                );
+                results.push(
+                    serde_json::json!({"variant": variant, "test":test.name, "exit":status.code()}),
+                );
             }
         }
-        std::fs::write(build.output.join("c-tests.json"), serde_json::to_vec_pretty(&results).unwrap()).unwrap();
+        std::fs::write(
+            build.output.join("c-tests.json"),
+            serde_json::to_vec_pretty(&results).unwrap(),
+        )
+        .unwrap();
     }
     let nvenc = if std::env::var_os("OBS_BUILD_NVENC").is_some() {
         let archive = std::env::var_os("OBS_BUILD_NVENC_RUST_ARCHIVE")

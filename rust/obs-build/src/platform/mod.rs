@@ -402,7 +402,9 @@ pub fn configure_source(
             }
             if let Some(headers) = headers {
                 includes.extend(headers.include_paths);
-                library.definitions.extend(headers.defines);
+                let mut definitions: Vec<_> = headers.defines.into_iter().collect();
+                definitions.sort();
+                library.definitions.extend(definitions);
             }
             includes.extend(["/usr/include".into(), "/usr/local/include".into()]);
             if !includes
@@ -459,6 +461,67 @@ pub fn configure_source(
             }
         }
         _ => {}
+    }
+    Ok(())
+}
+
+pub fn configure_c_tests(
+    build: &crate::NativeBuild,
+    library: &mut crate::SharedLibrary,
+    sanitizer: Option<&str>,
+) -> Result<(), String> {
+    if !build.target.contains("linux") {
+        return Err(format!(
+            "C test graph for {} is not implemented yet",
+            build.target
+        ));
+    }
+    library.compile_options.extend([
+        "-std=gnu17".into(),
+        "-pthread".into(),
+        "-Wno-double-promotion".into(),
+        "-Wno-cast-qual".into(),
+        "-Wno-format-nonliteral".into(),
+        "-Wno-shadow".into(),
+        "-fno-strict-aliasing".into(),
+        "-fvisibility=hidden".into(),
+        "-fopenmp-simd".into(),
+    ]);
+    library
+        .definitions
+        .push(("SIMDE_ENABLE_OPENMP".into(), None));
+    library.link_options.extend([
+        "-pthread".into(),
+        "-lm".into(),
+        "-Wl,--export-dynamic".into(),
+    ]);
+    let compiler = build.compiler(library, &build.output, false).get_compiler();
+    let mut already_sanitized = compiler
+        .args()
+        .iter()
+        .any(|arg| arg.to_string_lossy().contains("-fsanitize="));
+    for variable in [
+        "CXXFLAGS".into(),
+        "HOST_CXXFLAGS".into(),
+        "TARGET_CXXFLAGS".into(),
+        format!("CXXFLAGS_{}", build.target),
+        format!("CXXFLAGS_{}", build.target.replace('-', "_")),
+    ] {
+        println!("cargo:rerun-if-env-changed={variable}");
+        already_sanitized |= std::env::var_os(variable)
+            .is_some_and(|flags| flags.to_string_lossy().contains("-fsanitize="));
+    }
+    if let Some(sanitizer) = sanitizer.filter(|_| !already_sanitized) {
+        let flag = format!("-fsanitize={sanitizer}");
+        library
+            .compile_options
+            .extend([flag.clone(), "-fno-omit-frame-pointer".into()]);
+        if sanitizer.split(',').any(|name| name == "undefined") {
+            library
+                .compile_options
+                .push("-fno-sanitize-recover=undefined".into());
+        }
+        library.link_options.push(flag);
     }
     Ok(())
 }

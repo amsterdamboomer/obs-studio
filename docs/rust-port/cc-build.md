@@ -490,9 +490,9 @@ The local validation image includes pinned uv and checks offline system-Python
 startup while building the image, matching the repository's Python policy.
 
 This fixes the CI reader that found only one object after the source lists
-moved out of CMake. The complete Linux Tier 2 CI result still needs verification
-on the updated branch; local source parity and HEVC on/off lifecycle/symbol
-checks pass (1766/1762 exports respectively, identical between cores).
+moved out of CMake. Linux Tier 2 CI passes on `ca331a93d`; local source parity
+and HEVC on/off lifecycle/symbol checks also pass (1766/1762 exports
+respectively, identical between cores).
 
 ## Individual libobs source compilation
 
@@ -529,7 +529,43 @@ The subsequent stock-container CI run exposed a separate missing-uv dependency:
 unlike the local Docker image, both Tier 2 jobs start from stock Ubuntu. The
 existing build and test jobs now provision the same pinned uv before invoking
 validation. No workflow files or jobs were added; remote verification remains
-required.
+required for subsequent conversion commits. This provisioning fix passes the
+build and both test modes on `ca331a93d`.
+
+## Building the C tests through Cargo
+
+`validation::build_c_tests` builds the 51 previously selected, unchanged C test
+executables through the native engine, using an explicit source/dependency
+inventory in `rust/obs-build/manifests/c-tests-linux.json`. It invokes no CMake.
+Private implementation files get generated C translation units; test bodies
+and public headers remain unchanged. Caption, happy-eyeballs, MbedTLS and
+other target dependencies are explicit. Header-only fixture dependencies stay
+header-only, including the fake PulseAudio test.
+
+`OBS_BUILD_C_TESTS=1` enables the build and execution checks in the native
+integration driver. Each binary runs against both cores from a private working
+directory and HOME. Loader resolution must identify the selected core;
+stdout/stderr and JSON results are retained. A 60-second limit applies to each
+process.
+
+Per-target sanitizers default on for the same four cases selected by the
+original CMake configuration. The central platform helper suppresses them if
+global compiler flags already select a sanitizer. The two address/undefined
+cases retain their frame-pointer and no-recovery options. ELF checks confirm
+the expected ASan/UBSan runtime dependencies. Set
+`OBS_BUILD_DISABLE_C_TEST_SANITIZERS=1` to select the disabled option.
+
+Local results: 51 compiled executables and 102 successful runs with HEVC and
+per-target sanitizers enabled; 50 executables and 100 successful runs with
+HEVC/sanitizers disabled and individual-source libobs compilation enabled.
+The disabled HEVC target is excluded and disabled sanitizer runtimes are
+absent from the selected executable dependencies. This is the selected
+51-test inventory, not the repository's complete C test graph; the remaining
+targets and their platform/feature conditions still require conversion.
+
+PR CI on `ca331a93d` completed successfully, including the repaired Linux
+Tier 2 build and both C/Rust test modes. The subsequent VLC and native-test
+builder commits require their own remote verification.
 
 ## Linux VLC media source
 
