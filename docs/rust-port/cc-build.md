@@ -302,5 +302,18 @@ desktop built with another Qt installation cannot override the linked Qt's
 platform plugins. It retains the linked Qt's default plugin discovery and uses
 Fusion styling. System native dependencies remain installed on the host; this
 development layout does not establish portable release packaging. Hardware
-capture, GUI recording, browser/websocket features, remaining modules/platforms,
+capture, browser/websocket features, remaining modules/platforms,
 full test tiers and controlled performance measurements are still required.
+
+Add `OBS_BUILD_APP_RECORD=1` alongside `OBS_BUILD_APP_GUI=1` to exercise the
+frontend's real recording path. Its private profile selects x264/AAC and
+Matroska at 640x360/30fps; `--startrecording` starts the frontend output. The
+probe requires the recording-start log, records for three seconds and closes
+the window normally. ffprobe must decode at least sixty video frames and find
+H.264, stereo AAC at 48kHz and the expected dimensions/duration. FFmpeg decodes
+the first video frame and checks that it contains the restored white scene.
+The finalized recording and ffprobe JSON remain under the retained runtime.
+Both cores pass locally: each file has 98 decoded H.264 frames, 48kHz stereo AAC
+and a 3.366-second container duration. Both screenshots show recording active
+with the white preview. The private headless session's desktop portal backend
+does not remain healthy; these checks establish no screen/camera portal capture.

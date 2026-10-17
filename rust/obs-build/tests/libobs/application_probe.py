@@ -28,6 +28,16 @@ def profile(runtime: Path) -> Path:
         "OutputCX=640\nOutputCY=360\nFPSType=0\nFPSCommon=30\n"
         "[Audio]\nSampleRate=48000\nChannelSetup=Stereo\n"
     )
+    if os.environ.get("OBS_BUILD_APP_RECORD"):
+        recordings = runtime / "recordings"
+        recordings.mkdir()
+        with (selected / "basic.ini").open("a") as output:
+            output.write(
+                "[Output]\nMode=Simple\n[SimpleOutput]\n"
+                f"FilePath={recordings}\nRecFormat2=mkv\nRecQuality=Small\n"
+                "RecEncoder=x264\nRecAudioEncoder=aac\nRecTracks=1\n"
+                "StreamAudioEncoder=aac\nABitrate=128\nVBitrate=1000\n"
+            )
     color = {"name": "Native white", "id": "color_source_v3", "uuid": str(uuid.uuid4()),
              "settings": {"width": 640, "height": 360, "color": 0xFFFFFFFF}, "volume": 1.0}
     scene = {"name": "Native scene", "id": "scene", "uuid": str(uuid.uuid4()),
@@ -59,9 +69,12 @@ def main() -> None:
     env["LD_LIBRARY_PATH"] = str(runtime / "lib64") + os.pathsep + env.get("LD_LIBRARY_PATH", "")
     env.pop("OBS_DATA_PATH", None)
     env.pop("WAYLAND_DISPLAY", None)
-    app = subprocess.Popen([str(runtime / "bin/obs-studio-rust"), "--multi", "--only-bundled-plugins",
-                            "--disable-shutdown-check", "--disable-updater", "--disable-missing-files-check",
-                            "--unfiltered_log"], env=env, cwd=runtime, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    recording = bool(os.environ.get("OBS_BUILD_APP_RECORD"))
+    command = [str(runtime / "bin/obs-studio-rust"), "--multi", "--only-bundled-plugins",
+               "--disable-shutdown-check", "--disable-updater", "--disable-missing-files-check", "--unfiltered_log"]
+    if recording:
+        command.append("--startrecording")
+    app = subprocess.Popen(command, env=env, cwd=runtime, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     log = bytearray()
     drained = False
     try:
@@ -74,7 +87,7 @@ def main() -> None:
                 chunk = os.read(app.stdout.fileno(), 65536)
                 log.extend(chunk)
                 (runtime / "application.log").write_bytes(log)
-            if b"==== Startup complete" in log:
+            if b"==== Startup complete" in log and (not recording or b"==== Recording Start" in log):
                 found = subprocess.run([str(args.inspector), "find", str(app.pid)], env=env, capture_output=True)
                 if found.returncode == 0:
                     ready = True
@@ -88,6 +101,10 @@ def main() -> None:
         for name in json.loads((runtime / "expected-modules.json").read_text()):
             assert str(runtime / "lib64/obs-modules/core" / (name + ".so")) in maps, f"module {name} was not loaded"
         assert b"Native white" in log, "saved color source was not restored"
+        if recording:
+            # Keep the actual frontend output running long enough to decode a
+            # meaningful recording. Window-close must finalize the mux helper.
+            time.sleep(3)
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "x11grab", "-video_size", "1280x720",
                         "-i", env["DISPLAY"], "-frames:v", "1", str(runtime / "application.png")], env=env,
                        check=True, capture_output=True, timeout=15)
@@ -100,9 +117,10 @@ def main() -> None:
         assert b"==== Shutting down" in log, "frontend did not enter normal shutdown"
         saved = json.loads((config / "basic/scenes/NativeSmoke.json").read_text())
         assert any(source.get("name") == "Native white" for source in saved["sources"]), "saved scene was lost"
-        if os.environ.get("OBS_BUILD_APP_RECORD"):
+        if recording:
             recordings = list((runtime / "recordings").glob("*.mkv"))
             assert len(recordings) == 1, "frontend did not create the requested recording"
+            verify_recording(recordings[0], env)
         print(f"OBS normal window, staged libraries/modules, saved scene, screenshot and clean shutdown: {runtime}")
     finally:
         if not drained:
@@ -115,6 +133,28 @@ def main() -> None:
                 remainder, _ = app.communicate(timeout=5)
             log.extend(remainder)
         (runtime / "application.log").write_bytes(log)
+
+
+def verify_recording(path: Path, env: dict[str, str]) -> None:
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-count_frames", "-show_streams", "-show_format", "-of", "json", str(path)],
+        env=env, check=True, capture_output=True, timeout=15,
+    )
+    report = json.loads(result.stdout)
+    path.with_suffix(".ffprobe.json").write_text(json.dumps(report, indent=2))
+    video = next(stream for stream in report["streams"] if stream["codec_type"] == "video")
+    audio = next(stream for stream in report["streams"] if stream["codec_type"] == "audio")
+    assert video["codec_name"] == "h264" and (video["width"], video["height"]) == (640, 360)
+    assert int(video["nb_read_frames"]) >= 60, "frontend recording has too few decoded frames"
+    assert audio["codec_name"] == "aac" and int(audio["sample_rate"]) == 48000 and audio["channels"] == 2
+    assert 2 <= float(report["format"]["duration"]) <= 15, "unexpected frontend recording duration"
+    frame = subprocess.run(
+        ["ffmpeg", "-v", "error", "-i", str(path), "-vf", "scale=1:1", "-frames:v", "1",
+         "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"],
+        env=env, check=True, capture_output=True, timeout=15,
+    ).stdout
+    assert len(frame) == 3 and min(frame) >= 240, "frontend did not record the restored white source"
+    print(f"Validated actual frontend H264/AAC recording and white frame: {path}")
 
 
 if __name__ == "__main__":
