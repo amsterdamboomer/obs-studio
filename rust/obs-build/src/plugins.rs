@@ -8,6 +8,16 @@ pub struct Module {
     pub data: PathBuf,
 }
 
+pub fn build_frontend_tools(
+    _build: &NativeBuild,
+    _root: &Path,
+    _core: &Path,
+    _api: &Path,
+    _scripting: Option<&crate::scripting::Artifacts>,
+) -> Result<Module, String> {
+    Err("frontend Tools native graph is not implemented".into())
+}
+
 #[derive(Debug)]
 pub struct NvencArtifacts {
     pub reference: Module,

@@ -106,14 +106,18 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         speexdsp: std::env::var_os("OBS_BUILD_DISABLE_SPEEXDSP").is_none(),
         rnnoise: std::env::var_os("OBS_BUILD_DISABLE_RNNOISE").is_none(),
     };
-    if std::env::var_os("OBS_BUILD_SCRIPTING").is_some() {
-        let api = std::env::var_os("OBS_BUILD_SCRIPTING_FRONTEND")
-            .map(|_| frontend::build_api(&build, &root, &libraries.reference).unwrap());
+    let tools_enabled = std::env::var_os("OBS_BUILD_FRONTEND_TOOLS").is_some();
+    let scripting_enabled = (std::env::var_os("OBS_BUILD_SCRIPTING").is_some() || tools_enabled)
+        && std::env::var_os("OBS_BUILD_DISABLE_SCRIPTING").is_none();
+    let scripting_api = (scripting_enabled
+        && (std::env::var_os("OBS_BUILD_SCRIPTING_FRONTEND").is_some() || tools_enabled))
+        .then(|| frontend::build_api(&build, &root, &libraries.reference).unwrap());
+    let script_artifacts = if scripting_enabled {
         let artifacts = scripting::build(
             &build,
             &root,
             &libraries.reference,
-            api.as_deref(),
+            scripting_api.as_deref(),
             &scripting::Options {
                 lua: std::env::var_os("OBS_BUILD_DISABLE_LUA").is_none(),
                 python: std::env::var_os("OBS_BUILD_DISABLE_PYTHON").is_none(),
@@ -126,9 +130,12 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             &root,
             &artifacts,
             &[&libraries.reference, &libraries.with_rust],
-            api.is_some(),
+            scripting_api.is_some(),
         );
-    }
+        Some(artifacts)
+    } else {
+        None
+    };
     let mut modules = vec![
         plugins::build_transitions(&build, &root, &libraries.reference).unwrap(),
         plugins::build_filters(&build, &root, &libraries.reference, &filters).unwrap(),
@@ -164,7 +171,21 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     let frontend = (enabled("OBS_BUILD_QT") || enabled("OBS_BUILD_APP")).then(|| {
         qt::exercise(&build, &root);
         modules.push(plugins::build_vst(&build, &root, &libraries.reference).unwrap());
-        frontend::build_api(&build, &root, &libraries.reference).unwrap()
+        scripting_api
+            .clone()
+            .unwrap_or_else(|| frontend::build_api(&build, &root, &libraries.reference).unwrap())
+    });
+    let _frontend_tools = tools_enabled.then(|| {
+        plugins::build_frontend_tools(
+            &build,
+            &root,
+            &libraries.reference,
+            frontend
+                .as_deref()
+                .expect("frontend Tools test requires OBS_BUILD_APP_GUI=1"),
+            script_artifacts.as_ref(),
+        )
+        .unwrap()
     });
     if let (Some(frontend), Some(reference)) =
         (&frontend, std::env::var_os("OBS_BUILD_FRONTEND_REFERENCE"))
