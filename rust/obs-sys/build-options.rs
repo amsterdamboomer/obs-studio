@@ -10,7 +10,19 @@ pub struct BuildModes {
 }
 
 impl BuildModes {
-    pub fn from_lookup(_lookup: impl FnMut(&str) -> Option<OsString>) -> Result<Self, String> {
-        Err("bundled native build modes are not implemented".into())
+    pub fn from_lookup(mut lookup: impl FnMut(&str) -> Option<OsString>) -> Result<Self, String> {
+        Ok(Self {
+            unity: flag(VARIABLES[0], lookup(VARIABLES[0]), true)?,
+            pch: flag(VARIABLES[1], lookup(VARIABLES[1]), false)?,
+        })
+    }
+}
+
+fn flag(name: &str, value: Option<OsString>, default: bool) -> Result<bool, String> {
+    match value.as_ref().map(|value| value.to_str()) {
+        None => Ok(default),
+        Some(Some("0")) => Ok(false),
+        Some(Some("1")) => Ok(true),
+        _ => Err(format!("{name} must be 0 or 1")),
     }
 }

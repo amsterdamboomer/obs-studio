@@ -664,3 +664,55 @@ by default. PCH preparation and its per-header compilation batches still need
 performance work before recommending it. These results do not establish full
 application build time, clean-cache performance, a CMake comparison or Cargo
 no-op behavior.
+
+## Bundled obs-sys configuration and Cargo scheduling
+
+The `bundled` feature exposes the core build modes through environment variables:
+
+| Variable | Values | Default |
+| --- | --- | --- |
+| `OBS_SYS_UNITY` | `0` or `1` | `1` |
+| `OBS_SYS_PCH` | `0` or `1` | `0` |
+
+The options are independent. Empty, non-text or other values fail configuration
+before native compilation. PCH currently requires Linux GCC or Clang, as above.
+With the native dependencies installed, for example:
+
+```sh
+OBS_SYS_UNITY=0 OBS_SYS_PCH=1 soldr cargo test -p obs-sys --features bundled --test native
+```
+
+The build script tracks both variables and passes them to the shared libobs
+builder. Four bundled contracts cover parsing/validation, requested versus
+compiled settings, the public API version and native startup/shutdown. Tests
+read the inherited environment without mutating process-global settings.
+
+A local fifteen-invocation Cargo experiment used a separate target directory,
+four compilation jobs and the shared host/compiler cache. All four mode
+combinations passed. Changing either option made Cargo mark `obs-sys` dirty
+for that variable. An invalid PCH value failed the build script before changing
+the native library. Five no-change invocations reported the package fresh and
+kept the native library's nanosecond timestamp unchanged, including PCH modes.
+
+The experiment then made successive temporary edits to three private inputs,
+changing one additional file per step with unity and PCH enabled. Each change
+made Cargo rerun the build script.
+A separate process loaded the resulting library and asserted its changed
+public API return value or version string:
+
+| Input | Observable change | Invocation time | Reported cache hits/misses |
+| --- | --- | ---: | ---: |
+| `libobs/obs.c.h` | API version increment | 14.15 s | 52 / 1 |
+| `libobs/build/libobs.pch.h` | Further API version increment | 19.54 s | 47 / 6 |
+| `libobs/obsversion.c.in` | Generated version string suffix | 11.07 s | 52 / 1 |
+
+Times and cache summaries cover the whole Cargo/test invocation, not just
+native compilation. These are observed incremental cases on a shared host,
+not isolated benchmarks. All temporary inputs were restored; a final build
+returned the original API values and its subsequent no-change run stayed fresh.
+This verifies selected core input scheduling, not every generated frontend,
+plugin, SDK or packaging dependency. The full conversion remains incomplete.
+
+PR CI run `39080352730` on `5f04b9f0a` completed successfully after the PCH
+checkpoint, including both Linux core test modes and the selected Windows/macOS
+lanes. The subsequent bundled-mode changes require their own remote run.
