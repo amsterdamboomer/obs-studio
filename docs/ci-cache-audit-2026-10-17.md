@@ -108,6 +108,13 @@ scenarios executed. Their environmental coverage remains a stated limitation.
 5. Keep independent OFF/ON test runners and publish the extra runner cost.
    Keep all applicable test coverage; no test sharding was introduced.
 
+Nightly security migration is live-verified: manual Scheduled run
+[39064183327](https://github.com/obs-rust/obs-studio/actions/runs/39064183327)
+passed CodeQL for Actions, C/C++, Python and Rust. Automatic default setup
+remains disabled. [Per-language results](ci-evidence/2026-10-17-nightly-codeql-verification.json)
+record durations and job IDs. This proves nightly/manual scanning works; the
+full nightly build workflow is still running and is not claimed complete.
+
 ### Measurement status and limits
 
 The before window is 2026-10-16 17:00 through 2026-10-17 17:00 UTC: 473 listed
