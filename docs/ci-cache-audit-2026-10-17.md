@@ -357,8 +357,11 @@ specific failure mode rather than checking only an ordinary append.
 
 [#1288](https://github.com/obs-rust/obs-studio/pull/1288) enables hidden-file
 uploads for `.tier2-cost` and rejects missing or unmeasured OFF/ON timing
-files before writing a cache. Master artifact production and subsequent
-consumption must be observed before declaring the timing pipeline repaired.
+files before writing a cache. #1311 subsequently fixed the singleton-artifact
+download layout. Master run 39059448618 produced 282 measured records per
+mode and saved a 5,920-byte timing cache. Later run 39060831338 restored the
+newer nonempty timing entry and completed both CTest modes. Producer,
+persistence and consumer evidence are recorded in #1286.
 
 The [failed scheduled run](https://github.com/obs-rust/obs-studio/actions/runs/39002695404)
 was rejected before job execution: its annotation says the nested `ci-mode`
@@ -367,7 +370,10 @@ permission error, not a cache script failure.
 [#1289](https://github.com/obs-rust/obs-studio/pull/1289) grants that permission
 and removes the independent nightly compiler-cache purge. Cache retention
 belongs to the existing merge-group/master janitor and `ci.toml`; scheduled
-builds reuse its warm entries. A live full dispatch remains the startup check.
+builds reuse its warm entries. Dispatch 39064183327 subsequently started every
+job and completed the full native app matrix and security scans. Its separate
+macOS ingest-refresh assertion failure (#1334) remains visible; it is not a
+startup or cleanup failure.
 
 ## A day of baseline CI traffic
 
@@ -422,7 +428,7 @@ hits, misses and compilations; post-job save skipped the zero-compile
 delta. The local gate explicitly bypasses this Rust compiler cache for
 lint, tests and cross checks because of the verified correctness blocker.
 
-Disable this layer only for deferred PR/merge-group Fast Gate runs,
+Merged #1315 disables this layer only for deferred PR/merge-group Fast Gate runs,
 retaining cook and registry snapshots. The full-day sample contains 26
 PR and 18 merge-group Fast Gate session reports with no positive compiler
 hits (26 and 16 respectively had zero compilations). In contrast, 5/24
@@ -444,25 +450,27 @@ times must not be summed as sequential wall time.
 The cache API snapshot at 2026-10-17 18:39 UTC contained 43 entries totaling
 4,389,323,635 bytes (below the 10 GB repository budget). This is a live
 snapshot, not historical baseline occupancy. Qt's newest entry was
-1,114,881,014 bytes, reinforcing the pending sizing correction.
+1,114,881,014 bytes; #1309 subsequently corrected its bound and allowance.
 
-GitHub's default CodeQL setup writes `codeql-overlay-base-database-*`
-entries outside the repository's explicit workflows. The snapshot included
-a 131,294,279-byte C++ base and Python bases around 11 MB. These keys have
-no matching declared family, so the janitor treats them as unknown after
-the grace window. They are consumed: PR run 39057119695, C++ job
-117467259478, restored the master overlay in about 3.7 s (18:13:17.924 to
-18:13:21.606). Master run 39057995138 saved a new base in about 5.1 s.
+At that initial snapshot, GitHub's default CodeQL setup wrote
+`codeql-overlay-base-database-*` entries outside the explicit workflow files.
+The snapshot included a 131,294,279-byte C++ base and Python bases around
+11 MB. They were undeclared then. PR run 39057119695, C++ job 117467259478,
+restored the master overlay in about 3.7 s; master run 39057995138 saved a
+new base in about 5.1 s. This demonstrated consumption, not a measured
+analysis speedup against a cold run.
 
-A bounded retention family merits evaluation; blanket deletion discards
-observed reuse, but these logs alone do not measure the analysis speedup
-against a cold run. Keep this separate from compiler-cache hit rates and
-from the required merge gate, which does not wait for CodeQL.
+#1316 subsequently declared a bounded 200 MB LRU overlay family. #1327 then
+disabled automatic default setup and moved all four languages to the existing
+nightly workflow. The explicit nightly C++ job 117488229574 still uploaded
+an overlay base, so the bounded family remains relevant after that migration.
+Security analysis stays outside PR/merge-group admission. Its cache behavior
+is independent of the compiler-cache hit rates used to assess build speed.
 
 ## Post-job cook-profile comparison
 
 The pinned action saves its cook archive **after** the job's consumers, so
-a release-keyed archive can contain dev/test artifacts. A pre-consumer
+an archive initially cooked with `--release` can contain dev/test artifacts. A pre-consumer
 snapshot is not an adequate model for disabling this cache.
 
 The isolated local experiment used soldr 0.9.35, four Cargo jobs, identical
