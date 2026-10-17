@@ -78,7 +78,9 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             .unwrap(),
         );
     }
-    let frontend = std::env::var_os("OBS_BUILD_QT").map(|_| {
+    let frontend = (std::env::var_os("OBS_BUILD_QT").is_some()
+        || std::env::var_os("OBS_BUILD_APP").is_some())
+    .then(|| {
         qt::exercise(&build, &root);
         modules.push(plugins::build_vst(&build, &root, &libraries.reference).unwrap());
         frontend::build_api(&build, &root, &libraries.reference).unwrap()
@@ -87,6 +89,35 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         (&frontend, std::env::var_os("OBS_BUILD_FRONTEND_REFERENCE"))
     {
         assert_eq!(exports(frontend), exports(&PathBuf::from(reference)));
+    }
+    if std::env::var_os("OBS_BUILD_APP").is_some() {
+        let gpu_archive = PathBuf::from(
+            std::env::var_os("OBS_BUILD_GPU_ARCHIVE")
+                .expect("build obs-gpu-status-frontend in release mode first"),
+        );
+        let executable = frontend::build_application(
+            &build,
+            &root,
+            &libraries.reference,
+            frontend.as_ref().unwrap(),
+            &gpu_archive,
+        )
+        .unwrap();
+        let output = std::process::Command::new(&executable)
+            .arg("--version")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("33.0"));
+        println!(
+            "OBS application version: {}",
+            String::from_utf8_lossy(&output.stdout).trim()
+        );
     }
     let mut ffmpeg = None;
     if std::env::var_os("OBS_BUILD_RECORD").is_some() {

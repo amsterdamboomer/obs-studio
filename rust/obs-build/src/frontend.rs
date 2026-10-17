@@ -55,3 +55,13 @@ pub fn add_spinbox(
     }
     Ok(())
 }
+
+pub fn build_application(
+    _build: &NativeBuild,
+    _root: &Path,
+    _core: &Path,
+    _api: &Path,
+    _gpu_status_archive: &Path,
+) -> Result<PathBuf, String> {
+    Err("full frontend application build is not implemented".into())
+}
