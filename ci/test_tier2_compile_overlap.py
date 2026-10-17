@@ -17,7 +17,7 @@ def job(name):
 
 def dependencies(name):
     match = re.search(r"^    needs: \[([^]]+)\]", job(name), re.M)
-    return [value.strip() for value in match.group(1).split(",")]
+    return [value.strip() for value in match.group(1).split(",")] if match else []
 
 
 def tests_allowed(results, cancelled=False):
@@ -43,8 +43,7 @@ class CompileOverlapTest(unittest.TestCase):
     def test_build_has_no_fast_gate_ancestor(self):
         def ancestors(name):
             direct = dependencies(name)
-            return set(direct).union(*(ancestors(parent) for parent in direct
-                                       if parent in {"rust-tests-linux", "rust-linux-tier2-build"}))
+            return set(direct).union(*(ancestors(parent) for parent in direct))
         self.assertNotIn("rust-tests-linux", ancestors("rust-linux-tier2-build"))
         self.assertIn("check-event", dependencies("rust-linux-tier2-build"))
         self.assertIn("ci-mode", dependencies("rust-linux-tier2-build"))
