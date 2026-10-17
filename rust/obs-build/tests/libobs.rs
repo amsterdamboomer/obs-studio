@@ -44,10 +44,26 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         speexdsp: std::env::var_os("OBS_BUILD_DISABLE_SPEEXDSP").is_none(),
         rnnoise: std::env::var_os("OBS_BUILD_DISABLE_RNNOISE").is_none(),
     };
-    let modules = [
+    let mut modules = vec![
         plugins::build_transitions(&build, &root, &libraries.reference).unwrap(),
         plugins::build_filters(&build, &root, &libraries.reference, &filters).unwrap(),
     ];
+    if std::env::var_os("OBS_BUILD_RECORD").is_some() {
+        modules.push(plugins::build_x264(&build, &root, &libraries.reference).unwrap());
+        modules
+            .push(plugins::build_outputs(&build, &root, &libraries.reference, &options).unwrap());
+        modules.push(
+            plugins::build_ffmpeg(
+                &build,
+                &root,
+                &libraries.reference,
+                &options,
+                &plugins::FfmpegOptions::default(),
+            )
+            .unwrap()
+            .module,
+        );
+    }
     let renderer = std::env::var_os("OBS_BUILD_RENDER")
         .map(|_| graphics::build_opengl(&build, &root, &libraries.reference, &options).unwrap());
     let probe = renderer

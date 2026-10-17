@@ -111,3 +111,51 @@ fn finish(build: &NativeBuild, root: &Path, library: SharedLibrary) -> Result<Mo
         library: build.shared_library(&library)?,
     })
 }
+
+#[derive(Clone, Debug)]
+pub struct FfmpegOptions {
+    pub logging: bool,
+    pub mpegts: bool,
+    pub nvenc: bool,
+    pub mux_debug: bool,
+}
+
+impl Default for FfmpegOptions {
+    fn default() -> Self {
+        Self {
+            logging: false,
+            mpegts: true,
+            nvenc: false,
+            mux_debug: false,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct FfmpegArtifacts {
+    pub module: Module,
+    pub muxer: PathBuf,
+}
+
+pub fn build_x264(_build: &NativeBuild, _root: &Path, _core: &Path) -> Result<Module, String> {
+    Err("real x264 module build is not implemented".into())
+}
+
+pub fn build_outputs(
+    _build: &NativeBuild,
+    _root: &Path,
+    _core: &Path,
+    _options: &crate::libobs::Options,
+) -> Result<Module, String> {
+    Err("real outputs module build is not implemented".into())
+}
+
+pub fn build_ffmpeg(
+    _build: &NativeBuild,
+    _root: &Path,
+    _core: &Path,
+    _options: &crate::libobs::Options,
+    _features: &FfmpegOptions,
+) -> Result<FfmpegArtifacts, String> {
+    Err("real FFmpeg module and muxer build is not implemented".into())
+}
