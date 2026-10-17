@@ -26,11 +26,9 @@ set(OBS_UNITY_BUILD_BATCH_SIZE 8 CACHE STRING "Sources per unity translation uni
 # arm64, util/sse-intrin.h leaves that defined), making its own include a
 # no-op.
 #
-# The SAPI caption sources include <sapi.h>, whose `byte` is ambiguous next to
-# frontend-tools' `using namespace std` (std::byte) in the same batch.
-#
-# obs-browser-source.cpp declares DispatchJSEvent with a default argument
-# that obs-browser-plugin.cpp declares again.
+# The SAPI caption sources include <sapi.h>, and the frontend sources below
+# the full <windows.h> (COM's objidl.h): their `byte` is ambiguous next to an
+# earlier source's `using namespace std` (std::byte) in the same batch.
 set(
   _OBS_UNITY_SKIP_SOURCES
   libobs-opengl/gl-wayland-egl.c
@@ -43,8 +41,23 @@ set(
   plugins/frontend-tools/captions.cpp
   plugins/frontend-tools/captions-mssapi.cpp
   plugins/frontend-tools/captions-mssapi-stream.cpp
-  plugins/obs-browser/obs-browser-source.cpp
+  frontend/components/SourceTreeItem.cpp
+  frontend/dialogs/OBSBasicFilters.cpp
+  frontend/dialogs/OBSBasicInteraction.cpp
+  frontend/dialogs/OBSBasicProperties.cpp
+  frontend/obs-main.cpp
+  frontend/plugin-manager/PluginModuleLoader_Windows.cpp
+  frontend/utility/AutoUpdateThread.cpp
+  frontend/utility/NativeEventFilter_Windows.cpp
+  frontend/utility/platform-windows.cpp
+  frontend/utility/ScreenshotObj.cpp
+  frontend/utility/system-info-windows.cpp
+  frontend/widgets/OBSQTDisplay.cpp
 )
+
+# Submodules build the way their upstream ships them (BUILD.md): one
+# translation unit per source. They keep the precompiled header.
+set(_OBS_UNITY_SKIP_DIRS plugins/obs-browser plugins/obs-websocket)
 
 # obs_target_unity: turn on unity builds for <target>.
 function(obs_target_unity target)
@@ -59,6 +72,13 @@ function(obs_target_unity target)
   if(_disabled)
     return()
   endif()
+  get_target_property(_source_dir ${target} SOURCE_DIR)
+  cmake_path(RELATIVE_PATH _source_dir BASE_DIRECTORY "${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE _relative)
+  foreach(_dir IN LISTS _OBS_UNITY_SKIP_DIRS)
+    if(_relative STREQUAL _dir OR _relative MATCHES "^${_dir}/")
+      return()
+    endif()
+  endforeach()
 
   set_target_properties(
     ${target}
