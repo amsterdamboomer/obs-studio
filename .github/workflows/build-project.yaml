@@ -923,9 +923,9 @@ jobs:
           # core module that calls find_package(Qt6 REQUIRED). Nothing Qt is built
           # or tested here (only the touched targets); that is the Qt lane's job.
           grep -v '^#' rust/tools/linux-validate/apt-packages.txt |
-            xargs "${GITHUB_WORKSPACE}/.github/scripts/retry" sudo apt-get -o "Dir::Cache::archives=$APT_ARCHIVES" -o Binary::apt-get::APT::Keep-Downloaded-Packages=true install -y --no-install-recommends
+            xargs "${GITHUB_WORKSPACE}/.github/scripts/retry" sudo apt-get install -o "Dir::Cache::archives=$APT_ARCHIVES" -o Binary::apt-get::APT::Keep-Downloaded-Packages=true -y --no-install-recommends
           # The launcher below; apt-packages.txt no longer lists it (#957, #1183).
-          "${GITHUB_WORKSPACE}/.github/scripts/retry" sudo apt-get -o "Dir::Cache::archives=$APT_ARCHIVES" -o Binary::apt-get::APT::Keep-Downloaded-Packages=true install -y --no-install-recommends ccache
+          "${GITHUB_WORKSPACE}/.github/scripts/retry" sudo apt-get install -o "Dir::Cache::archives=$APT_ARCHIVES" -o Binary::apt-get::APT::Keep-Downloaded-Packages=true -y --no-install-recommends ccache
           packages=("$APT_ARCHIVES"/*.deb)
           echo "apt archive retained packages: ${#packages[@]}"
           if [ "${#packages[@]}" -gt 0 ]; then du -ch "${packages[@]}" | tail -1; fi
