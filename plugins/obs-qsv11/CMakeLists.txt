@@ -31,6 +31,14 @@ target_sources(
     QSV_Encoder_Internal.h
 )
 
+# The host's bits/<os>_defs.h for common_utils.h (#860).
+target_compile_definitions(
+  obs-qsv11
+  PRIVATE
+    $<$<PLATFORM_ID:Linux>:OBS_QSV_HOST_DEFS="plugins/obs-qsv11/bits/linux_defs.h">
+    $<$<PLATFORM_ID:Windows>:OBS_QSV_HOST_DEFS="plugins/obs-qsv11/bits/windows_defs.h">
+)
+
 target_compile_options(
   obs-qsv11
   PRIVATE

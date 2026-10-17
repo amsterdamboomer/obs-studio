@@ -2,6 +2,5 @@
 
 bool qsv_host_texture_valid(const struct encoder_texture *tex)
 {
-	(void)tex;
-	return false; /* RED stub (#860) */
+	return tex && tex->handle != GS_INVALID_HANDLE;
 }
