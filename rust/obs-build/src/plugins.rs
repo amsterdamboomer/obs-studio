@@ -370,6 +370,19 @@ pub fn build_source(
     finish(build, &root, library)
 }
 
-pub fn build_vst(_build: &NativeBuild, _root: &Path, _core: &Path) -> Result<Module, String> {
-    Err("Qt VST module build is not implemented".into())
+pub fn build_vst(build: &NativeBuild, root: &Path, core: &Path) -> Result<Module, String> {
+    let root = root.canonicalize().map_err(|e| e.to_string())?;
+    let mut library = module(build, &root, core, "obs-vst")?;
+    library.sources = vec![root.join("plugins/obs-vst/build/obs-vst.core+.hpp.cpp")];
+    library
+        .include_dirs
+        .push(root.join("plugins/obs-vst/vst_header"));
+    crate::platform::configure_vst(&build.target, &root, &mut library)?;
+    add_package(&mut library, &build.target, "Qt6Widgets")?;
+    crate::qt::moc(
+        &mut library,
+        &root.join("plugins/obs-vst/headers/VSTPlugin.h"),
+        &build.output.join("obs-vst/qt/moc_VSTPlugin.cpp"),
+    )?;
+    finish(build, &root, library)
 }

@@ -11,6 +11,7 @@ pub mod graphics;
 pub mod libobs;
 mod platform;
 pub mod plugins;
+pub mod qt;
 
 #[derive(Clone, Debug, Default)]
 pub struct SharedLibrary {

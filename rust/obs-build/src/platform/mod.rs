@@ -142,12 +142,16 @@ pub fn configure_libobs_variant(
 pub fn configure_module(target: &str, library: &mut crate::SharedLibrary) -> Result<(), String> {
     if target.contains("linux") {
         library.file_name = Some(format!("{}.so", library.name));
-        library.compile_options.extend(
-            ["-std=gnu17", "-fno-strict-aliasing", "-fvisibility=hidden"].map(String::from),
-        );
-        library
-            .link_options
-            .extend(["-lm", "-pthread"].map(String::from));
+        for flag in ["-std=gnu17", "-fno-strict-aliasing", "-fvisibility=hidden"] {
+            if !library.compile_options.iter().any(|option| option == flag) {
+                library.compile_options.push(flag.into());
+            }
+        }
+        for flag in ["-lm", "-pthread"] {
+            if !library.link_options.iter().any(|option| option == flag) {
+                library.link_options.push(flag.into());
+            }
+        }
         Ok(())
     } else {
         Err(format!(
@@ -416,6 +420,42 @@ pub fn configure_source(
         }
         _ => {}
     }
+    Ok(())
+}
+
+pub fn configure_cpp_module(
+    target: &str,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    configure_module(target, library)?;
+    library
+        .compile_options
+        .retain(|flag| !flag.starts_with("-std="));
+    library
+        .compile_options
+        .extend(["-std=gnu++17", "-fvisibility-inlines-hidden"].map(String::from));
+    Ok(())
+}
+
+pub fn configure_frontend_api(
+    target: &str,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    configure_cpp_module(target, library)?;
+    library.file_name = Some("libobs-frontend-api.so.30".into());
+    Ok(())
+}
+
+pub fn configure_vst(
+    target: &str,
+    root: &Path,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    configure_cpp_module(target, library)?;
+    library
+        .sources
+        .push(root.join("plugins/obs-vst/build/obs-vst.linux+.hpp.cpp"));
+    crate::libobs::add_package(library, target, "xcb")?;
     Ok(())
 }
 

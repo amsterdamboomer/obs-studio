@@ -80,6 +80,11 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         modules.push(plugins::build_vst(&build, &root, &libraries.reference).unwrap());
         frontend::build_api(&build, &root, &libraries.reference).unwrap()
     });
+    if let (Some(frontend), Some(reference)) =
+        (&frontend, std::env::var_os("OBS_BUILD_FRONTEND_REFERENCE"))
+    {
+        assert_eq!(exports(frontend), exports(&PathBuf::from(reference)));
+    }
     let mut ffmpeg = None;
     if std::env::var_os("OBS_BUILD_RECORD").is_some() {
         modules.push(plugins::build_x264(&build, &root, &libraries.reference).unwrap());

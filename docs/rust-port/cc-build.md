@@ -206,3 +206,23 @@ shared GLAD archive. Enable its opt-in build/load check with
 initialization, then render and shut down. Portal availability, camera
 permissions and actual screen/camera capture remain unverified; module load alone
 does not establish those capabilities.
+
+## Linux frontend API and Qt checkpoint
+
+`frontend::build_api` builds the original C++ frontend API as a shared library.
+It preserves Linux's SONAME 30 and creates its unversioned lookup name. C++17 and
+hidden inline visibility match the CMake compiler configuration. Local symbol
+comparison finds exactly 101 exports in both frontend libraries, with no missing
+or extra symbols. `OBS_BUILD_FRONTEND_REFERENCE` optionally enables this complete
+comparison against an existing CMake artifact in the integration test.
+
+`qt::moc` runs Qt's meta-object compiler with the native target's include paths and
+definitions and compiles its generated translation unit explicitly. It preserves
+unchanged output contents/mtime. `OBS_QT_MOC` selects a host tool explicitly;
+default discovery uses Qt6Core's pkg-config libexec directory. Application builds
+still need UI/resource generation and complete build-script input tracking.
+
+Enable `OBS_BUILD_QT=1` to build the real VST module and frontend API. Both cores
+load the VST module and expose its filter; the frontend API's no-callback defaults
+are callable. VST editor/audio behavior, the full Qt application and resources,
+other platforms and packaging remain outstanding.
