@@ -41,6 +41,21 @@ runner placement and compiler-cache rollout conditions differ.
 include job IDs, phase times and independent compiler counters. The isolated
 libobs results below remain separate from whole-app and CI build timings.
 
+### Native Rust profile verification
+
+Master [39063249804](https://github.com/obs-rust/obs-studio/actions/runs/39063249804)
+passed native Rust test jobs on both platforms with `--profile dev`:
+
+| Platform | Setup | Cook inside setup | Rust tests | Post-job setup-soldr save |
+| --- | --- | --- | --- | --- |
+| macOS arm64 | 34 s | 23.1 s | 89 s | 13 s |
+| Windows x64 | 53 s | 30.0 s | 125 s | 15 s |
+
+[Raw job observations](ci-evidence/2026-10-17-native-rust-cook-rollout.json)
+verify profile use and successful consumers. Compiler-wrapper session counters
+were zero in both jobs; these are separate from dependency-cook reuse. The
+full workflow is still running, and this is not a matched speed comparison.
+
 ### What still dominates test time
 
 The [serial-test profile](ci-evidence/2026-10-17-tier2-serial-profile.json)
