@@ -32,6 +32,48 @@ pub struct NativeBuild {
 impl NativeBuild {
     /// Compile through cc::Build, then link a native shared library.
     pub fn shared_library(&self, library: &SharedLibrary) -> Result<PathBuf, String> {
+        let (output, cpp_link, objects) = self.objects(library)?;
+        let artifact = output.join(
+            library
+                .file_name
+                .clone()
+                .unwrap_or_else(|| platform::shared_filename(&self.target, &library.name)),
+        );
+        let compiler = self.compiler(library, &output, cpp_link).get_compiler();
+        let mut command = compiler.to_command();
+        platform::configure_shared_link(
+            &self.target,
+            &mut command,
+            &artifact,
+            &objects,
+            &library.dependencies,
+            compiler.is_like_msvc(),
+        )?;
+        command.args(&library.link_options);
+        let result = command
+            .output()
+            .map_err(|e| format!("execute linker {command:?}: {e}"))?;
+        if !result.status.success() {
+            return Err(format!(
+                "link {} failed ({})\n{}\n{}",
+                library.name,
+                result.status,
+                String::from_utf8_lossy(&result.stdout),
+                String::from_utf8_lossy(&result.stderr)
+            ));
+        }
+        Ok(artifact)
+    }
+
+    /// Build an archive with the same compiler, flags and source grouping.
+    pub fn static_library(&self, library: &SharedLibrary) -> Result<PathBuf, String> {
+        let (output, cpp, objects) = self.objects(library)?;
+        self.compiler(library, &output, cpp)
+            .try_create_archive(&library.name, objects)
+            .map_err(|e| e.to_string())
+    }
+
+    fn objects(&self, library: &SharedLibrary) -> Result<(PathBuf, bool, Vec<PathBuf>), String> {
         if library.name.is_empty()
             || !library
                 .name
@@ -96,36 +138,7 @@ impl NativeBuild {
                     .map_err(|e| e.to_string())?,
             );
         }
-        let artifact = output.join(
-            library
-                .file_name
-                .clone()
-                .unwrap_or_else(|| platform::shared_filename(&self.target, &library.name)),
-        );
-        let compiler = self.compiler(library, &output, cpp_link).get_compiler();
-        let mut command = compiler.to_command();
-        platform::configure_shared_link(
-            &self.target,
-            &mut command,
-            &artifact,
-            &objects,
-            &library.dependencies,
-            compiler.is_like_msvc(),
-        )?;
-        command.args(&library.link_options);
-        let result = command
-            .output()
-            .map_err(|e| format!("execute linker {command:?}: {e}"))?;
-        if !result.status.success() {
-            return Err(format!(
-                "link {} failed ({})\n{}\n{}",
-                library.name,
-                result.status,
-                String::from_utf8_lossy(&result.stdout),
-                String::from_utf8_lossy(&result.stderr)
-            ));
-        }
-        Ok(artifact)
+        Ok((output, cpp_link, objects))
     }
 
     fn compiler(&self, library: &SharedLibrary, output: &std::path::Path, cpp: bool) -> cc::Build {
@@ -138,7 +151,10 @@ impl NativeBuild {
             .debug(true)
             .pic(true)
             .cpp(cpp)
-            .cargo_metadata(false)
+            // Intermediate compilation and archive creation do not emit link
+            // directives. Keep cc's compiler/archiver environment tracking so
+            // target-qualified flags invalidate Cargo's bundled native build.
+            .cargo_metadata(true)
             .includes(&library.include_dirs);
         for (name, value) in &library.definitions {
             compiler.define(name, value.as_deref());

@@ -18,7 +18,9 @@
 # which build obs-nix.c the same way.
 
 # Canonical source lists are shared with obs-build and bundled obs-sys.
-file(READ "${CMAKE_CURRENT_LIST_DIR}/../build/source-sets.json" _libobs_source_sets)
+set(_libobs_source_manifest "${CMAKE_CURRENT_LIST_DIR}/../build/source-sets.json")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_libobs_source_manifest}")
+file(READ "${_libobs_source_manifest}" _libobs_source_sets)
 string(JSON _set_count LENGTH "${_libobs_source_sets}")
 math(EXPR _set_last "${_set_count} - 1")
 foreach(_set_index RANGE ${_set_last})

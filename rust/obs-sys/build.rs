@@ -3,6 +3,22 @@ fn main() {
     #[cfg(feature = "bundled")]
     {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        for directory in ["libobs", "deps/libcaption"] {
+            println!("cargo:rerun-if-changed={}", root.join(directory).display());
+        }
+        for variable in [
+            "CPATH",
+            "C_INCLUDE_PATH",
+            "CPLUS_INCLUDE_PATH",
+            "LIBRARY_PATH",
+            "CFLAGS",
+            "CXXFLAGS",
+            "CC",
+            "CXX",
+            "PKG_CONFIG_PATH",
+        ] {
+            println!("cargo:rerun-if-env-changed={variable}");
+        }
         let build = obs_build::NativeBuild {
             host: std::env::var("HOST").unwrap(),
             target: std::env::var("TARGET").unwrap(),

@@ -42,3 +42,33 @@ does not complete the conversion.
 
 The existing CMake build remains the artifact and behavior reference during the
 conversion. Intermediate progress must not be reported as full completion.
+
+## Linux libobs checkpoint
+
+The bundled `obs-sys` feature now compiles the real C libobs through `cc::Build`,
+links `libobs.so.30`, and generates configuration, version and core-module source
+files under Cargo's output directory. It uses the same canonical source manifest
+as the CMake reference. libcaption remains a separate static archive; system
+libraries remain dynamically linked, including when pkg-config lists a static
+archive directory before its shared-library directory.
+
+Local evidence for this checkpoint:
+
+- The native build engine's three tests pass (dependency selection, generated
+  source/unity toggle, and a dynamically loaded plugin observing a rebuilt core).
+- Bundled libobs passes its public C API version and startup/shutdown tests.
+- Editing only the JSON manifest triggers CMake regeneration. Changing a
+  target-qualified C compiler flag reruns Cargo's bundled native build; compiler
+  metadata does not add unintended static-library linkage.
+- Its 1,766 exported symbols exactly match the local CMake C reference.
+- 51 unchanged, already-built C test executables pass against both libraries.
+  `ldd` confirms each executable loads the intended replacement `libobs.so.30`.
+  This validates the replacement library; it does not demonstrate a Cargo build
+  of those test executables or the Rust implementation twin.
+
+This checkpoint is Linux C libobs only. The Rust twin, application and plugins,
+full test battery, macOS/Windows graphs, installation/packaging, optional PCH and
+controlled build/cache benchmarks remain required. The generated version and
+install paths are prototype defaults and still need release configuration.
+Native dependencies are discovered using pkg-config; local Nix verification used
+`PKG_CONFIG_PATH` and `CPATH` for installed packages and uthash respectively.
