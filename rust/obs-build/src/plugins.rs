@@ -330,6 +330,7 @@ pub enum SourceModule {
     Image,
     Text,
     PulseAudio,
+    PipeWire,
     Alsa,
     V4l2 { udev: bool },
     X11Capture,
@@ -342,6 +343,7 @@ impl SourceModule {
             Self::Image => "image-source",
             Self::Text => "text-freetype2",
             Self::PulseAudio => "linux-pulseaudio",
+            Self::PipeWire => "linux-pipewire",
             Self::Alsa => "linux-alsa",
             Self::V4l2 { .. } => "linux-v4l2",
             Self::X11Capture => "linux-capture",
@@ -356,6 +358,9 @@ pub fn build_source(
     core: &Path,
     source: SourceModule,
 ) -> Result<Module, String> {
+    if matches!(source, SourceModule::PipeWire) {
+        return Err("PipeWire module graph is not implemented".into());
+    }
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let mut library = module(build, &root, core, source.name())?;
     library.sources.clear();

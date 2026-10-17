@@ -65,6 +65,17 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
                 .push(plugins::build_source(&build, &root, &libraries.reference, source).unwrap());
         }
     }
+    if std::env::var_os("OBS_BUILD_PIPEWIRE").is_some() {
+        modules.push(
+            plugins::build_source(
+                &build,
+                &root,
+                &libraries.reference,
+                plugins::SourceModule::PipeWire,
+            )
+            .unwrap(),
+        );
+    }
     let mut ffmpeg = None;
     if std::env::var_os("OBS_BUILD_RECORD").is_some() {
         modules.push(plugins::build_x264(&build, &root, &libraries.reference).unwrap());
@@ -97,7 +108,8 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     };
     let wants_graphics = std::env::var_os("OBS_BUILD_RENDER").is_some()
         || std::env::var_os("OBS_BUILD_RECORD").is_some()
-        || std::env::var_os("OBS_BUILD_SOURCES").is_some();
+        || std::env::var_os("OBS_BUILD_SOURCES").is_some()
+        || std::env::var_os("OBS_BUILD_PIPEWIRE").is_some();
     let renderer = wants_graphics
         .then(|| graphics::build_opengl(&build, &root, &libraries.reference, &options).unwrap());
     let probe = renderer

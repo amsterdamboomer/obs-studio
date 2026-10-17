@@ -353,12 +353,16 @@ pub fn configure_source(
     library: &mut crate::SharedLibrary,
 ) -> Result<(), String> {
     use crate::{libobs::add_package, plugins::SourceModule};
+    if matches!(source, SourceModule::PipeWire) {
+        return Err("PipeWire module graph is not implemented".into());
+    }
     if !target.contains("linux") {
         return Err(format!(
             "source module graph for {target} is not implemented yet"
         ));
     }
     let groups: &[&str] = match source {
+        SourceModule::PipeWire => unreachable!(),
         SourceModule::Image => &["core", "slideshow", "posix"],
         SourceModule::Text => &["core", "nix"],
         SourceModule::PulseAudio | SourceModule::Alsa | SourceModule::X11Capture => &["nix"],
@@ -372,6 +376,7 @@ pub fn configure_source(
             .map(|group| root.join(format!("plugins/{0}/build/{0}.{group}+.h.c", source.name()))),
     );
     let packages: &[&str] = match source {
+        SourceModule::PipeWire => unreachable!(),
         SourceModule::Image => &[],
         SourceModule::Text => &["freetype2", "fontconfig"],
         SourceModule::PulseAudio => &["libpulse"],
