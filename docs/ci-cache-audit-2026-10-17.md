@@ -113,7 +113,7 @@ Nightly security migration is live-verified: manual Scheduled run
 passed CodeQL for Actions, C/C++, Python and Rust. Automatic default setup
 remains disabled. [Per-language results](ci-evidence/2026-10-17-nightly-codeql-verification.json)
 record durations and job IDs. This proves nightly/manual scanning works; the
-full nightly build workflow is still running and is not claimed complete.
+full nightly run subsequently finished with the macOS integrity failure described below.
 
 Trusted scoped-plugin warming is now observed: master run
 [39064132902](https://github.com/obs-rust/obs-studio/actions/runs/39064132902)
@@ -122,8 +122,41 @@ The touched-target build and save steps succeeded. The prepared measurement
 PR selects only `linux-v4l2`; its tracked compiler-input fingerprint matches
 the seed revision, excluding Markdown and generated version metadata.
 [Experiment records](ci-evidence/2026-10-17-plugin-cache-experiment.json)
-retain the cold sample and trusted save. Actual PR compiler hits and runtime
-remain pending; archive creation alone is not proof of reuse.
+retain the cold sample and trusted save. Subsequent PR compiler reuse is verified below; archive creation alone was
+not used as proof of reuse.
+
+### Scoped plugin follow-up measurements
+
+| Condition | Compiler hits | Target step | Full job | Apt fetched |
+| --- | --- | --- | --- | --- |
+| Original cold PR | 0/41 | 57 s | 153 s | 147 MB / 13 s |
+| Warm compiler archive | 41/41 | 70 s | 169 s | 147 MB / 30 s |
+| Shared apt archive, wrong layout | 41/41 | 70 s | 190 s | 147 MB / 28 s |
+| Shared apt archive, layout normalized | 41/41 | 46 s | 145 s | 142 MB / 13 s |
+
+Compiler work fell from about 12 s to half a second, but this alone did not
+make the first warm job faster. Package download/install overhead dominated.
+The container archive supplied only about 5 MB of the host's package needs,
+even after 563 archives were relocated correctly. The large shared restore
+is therefore rejected. #1335 instead seeds a bounded host-specific archive;
+its trusted writer and subsequent download/runtime benefit remain to verify.
+These are individual unmatched runs, with network and runner variation;
+145 versus 153 s is not claimed as a robust causal improvement.
+
+### Full nightly outcome
+
+[Final job results](ci-evidence/2026-10-17-nightly-final-results.json) show
+successful Ubuntu OFF/ON app builds, macOS Intel/Apple Silicon, Windows
+x64/arm64, Flatpak, security analysis, Linux OFF/ON Tier 2 and Windows Tier 2.
+The **overall run failed** at macOS `test_ingest_refresh_wait` /
+`failed_refresh_ends_wait`: its elapsed time exceeded 150 ms. The first
+implementation run failed, so the second implementation was not validated.
+[Failure evidence](ci-evidence/2026-10-17-nightly-macos-failure.json) and
+[#1334](https://github.com/obs-rust/obs-studio/issues/1334) preserve the failure
+and required diagnostics. Scheduling sensitivity is a hypothesis; no cache
+cause is established. The existing C test was neither weakened nor skipped,
+and no speculative whole-workflow retry was performed. This native build
+matrix is distinct from the AppImage nightly release pipeline.
 
 ### Measurement status and limits
 
