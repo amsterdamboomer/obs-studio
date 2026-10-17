@@ -130,6 +130,23 @@ counts. Logs were unavailable for 33 of 117 sampled attempts, all canceled;
 missing counters are unknown. Repeated archive messages and independent
 compiler scopes must not be summed into fictitious transfer/hit totals.
 
+The [per-lane baseline](ci-evidence/2026-10-16_17-ci-baseline-lane-timings.json)
+separates code/docs/configuration cohorts and records each literal step's
+sample count. Selected **code-cohort successful jobs** were:
+
+| Lane | PR n / median job | Queue n / median job | PR / queue median soldr setup |
+| --- | --- | --- | --- |
+| Fast Gate | 27 / 128 s | 19 / 139 s | 23 / 32 s |
+| Tier 2 build | 8 / 196.5 s | 7 / 179 s | 25 / 17 s |
+| Serial Tier 2 tests | 7 / 597 s | 3 / 598 s | Not applicable |
+| Qt frontend | 5 / 256 s | 10 / 161 s | Not applicable |
+
+These include successful jobs in workflows that later failed or were canceled;
+the JSON discloses parent outcomes. They are not the successful-gate sample
+counts above. Step medians are not additive totals, and historical lane/shard
+names remain separate. Missing/skipped step times do not become zero samples.
+The collector now emits `lane_cohorts` so the same method applies after rollout.
+
 The final after window must cover at least a full day of representative code
 PR and queue traffic following rollout. It has not elapsed. Plugin warming
 and a subsequent PR hit/timing comparison, the full nightly run, native-platform
