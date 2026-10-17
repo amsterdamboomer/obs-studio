@@ -12,10 +12,16 @@ fn target(name: &str, source: &Path, dependencies: Vec<std::path::PathBuf>) -> S
     }
 }
 
-unsafe fn answer(library: &Path, symbol: &[u8]) -> i32 {
+unsafe fn answer(library: &Path, symbol: &[u8], dependencies: &[&Path]) -> i32 {
     // SAFETY: the fixture below defines this symbol with the C ABI and no args;
     // its owning library stays loaded for the entire call.
     unsafe {
+        // Load dependencies explicitly as well: Windows does not search sibling
+        // target directories for DLLs. Keep their handles alive through the call.
+        let _dependencies: Vec<_> = dependencies
+            .iter()
+            .map(|path| libloading::Library::new(path).unwrap())
+            .collect();
         let lib = libloading::Library::new(library).unwrap();
         let function = lib.get::<unsafe extern "C" fn() -> i32>(symbol).unwrap();
         function()
@@ -50,7 +56,10 @@ fn native_plugin_links_shared_core_and_observes_rebuilt_dependency() {
         ))
         .unwrap();
     // SAFETY: both sources above define the expected no-argument C functions.
-    assert_eq!(unsafe { answer(&plugin, b"obs_fixture_plugin") }, 43);
+    assert_eq!(
+        unsafe { answer(&plugin, b"obs_fixture_plugin", &[&core]) },
+        43
+    );
     fs::write(
         &core_source,
         format!("{EXPORT} int obs_fixture_answer(void) {{ return 84; }}"),
@@ -60,7 +69,10 @@ fn native_plugin_links_shared_core_and_observes_rebuilt_dependency() {
         .shared_library(&target("fixture-core", &core_source, vec![]))
         .unwrap();
     // SAFETY: the rebuilt core preserves the function ABI; it changes its result.
-    assert_eq!(unsafe { answer(&plugin, b"obs_fixture_plugin") }, 85);
+    assert_eq!(
+        unsafe { answer(&plugin, b"obs_fixture_plugin", &[&core]) },
+        85
+    );
 }
 
 #[test]
@@ -95,7 +107,7 @@ fn unity_toggle_preserves_exports_and_explicit_generated_source_wins() {
         library.unity = unity;
         let artifact = build.shared_library(&library).unwrap();
         // SAFETY: the generated fixture defines this no-argument C function.
-        assert_eq!(unsafe { answer(&artifact, b"obs_fixture_count") }, 17);
+        assert_eq!(unsafe { answer(&artifact, b"obs_fixture_count", &[]) }, 17);
     }
 }
 
