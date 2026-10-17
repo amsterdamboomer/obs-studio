@@ -479,6 +479,62 @@ pub fn configure_vst(
     Ok(())
 }
 
+pub fn configure_application(
+    target: &str,
+    root: &Path,
+    manifest: &serde_json::Value,
+    config: &Path,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    if !target.contains("linux") {
+        return Err(format!(
+            "frontend application graph for {target} is not implemented yet"
+        ));
+    }
+    configure_cpp_module(target, library)?;
+    library.file_name = None;
+    let inputs: Vec<String> =
+        serde_json::from_value(manifest["linux"].clone()).map_err(|e| e.to_string())?;
+    library
+        .sources
+        .extend(inputs.iter().map(|path| root.join(path)));
+    for package in ["Qt6DBus", "libpci", "x11", "x11-xcb", "xcb"] {
+        crate::libobs::add_package(library, target, package)?;
+    }
+    library.definitions.extend([
+        ("OBS_INSTALL_PREFIX".into(), Some("\"/usr/local\"".into())),
+        ("DL_OPENGL".into(), Some("\"libobs-opengl.so.33\"".into())),
+        ("DL_D3D11".into(), Some("\"\"".into())),
+        ("DL_METAL".into(), Some("\"\"".into())),
+    ]);
+    library
+        .link_options
+        .extend(["-lgcc_s", "-lutil", "-lrt", "-ldl"].map(String::from));
+    let mut paths =
+        std::fs::read_to_string(root.join("frontend/plugin-manager/LoaderPaths_Linux.hpp.in"))
+            .map_err(|e| e.to_string())?;
+    for (name, value) in [
+        ("OBS_PLATFORM_INSTALL_PATH", "/usr/local/"),
+        ("OBS_PLATFORM_LIBRARY_PATH", "lib64/"),
+        ("OBS_PLATFORM_DATA_PATH", "share/"),
+        (
+            "OBS_PLATFORM_PLUGIN_MODULE_PATH",
+            "/usr/local/lib64/obs-plugins/plugins",
+        ),
+        (
+            "OBS_PLATFORM_PLUGIN_DATA_PATH",
+            "/usr/local/share/obs/obs-modules/plugins",
+        ),
+    ] {
+        paths = paths.replace(&format!("@{name}@"), value);
+    }
+    let output = config.join("LoaderPaths_Linux.hpp");
+    if std::fs::read_to_string(&output).ok().as_deref() != Some(&paths) {
+        std::fs::write(output, paths).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

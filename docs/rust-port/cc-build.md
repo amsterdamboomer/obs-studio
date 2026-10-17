@@ -252,3 +252,28 @@ embedded OBS PNG, exercise both OBS spinbox types and their metaobject, process
 UI events and accept the dialog through its OK button. This passes locally.
 This widget test does not yet start the complete OBS application or validate a
 packaged runtime/plugin path.
+
+## Linux frontend executable checkpoint
+
+`frontend::build_application` compiles and links the frontend executable using an
+explicit source inventory, shared Qt interfaces, an Idian archive, JSON11, BPM,
+libcaption, the frontend API and a caller-provided Rust GPU status archive. It
+creates UI/plugin-path configuration in the output tree. This initial frontend
+configuration is Linux with browser panels disabled; other feature/platform
+configurations and release paths remain under conversion.
+
+Build the GPU archive with
+`soldr cargo build -p obs-gpu-status-frontend --release`, then enable the integration
+check with `OBS_BUILD_APP=1` and `OBS_BUILD_GPU_ARCHIVE` pointing to the resulting
+`target/release/libobs_gpu_status_frontend.a`. The executable runs and reports
+`OBS-Studio-Rust 0.1.0 (based on OBS 33.0.0-cc-build)` through `--version`.
+This establishes compilation, linking and CLI execution; GUI startup, runtime
+staging and complete application behavior still need validation.
+
+The inventory includes two forms that CMake AUTOUIC discovered through header
+includes. Generated metaobjects are combined into one translation unit with the
+same textual header closure CMake supplies to its moc compilation. This preserves
+complete Qt types without changing original headers or requiring precompilation.
+Compiler include paths and identical definitions are deduplicated while retaining
+order. Build/profile/version/install settings are still prototype defaults, and
+controlled performance measurements have not been completed.

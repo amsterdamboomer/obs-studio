@@ -285,7 +285,9 @@
     "frontend/plugin-manager/PluginManager.hpp",
     "frontend/build/frontend.plugin-manager-pluginmanagerwindow+.hpp.cpp",
     "frontend/plugin-manager/PluginManagerWindow.hpp",
-    "frontend/plugin-manager/PluginModuleLoader.hpp"
+    "frontend/plugin-manager/PluginModuleLoader.hpp",
+    "frontend/forms/OBSBasicTransform.ui",
+    "frontend/forms/OBSLogViewer.ui"
   ],
   "linux": [
     "frontend/build/frontend.linux+.hpp.cpp",

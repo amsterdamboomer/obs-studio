@@ -1,5 +1,5 @@
 //! Native OBS module builds using the same engine as bundled libobs.
-use crate::{NativeBuild, SharedLibrary, libobs::add_package};
+use crate::{NativeBuild, SharedLibrary, deps::shared_archive, libobs::add_package};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -303,25 +303,6 @@ pub fn build_ffmpeg(
         module,
         muxer: build.executable(&mux)?,
     })
-}
-
-fn shared_archive(build: &NativeBuild, root: &Path, name: &str) -> Result<PathBuf, String> {
-    let mut library = SharedLibrary {
-        name: name.into(),
-        sources: vec![root.join(format!("shared/{name}/build/{name}.core+.h.c"))],
-        include_dirs: vec![
-            root.into(),
-            root.join("libobs"),
-            root.join("shared").join(name),
-            root.join("deps/libcaption"),
-            root.join("deps/libcaption/caption"),
-            build.output.join("config"),
-        ],
-        ..SharedLibrary::default()
-    };
-    crate::platform::configure_shared_dependency(&build.target, root, name, &mut library)?;
-    add_package(&mut library, &build.target, "simde")?;
-    build.static_library(&library)
 }
 
 /// Built-in source and service modules with independent optional features.

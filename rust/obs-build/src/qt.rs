@@ -31,6 +31,7 @@ pub fn uic(library: &mut SharedLibrary, form: &Path, output: &Path) -> Result<Pa
         .ok_or("UI output has no parent directory")?
         .canonicalize()
         .map_err(|e| e.to_string())?;
+    library.include_dirs.retain(|path| path != &directory);
     library.include_dirs.insert(0, directory);
     Ok(output.into())
 }
@@ -105,5 +106,49 @@ fn generate(command: Command, input: &Path, output: &Path) -> Result<(), String>
     if std::fs::read(output).ok().as_deref() != Some(code.as_slice()) {
         std::fs::write(output, code).map_err(|e| e.to_string())?;
     }
+    Ok(())
+}
+
+/// Combine generated metaobjects with the target's textual header closure.
+/// This mirrors Qt's mocs_compilation.cpp without requiring precompiled headers.
+pub fn combine_moc(
+    library: &mut SharedLibrary,
+    output: &Path,
+    prelude: &Path,
+) -> Result<(), String> {
+    let directory = output.parent().ok_or("moc group output has no parent")?;
+    let is_moc = |path: &PathBuf| {
+        path.parent() == Some(directory)
+            && path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("moc_"))
+    };
+    let sources: Vec<_> = library
+        .sources
+        .iter()
+        .filter(|path| is_moc(path))
+        .cloned()
+        .collect();
+    if sources.is_empty() {
+        return Ok(());
+    }
+    let mut content = String::from("/* Generated Qt metaobject group. */\n");
+    for path in std::iter::once(prelude.to_owned()).chain(sources) {
+        let path = path.canonicalize().map_err(|e| e.to_string())?;
+        let name = path
+            .to_str()
+            .ok_or("non-UTF8 moc include")?
+            .replace('\\', "/");
+        if name.contains(['\n', '\r', '"']) {
+            return Err("moc include path contains a quote or newline".into());
+        }
+        content.push_str(&format!("#include \"{name}\"\n"));
+    }
+    if std::fs::read_to_string(output).ok().as_deref() != Some(&content) {
+        std::fs::write(output, content).map_err(|e| e.to_string())?;
+    }
+    library.sources.retain(|path| !is_moc(path));
+    library.sources.push(output.into());
     Ok(())
 }

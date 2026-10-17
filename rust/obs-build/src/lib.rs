@@ -6,6 +6,7 @@
 
 use std::{fs, path::PathBuf};
 
+mod deps;
 pub mod frontend;
 pub mod graphics;
 pub mod libobs;
@@ -199,10 +200,18 @@ impl NativeBuild {
             // Intermediate compilation and archive creation do not emit link
             // directives. Keep cc's compiler/archiver environment tracking so
             // target-qualified flags invalidate Cargo's bundled native build.
-            .cargo_metadata(true)
-            .includes(&library.include_dirs);
+            .cargo_metadata(true);
+        let mut includes = std::collections::HashSet::new();
+        for directory in &library.include_dirs {
+            if includes.insert(directory) {
+                compiler.include(directory);
+            }
+        }
+        let mut definitions = std::collections::HashSet::new();
         for (name, value) in &library.definitions {
-            compiler.define(name, value.as_deref());
+            if definitions.insert((name, value)) {
+                compiler.define(name, value.as_deref());
+            }
         }
         compiler.flags(&library.compile_options);
         compiler.flags(if cpp {
