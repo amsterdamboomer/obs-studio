@@ -430,14 +430,30 @@ pub fn configure_source(
     Ok(())
 }
 
+pub fn configure_cpp17(target: &str, library: &mut crate::SharedLibrary) {
+    let standard = if target.contains("msvc") {
+        "/std:c++17"
+    } else {
+        "-std=gnu++17"
+    };
+    if !library
+        .cpp_compile_options
+        .iter()
+        .any(|option| option == standard)
+    {
+        library.cpp_compile_options.push(standard.into());
+    }
+}
+
 pub fn configure_cpp_module(
     target: &str,
     library: &mut crate::SharedLibrary,
 ) -> Result<(), String> {
     configure_module(target, library)?;
+    configure_cpp17(target, library);
     library
         .cpp_compile_options
-        .extend(["-std=gnu++17", "-fvisibility-inlines-hidden"].map(String::from));
+        .push("-fvisibility-inlines-hidden".into());
     Ok(())
 }
 

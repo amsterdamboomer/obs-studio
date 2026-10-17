@@ -29,10 +29,29 @@ pub fn build_api(build: &NativeBuild, root: &Path, core: &Path) -> Result<PathBu
     Ok(artifact)
 }
 
+/// Add the shared Qt spinbox interface sources to a native target.
 pub fn add_spinbox(
-    _build: &NativeBuild,
-    _root: &Path,
-    _library: &mut SharedLibrary,
+    build: &NativeBuild,
+    root: &Path,
+    library: &mut SharedLibrary,
 ) -> Result<(), String> {
-    Err("Qt spinbox build is not implemented".into())
+    let root = root.canonicalize().map_err(|e| e.to_string())?;
+    crate::platform::configure_cpp17(&build.target, library);
+    let directory = root.join("shared/qt/obs-spinbox");
+    library
+        .sources
+        .push(directory.join("build/qt-obs-spinbox.core+.hpp.cpp"));
+    library.include_dirs.push(directory.clone());
+    add_package(library, &build.target, "Qt6Widgets")?;
+    for name in ["AutoSelectLineEdit", "DoubleSpinBox", "SpinBox"] {
+        crate::qt::moc(
+            library,
+            &directory.join(format!("{name}.hpp")),
+            &build
+                .output
+                .join(&library.name)
+                .join(format!("qt/moc_{name}.cpp")),
+        )?;
+    }
+    Ok(())
 }

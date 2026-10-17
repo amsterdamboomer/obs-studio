@@ -236,3 +236,19 @@ C++ driver. The regression builds and executes a C++ standard-library program
 that calls a C helper; each translation unit rejects flags intended for the other
 language. All five native integration tests pass, as does the combined
 core/source/Qt/PipeWire/MP4/Matroska check with frontend export comparison.
+
+## Qt UI, resources and widgets checkpoint
+
+`qt::uic` generates UI headers with the generated include directory first.
+`qt::rcc` embeds resource collections as explicit C++ sources and records every
+resource listed by RCC as a Cargo input. Both preserve unchanged generated files.
+`OBS_QT_UIC` and `OBS_QT_RCC` select host tools for cross builds, alongside MOC.
+
+`frontend::add_spinbox` adds the original shared spinbox unity source, Qt Widgets
+and all three generated metaobjects, with C++17 required explicitly. The Qt opt-in
+integration now runs a real QApplication using the offscreen platform: construct
+OBS's virtual-camera dialog from its original UI, find its controls, decode an
+embedded OBS PNG, exercise both OBS spinbox types and their metaobject, process
+UI events and accept the dialog through its OK button. This passes locally.
+This widget test does not yet start the complete OBS application or validate a
+packaged runtime/plugin path.
