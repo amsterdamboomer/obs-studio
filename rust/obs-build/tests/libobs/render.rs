@@ -66,7 +66,7 @@ static void receive_frame(void *unused, struct video_data *frame)
     atomic_fetch_add(&frames, 1);
 }
 
-static int record_clip(const char *path)
+static int record_clip(const char *path, const char *output_id)
 {
     obs_data_t *settings = obs_data_create();
     obs_data_set_string(settings, "rate_control", "CBR");
@@ -81,7 +81,7 @@ static int record_clip(const char *path)
     obs_data_release(settings);
     settings = obs_data_create();
     obs_data_set_string(settings, "path", path);
-    obs_output_t *output = obs_output_create("mp4_output", "cc-build-recording", settings, NULL);
+    obs_output_t *output = obs_output_create(output_id, "cc-build-recording", settings, NULL);
     obs_data_release(settings);
     int status = 0;
     if (!video || !audio || !output) {
@@ -116,7 +116,7 @@ cleanup:
     return status;
 }
 
-EXPORT int obs_fixture_render(const char *renderer, const char *data_path, const char *record_path)
+EXPORT int obs_fixture_render(const char *renderer, const char *data_path, const char *record_path, const char *output_id)
 {
     obs_add_data_path(data_path);
     if (record_path) {
@@ -151,7 +151,7 @@ EXPORT int obs_fixture_render(const char *renderer, const char *data_path, const
     for (unsigned i = 0; i < 200 && atomic_load(&frames) < 3; ++i)
         os_sleep_ms(10);
     obs_remove_raw_video_callback(receive_frame, NULL);
-    int recording_status = record_path ? record_clip(record_path) : 0;
+    int recording_status = record_path ? record_clip(record_path, output_id) : 0;
     obs_set_output_source(0, NULL);
     obs_scene_release(scene);
     /* The owning test calls obs_shutdown after this probe. */

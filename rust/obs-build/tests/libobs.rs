@@ -48,22 +48,36 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         plugins::build_transitions(&build, &root, &libraries.reference).unwrap(),
         plugins::build_filters(&build, &root, &libraries.reference, &filters).unwrap(),
     ];
+    let mut ffmpeg = None;
     if std::env::var_os("OBS_BUILD_RECORD").is_some() {
         modules.push(plugins::build_x264(&build, &root, &libraries.reference).unwrap());
         modules
             .push(plugins::build_outputs(&build, &root, &libraries.reference, &options).unwrap());
-        modules.push(
-            plugins::build_ffmpeg(
-                &build,
-                &root,
-                &libraries.reference,
-                &options,
-                &plugins::FfmpegOptions::default(),
-            )
-            .unwrap()
-            .module,
-        );
+        let artifacts = plugins::build_ffmpeg(
+            &build,
+            &root,
+            &libraries.reference,
+            &options,
+            &plugins::FfmpegOptions::default(),
+        )
+        .unwrap();
+        modules.push(plugins::Module {
+            library: artifacts.module.library.clone(),
+            data: artifacts.module.data.clone(),
+        });
+        ffmpeg = Some(artifacts);
     }
+    // Mirror the app layout: the module launches its helper beside the process.
+    let runner = if let Some(ffmpeg) = &ffmpeg {
+        let bin = build.output.join("test-bin");
+        let helper = ffmpeg.deploy_muxer(&bin).unwrap();
+        assert!(helper.is_file());
+        let runner = bin.join("obs-native-integration");
+        std::fs::copy(std::env::current_exe().unwrap(), &runner).unwrap();
+        runner
+    } else {
+        std::env::current_exe().unwrap()
+    };
     let wants_graphics = std::env::var_os("OBS_BUILD_RENDER").is_some()
         || std::env::var_os("OBS_BUILD_RECORD").is_some();
     let renderer = wants_graphics
@@ -79,8 +93,23 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         .map(|module| (&module.library, &module.data))
         .collect();
     let serialized = serde_json::to_string(&modules).unwrap();
-    for path in [&libraries.reference, &libraries.with_rust] {
-        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+    let outputs: &[(&str, &str)] = if ffmpeg.is_some() {
+        &[("mp4_output", "mp4"), ("ffmpeg_muxer", "mkv")]
+    } else {
+        &[("mp4_output", "mp4")]
+    };
+    for (path, (output_id, extension)) in [&libraries.reference, &libraries.with_rust]
+        .into_iter()
+        .flat_map(|path| outputs.iter().map(move |output| (path, output)))
+    {
+        let mut command = std::process::Command::new(&runner);
+        command.env("OBS_BUILD_TEST_OUTPUT_ID", output_id);
+        // The helper is a fresh process; select the same twin as its parent.
+        let mut search = vec![path.parent().unwrap().to_owned()];
+        search.extend(std::env::split_paths(
+            &std::env::var_os("LD_LIBRARY_PATH").unwrap_or_default(),
+        ));
+        command.env("LD_LIBRARY_PATH", std::env::join_paths(search).unwrap());
         if let Some(renderer) = &renderer {
             command.env("OBS_BUILD_TEST_RENDERER", renderer);
             command.env("OBS_BUILD_TEST_PROBE", probe.as_ref().unwrap());
@@ -93,7 +122,9 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
                 .unwrap()
                 .to_str()
                 .unwrap();
-            build.output.join(format!("recording-{variant}.mp4"))
+            build
+                .output
+                .join(format!("recording-{variant}.{extension}"))
         });
         if let Some(recording) = &recording {
             command.env("OBS_BUILD_TEST_RECORDING", recording);
@@ -208,6 +239,7 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
                 (b"obs_enum_encoder_types".as_slice(), "obs_x264"),
                 (b"obs_enum_encoder_types".as_slice(), "ffmpeg_aac"),
                 (b"obs_enum_output_types".as_slice(), "mp4_output"),
+                (b"obs_enum_output_types".as_slice(), "ffmpeg_muxer"),
             ]);
             let maps = std::fs::read_to_string("/proc/self/maps").unwrap();
             let srt: std::collections::BTreeSet<_> = maps
@@ -252,18 +284,24 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
                     *const std::ffi::c_char,
                     *const std::ffi::c_char,
                     *const std::ffi::c_char,
+                    *const std::ffi::c_char,
                 ) -> i32>(b"obs_fixture_render")
                 .unwrap();
             let recording = std::env::var("OBS_BUILD_TEST_RECORDING")
                 .ok()
                 .map(|path| std::ffi::CString::new(path).unwrap());
+            let output_id = std::ffi::CString::new(
+                std::env::var("OBS_BUILD_TEST_OUTPUT_ID").unwrap_or_else(|_| "mp4_output".into()),
+            )
+            .unwrap();
             assert_eq!(
                 render(
                     renderer.as_ptr(),
                     data_path.as_ptr(),
                     recording
                         .as_ref()
-                        .map_or(std::ptr::null(), |path| path.as_ptr())
+                        .map_or(std::ptr::null(), |path| path.as_ptr()),
+                    output_id.as_ptr()
                 ),
                 0,
                 "graphics/frame rendering failed"

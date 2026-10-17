@@ -137,6 +137,13 @@ pub struct FfmpegArtifacts {
     pub muxer: PathBuf,
 }
 
+impl FfmpegArtifacts {
+    /// Deploy the mux helper beside the executable that loads the module.
+    pub fn deploy_muxer(&self, _bin_dir: &Path) -> Result<PathBuf, String> {
+        Err("FFmpeg helper deployment is not implemented".into())
+    }
+}
+
 pub fn build_x264(build: &NativeBuild, root: &Path, core: &Path) -> Result<Module, String> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let mut library = module(build, &root, core, "obs-x264")?;
