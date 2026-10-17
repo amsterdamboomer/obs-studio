@@ -24,30 +24,38 @@ static inline void xcomp_search_reset(struct xcomp_search *st)
 	st->interval = XCOMP_SEARCH_INTERVAL_MIN;
 }
 
-/* Called every tick. True when the window search runs now. */
+/* Called every tick. True when the window search runs now: at once when the
+ * window changed (an X event on it or new settings), else when the window is
+ * lost and the current interval has passed. */
 static inline bool xcomp_search_due(struct xcomp_search *st, double seconds, bool window_lost, bool forced)
 {
-	(void)st;
-	(void)seconds;
-	(void)window_lost;
-	(void)forced;
-	return true; /* RED stub */
+	if (st->interval < XCOMP_SEARCH_INTERVAL_MIN)
+		st->interval = XCOMP_SEARCH_INTERVAL_MIN;
+	st->since_search += seconds;
+	if (forced)
+		return true;
+	return window_lost && st->since_search > st->interval;
 }
 
-/* After a search: true when the pixmap and the watcher must be rebuilt. */
+/* After a search: true when the pixmap and the watcher must be rebuilt. A
+ * search that found the same window, still not viewable, changes nothing:
+ * the watcher already listens on it and a pixmap cannot be made. */
 static inline bool xcomp_search_needs_rebuild(uint32_t old_win, uint32_t found_win, bool found_viewable, bool forced)
 {
-	(void)old_win;
-	(void)found_win;
-	(void)found_viewable;
-	(void)forced;
-	return true; /* RED stub */
+	return forced || found_win != old_win || found_viewable;
 }
 
-/* After a search: captured is whether a texture exists now. */
+/* After a search: captured is whether a texture exists now. A capture or a
+ * forced search starts the interval over; another miss doubles it, up to
+ * the cap. */
 static inline void xcomp_search_done(struct xcomp_search *st, bool captured, bool forced)
 {
-	(void)captured;
-	(void)forced;
 	st->since_search = 0.0;
+	if (captured || forced) {
+		st->interval = XCOMP_SEARCH_INTERVAL_MIN;
+		return;
+	}
+	st->interval *= 2.0;
+	if (st->interval > XCOMP_SEARCH_INTERVAL_MAX)
+		st->interval = XCOMP_SEARCH_INTERVAL_MAX;
 }
