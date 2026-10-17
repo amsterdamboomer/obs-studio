@@ -43,6 +43,7 @@ target_sources(
     $<$<PLATFORM_ID:Windows>:captions-mssapi.hpp>
     $<$<PLATFORM_ID:Windows>:build/frontend-tools.captions-windows+.hpp.cpp>
     $<$<PLATFORM_ID:Windows>:captions.hpp>
+    $<$<PLATFORM_ID:Windows>:captions-host-windows.hpp>
     build/frontend-tools.core+.hpp.cpp
     auto-scene-switcher.hpp
     build/frontend-tools.c+.h.c
