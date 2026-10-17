@@ -94,6 +94,15 @@ class CiPreTest(unittest.TestCase):
                 if "ci-pre" in needs(block):
                     self.assertRegex(block, r"if: \$\{\{ !cancelled\(\)", "a cancelled sweep must not skip it")
 
+    def test_janitor_only_runs_on_trusted_queue_without_blocking_work(self):
+        text = PULL.read_text()
+        all_jobs = jobs(text)
+        self.assertRegex(all_jobs["ci-pre"], r"if:.*github\.event_name == 'merge_group'")
+        for name, block in all_jobs.items():
+            if name != "ci-pre":
+                with self.subTest(job=name):
+                    self.assertNotIn("ci-pre", needs(block))
+
     def test_gate_ignores_the_sweep(self):
         self.assertNotIn("ci-pre", needs(jobs(PULL.read_text())["ci-gate"]))
 
