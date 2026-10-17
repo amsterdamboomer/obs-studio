@@ -445,6 +445,38 @@ pub fn configure_cpp17(target: &str, library: &mut crate::SharedLibrary) {
     }
 }
 
+pub fn configure_scripting(target: &str, library: &mut crate::SharedLibrary) -> Result<(), String> {
+    if !target.contains("linux") {
+        return Err("scripting native graph is currently Linux-only".into());
+    }
+    configure_cpp_module(target, library)?;
+    library.file_name = None;
+    library.c_compile_options.push("-Wno-cast-qual".into());
+    Ok(())
+}
+
+pub fn python_library_name(target: &str, libraries: &[String]) -> Result<String, String> {
+    if !target.contains("linux") {
+        return Err("Python library discovery is currently Linux-only".into());
+    }
+    let library = libraries
+        .iter()
+        .find(|name| name.starts_with("python"))
+        .ok_or("Python pkg-config lacks a Python library")?;
+    Ok(format!("lib{library}.so"))
+}
+
+pub fn scripting_module_name(target: &str, language: &str) -> Result<String, String> {
+    if !target.contains("linux") {
+        return Err("scripting binding naming is currently Linux-only".into());
+    }
+    match language {
+        "lua" => Ok("obslua.so".into()),
+        "python" => Ok("_obspython.so".into()),
+        _ => Err(format!("unknown scripting language {language}")),
+    }
+}
+
 pub fn configure_nvenc(
     target: &str,
     root: &Path,

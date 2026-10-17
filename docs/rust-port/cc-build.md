@@ -365,3 +365,39 @@ screenshots show recording active and both apps shut down normally. On the
 isolated Mesa display, NVENC reports its expected fallback to frame upload.
 This demonstrates frontend hardware encoding through both loaders; it does
 not establish direct NVIDIA OpenGL texture interop.
+
+## Linux Lua/Python scripting checkpoint
+
+`scripting::build` compiles the original shared scripting unity groups and
+C++ string cache. Lua and Python remain independent options, and a supplied
+frontend API enables the original frontend scripting groups. SWIG 4 or newer
+generates separate language runtimes and wrappers; `OBS_SWIG` selects the host
+tool. The build tracks SWIG environment/input trees, writes generated sources
+and headers only when their contents change, and explicitly compiles them.
+
+Bindings are placed under a retained runtime root with a configurable relative
+module directory (default `lib64/obs-scripting`). The scripting library uses
+executable-relative discovery. Artifacts identify the enabled Lua module,
+Python extension and Python wrapper explicitly; disabled-language files from
+an earlier build are not an installation manifest. Release packaging must use
+the selected artifacts.
+
+Enable the opt-in check with `OBS_BUILD_SCRIPTING=1`. It builds a native probe
+against the unchanged scripting API, then runs it with each core from an
+unrelated working directory and private module configuration. Real Lua and
+Python scripts exercise defaults, update, properties, save, reload and unload
+callbacks. Process maps must contain the intended core and generated binding,
+and the supported-language list must match the build options. Logs remain in
+`script-scenarios/` under the native output directory.
+
+`OBS_BUILD_SCRIPTING_FRONTEND=1` enables frontend bindings and verifies their
+default callable behavior; the disabled mode checks that they are absent.
+`OBS_BUILD_DISABLE_LUA=1` and `OBS_BUILD_DISABLE_PYTHON=1` select the independent
+language cases. Local checks pass both languages with and without frontend
+bindings, Lua-only with a relative native output path, and Python-only with
+frontend bindings, against both cores. The environment uses SWIG 4.4.1,
+LuaJIT and Python 3.13 development packages discovered through pkg-config.
+
+The frontend Tools plugin, scripting UI/application staging, other platforms
+and release packaging still require conversion and validation. This shared
+library checkpoint does not complete those application features.

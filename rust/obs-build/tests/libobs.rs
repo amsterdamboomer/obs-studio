@@ -7,6 +7,8 @@ mod application;
 mod qt;
 #[path = "libobs/render.rs"]
 mod render;
+#[path = "libobs/scripting.rs"]
+mod script_tests;
 
 #[test]
 fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
@@ -105,14 +107,27 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         rnnoise: std::env::var_os("OBS_BUILD_DISABLE_RNNOISE").is_none(),
     };
     if std::env::var_os("OBS_BUILD_SCRIPTING").is_some() {
-        scripting::build(
+        let api = std::env::var_os("OBS_BUILD_SCRIPTING_FRONTEND")
+            .map(|_| frontend::build_api(&build, &root, &libraries.reference).unwrap());
+        let artifacts = scripting::build(
             &build,
             &root,
             &libraries.reference,
-            None,
-            &scripting::Options::default(),
+            api.as_deref(),
+            &scripting::Options {
+                lua: std::env::var_os("OBS_BUILD_DISABLE_LUA").is_none(),
+                python: std::env::var_os("OBS_BUILD_DISABLE_PYTHON").is_none(),
+                ..scripting::Options::default()
+            },
         )
         .unwrap();
+        script_tests::exercise(
+            &build,
+            &root,
+            &artifacts,
+            &[&libraries.reference, &libraries.with_rust],
+            api.is_some(),
+        );
     }
     let mut modules = vec![
         plugins::build_transitions(&build, &root, &libraries.reference).unwrap(),
