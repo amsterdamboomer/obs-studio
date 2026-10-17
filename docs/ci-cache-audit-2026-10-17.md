@@ -376,6 +376,48 @@ headroom and the representative-day comparison remain acceptance work under
 
 ## Recommendation and acceptance checkpoint
 
+### Rebuilt Tier 2 cache: observed warm consumer
+
+After the archive disappearance, master `635454ee7` rebuilt 783 units cold
+and saved a 188,194,495-byte compiler archive. Master `3ac86f74c` subsequently
+restored it, recorded 734 cached / 49 cold compilations, and saved an updated
+193,854,787-byte archive. Only documentation changed between these revisions;
+generated revision metadata and runner placement still differ.
+
+| Observed job | Complete build step | Whole job | Compiler hits |
+| --- | ---: | ---: | ---: |
+| Cold producer 117527420015 | 300 s | 383 s | 0/783 |
+| Warm consumer 117530045228 | 117 s | 238 s | 734/783 |
+
+[Raw producer/consumer observations](ci-evidence/2026-10-17-tier2-reseed-cold-warm.json)
+establish useful reuse of the smaller new archive. These are single
+observations, not a matched causal benchmark. Survival through another full
+nightly write burst and representative-day traffic remains unverified.
+
+### Existing artifact transport cost
+
+The successful #1353 queue run uploaded its 177,835,306-byte execution tree
+in 3 seconds. OFF/ON consumers downloaded it in 2/4 seconds and unpacked it
+in 2 seconds each. [Literal step observations](ci-evidence/2026-10-17-tier2-artifact-transfer.json)
+show inexpensive same-run transport for this payload. Cross-run producer
+selection/authentication and deep Cargo/object-state payloads are separate,
+unmeasured costs; this does not implement queue-only cache publication.
+
+### Startup blocker: local failure identified
+
+The failure diagnostics in proposed #1365 let the real unchanged slideshow
+test identify `XOpenDisplay` failure during hotkey initialization under
+concurrent startup/shutdown. On a shared default Xvfb server, six of 68
+attempted invocations failed (workers stop at their first failure). With
+only `-noreset` added, all 160 invocations and 1,920 startup groups passed.
+The earlier Xlib-only probe had not reproduced this behavior. #1365 proposes
+the server-lifetime fix for normal and repeated runs, preserving assertions,
+parallelism and failure propagation. Full fresh OFF/ON CI and queue validation
+remain pending; this local reproduction does not assign every historical
+startup failure to the same cause.
+
+### Remaining acceptance work
+
 Keep the merged queue policy, Rust correctness safeguard, bounded useful
 compiler caches and parallel OFF/ON runners. Validate the observed host-package
 benefit over real traffic; an archive HIT alone is not a throughput result.
