@@ -50,3 +50,15 @@ pub fn moc(library: &mut SharedLibrary, header: &Path, output: &Path) -> Result<
     library.sources.push(output.into());
     Ok(output.into())
 }
+
+pub fn uic(_library: &mut SharedLibrary, _form: &Path, _output: &Path) -> Result<PathBuf, String> {
+    Err("Qt UI generation is not implemented".into())
+}
+
+pub fn rcc(
+    _library: &mut SharedLibrary,
+    _resources: &Path,
+    _output: &Path,
+) -> Result<PathBuf, String> {
+    Err("Qt resource generation is not implemented".into())
+}

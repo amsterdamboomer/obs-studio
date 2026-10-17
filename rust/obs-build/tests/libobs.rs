@@ -1,6 +1,8 @@
 //! Opt-in integration against real native dependencies and libobs-rust.
 use obs_build::{NativeBuild, frontend, graphics, libobs, plugins};
 use std::{ffi::c_void, path::PathBuf};
+#[path = "libobs/qt.rs"]
+mod qt;
 #[path = "libobs/render.rs"]
 mod render;
 
@@ -77,6 +79,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         );
     }
     let frontend = std::env::var_os("OBS_BUILD_QT").map(|_| {
+        qt::exercise(&build, &root);
         modules.push(plugins::build_vst(&build, &root, &libraries.reference).unwrap());
         frontend::build_api(&build, &root, &libraries.reference).unwrap()
     });

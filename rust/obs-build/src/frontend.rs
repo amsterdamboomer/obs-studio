@@ -28,3 +28,11 @@ pub fn build_api(build: &NativeBuild, root: &Path, core: &Path) -> Result<PathBu
     }
     Ok(artifact)
 }
+
+pub fn add_spinbox(
+    _build: &NativeBuild,
+    _root: &Path,
+    _library: &mut SharedLibrary,
+) -> Result<(), String> {
+    Err("Qt spinbox build is not implemented".into())
+}
