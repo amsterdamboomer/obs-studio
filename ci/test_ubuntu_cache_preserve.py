@@ -1,6 +1,8 @@
 """Restored Ubuntu app compiler caches must be consumed before sizing saves."""
 from pathlib import Path
 import re
+import os
+import subprocess
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -23,6 +25,15 @@ class UbuntuCachePreserveTest(unittest.TestCase):
         self.assertIn("steps.cache-size.outputs.save == 'true'",job)
         self.assertIn('save=false',job)
         self.assertIn('save=true',job)
+
+    def test_real_snapshot_shell_keeps_normal_build_and_rejects_growth(self):
+        block=ubuntu_job().split('id: cache-size',1)[1]
+        body=re.search(r'        run: \|\n((?:          .*\n|\n)*)',block).group(1)
+        script='\n'.join(line[10:] for line in body.splitlines())
+        for size,expected in [(6144,'true'),(8192,'true'),(8193,'false')]:
+            env={**os.environ,'CACHE_DIR':str(ROOT/'ci'),'GITHUB_OUTPUT':'/dev/stdout','TEST_SIZE':str(size)}
+            run=subprocess.run(['bash','-e','-c','du() { echo "$TEST_SIZE"; }\n'+script],env=env,capture_output=True,text=True,check=True)
+            self.assertIn('save='+expected,run.stdout)
 
 if __name__ == '__main__':
     unittest.main()
