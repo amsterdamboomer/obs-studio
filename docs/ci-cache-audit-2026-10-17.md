@@ -394,6 +394,18 @@ establish useful reuse of the smaller new archive. These are single
 observations, not a matched causal benchmark. Survival through another full
 nightly write burst and representative-day traffic remains unverified.
 
+### Expanded soldr lane observations
+
+The earlier full dispatch also supplies
+[eight soldr lane observations](ci-evidence/2026-10-17-full-dispatch-soldr-lanes.json),
+including separate setup/post-step times and literal cook/embedded compiler
+summaries. These are eight expanded jobs from the configured callsites,
+not eight matched cold/warm experiments. Native test and static-library
+consumers are kept separate from host cross-lint and Fast Gate. The Windows
+Tier 2 standalone ccache hit 308/308 cacheable calls while its embedded soldr
+counter was zero; those values describe different cache layers. Do not
+disable the working native compiler cache based on the embedded counter.
+
 ### Existing artifact transport cost
 
 The successful #1353 queue run uploaded its 177,835,306-byte execution tree
