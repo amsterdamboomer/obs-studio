@@ -48,22 +48,22 @@ class AptCacheTest(unittest.TestCase):
             install_git = j[j.index("Install Git"):j.index("actions/checkout@")]
             self.assertIn("zstd", install_git, name)
 
-    def test_scoped_target_lane_reuses_the_existing_apt_archive(self):
-        text = WORKFLOW.read_text()
-        restore = text.index('- name: Restore Touched Target apt Downloads')
-        build = text.index('- name: Build Touched Linux Targets')
-        self.assertLess(restore, build)
-        block = text[restore:build]
-        self.assertIn('actions/cache/restore@', block)
-        self.assertIn('path: /var/cache/apt/archives', block)
-        self.assertIn("key: tier2-apt-ubuntu2604-f144425f-${{ hashFiles('rust/tools/linux-validate/apt-packages.txt') }}", block)
-        self.assertIn('needs.check-event.outputs.linux_targets', block)
-        prepare = text[text.index('- name: Prepare Touched Target apt Directory'):restore]
-        self.assertIn('sudo chown', prepare)
-        self.assertNotIn('actions/cache/save@', text[restore:build])
-        install = text[build:text.index('- name: Save Touched Target ccache', build)]
-        self.assertLess(install.index('ci/apt_cache_layout.py'), install.index('sudo apt-get update'))
-        self.assertIn('targets-docker-clean.disabled', install)
+    def test_scoped_host_archive_is_used_and_only_master_saves(self):
+        text=WORKFLOW.read_text()
+        restore=text.index('- name: Restore Touched Target apt Downloads')
+        build=text.index('- name: Build Touched Linux Targets')
+        self.assertLess(restore,build)
+        self.assertIn('path: ${{ github.workspace }}/.targets-apt/*.deb',text[restore:build])
+        self.assertIn('targets-apt-ubuntu2604-',text[restore:build])
+        install=text[build:text.index('- name: Save Touched Target ccache',build)]
+        self.assertIn('Dir::Cache::archives=$APT_ARCHIVES',install)
+        self.assertIn('APT::Keep-Downloaded-Packages=true',install)
+        save=text[text.index('- name: Save Touched Target apt Downloads'):]
+        save=save.split('\n\n',1)[0]
+        self.assertIn("github.event_name == 'push'",save)
+        self.assertIn("refs/heads/master",save)
+        self.assertIn('/.targets-apt/*.deb',save)
+        self.assertIn('evict = "lru"',(WORKFLOW.parents[2]/'ci.toml').read_text().split('targets-apt =',1)[1].splitlines()[0])
 
     def test_only_master_build_job_saves(self):
         # Every PR and queue run saved its own 323 MB entry and pushed the
