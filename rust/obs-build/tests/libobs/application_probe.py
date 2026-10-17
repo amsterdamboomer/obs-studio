@@ -100,6 +100,9 @@ def main() -> None:
         assert b"==== Shutting down" in log, "frontend did not enter normal shutdown"
         saved = json.loads((config / "basic/scenes/NativeSmoke.json").read_text())
         assert any(source.get("name") == "Native white" for source in saved["sources"]), "saved scene was lost"
+        if os.environ.get("OBS_BUILD_APP_RECORD"):
+            recordings = list((runtime / "recordings").glob("*.mkv"))
+            assert len(recordings) == 1, "frontend did not create the requested recording"
         print(f"OBS normal window, staged libraries/modules, saved scene, screenshot and clean shutdown: {runtime}")
     finally:
         if not drained:
