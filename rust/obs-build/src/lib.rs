@@ -15,6 +15,7 @@ mod platform;
 pub mod plugins;
 pub mod qt;
 pub mod scripting;
+pub mod validation;
 
 #[derive(Clone, Debug, Default)]
 pub struct SharedLibrary {

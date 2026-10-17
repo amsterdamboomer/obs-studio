@@ -101,6 +101,28 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     let libraries = libobs::build_pair(&build, &root, &options, &archive).unwrap();
     assert_ne!(libraries.reference, libraries.with_rust);
     assert_eq!(exports(&libraries.reference), exports(&libraries.with_rust));
+    if std::env::var_os("OBS_BUILD_C_TESTS").is_some() {
+        let executables = obs_build::validation::build_c_tests(&build, &root, &libraries.reference, options.hevc).unwrap();
+        assert_eq!(executables.len(), if options.hevc { 51 } else { 50 });
+        let mut results = Vec::new();
+        for core in [&libraries.reference, &libraries.with_rust] {
+            let variant = core.parent().unwrap().file_name().unwrap().to_string_lossy();
+            for test in &executables {
+                let directory = build.output.join("c-test-runs").join(variant.as_ref()).join(&test.name);
+                std::fs::create_dir_all(&directory).unwrap();
+                let paths = std::env::join_paths(std::iter::once(core.parent().unwrap().to_path_buf()).chain(std::env::split_paths(&std::env::var_os("LD_LIBRARY_PATH").unwrap_or_default()))).unwrap();
+                let resolution = std::process::Command::new("ldd").arg(&test.path).env("LD_LIBRARY_PATH", &paths).output().unwrap();
+                assert!(resolution.status.success());
+                assert!(String::from_utf8_lossy(&resolution.stdout).contains(core.to_str().unwrap()), "{} did not resolve the selected core", test.name);
+                let output = std::process::Command::new(&test.path).current_dir(&directory).env("LD_LIBRARY_PATH", paths).output().unwrap();
+                std::fs::write(directory.join("stdout.log"), &output.stdout).unwrap();
+                std::fs::write(directory.join("stderr.log"), &output.stderr).unwrap();
+                assert!(output.status.success(), "{} against {variant} failed: {}", test.name, String::from_utf8_lossy(&output.stderr));
+                results.push(serde_json::json!({"variant": variant, "test":test.name, "exit":output.status.code()}));
+            }
+        }
+        std::fs::write(build.output.join("c-tests.json"), serde_json::to_vec_pretty(&results).unwrap()).unwrap();
+    }
     let nvenc = if std::env::var_os("OBS_BUILD_NVENC").is_some() {
         let archive = std::env::var_os("OBS_BUILD_NVENC_RUST_ARCHIVE")
             .map(PathBuf::from)
