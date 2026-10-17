@@ -895,6 +895,19 @@ jobs:
           path: ${{ github.workspace }}/.targets-ccache
           key: targets-ccache-linux-${{ github.sha }}
           restore-keys: targets-ccache-linux-
+      # Match the container lane's archive path/key/version. The hosted
+      # runner needs write access for tar extraction; only Tier 2 saves it.
+      - name: Prepare Touched Target apt Directory
+        if: needs.check-event.outputs.linux_targets != '' && (needs.check-event.outputs.deferred == 'true' || (github.event_name == 'push' && github.ref == 'refs/heads/master'))
+        run: |
+          sudo mkdir -p /var/cache/apt/archives
+          sudo chown -R "$(id -u):$(id -g)" /var/cache/apt/archives
+      - name: Restore Touched Target apt Downloads
+        if: needs.check-event.outputs.linux_targets != '' && (needs.check-event.outputs.deferred == 'true' || (github.event_name == 'push' && github.ref == 'refs/heads/master'))
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: /var/cache/apt/archives
+          key: tier2-apt-ubuntu2604-f144425f-${{ hashFiles('rust/tools/linux-validate/apt-packages.txt') }}
       - name: Build Touched Linux Targets 🧱
         if: needs.check-event.outputs.linux_targets != '' && (needs.check-event.outputs.deferred == 'true' || (github.event_name == 'push' && github.ref == 'refs/heads/master'))
         env:
