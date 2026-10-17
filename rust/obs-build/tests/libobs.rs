@@ -67,6 +67,24 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     let libraries = libobs::build_pair(&build, &root, &options, &archive).unwrap();
     assert_ne!(libraries.reference, libraries.with_rust);
     assert_eq!(exports(&libraries.reference), exports(&libraries.with_rust));
+    if std::env::var_os("OBS_BUILD_NVENC").is_some() {
+        let archive = root.join("target/release/libobs_nvenc_plugin.a");
+        let nvenc = plugins::build_nvenc_pair(
+            &build,
+            &root,
+            &libraries.reference,
+            &archive,
+            std::env::var_os("OBS_BUILD_DISABLE_NVENC_FFMPEG_IDS").is_none(),
+        )
+        .unwrap();
+        assert_eq!(
+            exports(&nvenc.reference.library),
+            exports(&nvenc.with_rust.library)
+        );
+        let output = std::process::Command::new(&nvenc.helper).output().unwrap();
+        assert!(output.status.success());
+        assert!(String::from_utf8_lossy(&output.stdout).contains("nvenc_supported=true"));
+    }
     let filters = plugins::FiltersOptions {
         speexdsp: std::env::var_os("OBS_BUILD_DISABLE_SPEEXDSP").is_none(),
         rnnoise: std::env::var_os("OBS_BUILD_DISABLE_RNNOISE").is_none(),

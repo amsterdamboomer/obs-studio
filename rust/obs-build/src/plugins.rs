@@ -8,6 +8,23 @@ pub struct Module {
     pub data: PathBuf,
 }
 
+#[derive(Debug)]
+pub struct NvencArtifacts {
+    pub reference: Module,
+    pub with_rust: Module,
+    pub helper: PathBuf,
+}
+
+pub fn build_nvenc_pair(
+    _build: &NativeBuild,
+    _root: &Path,
+    _core: &Path,
+    _rust_archive: &Path,
+    _ffmpeg_ids: bool,
+) -> Result<NvencArtifacts, String> {
+    Err("NVENC native graph is not implemented".into())
+}
+
 #[derive(Clone, Debug)]
 pub struct FiltersOptions {
     pub speexdsp: bool,
