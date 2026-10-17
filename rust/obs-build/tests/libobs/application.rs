@@ -11,6 +11,7 @@ pub struct Inputs<'a> {
     pub ffmpeg: &'a plugins::FfmpegArtifacts,
     pub nvenc_helper: Option<&'a Path>,
     pub modules: &'a [plugins::Module],
+    pub websocket: Option<&'a plugins::Module>,
     pub frontend_tools: Option<&'a plugins::Module>,
     pub script_artifacts: Option<&'a scripting::Artifacts>,
     pub gui_probe: Option<&'a plugins::Module>,
@@ -109,6 +110,7 @@ pub fn exercise(inputs: Inputs<'_>, variants: &[Variant<'_>]) -> Result<(), Stri
             .iter()
             .chain(variant.nvenc)
             .chain(inputs.frontend_tools)
+            .chain(inputs.websocket)
             .chain(inputs.gui_probe)
         {
             let name = module

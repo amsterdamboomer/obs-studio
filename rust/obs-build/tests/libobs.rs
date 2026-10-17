@@ -80,6 +80,10 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             .core_modules
             .extend(["frontend-tools".into(), "native-frontend-probe".into()]);
     }
+    if std::env::var_os("OBS_BUILD_WEBSOCKET").is_some() {
+        assert!(enabled("OBS_BUILD_APP_GUI"), "websocket test requires the GUI");
+        options.core_modules.push("obs-websocket".into());
+    }
     let libraries = libobs::build_pair(&build, &root, &options, &archive).unwrap();
     assert_ne!(libraries.reference, libraries.with_rust);
     assert_eq!(exports(&libraries.reference), exports(&libraries.with_rust));
@@ -198,6 +202,14 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         )
         .unwrap()
     });
+    let websocket = std::env::var_os("OBS_BUILD_WEBSOCKET").map(|_| {
+        plugins::build_websocket(
+            &build,
+            &root,
+            &libraries.reference,
+            frontend.as_deref().expect("websocket requires the frontend API"),
+        ).unwrap()
+    });
     if let (Some(frontend), Some(reference)) =
         (&frontend, std::env::var_os("OBS_BUILD_FRONTEND_REFERENCE"))
     {
@@ -300,6 +312,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
                 nvenc_helper: nvenc.as_ref().map(|nvenc| nvenc.helper.as_path()),
                 modules: &modules,
                 frontend_tools: frontend_tools.as_ref(),
+                websocket: websocket.as_ref(),
                 script_artifacts: if tools_enabled {
                     script_artifacts.as_ref()
                 } else {

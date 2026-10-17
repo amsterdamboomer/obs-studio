@@ -7,6 +7,8 @@ import json
 import os
 from pathlib import Path
 import select
+import secrets
+import socket
 import subprocess
 import time
 import uuid
@@ -59,6 +61,18 @@ def profile(runtime: Path) -> Path:
         "name": "NativeSmoke", "current_scene": "Native scene", "current_program_scene": "Native scene",
         "scene_order": [{"name": "Native scene"}], "sources": [color, scene], "modules": modules,
     }))
+    if os.environ.get("OBS_BUILD_WEBSOCKET"):
+        with socket.socket() as reservation:
+            reservation.bind(("127.0.0.1", 0))
+            port = reservation.getsockname()[1]
+        password = secrets.token_hex(16)
+        directory = config / "plugin_config/obs-websocket"
+        directory.mkdir(parents=True)
+        (directory / "config.json").write_text(json.dumps({
+            "first_load": False, "server_enabled": True, "server_port": port,
+            "alerts_enabled": False, "auth_required": True, "server_password": password,
+        }))
+        (runtime / "expected-websocket.json").write_text(json.dumps({"port": port, "password": password}))
     return config
 
 
@@ -130,6 +144,12 @@ def main() -> None:
         if os.environ.get("OBS_BUILD_FRONTEND_TOOLS"):
             for name in ["tools-scene-switcher.png", "tools-output-timer.png", *(["tools-scripts.png"] if scripting else [])]:
                 assert (runtime / name).is_file(), f"missing Tools dialog evidence: {name}"
+        if os.environ.get("OBS_BUILD_WEBSOCKET"):
+            wire = ["uv", "run", "--no-project", str(Path(__file__).with_name("websocket_probe.py")),
+                    "--runtime", str(runtime)]
+            if recording:
+                wire.append("--recording")
+            subprocess.run(wire, env=env, check=True, timeout=60)
         assert b"Native white" in log, "saved color source was not restored"
         if recording:
             # Keep the actual frontend output running long enough to decode a

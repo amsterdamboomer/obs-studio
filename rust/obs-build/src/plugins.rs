@@ -445,3 +445,14 @@ pub fn build_vst(build: &NativeBuild, root: &Path, core: &Path) -> Result<Module
     )?;
     finish(build, &root, library)
 }
+
+
+/// Build the original obs-websocket frontend plugin.
+pub fn build_websocket(
+    _build: &NativeBuild,
+    _root: &Path,
+    _core: &Path,
+    _api: &Path,
+) -> Result<Module, String> {
+    Err("obs-websocket native graph is not implemented".into())
+}
