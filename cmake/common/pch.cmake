@@ -19,8 +19,7 @@ set(_OBS_PCH_DIR "${CMAKE_CURRENT_LIST_DIR}/../pch")
 # _GNU_SOURCE makes strstr() return const char * for a const argument
 # (librtmp's parseurl.c then fails with -Werror=discarded-qualifiers).
 #
-# Likewise the sources that need the full <windows.h> (winsock's u_long,
-# NTSTATUS):
+# Likewise the sources that need the full <windows.h> (winsock's u_long):
 # on Windows arm64 the PCH's libobs headers (util/sse-intrin.h, then SIMDe's
 # x86/sse.h) include it with WIN32_LEAN_AND_MEAN first, making their own
 # include a no-op.
@@ -36,7 +35,6 @@ set(
   plugins/oss-audio/oss-input-freebsd.c
   plugins/obs-browser/browser-app.cpp
   plugins/obs-browser/obs-browser-page/obs-browser-page-main.cpp
-  frontend/utility/win-dll-blocklist.c
 )
 
 # _obs_pch_profile: pick the header set from what <target> links.
