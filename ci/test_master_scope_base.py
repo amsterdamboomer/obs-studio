@@ -2,7 +2,7 @@
 import subprocess
 import unittest
 from unittest.mock import Mock
-from ci.master_scope_base import scope_base
+from master_scope_base import scope_base
 
 class MasterScopeBaseTest(unittest.TestCase):
     def test_uses_successful_ancestor_instead_of_immediate_push_parent(self):
@@ -22,8 +22,8 @@ class MasterScopeBaseTest(unittest.TestCase):
 
     def test_fallback_scopes_all_tracked_paths(self):
         from unittest.mock import patch
-        from ci.ci_scope import changed_files
-        with patch('ci.ci_scope.subprocess.run', return_value=subprocess.CompletedProcess([], 0, 'plugins/linux-v4l2/build/plugin.c\n')) as run:
+        from ci_scope import changed_files
+        with patch('ci_scope.subprocess.run', return_value=subprocess.CompletedProcess([], 0, 'plugins/linux-v4l2/build/plugin.c\n')) as run:
             self.assertEqual(changed_files('ALL'), ['plugins/linux-v4l2/build/plugin.c'])
             self.assertEqual(run.call_args.args[0], ['git', 'ls-files'])
 
