@@ -175,7 +175,11 @@ fn explicit_groups_compile_as_individual_sources_and_observe_member_edits() {
     fs::create_dir(root.join("build")).unwrap();
     fs::write(root.join("build/fixture.pch.h"), "#define VALUE 17\n").unwrap();
     let first = root.join("first.c.h");
-    fs::write(&first, "#include \"build/fixture.pch.h\"\nint first(void) { return VALUE; }\n").unwrap();
+    fs::write(
+        &first,
+        "#include \"build/fixture.pch.h\"\nint first(void) { return VALUE; }\n",
+    )
+    .unwrap();
     fs::write(root.join("second.c.h"), format!("#include \"build/fixture.pch.h\"\nextern int first(void); {EXPORT} int obs_fixture_separate(void) {{ return first() + VALUE; }}\n")).unwrap();
     let group = root.join("build/fixture+.h.c");
     fs::write(&group, "/* explicit group */\n#include \"build/fixture.pch.h\"\n#include \"first.c.h\"\n#include \"second.c.h\"\n").unwrap();
@@ -187,17 +191,49 @@ fn explicit_groups_compile_as_individual_sources_and_observe_member_edits() {
     let mut library = target("fixture-separate", &group, vec![]);
     library.unity = false;
     library.include_dirs.push(root.into());
-    library.sources = build.separate_group_sources(root, &library.sources).unwrap();
+    library.sources = build
+        .separate_group_sources(root, &library.sources)
+        .unwrap();
     assert_eq!(library.sources.len(), 2);
     assert!(!library.sources.contains(&group));
     let artifact = build.shared_library(&library).unwrap();
     // SAFETY: the fixture defines this no-argument C function.
-    assert_eq!(unsafe { answer(&artifact, b"obs_fixture_separate", &[]) }, 34);
-    fs::write(&first, "#include \"build/fixture.pch.h\"\nint first(void) { return VALUE + 1; }\n").unwrap();
+    assert_eq!(
+        unsafe { answer(&artifact, b"obs_fixture_separate", &[]) },
+        34
+    );
+    fs::write(
+        &first,
+        "#include \"build/fixture.pch.h\"\nint first(void) { return VALUE + 1; }\n",
+    )
+    .unwrap();
     fs::write(root.join("build/fixture.pch.h"), "#define VALUE 21\n").unwrap();
     let artifact = build.shared_library(&library).unwrap();
     // SAFETY: the rebuilt fixture preserves its function ABI.
-    assert_eq!(unsafe { answer(&artifact, b"obs_fixture_separate", &[]) }, 43);
+    assert_eq!(
+        unsafe { answer(&artifact, b"obs_fixture_separate", &[]) },
+        43
+    );
+}
+
+#[test]
+fn individual_compilation_rejects_conditional_group_selection() {
+    let directory = tempfile::tempdir().unwrap();
+    let group = directory.path().join("conditional+.h.c");
+    fs::write(
+        &group,
+        "#if ENABLE_OPTION\n#include \"optional.c.h\"\n#endif\n",
+    )
+    .unwrap();
+    let build = NativeBuild {
+        host: env!("OBS_BUILD_HOST").into(),
+        target: env!("OBS_BUILD_TARGET").into(),
+        output: directory.path().join("artifacts"),
+    };
+    let error = build
+        .separate_group_sources(directory.path(), &[group])
+        .unwrap_err();
+    assert!(error.contains("non-include group line"), "{error}");
 }
 
 #[test]

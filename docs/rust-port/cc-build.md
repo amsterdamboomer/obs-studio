@@ -464,8 +464,7 @@ that the QR image contains dark and light pixels, and captures both dialogs.
 `OBS_BUILD_DISABLE_WEBSOCKET_UNITY=1` compiles the 52 separate C++ sources.
 Both modes pass the GUI, wire and recording checks against both cores. Their
 11 public `obs_module*` entry points agree; incidental exported C++ template
-symbols differ. This toggle does not yet expand the core's explicit unity
-groups into individual sources.
+symbols differ. The core has a separate typed unity option, described below.
 
 The existing `test/websocket-tier4` suite also passes against both staged cores:
 193/193 checks and 147/147 documented request types. The external fixture
@@ -477,7 +476,8 @@ screenshots from both cores were visually inspected.
 
 These are functional checks, not controlled build-speed measurements. Browser,
 remaining plugins, real capture profiles, Windows/macOS native graphs,
-production packaging and the full configurable unity/PCH path remain required.
+production packaging and configurable unity/PCH across the remaining graph
+remain required.
 
 ## Shared source inventory and Linux Tier 2
 
@@ -493,3 +493,40 @@ This fixes the CI reader that found only one object after the source lists
 moved out of CMake. The complete Linux Tier 2 CI result still needs verification
 on the updated branch; local source parity and HEVC on/off lifecycle/symbol
 checks pass (1766/1762 exports respectively, identical between cores).
+
+## Individual libobs source compilation
+
+`libobs::Options::unity` defaults to true, preserving the selected explicit
+groups. Set it to false to compile each implementation separately. The native
+engine expands C/C++ BUILD.md groups into generated one-member translation
+units, preserving their group headers and keeping the source tree unchanged.
+Ordinary and explicitly generated sources retain their original paths.
+Wrappers are rewritten only when their contents change. Cargo rerun metadata
+tracks the groups, their headers and their implementation members; compiler
+includes retain direct dependency on the original contents.
+
+The expander rejects conditional or otherwise unsupported group directives
+instead of flattening them into a different source selection. It also rejects
+duplicate members and includes outside the source root. Objective-C groups
+still require platform implementation.
+
+`OBS_BUILD_DISABLE_CORE_UNITY=1` selects this mode in the native integration
+driver. Local checks pass lifecycle/export parity with HEVC on and off against
+both cores. With HEVC enabled, all 1766 exports match the retained unity-built
+core exactly, and 51 existing C test executables pass against each core with
+loader resolution verified. The browser-disabled GUI, websocket wire checks,
+white preview/screenshot and real frontend/API recordings also pass against
+both cores. These C executables were built by CMake; their build migration is
+still required. The direct native fixture also verifies member/header edits
+change the loaded result; that is compiler invalidation evidence, not a full
+Cargo scheduling experiment.
+
+This establishes the core option. Other targets still need to expose it
+consistently, and optional compiled PCH and controlled performance comparisons
+remain outstanding.
+
+The subsequent stock-container CI run exposed a separate missing-uv dependency:
+unlike the local Docker image, both Tier 2 jobs start from stock Ubuntu. The
+existing build and test jobs now provision the same pinned uv before invoking
+validation. No workflow files or jobs were added; remote verification remains
+required.

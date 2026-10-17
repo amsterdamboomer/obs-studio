@@ -9,6 +9,7 @@ use std::{fs, path::PathBuf};
 mod deps;
 pub mod frontend;
 pub mod graphics;
+mod groups;
 pub mod libobs;
 mod platform;
 pub mod plugins;
@@ -43,10 +44,10 @@ impl NativeBuild {
     /// Expand explicit BUILD.md groups into individual translation units.
     pub fn separate_group_sources(
         &self,
-        _root: &std::path::Path,
-        _sources: &[PathBuf],
+        root: &std::path::Path,
+        sources: &[PathBuf],
     ) -> Result<Vec<PathBuf>, String> {
-        Err("individual BUILD.md source compilation is not implemented".into())
+        groups::separate(root, &self.output.join("individual-sources"), sources)
     }
 
     /// Compile through cc::Build, then link a native shared library.

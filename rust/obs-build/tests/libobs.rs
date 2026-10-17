@@ -42,6 +42,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             .unwrap_or_else(|| output.path().into()),
     };
     let mut options = libobs::Options {
+        unity: std::env::var_os("OBS_BUILD_DISABLE_CORE_UNITY").is_none(),
         hevc: std::env::var_os("OBS_BUILD_DISABLE_HEVC").is_none(),
         core_modules: if enabled("OBS_BUILD_APP_GUI") {
             [

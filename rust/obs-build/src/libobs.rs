@@ -8,6 +8,8 @@ use std::{
 
 #[derive(Clone, Debug)]
 pub struct Options {
+    /// Keep explicit BUILD.md unity groups; false compiles their members separately.
+    pub unity: bool,
     pub hevc: bool,
     pub wayland: bool,
     pub pulseaudio: bool,
@@ -18,6 +20,7 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
+            unity: true,
             hevc: true,
             wayland: true,
             pulseaudio: true,
@@ -132,6 +135,9 @@ fn prepare(build: &NativeBuild, root: &Path, options: &Options) -> Result<Plan, 
     let module_source = config.join("obs-core-modules.c");
     write_if_changed(&module_source, &modules)?;
     library.sources.push(module_source);
+    if !options.unity {
+        library.sources = build.separate_group_sources(&root, &library.sources)?;
+    }
     Ok(Plan {
         common: library,
         root,
@@ -166,7 +172,11 @@ fn add_variant(
             append_sources(sets, "LIBOBS_HEVC_PORTED_SOURCES", root, library)?;
         }
     }
-    crate::platform::configure_libobs_variant(build, root, options, sets, library, rust_archive)
+    crate::platform::configure_libobs_variant(build, root, options, sets, library, rust_archive)?;
+    if !options.unity {
+        library.sources = build.separate_group_sources(root, &library.sources)?;
+    }
+    Ok(())
 }
 
 pub(crate) fn append_sources(
