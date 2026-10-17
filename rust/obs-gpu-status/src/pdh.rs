@@ -21,12 +21,61 @@ pub struct PdhInstance {
 }
 
 /// Parses an instance name; `None` when it does not have the expected shape.
-pub fn parse_pdh_instance(_name: &str) -> Option<PdhInstance> {
-    None
+pub fn parse_pdh_instance(name: &str) -> Option<PdhInstance> {
+    fn dec(s: &str) -> Option<u32> {
+        if s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+        s.parse().ok()
+    }
+    fn hex(s: &str) -> Option<u32> {
+        let s = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X"))?;
+        if s.is_empty() || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return None;
+        }
+        u32::from_str_radix(s, 16).ok()
+    }
+    let rest = name.strip_prefix("pid_")?;
+    let (pid, rest) = rest.split_once("_luid_")?;
+    let (high, rest) = rest.split_once('_')?;
+    let (low, rest) = rest.split_once("_phys_")?;
+    let (phys, rest) = rest.split_once("_eng_")?;
+    let (eng, engtype) = rest.split_once("_engtype_")?;
+    if engtype.is_empty() {
+        return None;
+    }
+    Some(PdhInstance {
+        pid: dec(pid)?,
+        luid: (u64::from(hex(high)?) << 32) | u64::from(hex(low)?),
+        phys: dec(phys)?,
+        eng: dec(eng)?,
+        engtype: engtype.to_owned(),
+    })
 }
 
 /// Utilization of adapter `luid` (only process `pid`'s share when `Some`)
-/// from `(instance name, percent)` samples.
-pub fn pdh_utilization(_samples: &[(String, f64)], _luid: u64, _pid: Option<u32>) -> Utilization {
-    Utilization::Unavailable
+/// from `(instance name, percent)` samples: each engine `(phys, eng)` summed
+/// over processes, the busiest engine, clamped to 0..=100 and rounded.
+/// `Unavailable` when no sample matches.
+pub fn pdh_utilization(samples: &[(String, f64)], luid: u64, pid: Option<u32>) -> Utilization {
+    let mut engines: std::collections::BTreeMap<(u32, u32), f64> = Default::default();
+    for (name, value) in samples {
+        let Some(inst) = parse_pdh_instance(name) else {
+            continue;
+        };
+        if inst.luid != luid || pid.is_some_and(|p| p != inst.pid) {
+            continue;
+        }
+        let v = if value.is_finite() {
+            value.max(0.0)
+        } else {
+            0.0
+        };
+        *engines.entry((inst.phys, inst.eng)).or_insert(0.0) += v;
+    }
+    match engines.values().copied().reduce(f64::max) {
+        // Clamped to 0..=100 first, so the cast cannot truncate.
+        Some(max) => Utilization::Percent(max.clamp(0.0, 100.0).round() as u8),
+        None => Utilization::Unavailable,
+    }
 }
