@@ -8,6 +8,7 @@ use std::{fs, path::PathBuf};
 
 pub mod libobs;
 mod platform;
+pub mod plugins;
 
 #[derive(Clone, Debug, Default)]
 pub struct SharedLibrary {

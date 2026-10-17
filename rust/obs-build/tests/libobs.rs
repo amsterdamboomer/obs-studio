@@ -1,5 +1,5 @@
 //! Opt-in integration against real native dependencies and libobs-rust.
-use obs_build::{NativeBuild, libobs};
+use obs_build::{NativeBuild, libobs, plugins};
 use std::{ffi::c_void, path::PathBuf};
 
 #[test]
@@ -24,6 +24,16 @@ fn c_and_rust_twins_preserve_the_public_data_and_lifecycle_apis() {
     let libraries = libobs::build_pair(&build, &root, &options, &archive).unwrap();
     assert_ne!(libraries.reference, libraries.with_rust);
     assert_eq!(exports(&libraries.reference), exports(&libraries.with_rust));
+    let modules = [
+        plugins::build_transitions(&build, &root, &libraries.reference).unwrap(),
+        plugins::build_filters(
+            &build,
+            &root,
+            &libraries.reference,
+            &plugins::FiltersOptions::default(),
+        )
+        .unwrap(),
+    ];
     for path in [&libraries.reference, &libraries.with_rust] {
         // SAFETY: these signatures come from the unchanged obs.h/obs-data.h.
         // Symbols are called only while their library is loaded, data handles
@@ -72,6 +82,44 @@ fn c_and_rust_twins_preserve_the_public_data_and_lifecycle_apis() {
                 std::ptr::null(),
                 std::ptr::null_mut()
             ));
+            let open = library
+                .get::<unsafe extern "C" fn(
+                    *mut *mut c_void,
+                    *const std::ffi::c_char,
+                    *const std::ffi::c_char,
+                ) -> i32>(b"obs_open_module")
+                .unwrap();
+            let init = library
+                .get::<unsafe extern "C" fn(*mut c_void) -> bool>(b"obs_init_module")
+                .unwrap();
+            for module in &modules {
+                let binary = std::ffi::CString::new(module.library.to_str().unwrap()).unwrap();
+                let data_path = std::ffi::CString::new(module.data.to_str().unwrap()).unwrap();
+                let mut handle = std::ptr::null_mut();
+                assert_eq!(open(&mut handle, binary.as_ptr(), data_path.as_ptr()), 0);
+                assert!(init(handle));
+            }
+            for (symbol, expected) in [
+                (b"obs_enum_transition_types".as_slice(), "fade_transition"),
+                (b"obs_enum_filter_types".as_slice(), "noise_suppress_filter"),
+                (b"obs_enum_filter_types".as_slice(), "gain_filter"),
+            ] {
+                let enumerate = library
+                    .get::<unsafe extern "C" fn(usize, *mut *const std::ffi::c_char) -> bool>(
+                        symbol,
+                    )
+                    .unwrap();
+                let mut found = false;
+                for index in 0..1024 {
+                    let mut name = std::ptr::null();
+                    if !enumerate(index, &mut name) {
+                        break;
+                    }
+                    assert!(!name.is_null());
+                    found |= std::ffi::CStr::from_ptr(name).to_str().unwrap() == expected;
+                }
+                assert!(found, "{expected} was not registered");
+            }
             let data = create();
             assert!(!data.is_null());
             set(data, c"value".as_ptr(), -9223372036854775807);
