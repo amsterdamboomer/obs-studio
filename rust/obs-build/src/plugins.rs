@@ -369,3 +369,7 @@ pub fn build_source(
     }
     finish(build, &root, library)
 }
+
+pub fn build_vst(_build: &NativeBuild, _root: &Path, _core: &Path) -> Result<Module, String> {
+    Err("Qt VST module build is not implemented".into())
+}

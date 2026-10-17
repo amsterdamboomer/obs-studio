@@ -1,5 +1,5 @@
 //! Opt-in integration against real native dependencies and libobs-rust.
-use obs_build::{NativeBuild, graphics, libobs, plugins};
+use obs_build::{NativeBuild, frontend, graphics, libobs, plugins};
 use std::{ffi::c_void, path::PathBuf};
 #[path = "libobs/render.rs"]
 mod render;
@@ -76,6 +76,10 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             .unwrap(),
         );
     }
+    let frontend = std::env::var_os("OBS_BUILD_QT").map(|_| {
+        modules.push(plugins::build_vst(&build, &root, &libraries.reference).unwrap());
+        frontend::build_api(&build, &root, &libraries.reference).unwrap()
+    });
     let mut ffmpeg = None;
     if std::env::var_os("OBS_BUILD_RECORD").is_some() {
         modules.push(plugins::build_x264(&build, &root, &libraries.reference).unwrap());
@@ -134,6 +138,9 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     {
         let mut command = std::process::Command::new(&runner);
         command.env("OBS_BUILD_TEST_OUTPUT_ID", output_id);
+        if let Some(frontend) = &frontend {
+            command.env("OBS_BUILD_TEST_FRONTEND_API", frontend);
+        }
         // The helper is a fresh process; select the same twin as its parent.
         let mut search = vec![path.parent().unwrap().to_owned()];
         search.extend(std::env::split_paths(
@@ -203,6 +210,19 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
             b"obs_extract_hevc_headers".as_slice(),
         ] {
             assert_eq!(library.get::<unsafe extern "C" fn()>(symbol).is_ok(), hevc);
+        }
+        let frontend = std::env::var_os("OBS_BUILD_TEST_FRONTEND_API")
+            .map(|path| libloading::Library::new(path).unwrap());
+        if let Some(frontend) = &frontend {
+            assert!(!frontend
+                .get::<unsafe extern "C" fn() -> bool>(b"obs_frontend_recording_active")
+                .unwrap()());
+            assert!(
+                frontend
+                    .get::<unsafe extern "C" fn() -> *mut c_void>(b"obs_frontend_get_main_window")
+                    .unwrap()()
+                .is_null()
+            );
         }
         let probe = std::env::var_os("OBS_BUILD_TEST_PROBE")
             .map(|path| libloading::Library::new(path).unwrap());
@@ -325,6 +345,9 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
                 (b"obs_enum_service_types".as_slice(), "rtmp_common"),
                 (b"obs_enum_service_types".as_slice(), "rtmp_custom"),
             ]);
+        }
+        if std::env::var_os("OBS_BUILD_QT").is_some() {
+            expected_types.push((b"obs_enum_filter_types".as_slice(), "vst_filter"));
         }
         for (symbol, expected) in expected_types {
             let enumerate = library
