@@ -218,3 +218,55 @@ A bounded retention family merits evaluation; blanket deletion discards
 observed reuse, but these logs alone do not measure the analysis speedup
 against a cold run. Keep this separate from compiler-cache hit rates and
 from the required merge gate, which does not wait for CodeQL.
+
+## Post-job cook-profile comparison
+
+The pinned action saves its cook archive **after** the job's consumers, so
+a release-keyed archive can contain dev/test artifacts. A pre-consumer
+snapshot is not an adequate model for disabling this cache.
+
+The isolated local experiment used soldr 0.9.35, four Cargo jobs, identical
+compiled Rust inputs and dependency environment, wrapper bypass enabled
+for consumers, and post-job snapshots taken after workspace clippy and
+`obs-util` tests. Each restored snapshot ran warm cook, workspace clippy
+and the same tests. Policy order rotated across three trials per scenario.
+A forced core rebuild touched the unchanged obs-util crate root and
+required actual recompilation in the log; source bytes were preserved.
+
+| Policy | Unchanged median (range), s | Core rebuild median (range), s | Archive bytes |
+| --- | ---: | ---: | ---: |
+| release cook | 57.259 (56.007–57.611) | 67.869 (67.801–90.592) | 205,118,438 |
+| dev cook | 36.170 (35.849–40.269) | 82.736 (48.692–139.906) | 187,723,562 |
+| no cook/archive | 72.136 (71.493–74.113) | 78.291 (73.830–79.011) | 0 |
+
+[Raw trial results](ci-evidence/2026-10-17-soldr-cook-post-job.json) include
+individual command, restore and warm-cook durations and load averages.
+The totals include local restore plus consumer commands, excluding network
+transfer, formatters, Dylint and post-job save. Initial archive creation
+took 8.534 s for release and 7.203 s for dev. Local archives cover selected
+tests and are smaller than the 637,542,999-byte live CI release snapshot;
+their sizes are not predictions of full-workspace CI archives.
+
+Dev cooking clearly wins the unchanged-input scenario here. Core rebuild
+variance is large and the ranges overlap; its median favors release, so
+these data do not establish a universally fastest profile. Disabling cook
+loses useful post-job artifact reuse. Retain release cooking on core work
+until live comparisons justify changing it, and evaluate dev cooking for
+non-core Fast Gate runs with unchanged workspace inputs. Match explicit
+release/static-library consumers to release; do not infer cross-target
+benefits from this host-only experiment.
+
+Reproduce using a fresh directory in the same checkout and the same Nix
+dependency environment (existing target caches are left intact):
+
+```sh
+nix-shell rust/tools/sanitize/shell.nix --run \
+  'uv run ci/benchmark_soldr_cache.py --directory build_ci_audit/cook-new --soldr /absolute/path/to/soldr --trials 3 --jobs 4'
+```
+
+Keep compiled sources fixed throughout. The recorded run reused completed
+seed consumers at their original target paths, then modeled actual
+post-job saves. A measurement assertion initially expected Cargo to label
+a forced rebuild only “Checking”; Cargo correctly used “Compiling”. The
+assertion was corrected, that attempt's logs were preserved, and only the
+remaining unrecorded trials resumed. All published trials passed.
