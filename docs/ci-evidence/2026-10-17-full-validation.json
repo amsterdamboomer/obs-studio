@@ -150,6 +150,13 @@
       "soldr build cache",
       "CTest timing cache"
     ],
-    "limits": "Changed source and runner conditions prevent a matched runtime attribution; archive miss and cold compilations are directly observed."
+    "limits": "Changed source and runner conditions prevent a matched runtime attribution; archive miss and cold compilations are directly observed.",
+    "job_started_at": "2026-10-17T22:32:11Z",
+    "job_completed_at": "2026-10-17T22:39:17Z",
+    "job_wall_seconds": 426,
+    "build_step_started_at": "2026-10-17T22:33:23Z",
+    "build_step_completed_at": "2026-10-17T22:39:08Z",
+    "build_step_seconds": 345,
+    "conclusion": "success"
   }
 }

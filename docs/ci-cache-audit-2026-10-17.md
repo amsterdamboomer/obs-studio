@@ -72,7 +72,8 @@ it does not yet demonstrate durable retention.
 The loss affected a real consumer: PR #1353's Tier 2 build
 [job 117521595282](https://github.com/obs-rust/obs-studio/actions/runs/39075342558/job/117521595282)
 missed all Tier 2 compiler-cache restore keys at 22:33:13 UTC, then reported
-782 total compilations, zero cached and 782 cold. Its apt, soldr cook/build
+782 total compilations, zero cached and 782 cold. The successful job took
+426 seconds, including a 345-second build step. Its apt, soldr cook/build
 and CTest timing restores succeeded. This establishes an archive miss and
 cold compilation, but changed source and runner conditions prevent a matched
 runtime attribution. The disappearance therefore has an observed consumer
