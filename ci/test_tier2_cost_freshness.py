@@ -28,7 +28,9 @@ CHECK = ROOT / "rust" / "tools" / "linux-validate" / "check-costs.sh"
 
 def job(name: str) -> str:
     text = WORKFLOW.read_text(encoding="utf-8")
-    m = re.search(rf"^  {re.escape(name)}:\n(.*?)(?=^  [a-z0-9-]+:\n|\Z)", text, re.S | re.M)
+    m = re.search(
+        rf"^  {re.escape(name)}:\n(.*?)(?=^  [a-z0-9-]+:\n|\Z)", text, re.S | re.M
+    )
     assert m, f"no job {name}"
     return m.group(1)
 
@@ -54,7 +56,9 @@ class MergeCostsTest(unittest.TestCase):
         s3 = "a 3 10\nb 3 20\nc 4 33\nnew 1 7\n---\nc\n"
         out = merge(s1, s2, s3)
         lines, _, failed = out.partition("---\n")
-        self.assertEqual(sorted(lines.splitlines()), ["a 4 12", "b 4 25", "c 4 33", "new 1 7"])
+        self.assertEqual(
+            sorted(lines.splitlines()), ["a 4 12", "b 4 25", "c 4 33", "new 1 7"]
+        )
         self.assertEqual(failed.split(), ["c"])
 
     def test_empty_inputs_give_empty_data(self):
@@ -64,13 +68,15 @@ class MergeCostsTest(unittest.TestCase):
 class WorkflowTest(unittest.TestCase):
     def test_upload_includes_hidden_timings_and_rejects_missing_files(self):
         j = job("rust-linux-tier2")
-        upload = j[j.index("- name: Upload Test Timings"):]
+        upload = j[j.index("- name: Upload Test Timings") :]
         self.assertIn("include-hidden-files: true", upload)
         self.assertIn("if-no-files-found: error", upload)
 
     def test_cache_save_requires_valid_timings(self):
         j = job("rust-linux-tier2-done")
-        self.assertLess(j.index("check-costs.sh .tier2-cost"), j.index("actions/cache/save@"))
+        self.assertLess(
+            j.index("check-costs.sh .tier2-cost"), j.index("actions/cache/save@")
+        )
 
     def test_validate_reads_a_cost_dir(self):
         text = VALIDATE.read_text(encoding="utf-8")
@@ -103,26 +109,47 @@ class WorkflowTest(unittest.TestCase):
         # download-artifact v8 flattens a single match even when
         # merge-multiple is false. Execute the actual workflow shell.
         block = job("rust-linux-tier2-done")
-        script = block.split("      - name: Merge Test Timings", 1)[1].split("        run: |\n", 1)[1].split("      - uses:", 1)[0]
+        script = (
+            block.split("      - name: Merge Test Timings", 1)[1]
+            .split("        run: |\n", 1)[1]
+            .split("      - uses:", 1)[0]
+        )
         script = "\n".join(line[10:] for line in script.splitlines())
         import os
 
         for nested in (False, True):
-            with self.subTest(nested=nested), tempfile.TemporaryDirectory() as directory:
+            with (
+                self.subTest(nested=nested),
+                tempfile.TemporaryDirectory() as directory,
+            ):
                 root = Path(directory)
                 destination = root / "tier2-cost-shards"
-                sources = [destination / "tier2-cost-a", destination / "tier2-cost-b"] if nested else [destination]
+                sources = (
+                    [destination / "tier2-cost-a", destination / "tier2-cost-b"]
+                    if nested
+                    else [destination]
+                )
                 for source in sources:
                     source.mkdir(parents=True)
                     for mode in ("OFF", "ON"):
-                        (source / f"ctest-cost-{mode}.txt").write_text("test_one 1 0.2\n---\n")
+                        (source / f"ctest-cost-{mode}.txt").write_text(
+                            "test_one 1 0.2\n---\n"
+                        )
                 # Resolve repo scripts while retaining an isolated output dir.
                 script_here = script.replace("bash rust/", f"bash {ROOT}/rust/")
-                result = subprocess.run(["bash", "-e", "-c", script_here], cwd=root,
-                                        env={**os.environ, "RUNNER_TEMP": directory}, capture_output=True, text=True)
+                result = subprocess.run(
+                    ["bash", "-e", "-c", script_here],
+                    cwd=root,
+                    env={**os.environ, "RUNNER_TEMP": directory},
+                    capture_output=True,
+                    text=True,
+                )
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 for mode in ("OFF", "ON"):
-                    self.assertIn("test_one 1 0.2", (root / ".tier2-cost" / f"ctest-cost-{mode}.txt").read_text())
+                    self.assertIn(
+                        "test_one 1 0.2",
+                        (root / ".tier2-cost" / f"ctest-cost-{mode}.txt").read_text(),
+                    )
 
     def test_build_job_restores_the_merged_costs(self):
         j = job("rust-linux-tier2-build")
@@ -137,7 +164,9 @@ class CheckCostsTest(unittest.TestCase):
             for mode, body in (("OFF", off), ("ON", on)):
                 if body is not None:
                     (root / f"ctest-cost-{mode}.txt").write_text(body)
-            return subprocess.run(["bash", str(CHECK), directory], capture_output=True, text=True)
+            return subprocess.run(
+                ["bash", str(CHECK), directory], capture_output=True, text=True
+            )
 
     def test_both_modes_have_measured_tests(self):
         result = self.check("test_one 1 0.2\n---\n", "test_one 2 0.3\n---\n")
@@ -148,7 +177,9 @@ class CheckCostsTest(unittest.TestCase):
     def test_empty_or_unmeasured_modes_fail(self):
         for bad in (None, "", "---\n", "test_one 0 0\n---\n"):
             with self.subTest(body=bad):
-                self.assertNotEqual(self.check("test_one 1 0.2\n---\n", bad).returncode, 0)
+                self.assertNotEqual(
+                    self.check("test_one 1 0.2\n---\n", bad).returncode, 0
+                )
 
 
 if __name__ == "__main__":
