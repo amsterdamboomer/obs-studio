@@ -637,6 +637,30 @@ the cache-write exception; ordinary jobs could enforce `cache-mode: read`.
 No publication-policy change or promotion implementation is claimed here.
 GitHub caches are immutable, so refreshed payloads need generation keys.
 
+There is also a GitHub-native alternative to master-side promotion: queue
+jobs can publish compressed build-state artifacts, and consumers can select
+and download them across workflow runs. The official
+[artifact action](https://github.com/actions/download-artifact#download-artifacts-from-other-workflow-runs-or-repositories)
+supports this with a run ID and token possessing `actions:read`. This means
+literal queue-only production does not necessarily require external storage.
+Artifact storage is separate from the native cache allowance, with different
+[storage accounting](https://docs.github.com/en/billing/concepts/product-billing/github-actions).
+
+A read-only feasibility check listed #1353's successful queue artifacts and
+downloaded its tiny lane-proof marker from a separate CLI session. Its
+177,835,306-byte Tier 2 execution-tree artifact remained available with one-day
+retention. This verifies discovery and authenticated cross-run access, not
+large-payload transfer performance or fork-job token behavior. The execution
+tree lacks objects/Cargo state; it is not itself a deep incremental cache.
+
+Before choosing this design, measure one queue-produced build-state archive
+and later PR consumption; validate producer repository, merge-group event,
+successful required gate and compatibility metadata; bound retained generations
+and verify fork access. Preserve executable permissions inside the archive,
+keep miss/expiry fallback to normal compilation, and retain current-source
+invalidation safeguards. No artifact-backed cache producer or writer-policy
+change has been implemented.
+
 Deep Rust state is already present: the pinned setup action's native macOS
 post-step saved a `full` archive with 8,238 files, and the local dev archive
 contains test fingerprints and incremental state. With the pinned action's
