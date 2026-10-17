@@ -534,6 +534,15 @@ update_info_t *update_info_create_single(const char *log_prefix, const char *use
 	return info;
 }
 
+update_info_t *update_info_create_single_with_done(const char *log_prefix, const char *user_agent, const char *file_url,
+						   confirm_file_callback_t confirm_callback,
+						   update_done_callback_t done_callback, void *param)
+{
+	/* RED stub (#1347): the done callback is not wired yet. */
+	(void)done_callback;
+	return update_info_create_single(log_prefix, user_agent, file_url, confirm_callback, param);
+}
+
 /* File-local macros (BUILD.md): out of the next file in the unity group. */
 #undef warn
 #undef info
