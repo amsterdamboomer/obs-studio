@@ -1,5 +1,5 @@
 #!/usr/bin/env -S uv run --script
-"""ci-pre.yml runs cache maintenance beside trusted queue work (#1269).
+"""ci-pre.yml runs pre-work; janitor is limited to trusted events (#1269).
 
     uv run python -m unittest ci/test_ci_pre.py
 
@@ -8,8 +8,8 @@ workflow_call-only workflow with read-only top-level permissions and no
 workflow-level concurrency. Its cache-janitor job holds actions: write, runs
 on the repo-wide non-cancelling `cache-janitor` group, checks out ci_lint at
 the pinned SHA without credentials and runs it with stdlib python3 (no
-installs). ci.yml calls it only for merge_group. No job depends on it, and
-CI Gate does not count it.
+installs). ci.yml calls it on PRs and queue runs; push.yaml calls it on
+master. No job depends on it, and CI Gate does not count it.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 WORKFLOWS = ROOT / ".github" / "workflows"
 CI_PRE = WORKFLOWS / "ci-pre.yml"
 PULL = WORKFLOWS / "ci.yml"
+PUSH = WORKFLOWS / "push.yaml"
 PIN = "1a970f01574447d681571ff3d0b8de56cb983dcc"
 
 
@@ -59,6 +60,7 @@ class CiPreTest(unittest.TestCase):
 
     def test_janitor_job(self):
         j = self.janitor
+        self.assertRegex(j, r"if:.*github\.event_name == 'merge_group'.*github\.event_name == 'push'.*refs/heads/master")
         self.assertRegex(j, r"concurrency:\n\s+group: cache-janitor\n\s+cancel-in-progress: false")
         self.assertRegex(j, r"permissions:\n(\s+\w+: \w+\n)*\s+actions: write")
         self.assertIn("timeout-minutes:", j)
@@ -81,7 +83,17 @@ class CiPreTest(unittest.TestCase):
     def test_janitor_only_runs_on_trusted_queue_without_blocking_work(self):
         text = PULL.read_text()
         all_jobs = jobs(text)
-        self.assertRegex(all_jobs["ci-pre"], r"if:.*github\.event_name == 'merge_group'")
+        self.assertNotRegex(all_jobs["ci-pre"], r"if:.*github\.event_name")
+        for name, block in all_jobs.items():
+            if name != "ci-pre":
+                with self.subTest(job=name):
+                    self.assertNotIn("ci-pre", needs(block))
+
+    def test_master_push_calls_prework_without_blocking_build(self):
+        all_jobs = jobs(PUSH.read_text())
+        self.assertIn("uses: ./.github/workflows/ci-pre.yml", all_jobs["ci-pre"])
+        self.assertIn("github.ref == 'refs/heads/master'", all_jobs["ci-pre"])
+        self.assertIn("actions: write", all_jobs["ci-pre"])
         for name, block in all_jobs.items():
             if name != "ci-pre":
                 with self.subTest(job=name):

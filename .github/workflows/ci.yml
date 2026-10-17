@@ -14,11 +14,10 @@ concurrency:
   group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
   cancel-in-progress: true
 jobs:
-  # Cache maintenance runs only with a trusted merge-group token. It has no
-  # dependents: cleanup cannot delay cancellation, builds, or the CI gate.
+  # Run the pre-work entry point for every PR and queue run. Its cache janitor
+  # job runs only with a trusted queue token. No CI job waits for pre-work.
   ci-pre:
     name: CI Pre 🧹
-    if: github.event_name == 'merge_group'
     uses: ./.github/workflows/ci-pre.yml
     permissions:
       actions: write
