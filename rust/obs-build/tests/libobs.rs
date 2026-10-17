@@ -86,6 +86,11 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         );
         options.core_modules.push("obs-websocket".into());
     }
+    if std::env::var_os("OBS_BUILD_VLC").is_some() {
+        assert!(enabled("OBS_BUILD_APP_GUI") && std::env::var_os("OBS_BUILD_WEBSOCKET").is_some(),
+            "VLC integration requires the staged GUI and websocket client");
+        options.core_modules.push("vlc-video".into());
+    }
     if std::env::var_os("OBS_BUILD_FRONTEND_TOOLS").is_some()
         || std::env::var_os("OBS_BUILD_WEBSOCKET").is_some()
     {
@@ -162,6 +167,9 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         plugins::build_transitions(&build, &root, &libraries.reference).unwrap(),
         plugins::build_filters(&build, &root, &libraries.reference, &filters).unwrap(),
     ];
+    if std::env::var_os("OBS_BUILD_VLC").is_some() {
+        modules.push(plugins::build_source(&build, &root, &libraries.reference, plugins::SourceModule::Vlc).unwrap());
+    }
     if enabled("OBS_BUILD_SOURCES") {
         for source in [
             plugins::SourceModule::Image,

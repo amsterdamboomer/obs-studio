@@ -9,6 +9,7 @@ import argparse
 import asyncio
 import base64
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -79,6 +80,8 @@ async def verify(runtime: Path, recording: bool) -> None:
         assert all(item["requestStatus"]["code"] == 100 for item in batch["d"]["results"])
         unknown = await client.request("NativeMissingRequest")
         assert unknown["d"]["requestStatus"]["code"] == 204
+        if os.environ.get("OBS_BUILD_VLC"):
+            await verify_vlc(runtime, request)
         if recording:
             await request("StartRecord")
             deadline = asyncio.get_running_loop().time() + 5
@@ -94,6 +97,54 @@ async def verify(runtime: Path, recording: bool) -> None:
         print("Staged obs-websocket auth, requests, event, batch, recording status and white screenshot passed")
     finally:
         await client.close_conn()
+
+
+async def verify_vlc(runtime: Path, request) -> None:
+    clip = runtime / "vlc-white.mkv"
+    subprocess.run([
+        "ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=white:s=320x180:r=30",
+        "-t", "6", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", str(clip),
+    ], check=True, capture_output=True, timeout=20)
+    await request("CreateInput", {
+        "sceneName": "Native scene", "inputName": "Native VLC", "inputKind": "vlc_source",
+        "sceneItemEnabled": True,
+        "inputSettings": {"playlist": [{"value": str(clip)}], "loop": True,
+                          "playback_behavior": "always_play"},
+    })
+    deadline = asyncio.get_running_loop().time() + 15
+    while True:
+        status = await request("GetMediaInputStatus", {"inputName": "Native VLC"})
+        if status["mediaState"] == "OBS_MEDIA_STATE_PLAYING" and status["mediaDuration"] > 0:
+            break
+        assert asyncio.get_running_loop().time() < deadline, status
+        await asyncio.sleep(0.1)
+    assert 5000 <= status["mediaDuration"] <= 6500, status
+    while True:
+        image = await request("GetSourceScreenshot", {
+            "sourceName": "Native VLC", "imageFormat": "png", "imageWidth": 64, "imageHeight": 36,
+        })
+        screenshot = runtime / "vlc-white.png"
+        screenshot.write_bytes(base64.b64decode(image["imageData"].split(",", 1)[1], validate=True))
+        decoded = subprocess.run([
+            "ffmpeg", "-v", "error", "-i", str(screenshot), "-frames:v", "1",
+            "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
+        ], check=True, capture_output=True, timeout=15).stdout
+        if len(decoded) == 64 * 36 * 3 and min(decoded) >= 240:
+            break
+        assert asyncio.get_running_loop().time() < deadline, "VLC did not decode a white frame"
+        await asyncio.sleep(0.1)
+    for action, expected in [("PAUSE", "PAUSED"), ("PLAY", "PLAYING"), ("RESTART", "PLAYING")]:
+        await request("TriggerMediaInputAction", {
+            "inputName": "Native VLC", "mediaAction": f"OBS_WEBSOCKET_MEDIA_INPUT_ACTION_{action}",
+        })
+        deadline = asyncio.get_running_loop().time() + 5
+        while True:
+            status = await request("GetMediaInputStatus", {"inputName": "Native VLC"})
+            if status["mediaState"] == f"OBS_MEDIA_STATE_{expected}":
+                break
+            assert asyncio.get_running_loop().time() < deadline, status
+            await asyncio.sleep(0.05)
+    print("Native VLC playlist decoded white video; pause/play/restart passed")
 
 
 if __name__ == "__main__":

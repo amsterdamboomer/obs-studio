@@ -345,6 +345,7 @@ pub fn configure_source(
         ));
     }
     let groups: &[&str] = match source {
+        SourceModule::Vlc => &[],
         SourceModule::PipeWire => &["nix"],
         SourceModule::Image => &["core", "slideshow", "posix"],
         SourceModule::Text => &["core", "nix"],
@@ -359,6 +360,7 @@ pub fn configure_source(
             .map(|group| root.join(format!("plugins/{0}/build/{0}.{group}+.h.c", source.name()))),
     );
     let packages: &[&str] = match source {
+        SourceModule::Vlc => &[],
         SourceModule::PipeWire => &["libpipewire-0.3", "gio-unix-2.0", "libdrm"],
         SourceModule::Image => &[],
         SourceModule::Text => &["freetype2", "fontconfig"],

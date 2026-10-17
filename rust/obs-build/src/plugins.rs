@@ -388,6 +388,7 @@ pub fn build_ffmpeg(
 /// Built-in source and service modules with independent optional features.
 #[derive(Clone, Copy, Debug)]
 pub enum SourceModule {
+    Vlc,
     Image,
     Text,
     PulseAudio,
@@ -401,6 +402,7 @@ pub enum SourceModule {
 impl SourceModule {
     pub fn name(self) -> &'static str {
         match self {
+            Self::Vlc => "vlc-video",
             Self::Image => "image-source",
             Self::Text => "text-freetype2",
             Self::PulseAudio => "linux-pulseaudio",
@@ -420,6 +422,9 @@ pub fn build_source(
     source: SourceModule,
 ) -> Result<Module, String> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
+    if matches!(source, SourceModule::Vlc) {
+        return Err("native VLC graph is not implemented".into());
+    }
     let mut library = module(build, &root, core, source.name())?;
     library.sources.clear();
     crate::platform::configure_source(&build.target, &root, source, &mut library)?;
