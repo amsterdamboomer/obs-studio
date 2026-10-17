@@ -100,6 +100,8 @@ def main() -> None:
             assert str(runtime / "lib64" / name) in maps, f"staged {name} was not loaded"
         for name in json.loads((runtime / "expected-modules.json").read_text()):
             assert str(runtime / "lib64/obs-modules/core" / (name + ".so")) in maps, f"module {name} was not loaded"
+        if os.environ.get("OBS_BUILD_NVENC"):
+            assert str(runtime / "lib64/obs-modules/core/obs-nvenc.so") in maps, "staged NVENC was not loaded"
         assert b"Native white" in log, "saved color source was not restored"
         if recording:
             # Keep the actual frontend output running long enough to decode a
