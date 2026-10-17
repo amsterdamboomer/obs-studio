@@ -182,14 +182,22 @@ hits, misses and compilations; post-job save skipped the zero-compile
 delta. The local gate explicitly bypasses this Rust compiler cache for
 lint, tests and cross checks because of the verified correctness blocker.
 
-Disable this layer in Fast Gate and the two cross-lint jobs, retaining
-cook dependency snapshots and the registry. Keep compiler caching in native
-Rust test and static-library jobs, where the commands use it. This removes
-a measured cache-service operation; it is not a claim of a large CI gain.
-Cold cook may lose potential compiler-cache reuse after a lock change, but
-the currently restored archive contains no compiled artifacts to supply it.
-Verify the disabled layer and total setup time in live runs; do not sum
-concurrent action phase times as if they were sequential wall time.
+Disable this layer only for deferred PR/merge-group Fast Gate runs,
+retaining cook and registry snapshots. The full-day sample contains 26
+PR and 18 merge-group Fast Gate session reports with no positive compiler
+hits (26 and 16 respectively had zero compilations). In contrast, 5/24
+master Fast Gate samples and 3/8 PR/queue cross-lint samples had positive
+hits. Keep full/master and cross-lint caching rather than extrapolating
+from the initial zero-counter run.
+
+The Rust wrapper bypass does not establish that every compiler-cache
+consumer is inactive: dependency cooking and C compiler work may still
+use it. [Captured sample coverage](ci-evidence/2026-10-17-gate-cache-consumption.json).
+This is a small measured operation to remove from the deferred path, not
+a claim of a large CI gain. Cold cook may lose potential compiler-cache
+reuse after a lock change; retain the published post-job cook snapshots
+and measure total live setup/consumer time. Concurrent action phase
+times must not be summed as sequential wall time.
 
 ## Additional cache inventory: CodeQL overlays
 
