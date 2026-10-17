@@ -3,6 +3,8 @@ use obs_build::{NativeBuild, frontend, graphics, libobs, plugins};
 use std::{ffi::c_void, path::PathBuf};
 #[path = "libobs/qt.rs"]
 mod qt;
+#[path = "libobs/application.rs"]
+mod application;
 #[path = "libobs/render.rs"]
 mod render;
 
@@ -23,6 +25,9 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         return;
     }
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    if std::env::var_os("OBS_BUILD_APP_GUI").is_some() {
+        application::exercise(&root).unwrap();
+    }
     let archive = PathBuf::from(
         std::env::var_os("OBS_BUILD_RUST_ARCHIVE")
             .expect("build libobs-rust in release mode, then set OBS_BUILD_RUST_ARCHIVE"),
