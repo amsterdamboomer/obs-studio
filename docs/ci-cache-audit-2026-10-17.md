@@ -215,6 +215,34 @@ and host apt-cache runtime validation, the nightly integrity failure (#1334),
 native-platform cache occupancy and this representative-day comparison remain acceptance work
 under #1286. This report does not claim those requirements are complete.
 
+## Recommendation and acceptance checkpoint
+
+Keep the merged queue policy, Rust correctness safeguard, bounded useful
+compiler caches and parallel OFF/ON runners. Finish the host-package warm
+measurement before treating an archive HIT as a throughput improvement.
+Validate Ubuntu app reuse after removing the pre-build purge, and compare a
+full day of code PR/queue traffic after the final cache rollout. Track the
+macOS integrity failure separately through #1334 (proposed fix #1338).
+
+| #1286 requirement | Evidence/status at this checkpoint |
+| --- | --- |
+| 1. Match cook profiles and measure consumers | Explicit profiles landed in #1318; local dev/release/no-cook experiment and native consumers recorded. Representative post-rollout comparison remains pending. |
+| 2. Rust cache correctness | Reproduction still fails on pinned soldr; safeguard retained in #1290, upstream zccache#1943 linked. |
+| 3. Remove unused overhead | Deferred Fast Gate layer removed in #1315; 13 Ubuntu restore/purge events fixed by #1337. Live Ubuntu reuse and budget behavior remain to verify. |
+| 4. Warm scoped plugin builds | Trusted seed and 41/41 PR compiler hits observed. Host apt archive #1335 still needs trusted seeding and warm runtime proof. |
+| 5. Persist test timing | Nonempty OFF/ON producer, save, later restore and CTest consumption verified across master runs (#1288/#1311). |
+| 6. Match remote save policy | All seven setup-soldr consumers use master-only remote saves; PR/queue/local-save behavior verified (#1291). |
+| 7. Bound Qt cache | 1.2 GB compiler bound, 1.3 GB family, actual high hit rates and restore/save times verified (#1309). Overall repository headroom still needs the full-day view. |
+| 8. Unify nightly cleanup | Competing purge removed; original startup permission failure fixed (#1289). Real full dispatch completed; separate macOS test failure remains #1334. |
+| 9. Isolated libobs measurements | Three trials per condition and raw wall/CPU/cache evidence published in #1306. Wall-time ranges overlap. |
+| 10. Shorten critical path | Independent OFF/ON runners landed (#1314); phase times, runner cost, skips and serial-test bottlenecks recorded. Overall queue gain remains unproven. |
+| 11. Durable before/after comparison | Full-day baseline and cohort-separated per-step collector ready. At least one full representative post-rollout day remains outstanding. |
+
+This checkpoint preserves the original scope. #1286 remains open while the
+host warm run, Ubuntu app reuse, stable budget behavior and representative-day
+comparison are unverified. A green isolated job is not substituted for a
+full workflow, and configuration/docs traffic is not substituted for code PRs.
+
 ## Isolated C libobs build
 
 Measured the `libobs` target alone, with Rust libobs, frontend, scripting,
