@@ -129,11 +129,14 @@ image_hash() {
   } | if command -v sha256sum >/dev/null 2>&1; then sha256sum; else shasum -a 256; fi | cut -c1-16
 }
 
-prune_images() { # IMAGE KEEP APPLY
+prune_images() { # IMAGE KEEP APPLY [TAG-TO-KEEP]
   local tags
   tags=$(quiet docker image ls "$1" --format '{{.CreatedAt}}\t{{.Tag}}' | LC_ALL=C sort -r | cut -f2 | grep -v '^<none>$' || true)
   local n=0 tag
   for tag in $tags; do
+    # The tag this run just built: a build made entirely from cached layers
+    # gets the old image's creation time, so by date it can look the oldest.
+    [ -n "${4:-}" ] && [ "$tag" = "$4" ] && continue
     n=$((n + 1))
     [ "$n" -le "$2" ] && continue
     if [ "$3" = 1 ]; then
@@ -220,7 +223,7 @@ cmd_run() {
       for a in ${build_args[@]+"${build_args[@]}"}; do ba+=(--build-arg "$a"); done
       docker build -q ${ba[@]+"${ba[@]}"} -t "$tag" -f "$dockerfile" "$context" >/dev/null
     fi
-    prune_images "$image" "$keep_images" 1 >/dev/null
+    prune_images "$image" "$keep_images" 1 "${tag#"$image":}" >/dev/null
   fi
 
   # The singleton: one container per task and checkout.
