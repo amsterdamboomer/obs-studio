@@ -214,6 +214,7 @@ pub fn configure_glad(
 }
 
 fn dependency_link_name(path: &Path, msvc: bool) -> PathBuf {
+    let path = dunce::simplified(path);
     if path
         .extension()
         .and_then(|s| s.to_str())

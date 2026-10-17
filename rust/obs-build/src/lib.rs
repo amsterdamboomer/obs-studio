@@ -134,13 +134,12 @@ impl NativeBuild {
         }
         let output = self.output.join(&library.name);
         fs::create_dir_all(&output).map_err(|e| format!("create {}: {e}", output.display()))?;
-        let output = output.canonicalize().map_err(|e| e.to_string())?;
+        let output = dunce::canonicalize(&output).map_err(|e| e.to_string())?;
         let mut c_sources = Vec::new();
         let mut cpp_sources = Vec::new();
         for source in &library.sources {
-            let absolute = source
-                .canonicalize()
-                .map_err(|e| format!("{}: {e}", source.display()))?;
+            let absolute =
+                dunce::canonicalize(source).map_err(|e| format!("{}: {e}", source.display()))?;
             match source.extension().and_then(|e| e.to_str()) {
                 Some("c") => c_sources.push(absolute),
                 Some("cpp" | "cc" | "cxx") => cpp_sources.push(absolute),
@@ -205,7 +204,7 @@ impl NativeBuild {
         let mut includes = std::collections::HashSet::new();
         for directory in &library.include_dirs {
             if includes.insert(directory) {
-                compiler.include(directory);
+                compiler.include(dunce::simplified(directory));
             }
         }
         let mut definitions = std::collections::HashSet::new();
