@@ -3,10 +3,10 @@
 //! live handle is one allocation unit. In a `Box`-allocated port the
 //! counter never moves.
 //!
-//! This lives in its own test binary with a single test on purpose:
 //! `bnum_allocs` is a process-global counter, so asserting absolute
-//! deltas races with any concurrent allocation — including a second test
-//! in the same binary.
+//! deltas races with any concurrent allocation, including the other tests
+//! of this binary. The measurement therefore runs alone in a child process
+//! (`common::isolated`, #1133).
 //!
 //! Unix only, like the symbols it exercises.
 
@@ -43,9 +43,15 @@ fn measure() {
     assert_eq!(unsafe { bnum_allocs() }, base);
 }
 
+const INIT_DESTROY: &str = "threading_allocs::init_destroy_counts_one_bzalloc_per_live_handle";
+
+/// Measured in a child process of its own (#1133): the parent's other tests
+/// allocate through bmem in parallel.
 #[test]
 fn init_destroy_counts_one_bzalloc_per_live_handle() {
-    measure();
+    if crate::common::isolated(INIT_DESTROY) {
+        measure();
+    }
 }
 
 /// #1133: this binary runs ~40 tests in parallel and others allocate through
@@ -73,7 +79,8 @@ fn holds_under_concurrent_allocation() {
         thread::yield_now();
     }
 
-    measure();
+    // the check runs in its own process, which this thread does not touch
+    assert!(!crate::common::isolated(INIT_DESTROY));
 
     stop.store(true, Ordering::Relaxed);
     allocator.join().unwrap();
