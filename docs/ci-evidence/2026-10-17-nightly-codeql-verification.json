@@ -3,7 +3,7 @@
   "source": "713ceb3bfd3a13114c6a8c9a9d38ffd0a59e2d89",
   "event": "workflow_dispatch",
   "default_setup": "not-configured",
-  "full_workflow": "still in progress; only CodeQL job conclusions are verified here",
+  "full_workflow": "failure at macOS ingest-refresh integrity test (#1334); all four CodeQL jobs passed",
   "jobs": [
     {
       "job_id": 117488229464,

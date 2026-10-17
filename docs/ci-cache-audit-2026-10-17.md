@@ -54,7 +54,8 @@ passed native Rust test jobs on both platforms with `--profile dev`:
 [Raw job observations](ci-evidence/2026-10-17-native-rust-cook-rollout.json)
 verify profile use and successful consumers. Compiler-wrapper session counters
 were zero in both jobs; these are separate from dependency-cook reuse. The
-full workflow is still running, and this is not a matched speed comparison.
+parent master run was later canceled after its native jobs and cache writers
+finished; this is not a full-workflow pass or a matched speed comparison.
 
 Windows native Tier 2 also passed in this master run, using `--release` for
 the static-library consumer and recording **304/305 cacheable ccache hits**,
@@ -158,6 +159,14 @@ cause is established. The existing C test was neither weakened nor skipped,
 and no speculative whole-workflow retry was performed. This native build
 matrix is distinct from the AppImage nightly release pipeline.
 
+The full Ubuntu app cache has a separate confirmed defect: 13 baseline
+restore events unpacked 5–6 GiB and then deleted the directory at a 2 GiB
+pre-build threshold. [#1337](https://github.com/obs-rust/obs-studio/pull/1337)
+consumes the cache first and bounds the subsequent save instead. Its shell
+regression covers 6 GiB, 8 GiB and over-limit snapshots; actual warm app reuse
+still needs live verification. The 8 GiB guard is uncompressed per-run disk
+state, not additional Actions storage allocation.
+
 ### Measurement status and limits
 
 The before window is 2026-10-16 17:00 through 2026-10-17 17:00 UTC: 473 listed
@@ -192,8 +201,8 @@ The collector now emits `lane_cohorts` so the same method applies after rollout.
 
 The final after window must cover at least a full day of representative code
 PR and queue traffic following rollout. It has not elapsed. Plugin warming
-and a subsequent PR hit/timing comparison, the full nightly run, native-platform
-cache occupancy and this representative-day comparison remain acceptance work
+and host apt-cache runtime validation, the nightly integrity failure (#1334),
+native-platform cache occupancy and this representative-day comparison remain acceptance work
 under #1286. This report does not claim those requirements are complete.
 
 ## Isolated C libobs build
