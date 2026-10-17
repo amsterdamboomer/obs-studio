@@ -112,4 +112,49 @@ fn unity_toggle_preserves_exports_and_explicit_generated_source_wins() {
     }
 }
 
+#[test]
+fn executable_runs_against_its_shared_core_dependency() {
+    let dir = tempfile::tempdir().unwrap();
+    let core_source = dir.path().join("core.c");
+    let executable_source = dir.path().join("main.c");
+    fs::write(
+        &core_source,
+        format!("{EXPORT} int fixture_value(void) {{ return 42; }}"),
+    )
+    .unwrap();
+    fs::write(
+        &executable_source,
+        "extern int fixture_value(void); int main(void) { return fixture_value() == 42 ? 0 : 7; }",
+    )
+    .unwrap();
+    let build = NativeBuild {
+        host: env!("OBS_BUILD_HOST").into(),
+        target: env!("OBS_BUILD_TARGET").into(),
+        output: dir.path().join("artifacts"),
+    };
+    let core = build
+        .shared_library(&target("fixture-core", &core_source, vec![]))
+        .unwrap();
+    let executable = build
+        .executable(&target(
+            "fixture-app",
+            &executable_source,
+            vec![core.clone()],
+        ))
+        .unwrap();
+    let old_path = std::env::var_os("PATH").unwrap_or_default();
+    let search = std::env::join_paths(
+        std::iter::once(core.parent().unwrap().to_path_buf())
+            .chain(std::env::split_paths(&old_path)),
+    )
+    .unwrap();
+    assert!(
+        std::process::Command::new(executable)
+            .env("PATH", search)
+            .status()
+            .unwrap()
+            .success()
+    );
+}
+
 const EXPORT: &str = "\n#if defined(_WIN32)\n__declspec(dllexport)\n#endif\n";

@@ -70,6 +70,11 @@ impl NativeBuild {
         Ok(artifact)
     }
 
+    /// Compile and link an executable with the native shared dependencies.
+    pub fn executable(&self, _target: &SharedLibrary) -> Result<PathBuf, String> {
+        Err("native executable linking is not implemented".into())
+    }
+
     /// Build an archive with the same compiler, flags and source grouping.
     pub fn static_library(&self, library: &SharedLibrary) -> Result<PathBuf, String> {
         let (output, cpp, objects) = self.objects(library)?;
