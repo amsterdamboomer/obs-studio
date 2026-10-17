@@ -13,9 +13,12 @@
 
 /* ELF interposition injects a deterministic platform-init failure into the
  * real shared libobs, including the Rust-substituted implementation. */
+static bool injected_display_failure;
+
 Display *XOpenDisplay(const char *name)
 {
 	(void)name;
+	injected_display_failure = true;
 	errno = ECONNREFUSED;
 	return NULL;
 }
@@ -46,6 +49,7 @@ static void failed_startup_reports_initializer(void **state)
 	obs_set_nix_platform(OBS_NIX_PLATFORM_X11_EGL);
 	bool started = obs_startup("en-US", NULL, NULL);
 	base_set_log_handler(previous, previous_param);
+	assert_true(injected_display_failure);
 	assert_false(started);
 	assert_true(saw_hotkeys_stage);
 	assert_true(saw_display_failure);
