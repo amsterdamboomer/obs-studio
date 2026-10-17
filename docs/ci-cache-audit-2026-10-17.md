@@ -221,16 +221,17 @@ Nightly app archives dominate the transient footprint; useful queue caches
 must remain warm through the full representative-day comparison.
 
 The final after window must cover at least a full day of representative code
-PR and queue traffic following rollout. It has not elapsed. Plugin warming
-and host apt-cache runtime validation, the nightly integrity failure (#1334),
-native-platform cache occupancy and this representative-day comparison remain acceptance work
-under #1286. This report does not claim those requirements are complete.
+PR and queue traffic following rollout. It has not elapsed. The first host
+cold/warm pair is complete. Repeatability over real traffic, Ubuntu app reuse
+after the purge fix, the nightly integrity failure (#1334), stable cache
+headroom and the representative-day comparison remain acceptance work under
+#1286. This report does not claim those requirements are complete.
 
 ## Recommendation and acceptance checkpoint
 
 Keep the merged queue policy, Rust correctness safeguard, bounded useful
-compiler caches and parallel OFF/ON runners. Finish the host-package warm
-measurement before treating an archive HIT as a throughput improvement.
+compiler caches and parallel OFF/ON runners. Validate the observed host-package
+benefit over real traffic; an archive HIT alone is not a throughput result.
 Validate Ubuntu app reuse after removing the pre-build purge, and compare a
 full day of code PR/queue traffic after the final cache rollout. Track the
 macOS integrity failure separately through #1334 (proposed fix #1338).
@@ -240,7 +241,7 @@ macOS integrity failure separately through #1334 (proposed fix #1338).
 | 1. Match cook profiles and measure consumers | Explicit profiles landed in #1318; local dev/release/no-cook experiment and native consumers recorded. Representative post-rollout comparison remains pending. |
 | 2. Rust cache correctness | Reproduction still fails on pinned soldr; safeguard retained in #1290, upstream zccache#1943 linked. |
 | 3. Remove unused overhead | Deferred Fast Gate layer removed in #1315; 13 Ubuntu restore/purge events fixed by #1337. Live Ubuntu reuse and budget behavior remain to verify. |
-| 4. Warm scoped plugin builds | Trusted seed and 41/41 PR compiler hits observed. Trusted seeds consumed by a PR: 41/41 compiler hits, 323 packages, zero package bytes downloaded; job 165 → 148 s in the first host cold/warm pair. Day-scale validation remains. |
+| 4. Warm scoped plugin builds | Trusted compiler and host-package seeds consumed by a PR: 41/41 compiler hits, 323 packages, zero package bytes downloaded; job 165 → 148 s in the first host cold/warm pair. Day-scale validation remains. |
 | 5. Persist test timing | Nonempty OFF/ON producer, save, later restore and CTest consumption verified across master runs (#1288/#1311). |
 | 6. Match remote save policy | All seven setup-soldr consumers use master-only remote saves; PR/queue/local-save behavior verified (#1291). |
 | 7. Bound Qt cache | 1.2 GB compiler bound, 1.3 GB family, actual high hit rates and restore/save times verified (#1309). Overall repository headroom still needs the full-day view. |
