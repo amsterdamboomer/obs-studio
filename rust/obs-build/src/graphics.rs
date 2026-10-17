@@ -23,15 +23,7 @@ pub fn build_opengl(
         ..SharedLibrary::default()
     };
     crate::platform::configure_opengl(&build.target, &root, options, &mut library)?;
-    let mut glad = SharedLibrary {
-        name: "obsglad".into(),
-        sources: vec![root.join("deps/glad/src/glad.c")],
-        include_dirs: vec![root.join("deps/glad/include")],
-        compile_options: library.compile_options.clone(),
-        ..SharedLibrary::default()
-    };
-    crate::platform::configure_glad(&build.target, &root, &mut glad)?;
-    library.dependencies.push(build.static_library(&glad)?);
+    library.dependencies.push(build_glad(build, &root)?);
     let artifact = build.shared_library(&library)?;
     let linker_name = artifact.with_file_name(crate::platform::shared_filename(
         &build.target,
@@ -41,4 +33,16 @@ pub fn build_opengl(
         std::fs::copy(&artifact, &linker_name).map_err(|e| e.to_string())?;
     }
     Ok(artifact)
+}
+
+pub(crate) fn build_glad(build: &NativeBuild, root: &Path) -> Result<PathBuf, String> {
+    let mut glad = SharedLibrary {
+        name: "obsglad".into(),
+        sources: vec![root.join("deps/glad/src/glad.c")],
+        include_dirs: vec![root.join("deps/glad/include")],
+        ..SharedLibrary::default()
+    };
+    crate::platform::configure_module(&build.target, &mut glad)?;
+    crate::platform::configure_glad(&build.target, root, &mut glad)?;
+    build.static_library(&glad)
 }

@@ -336,11 +336,34 @@ pub enum SourceModule {
     RtmpServices { updates: bool },
 }
 
+impl SourceModule {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Image => "image-source",
+            Self::Text => "text-freetype2",
+            Self::PulseAudio => "linux-pulseaudio",
+            Self::Alsa => "linux-alsa",
+            Self::V4l2 { .. } => "linux-v4l2",
+            Self::X11Capture => "linux-capture",
+            Self::RtmpServices { .. } => "rtmp-services",
+        }
+    }
+}
+
 pub fn build_source(
-    _build: &NativeBuild,
-    _root: &Path,
-    _core: &Path,
-    _source: SourceModule,
+    build: &NativeBuild,
+    root: &Path,
+    core: &Path,
+    source: SourceModule,
 ) -> Result<Module, String> {
-    Err("source module graph is not implemented".into())
+    let root = root.canonicalize().map_err(|e| e.to_string())?;
+    let mut library = module(build, &root, core, source.name())?;
+    library.sources.clear();
+    crate::platform::configure_source(&build.target, &root, source, &mut library)?;
+    if matches!(source, SourceModule::X11Capture) {
+        library
+            .dependencies
+            .push(crate::graphics::build_glad(build, &root)?);
+    }
+    finish(build, &root, library)
 }

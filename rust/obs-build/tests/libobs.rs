@@ -161,6 +161,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             line.contains("Loading up OpenGL")
                 || line.contains("cc::Build graphics device")
                 || line.contains("cc::Build recording")
+                || line.contains("cc::Build color source")
         }) {
             println!("{}: {line}", path.display());
         }

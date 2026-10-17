@@ -174,3 +174,24 @@ for helper subprocesses, and also records through `ffmpeg_muxer` to Matroska.
 All four files (MP4 and Matroska, C and Rust cores) pass the same ffprobe checks. The full Qt application, capture sources, other
 modules/platforms, complete test battery, packaging and controlled performance
 measurements remain required. Do not treat this checkpoint as a CMake retirement.
+
+## Linux sources and services checkpoint
+
+`plugins::build_source` provides typed selections for image sources, FreeType
+text, PulseAudio, ALSA, V4L2, X11 capture and RTMP services. V4L2 preserves its
+independent UDEV switch. RTMP service updates are configurable and remain off in
+the integration smoke test to keep it offline. The default plugin behavior keeps
+updates enabled when requested through its typed option. X11 capture and OpenGL
+share the GLAD archive builder.
+
+Set `OBS_BUILD_SOURCES=1` on the integration test with an isolated X display and
+an EWMH window manager. Local checks use Xvfb plus an isolated KWin session;
+XComposite correctly declines registration on bare Xvfb without EWMH. Both cores
+load these seven modules and expose their thirteen expected input/output/service
+registrations. The graphics probe also creates a 64x64 white color source,
+adds it to the scene and requires three NV12 frames with Y=235 after draining
+previous black frames. Both cores still record validated MP4 and Matroska files.
+Disabled UDEV also passes registration and rendering against both cores.
+The test does not open camera or microphone devices. Hardware capture, text
+rasterization, streaming and service-update behavior remain to be validated with
+the full application and packaged artifact tests.

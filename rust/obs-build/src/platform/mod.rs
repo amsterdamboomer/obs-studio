@@ -345,3 +345,77 @@ mod tests {
         );
     }
 }
+
+pub fn configure_source(
+    target: &str,
+    root: &Path,
+    source: crate::plugins::SourceModule,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    use crate::{libobs::add_package, plugins::SourceModule};
+    if !target.contains("linux") {
+        return Err(format!(
+            "source module graph for {target} is not implemented yet"
+        ));
+    }
+    let groups: &[&str] = match source {
+        SourceModule::Image => &["core", "slideshow", "posix"],
+        SourceModule::Text => &["core", "nix"],
+        SourceModule::PulseAudio | SourceModule::Alsa | SourceModule::X11Capture => &["nix"],
+        SourceModule::V4l2 { udev: true } => &["nix", "nix-output", "nix-udev"],
+        SourceModule::V4l2 { udev: false } => &["nix", "nix-output"],
+        SourceModule::RtmpServices { .. } => &["core"],
+    };
+    library.sources.extend(
+        groups
+            .iter()
+            .map(|group| root.join(format!("plugins/{0}/build/{0}.{group}+.h.c", source.name()))),
+    );
+    let packages: &[&str] = match source {
+        SourceModule::Image => &[],
+        SourceModule::Text => &["freetype2", "fontconfig"],
+        SourceModule::PulseAudio => &["libpulse"],
+        SourceModule::Alsa => &["alsa"],
+        SourceModule::V4l2 { .. } => &["libv4l2", "libavcodec", "libavformat", "libavutil"],
+        SourceModule::X11Capture => &[
+            "x11",
+            "x11-xcb",
+            "xcb",
+            "xcb-xfixes",
+            "xcb-randr",
+            "xcb-shm",
+            "xcb-xinerama",
+            "xcb-composite",
+        ],
+        SourceModule::RtmpServices { .. } => &["libcurl", "jansson"],
+    };
+    for package in packages {
+        add_package(library, target, package)?;
+    }
+    match source {
+        SourceModule::V4l2 { udev: true } => {
+            add_package(library, target, "libudev")?;
+            library.definitions.push(("HAVE_UDEV".into(), None));
+        }
+        SourceModule::X11Capture => {
+            library.include_dirs.push(root.join("deps/glad/include"));
+        }
+        SourceModule::RtmpServices { updates } => {
+            library
+                .sources
+                .push(root.join("shared/file-updater/build/file-updater.core+.h.c"));
+            library.include_dirs.push(root.join("shared/file-updater"));
+            library.definitions.push((
+                "SERVICES_URL".into(),
+                Some("\"https://obsproject.com/obs2_update/rtmp-services\"".into()),
+            ));
+            if updates {
+                library
+                    .definitions
+                    .push(("ENABLE_SERVICE_UPDATES".into(), None));
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}

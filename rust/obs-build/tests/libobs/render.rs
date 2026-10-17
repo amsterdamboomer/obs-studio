@@ -39,6 +39,7 @@ pub fn build(build: &NativeBuild, root: &Path, core: &Path) -> PathBuf {
 const SOURCE: &str = r#"
 #include <X11/Xlib.h>
 #include <stdatomic.h>
+#include <stdlib.h>
 #include <obs.h>
 #include <obs-nix-platform.h>
 #include <util/platform.h>
@@ -46,6 +47,7 @@ const SOURCE: &str = r#"
 static Display *test_display;
 static atomic_uint frames;
 static atomic_uint invalid_frames;
+static atomic_uint expected_y = 16;
 
 EXPORT bool obs_fixture_open_display(void)
 {
@@ -61,7 +63,10 @@ EXPORT bool obs_fixture_open_display(void)
 static void receive_frame(void *unused, struct video_data *frame)
 {
     (void)unused;
-    if (!frame->data[0] || frame->linesize[0] < 64 || frame->data[0][0] != 16)
+    if (frame->data[0] && atomic_load(&expected_y) == 235 &&
+        atomic_load(&frames) == 0 && frame->data[0][0] == 16)
+        return; /* Drain black frames already in the video pipeline. */
+    if (!frame->data[0] || frame->linesize[0] < 64 || frame->data[0][0] != atomic_load(&expected_y))
         atomic_fetch_add(&invalid_frames, 1);
     atomic_fetch_add(&frames, 1);
 }
@@ -151,6 +156,28 @@ EXPORT int obs_fixture_render(const char *renderer, const char *data_path, const
     for (unsigned i = 0; i < 200 && atomic_load(&frames) < 3; ++i)
         os_sleep_ms(10);
     obs_remove_raw_video_callback(receive_frame, NULL);
+    int source_status = 0;
+    if (getenv("OBS_BUILD_SOURCES")) {
+        obs_data_t *settings = obs_data_create();
+        obs_data_set_int(settings, "width", 64);
+        obs_data_set_int(settings, "height", 64);
+        obs_data_set_int(settings, "color", 0xFFFFFFFF);
+        obs_source_t *color = obs_source_create("color_source_v3", "cc-build-white", settings, NULL);
+        obs_data_release(settings);
+        if (!color || obs_source_get_width(color) != 64 || obs_source_get_height(color) != 64) {
+            source_status = 89;
+        } else {
+            obs_scene_add(scene, color);
+            atomic_store(&frames, 0);
+            atomic_store(&expected_y, 235);
+            obs_add_raw_video_callback(NULL, receive_frame, NULL);
+            for (unsigned i = 0; i < 200 && atomic_load(&frames) < 3; ++i)
+                os_sleep_ms(10);
+            obs_remove_raw_video_callback(receive_frame, NULL);
+            blog(LOG_INFO, "cc::Build color source rendered %u white frames", atomic_load(&frames));
+        }
+        obs_source_release(color);
+    }
     int recording_status = record_path ? record_clip(record_path, output_id) : 0;
     obs_set_output_source(0, NULL);
     obs_scene_release(scene);
@@ -159,7 +186,7 @@ EXPORT int obs_fixture_render(const char *renderer, const char *data_path, const
         return 82;
     if (atomic_load(&invalid_frames))
         return 83;
-    return recording_status;
+    return source_status ? source_status : recording_status;
 }
 
 EXPORT void obs_fixture_close_display(void)
