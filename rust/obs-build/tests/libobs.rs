@@ -13,17 +13,34 @@ fn c_and_rust_twins_preserve_the_public_data_and_lifecycle_apis() {
     let build = NativeBuild {
         host: env!("OBS_BUILD_HOST").into(),
         target: env!("OBS_BUILD_TARGET").into(),
-        output: output.path().into(),
+        output: std::env::var_os("OBS_BUILD_TEST_OUTPUT")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| output.path().into()),
     };
-    let libraries =
-        libobs::build_pair(&build, &root, &libobs::Options::default(), &archive).unwrap();
+    let options = libobs::Options {
+        hevc: std::env::var_os("OBS_BUILD_DISABLE_HEVC").is_none(),
+        ..libobs::Options::default()
+    };
+    let libraries = libobs::build_pair(&build, &root, &options, &archive).unwrap();
     assert_ne!(libraries.reference, libraries.with_rust);
+    assert_eq!(exports(&libraries.reference), exports(&libraries.with_rust));
     for path in [&libraries.reference, &libraries.with_rust] {
         // SAFETY: these signatures come from the unchanged obs.h/obs-data.h.
         // Symbols are called only while their library is loaded, data handles
         // are released, and each library owns its complete startup/shutdown.
         unsafe {
             let library = libloading::Library::new(path).unwrap();
+            for symbol in [
+                b"obs_hevc_keyframe".as_slice(),
+                b"obs_parse_hevc_packet".as_slice(),
+                b"obs_parse_hevc_packet_priority".as_slice(),
+                b"obs_extract_hevc_headers".as_slice(),
+            ] {
+                assert_eq!(
+                    library.get::<unsafe extern "C" fn()>(symbol).is_ok(),
+                    options.hevc
+                );
+            }
             let startup = library
                 .get::<unsafe extern "C" fn(
                     *const std::ffi::c_char,
@@ -63,4 +80,24 @@ fn c_and_rust_twins_preserve_the_public_data_and_lifecycle_apis() {
             shutdown();
         }
     }
+}
+
+fn exports(path: &std::path::Path) -> std::collections::BTreeSet<String> {
+    // This opt-in integration currently exercises the Linux native graph.
+    let result = std::process::Command::new("nm")
+        .args(["-D", "--defined-only"])
+        .arg(path)
+        .output()
+        .expect("GNU nm is required for the Linux libobs export contract");
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    String::from_utf8(result.stdout)
+        .unwrap()
+        .lines()
+        .filter_map(|line| line.split_whitespace().last())
+        .map(|name| name.split('@').next().unwrap().to_owned())
+        .collect()
 }

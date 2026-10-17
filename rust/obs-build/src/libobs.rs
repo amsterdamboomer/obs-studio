@@ -37,6 +37,19 @@ pub fn build_with_options(
     root: &Path,
     options: &Options,
 ) -> Result<PathBuf, String> {
+    let plan = prepare(build, root, options)?;
+    let mut library = plan.common;
+    add_variant(build, &plan.root, &plan.sets, options, &mut library, None)?;
+    finish(build, &library)
+}
+
+struct Plan {
+    common: SharedLibrary,
+    root: PathBuf,
+    sets: BTreeMap<String, Vec<String>>,
+}
+
+fn prepare(build: &NativeBuild, root: &Path, options: &Options) -> Result<Plan, String> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let manifest = root.join("libobs/build/source-sets.json");
     let sets: BTreeMap<String, Vec<String>> =
@@ -63,13 +76,8 @@ pub fn build_with_options(
         unity: false,
         ..SharedLibrary::default()
     };
-    for key in ["LIBOBS_SOURCES", "LIBOBS_PORTED_SOURCES"] {
-        append_sources(&sets, key, &root, &mut library)?;
-    }
+    append_sources(&sets, "LIBOBS_SOURCES", &root, &mut library)?;
     if options.hevc {
-        library
-            .sources
-            .push(root.join("libobs/build/libobs.ported-hevc+.h.c"));
         library.definitions.push(("ENABLE_HEVC".into(), None));
     }
     crate::platform::configure_libobs(&build.target, &root, options, &sets, &mut library)?;
@@ -150,7 +158,15 @@ pub fn build_with_options(
     let module_source = config.join("obs-core-modules.c");
     write_if_changed(&module_source, &modules)?;
     library.sources.push(module_source);
-    let artifact = build.shared_library(&library)?;
+    Ok(Plan {
+        common: library,
+        root,
+        sets,
+    })
+}
+
+fn finish(build: &NativeBuild, library: &SharedLibrary) -> Result<PathBuf, String> {
+    let artifact = build.shared_library(library)?;
     let linker_name =
         artifact.with_file_name(crate::platform::shared_filename(&build.target, "obs"));
     if linker_name != artifact {
@@ -158,6 +174,27 @@ pub fn build_with_options(
             .map_err(|e| format!("create {}: {e}", linker_name.display()))?;
     }
     Ok(artifact)
+}
+
+fn add_variant(
+    build: &NativeBuild,
+    root: &Path,
+    sets: &BTreeMap<String, Vec<String>>,
+    options: &Options,
+    library: &mut SharedLibrary,
+    rust_archive: Option<&Path>,
+) -> Result<(), String> {
+    if rust_archive.is_some() {
+        append_sources(sets, "LIBOBS_RUST_SOURCES", root, library)?;
+    } else {
+        append_sources(sets, "LIBOBS_PORTED_SOURCES", root, library)?;
+        if options.hevc {
+            library
+                .sources
+                .push(root.join("libobs/build/libobs.ported-hevc+.h.c"));
+        }
+    }
+    crate::platform::configure_libobs_variant(build, root, options, sets, library, rust_archive)
 }
 
 pub(crate) fn append_sources(
@@ -230,10 +267,40 @@ pub struct Libraries {
 
 /// Compile common native sources once, then link C and Rust implementation twins.
 pub fn build_pair(
-    _build: &NativeBuild,
-    _root: &Path,
-    _options: &Options,
-    _rust_archive: &Path,
+    build: &NativeBuild,
+    root: &Path,
+    options: &Options,
+    rust_archive: &Path,
 ) -> Result<Libraries, String> {
-    Err("the native Rust implementation twin is not implemented".into())
+    // The Rust staticlib is built by the outer Cargo invocation, never a nested
+    // Cargo process inside obs-sys/build.rs (which would wait on its own lock).
+    if !rust_archive.is_file() {
+        return Err(format!(
+            "Rust archive does not exist: {}",
+            rust_archive.display()
+        ));
+    }
+    let plan = prepare(build, root, options)?;
+    let mut common = plan.common;
+    common.name = "obs-common".into();
+    let (_, _, objects) = build.objects(&common)?;
+    common.sources.clear();
+    common.precompiled_objects = objects;
+    let mut reference = common.clone();
+    reference.name = "obs".into();
+    add_variant(build, &plan.root, &plan.sets, options, &mut reference, None)?;
+    let mut with_rust = common;
+    with_rust.name = "obs-with-rust".into();
+    add_variant(
+        build,
+        &plan.root,
+        &plan.sets,
+        options,
+        &mut with_rust,
+        Some(rust_archive),
+    )?;
+    Ok(Libraries {
+        reference: finish(build, &reference)?,
+        with_rust: finish(build, &with_rust)?,
+    })
 }

@@ -66,9 +66,35 @@ Local evidence for this checkpoint:
   This validates the replacement library; it does not demonstrate a Cargo build
   of those test executables or the Rust implementation twin.
 
-This checkpoint is Linux C libobs only. The Rust twin, application and plugins,
+This checkpoint is Linux C libobs only. The application and plugins,
 full test battery, macOS/Windows graphs, installation/packaging, optional PCH and
 controlled build/cache benchmarks remain required. The generated version and
 install paths are prototype defaults and still need release configuration.
 Native dependencies are discovered using pkg-config; local Nix verification used
 `PKG_CONFIG_PATH` and `CPATH` for installed packages and uthash respectively.
+
+
+## Linux Rust implementation twin checkpoint
+
+`libobs::build_pair` accepts the release `libobs-rust` static archive from an
+outer Cargo invocation. It compiles common C objects once, then links the C
+reference and `libobs-with-rust` into separate directories with the same SONAME.
+The Rust archive is whole-archive linked and its internal symbols are hidden by
+the existing export map. The twin is never installed.
+
+Build the release archive with `soldr cargo build -p libobs-rust --release`.
+With native dependencies available, set `OBS_BUILD_RUST_ARCHIVE` to the absolute
+`target/release/liblibobs_rust.a` path and run
+`soldr cargo test -p obs-build --features libobs-integration --test libobs`.
+`OBS_BUILD_TEST_OUTPUT` optionally retains artifacts in a chosen output directory.
+The test defaults to a temporary output directory. Set
+`OBS_BUILD_DISABLE_HEVC=1` to exercise the disabled-HEVC configuration. GNU `nm`
+is required for the Linux export comparison.
+
+Local evidence: both variants pass startup/shutdown and public data API roundtrip
+checks, and each exports exactly the same 1,766 symbols (1,762 with HEVC disabled).
+The opt-in test compares complete export sets and checks HEVC export availability.
+The same 51 unchanged C
+executables pass against both newly built variants with their loaded library
+paths checked. The rest of the complete application/platform/test/packaging
+requirements above remain outstanding.

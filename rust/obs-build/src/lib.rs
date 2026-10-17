@@ -13,6 +13,8 @@ mod platform;
 pub struct SharedLibrary {
     pub name: String,
     pub sources: Vec<PathBuf>,
+    /// Objects compiled once and reused by multiple shared-library variants.
+    pub precompiled_objects: Vec<PathBuf>,
     pub include_dirs: Vec<PathBuf>,
     pub dependencies: Vec<PathBuf>,
     pub unity: bool,
@@ -32,7 +34,8 @@ pub struct NativeBuild {
 impl NativeBuild {
     /// Compile through cc::Build, then link a native shared library.
     pub fn shared_library(&self, library: &SharedLibrary) -> Result<PathBuf, String> {
-        let (output, cpp_link, objects) = self.objects(library)?;
+        let (output, cpp_link, mut objects) = self.objects(library)?;
+        objects.extend(library.precompiled_objects.iter().cloned());
         let artifact = output.join(
             library
                 .file_name

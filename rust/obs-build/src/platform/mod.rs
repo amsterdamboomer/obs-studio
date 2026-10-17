@@ -114,6 +114,31 @@ pub fn package_shared_library(target: &str, paths: &[PathBuf], name: &str) -> Op
         .find(|path| path.is_file())
 }
 
+pub fn configure_libobs_variant(
+    build: &crate::NativeBuild,
+    root: &Path,
+    options: &crate::libobs::Options,
+    sets: &std::collections::BTreeMap<String, Vec<String>>,
+    library: &mut crate::SharedLibrary,
+    rust_archive: Option<&Path>,
+) -> Result<(), String> {
+    if build.target.contains("linux") {
+        libobs_linux::configure_variant(
+            root,
+            options,
+            sets,
+            library,
+            rust_archive,
+            &build.output.join("config"),
+        )
+    } else {
+        Err(format!(
+            "real libobs variant for {} is not implemented yet",
+            build.target
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
