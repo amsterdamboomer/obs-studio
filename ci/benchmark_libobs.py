@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 
 
-def measure(build: Path, output: Path, repetitions: int, jobs: int, rebuild: bool) -> dict:
+def measure(build: Path, output: Path, repetitions: int, jobs: int, rebuild: bool, cache_stats: bool) -> dict:
     build = build.resolve()
     output.mkdir(parents=True, exist_ok=True)
     cache = (build / "CMakeCache.txt").read_text()
@@ -43,10 +43,14 @@ def measure(build: Path, output: Path, repetitions: int, jobs: int, rebuild: boo
         "runs": [],
     }
     for index in range(repetitions):
+        if cache_stats:
+            if not os.environ.get("CCACHE_DIR"):
+                raise ValueError("Set a dedicated CCACHE_DIR for benchmark statistics")
+            subprocess.run(["ccache", "--zero-stats"], check=True, stdout=subprocess.DEVNULL)
         if rebuild:
             artifacts = [p for p in build.rglob("*") if p.is_file() and p.suffix in {".o", ".gch", ".pch"}]
             if artifacts:
-                subprocess.run(["safe-rm", *map(str, artifacts)], check=True, stdout=subprocess.DEVNULL)
+                subprocess.run(["safe-rm", "--", *map(str, artifacts)], check=True, stdout=subprocess.DEVNULL)
         before = resource.getrusage(resource.RUSAGE_CHILDREN)
         load = os.getloadavg()
         start = time.monotonic()
@@ -58,6 +62,9 @@ def measure(build: Path, output: Path, repetitions: int, jobs: int, rebuild: boo
             "cpu_seconds": round(after.ru_utime + after.ru_stime - before.ru_utime - before.ru_stime, 3),
             "load_average": load, "returncode": process.returncode,
         })
+        if cache_stats:
+            stats = subprocess.run(["ccache", "--show-stats", "--verbose"], capture_output=True, text=True, check=True)
+            (output / f"cache-{index + 1}.log").write_text(stats.stdout)
         (output / "result.json").write_text(json.dumps(result, indent=2) + "\n")
         if process.returncode:
             raise RuntimeError(f"Build failed; see {output / f'build-{index + 1}.log'}")
@@ -71,7 +78,8 @@ if __name__ == "__main__":
     parser.add_argument("--repetitions", type=int, default=3)
     parser.add_argument("--jobs", type=int, default=8)
     parser.add_argument("--rebuild", action="store_true", help="Trash this dedicated build's objects before each trial")
+    parser.add_argument("--cache-stats", action="store_true", help="Reset/report ccache stats in the dedicated CCACHE_DIR")
     args = parser.parse_args()
     if args.repetitions < 1 or args.jobs < 1:
         parser.error("repetitions and jobs must be positive")
-    print(json.dumps(measure(args.build, args.output, args.repetitions, args.jobs, args.rebuild), indent=2))
+    print(json.dumps(measure(args.build, args.output, args.repetitions, args.jobs, args.rebuild, args.cache_stats), indent=2))
