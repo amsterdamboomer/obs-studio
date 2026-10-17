@@ -445,6 +445,52 @@ pub fn configure_cpp17(target: &str, library: &mut crate::SharedLibrary) {
     }
 }
 
+pub fn configure_nvenc(
+    target: &str,
+    root: &Path,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    if !target.contains("linux") {
+        return Err("NVENC native graph is currently Linux-only".into());
+    }
+    for group in ["caps-cache-linux", "linux", "caps-cache", "override"] {
+        library
+            .sources
+            .push(root.join(format!("plugins/obs-nvenc/build/obs-nvenc.{group}+.h.c")));
+    }
+    Ok(())
+}
+
+pub fn configure_nvenc_rust(
+    target: &str,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    if !target.contains("linux") {
+        return Err("NVENC Rust loader native linking is currently Linux-only".into());
+    }
+    library.link_options.extend([
+        "-Wl,--exclude-libs,ALL".into(),
+        "-ldl".into(),
+        "-lpthread".into(),
+        "-lm".into(),
+    ]);
+    Ok(())
+}
+
+pub fn configure_nvenc_helper(
+    target: &str,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    if !target.contains("linux") {
+        return Err("NVENC capability helper native linking is currently Linux-only".into());
+    }
+    configure_cpp17(target, library);
+    library
+        .link_options
+        .extend(["-pthread".into(), "-ldl".into()]);
+    Ok(())
+}
+
 pub fn configure_cpp_module(
     target: &str,
     library: &mut crate::SharedLibrary,

@@ -317,3 +317,34 @@ Both cores pass locally: each file has 98 decoded H.264 frames, 48kHz stereo AAC
 and a 3.366-second container duration. Both screenshots show recording active
 with the white preview. The private headless session's desktop portal backend
 does not remain healthy; these checks establish no screen/camera portal capture.
+
+## Linux NVENC checkpoint
+
+`plugins::build_nvenc_pair` compiles common NVENC objects once, then links the C
+CUDA loader and Rust CUDA loader variants separately. The latter accepts the
+outer Cargo build's `obs-nvenc-plugin` archive and hides its Rust symbols. The
+capability helper is a separate C++17 executable with thread/dynamic-loader
+linkage. FFnvcodec headers must be version 12 or newer. The FFmpeg compatibility
+encoder IDs remain independently configurable.
+
+Build `soldr cargo build -p obs-nvenc-plugin --release` and set
+`OBS_BUILD_NVENC=1` on the native integration test. This opt-in check requires
+a working NVIDIA driver/GPU: the helper must report support, and both plugin
+variants must load and register their H.264 encoders against their corresponding
+core. `OBS_BUILD_NVENC_RUST_ARCHIVE` overrides the default archive location;
+`OBS_BUILD_NVENC_REFERENCE` optionally compares all exports to a CMake module.
+The local comparison finds exactly eight exports in all three modules.
+`OBS_BUILD_DISABLE_NVENC_FFMPEG_IDS=1` disables the compatibility IDs.
+
+Add `OBS_BUILD_NVENC_ENCODE=1` with recording mode to exercise the soft-frame
+hardware encoder and therefore the actual CUDA driver loader. This uses 640x360
+because NVENC rejects the tiny 64x64 software probe. Both variants produce
+validated H.264/AAC MP4 and Matroska files locally. Source cleanup explicitly
+removes public sources from their canvas, releases owned references and drains
+the destruction queue before shutdown, matching the frontend sequence.
+
+Nix verification provides the installed driver libraries through
+`LD_LIBRARY_PATH=/run/opengl-driver/lib`. This checkpoint covers native module
+loading and soft-frame H.264 encoding. NVENC discovery/encoding in the staged
+GUI, OpenGL texture interoperability, HEVC/AV1 encoding and other platforms still
+need validation.

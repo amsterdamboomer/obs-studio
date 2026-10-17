@@ -67,8 +67,10 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     let libraries = libobs::build_pair(&build, &root, &options, &archive).unwrap();
     assert_ne!(libraries.reference, libraries.with_rust);
     assert_eq!(exports(&libraries.reference), exports(&libraries.with_rust));
-    if std::env::var_os("OBS_BUILD_NVENC").is_some() {
-        let archive = root.join("target/release/libobs_nvenc_plugin.a");
+    let nvenc = if std::env::var_os("OBS_BUILD_NVENC").is_some() {
+        let archive = std::env::var_os("OBS_BUILD_NVENC_RUST_ARCHIVE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| root.join("target/release/libobs_nvenc_plugin.a"));
         let nvenc = plugins::build_nvenc_pair(
             &build,
             &root,
@@ -84,7 +86,17 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         let output = std::process::Command::new(&nvenc.helper).output().unwrap();
         assert!(output.status.success());
         assert!(String::from_utf8_lossy(&output.stdout).contains("nvenc_supported=true"));
-    }
+        std::fs::write(build.output.join("nvenc-capabilities.ini"), &output.stdout).unwrap();
+        if let Some(reference) = std::env::var_os("OBS_BUILD_NVENC_REFERENCE") {
+            assert_eq!(
+                exports(&nvenc.reference.library),
+                exports(&PathBuf::from(reference))
+            );
+        }
+        Some(nvenc)
+    } else {
+        None
+    };
     let filters = plugins::FiltersOptions {
         speexdsp: std::env::var_os("OBS_BUILD_DISABLE_SPEEXDSP").is_none(),
         rnnoise: std::env::var_os("OBS_BUILD_DISABLE_RNNOISE").is_none(),
@@ -182,10 +194,16 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         ffmpeg = Some(artifacts);
     }
     // Mirror the app layout: the module launches its helper beside the process.
-    let runner = if let Some(ffmpeg) = &ffmpeg {
+    let runner = if ffmpeg.is_some() || nvenc.is_some() {
         let bin = build.output.join("test-bin");
-        let helper = ffmpeg.deploy_muxer(&bin).unwrap();
-        assert!(helper.is_file());
+        std::fs::create_dir_all(&bin).unwrap();
+        if let Some(ffmpeg) = &ffmpeg {
+            let helper = ffmpeg.deploy_muxer(&bin).unwrap();
+            assert!(helper.is_file());
+        }
+        if let Some(nvenc) = &nvenc {
+            std::fs::copy(&nvenc.helper, bin.join(nvenc.helper.file_name().unwrap())).unwrap();
+        }
         let runner = bin.join("obs-native-integration");
         std::fs::copy(std::env::current_exe().unwrap(), &runner).unwrap();
         runner
@@ -195,7 +213,8 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     let wants_graphics = enabled("OBS_BUILD_RENDER")
         || enabled("OBS_BUILD_RECORD")
         || enabled("OBS_BUILD_SOURCES")
-        || enabled("OBS_BUILD_PIPEWIRE");
+        || enabled("OBS_BUILD_PIPEWIRE")
+        || nvenc.is_some();
     let renderer = wants_graphics
         .then(|| graphics::build_opengl(&build, &root, &libraries.reference, &options).unwrap());
     let probe = renderer
@@ -223,7 +242,6 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         .iter()
         .map(|module| (&module.library, &module.data))
         .collect();
-    let serialized = serde_json::to_string(&modules).unwrap();
     let outputs: &[(&str, &str)] = if ffmpeg.is_some() {
         &[("mp4_output", "mp4"), ("ffmpeg_muxer", "mkv")]
     } else {
@@ -233,6 +251,16 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         .into_iter()
         .flat_map(|path| outputs.iter().map(move |output| (path, output)))
     {
+        let mut selected = modules.clone();
+        if let Some(nvenc) = &nvenc {
+            let module = if path == &libraries.with_rust {
+                &nvenc.with_rust
+            } else {
+                &nvenc.reference
+            };
+            selected.push((&module.library, &module.data));
+        }
+        let serialized = serde_json::to_string(&selected).unwrap();
         let mut command = std::process::Command::new(&runner);
         command.env("OBS_BUILD_TEST_OUTPUT_ID", output_id);
         if let Some(frontend) = &frontend {
@@ -295,6 +323,9 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
 }
 
 fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
+    let module_config = tempfile::tempdir().unwrap();
+    let module_config_path =
+        std::ffi::CString::new(module_config.path().to_str().unwrap()).unwrap();
     // SAFETY: these signatures come from the unchanged obs.h/obs-data.h.
     // Symbols are called only while their library is loaded, data handles
     // are released, and each library owns its complete startup/shutdown.
@@ -357,7 +388,7 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
             .unwrap();
         assert!(startup(
             c"en-US".as_ptr(),
-            std::ptr::null(),
+            module_config_path.as_ptr(),
             std::ptr::null_mut()
         ));
         if let Some(probe) = &probe {
@@ -407,6 +438,13 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
             (b"obs_enum_filter_types".as_slice(), "noise_suppress_filter"),
             (b"obs_enum_filter_types".as_slice(), "gain_filter"),
         ];
+        if std::env::var_os("OBS_BUILD_NVENC").is_some() {
+            expected_types.extend([
+                (b"obs_enum_encoder_types".as_slice(), "obs_nvenc_h264_soft"),
+                (b"obs_enum_encoder_types".as_slice(), "obs_nvenc_h264_tex"),
+                (b"obs_enum_encoder_types".as_slice(), "ffmpeg_nvenc"),
+            ]);
+        }
         if enabled("OBS_BUILD_RECORD") {
             expected_types.extend([
                 (b"obs_enum_encoder_types".as_slice(), "obs_x264"),
@@ -462,6 +500,9 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
             let enabled = expected != "noise_suppress_filter"
                 || std::env::var_os("OBS_BUILD_DISABLE_SPEEXDSP").is_none()
                 || std::env::var_os("OBS_BUILD_DISABLE_RNNOISE").is_none();
+            let enabled = enabled
+                && (expected != "ffmpeg_nvenc"
+                    || std::env::var_os("OBS_BUILD_DISABLE_NVENC_FFMPEG_IDS").is_none());
             assert_eq!(found, enabled, "unexpected registration of {expected}");
         }
         if let Some(probe) = &probe {
@@ -548,8 +589,13 @@ fn verify_recording(path: &std::path::Path) {
         .iter()
         .find(|stream| stream["codec_name"] == "h264")
         .expect("missing H.264 track");
-    assert_eq!(video["width"], 64);
-    assert_eq!(video["height"], 64);
+    let (width, height) = if std::env::var_os("OBS_BUILD_NVENC_ENCODE").is_some() {
+        (640, 360)
+    } else {
+        (64, 64)
+    };
+    assert_eq!(video["width"], width);
+    assert_eq!(video["height"], height);
     assert!(
         video["nb_read_frames"]
             .as_str()
