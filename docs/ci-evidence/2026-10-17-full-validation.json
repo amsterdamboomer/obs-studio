@@ -134,5 +134,22 @@
     "Cold Ubuntu producers do not establish warm reuse",
     "All seven native app builds passed; the overall workflow failed",
     "Full-day post-rollout comparison is incomplete"
-  ]
+  ],
+  "cold_tier2_consumer": {
+    "run": 39075342558,
+    "job": 117521595282,
+    "pr": 1353,
+    "restore_miss_utc": "2026-10-17T22:33:13.9958396Z",
+    "statistics_utc": "2026-10-17T22:39:08.6383581Z",
+    "total": 782,
+    "cached": 0,
+    "cold": 782,
+    "other_restores": [
+      "tier2 apt",
+      "soldr cook base",
+      "soldr build cache",
+      "CTest timing cache"
+    ],
+    "limits": "Changed source and runner conditions prevent a matched runtime attribution; archive miss and cold compilations are directly observed."
+  }
 }
