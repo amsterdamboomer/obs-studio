@@ -22,8 +22,7 @@ def scope_base(run=subprocess.run):
         pass
     # No trustworthy baseline: compare the entire tree. Never silently drop
     # paths because the API is unavailable or recent runs were unsuccessful.
-    return run(['git', 'hash-object', '-w', '-t', 'tree', '--stdin'],
-               input='', check=True, capture_output=True, text=True).stdout.strip()
+    return 'ALL'
 
 
 if __name__ == '__main__':
