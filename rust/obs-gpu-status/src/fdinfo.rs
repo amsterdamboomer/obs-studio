@@ -31,23 +31,130 @@ pub struct FdinfoClient {
     pub engines: BTreeMap<String, Engine>,
 }
 
+fn engine<'a>(engines: &'a mut BTreeMap<String, Engine>, name: &str) -> &'a mut Engine {
+    engines.entry(name.to_owned()).or_insert(Engine {
+        capacity: 1,
+        ..Engine::default()
+    })
+}
+
 /// Parse one fdinfo text; `None` if it is not a DRM client with an id.
-pub fn parse_fdinfo(_text: &str) -> Option<FdinfoClient> {
-    None
+pub fn parse_fdinfo(text: &str) -> Option<FdinfoClient> {
+    let mut driver = None;
+    let mut pdev = None;
+    let mut client_id = None;
+    let mut engines: BTreeMap<String, Engine> = BTreeMap::new();
+
+    for line in text.lines() {
+        let Some((key, value)) = line.split_once(':') else {
+            continue;
+        };
+        let value = value.trim();
+        let number = || {
+            value
+                .strip_suffix(" ns")
+                .unwrap_or(value)
+                .trim()
+                .parse::<u64>()
+                .ok()
+        };
+        if key == "drm-driver" {
+            driver = Some(value.to_owned());
+        } else if key == "drm-pdev" {
+            pdev = Some(value.to_owned());
+        } else if key == "drm-client-id" {
+            client_id = number();
+        } else if let Some(name) = key.strip_prefix("drm-engine-capacity-") {
+            if let Some(n) = number().filter(|&n| n > 0) {
+                engine(&mut engines, name).capacity = n;
+            }
+        } else if let Some(name) = key.strip_prefix("drm-engine-") {
+            // Only "<n> ns" values are engine times.
+            if let Some(n) = value
+                .strip_suffix(" ns")
+                .and_then(|v| v.trim().parse().ok())
+            {
+                engine(&mut engines, name).busy = n;
+            }
+        } else if let Some(name) = key.strip_prefix("drm-total-cycles-") {
+            if let Some(n) = number() {
+                engine(&mut engines, name).total = Some(n);
+            }
+        } else if let Some(name) = key.strip_prefix("drm-cycles-")
+            && let Some(n) = number()
+        {
+            engine(&mut engines, name).busy = n;
+        }
+    }
+
+    Some(FdinfoClient {
+        driver: driver?,
+        pdev,
+        client_id: client_id?,
+        engines,
+    })
 }
 
 /// Every DRM client among the fdinfo files in `dir` (`/proc/self/fdinfo`).
-pub fn read_fdinfo(_dir: &Path) -> Vec<FdinfoClient> {
-    Vec::new()
+pub fn read_fdinfo(dir: &Path) -> Vec<FdinfoClient> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter_map(|e| std::fs::read_to_string(e.path()).ok())
+        .filter_map(|text| parse_fdinfo(&text))
+        .collect()
+}
+
+/// Each client on `pdev` once, by client id: fds of one client carry the
+/// same counters.
+fn clients_on<'a>(clients: &'a [FdinfoClient], pdev: &str) -> BTreeMap<u64, &'a FdinfoClient> {
+    let mut by_id = BTreeMap::new();
+    for c in clients.iter().filter(|c| c.pdev.as_deref() == Some(pdev)) {
+        by_id.entry(c.client_id).or_insert(c);
+    }
+    by_id
 }
 
 /// The busiest engine's utilization on `pdev` between two samples taken
 /// `elapsed_ns` apart, each client counted once.
 pub fn fdinfo_utilization(
-    _before: &[FdinfoClient],
-    _after: &[FdinfoClient],
-    _pdev: &str,
-    _elapsed_ns: u64,
+    before: &[FdinfoClient],
+    after: &[FdinfoClient],
+    pdev: &str,
+    elapsed_ns: u64,
 ) -> Utilization {
-    Utilization::Unavailable
+    if elapsed_ns == 0 {
+        return Utilization::Unavailable;
+    }
+    let before = clients_on(before, pdev);
+    let after = clients_on(after, pdev);
+
+    // Per engine name: busy delta summed over clients, and what it counts
+    // against (wall time × capacity, or xe's total cycles).
+    let mut busy: BTreeMap<&str, (u64, u64)> = BTreeMap::new();
+    for (id, now) in &after {
+        let was = before.get(id);
+        for (name, e) in &now.engines {
+            let old = was
+                .and_then(|c| c.engines.get(name))
+                .copied()
+                .unwrap_or_default();
+            let delta = e.busy.saturating_sub(old.busy);
+            let span = match e.total {
+                Some(total) => total.saturating_sub(old.total.unwrap_or(0)),
+                None => elapsed_ns.saturating_mul(e.capacity),
+            };
+            let slot = busy.entry(name).or_default();
+            slot.0 = slot.0.saturating_add(delta);
+            slot.1 = slot.1.max(span);
+        }
+    }
+
+    busy.values()
+        .filter(|&&(_, span)| span > 0)
+        .map(|&(delta, span)| (u128::from(delta) * 100 / u128::from(span)).min(100) as u8)
+        .max()
+        .map_or(Utilization::Unavailable, Utilization::Percent)
 }
