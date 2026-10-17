@@ -66,7 +66,7 @@ cmake() {
 zccache() { echo "daemon diagnostic: $*"; return "$daemon_status"; }
 '''
                 result = subprocess.run(
-                    ['bash', '-eu', '-c', prefix + recovery],
+                    ['bash', '-euo', 'pipefail', '-c', prefix + recovery],
                     env={**os.environ, 'SRC': str(ROOT),
                          'build': directory + '/build', 'retry_status': str(retry_status),
                          'daemon_status': str(daemon_status)},
