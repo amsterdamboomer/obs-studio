@@ -506,3 +506,18 @@ failed: inspect whether it ever started before attributing the outcome.
 
 GitHub documents [job concurrency on reusable-workflow calls](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations)
 and [the default single-pending concurrency behavior](https://docs.github.com/en/actions/concepts/workflows-and-actions/concurrency).
+
+### Compiler and cache log evidence
+
+Add `--include-logs` to `ci/cache_metrics.py` to collect sampled terminal
+runs' latest-attempt logs alongside the existing API responses. Raw logs
+are cached per run/attempt, and each record/summary includes recognized
+per-job archive byte observations, compiler reports, saved keys and CTest
+counts. Missing logs or counters remain unknown.
+
+A restored archive does not imply compiler hits: one observed zccache
+rollout restored 278 MB but reported 772 cold compilations. Keep C/C++
+build totals separate from soldr session counters and ccache reports;
+their scopes differ. Archive messages can repeat and must not be summed
+as network transfer totals. Stratify compiler-version rollouts and cold
+cache seeds before comparing warm lane performance.
