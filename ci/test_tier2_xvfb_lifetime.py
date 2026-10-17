@@ -1,4 +1,5 @@
 """The shared Tier 2 display must survive gaps between test clients (#1355)."""
+import os
 import re
 import subprocess
 import tempfile
@@ -28,7 +29,7 @@ xvfb-run() { printf '%s\\n' "$@" > "$argv_file"; return 17; }
                 ['bash', '-c', declaration.group(0) + '\n' + prefix + invocation
                  + '\nprintf "%s" "$ctest_status"',
                  '_'],
-                env={**__import__('os').environ, 'build': directory + '/tree', 'mode': 'OFF',
+                env={**os.environ, 'build': directory + '/tree', 'mode': 'OFF',
                      'argv_file': str(argv)}, capture_output=True, text=True, check=True)
             self.assertEqual(run.stdout, '17', 'The test failure must reach the gate')
             args = argv.read_text().splitlines()
