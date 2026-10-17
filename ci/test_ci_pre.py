@@ -1,5 +1,5 @@
 #!/usr/bin/env -S uv run --script
-"""ci-pre.yml runs the cache janitor first in every PR run (#957).
+"""ci-pre.yml runs cache maintenance beside trusted queue work (#1269).
 
     uv run python -m unittest ci/test_ci_pre.py
 
@@ -8,13 +8,8 @@ workflow_call-only workflow with read-only top-level permissions and no
 workflow-level concurrency. Its cache-janitor job holds actions: write, runs
 on the repo-wide non-cancelling `cache-janitor` group, checks out ci_lint at
 the pinned SHA without credentials and runs it with stdlib python3 (no
-installs). ci.yml calls it as its first job and every other job runs
-after it.
-
-The janitor is maintenance, not a check: its group lets GitHub cancel a
-pending sweep when a newer one queues, and a fork PR's token cannot delete.
-So jobs wait for it but run whatever its result (`!cancelled()`), and CI Gate
-does not count it.
+installs). ci.yml calls it only for merge_group. No job depends on it, and
+CI Gate does not count it.
 """
 
 from __future__ import annotations
@@ -76,23 +71,12 @@ class CiPreTest(unittest.TestCase):
         # GEN-018: stdlib python3 only, nothing installed.
         self.assertNotRegex(j, r"setup-uv|setup-python|\buvx?\b|\bpipx?\b")
 
-    def test_pr_pull_runs_it_first(self):
+    def test_pr_pull_calls_it(self):
         text = PULL.read_text()
         all_jobs = jobs(text)
         self.assertEqual(next(iter(all_jobs)), "ci-pre")
         self.assertIn("uses: ./.github/workflows/ci-pre.yml", all_jobs["ci-pre"])
         self.assertIn("actions: write", all_jobs["ci-pre"])
-
-        def waits(name: str) -> bool:
-            return any(n == "ci-pre" or waits(n) for n in needs(all_jobs[name]))
-
-        for name, block in all_jobs.items():
-            if name in ("ci-pre", "ci-gate"):
-                continue
-            with self.subTest(job=name):
-                self.assertTrue(waits(name), f"{name} does not need ci-pre")
-                if "ci-pre" in needs(block):
-                    self.assertRegex(block, r"if: \$\{\{ !cancelled\(\)", "a cancelled sweep must not skip it")
 
     def test_janitor_only_runs_on_trusted_queue_without_blocking_work(self):
         text = PULL.read_text()
