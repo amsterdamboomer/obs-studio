@@ -9,12 +9,19 @@ pub struct Inputs<'a> {
     pub api: &'a Path,
     pub renderer: &'a Path,
     pub ffmpeg: &'a plugins::FfmpegArtifacts,
+    pub nvenc_helper: Option<&'a Path>,
     pub modules: &'a [plugins::Module],
 }
 
-pub fn exercise(inputs: Inputs<'_>, cores: &[&Path]) -> Result<(), String> {
+pub struct Variant<'a> {
+    pub core: &'a Path,
+    pub nvenc: Option<&'a plugins::Module>,
+}
+
+pub fn exercise(inputs: Inputs<'_>, variants: &[Variant<'_>]) -> Result<(), String> {
     let inspector = inspector(inputs.build)?;
-    for core in cores {
+    for variant in variants {
+        let core = variant.core;
         // Retain this owned runtime, profile, log and screenshot as evidence.
         let runtime = tempfile::Builder::new()
             .prefix("app-runtime-")
@@ -26,7 +33,7 @@ pub fn exercise(inputs: Inputs<'_>, cores: &[&Path]) -> Result<(), String> {
         std::fs::create_dir_all(&bin).map_err(|e| e.to_string())?;
         std::fs::create_dir_all(&libraries).map_err(|e| e.to_string())?;
         copy(inputs.executable, &bin.join("obs-studio-rust"))?;
-        for library in [*core, inputs.api, inputs.renderer] {
+        for library in [core, inputs.api, inputs.renderer] {
             copy(
                 library,
                 &libraries.join(
@@ -37,6 +44,12 @@ pub fn exercise(inputs: Inputs<'_>, cores: &[&Path]) -> Result<(), String> {
             )?;
         }
         inputs.ffmpeg.deploy_muxer(&bin)?;
+        if let Some(helper) = inputs.nvenc_helper {
+            copy(
+                helper,
+                &bin.join(helper.file_name().ok_or("NVENC helper has no filename")?),
+            )?;
+        }
         copy_tree(
             &inputs.root.join("libobs/data"),
             &runtime.join("share/obs/libobs"),
@@ -50,7 +63,7 @@ pub fn exercise(inputs: Inputs<'_>, cores: &[&Path]) -> Result<(), String> {
             &runtime.join("share/obs/obs-studio/authors"),
         )?;
         let mut names = Vec::new();
-        for module in inputs.modules {
+        for module in inputs.modules.iter().chain(variant.nvenc) {
             let name = module
                 .library
                 .file_stem()

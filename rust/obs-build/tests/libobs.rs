@@ -37,7 +37,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             .map(PathBuf::from)
             .unwrap_or_else(|| output.path().into()),
     };
-    let options = libobs::Options {
+    let mut options = libobs::Options {
         hevc: std::env::var_os("OBS_BUILD_DISABLE_HEVC").is_none(),
         core_modules: if enabled("OBS_BUILD_APP_GUI") {
             [
@@ -64,6 +64,9 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         },
         ..libobs::Options::default()
     };
+    if enabled("OBS_BUILD_APP_GUI") && std::env::var_os("OBS_BUILD_NVENC").is_some() {
+        options.core_modules.push("obs-nvenc".into());
+    }
     let libraries = libobs::build_pair(&build, &root, &options, &archive).unwrap();
     assert_ne!(libraries.reference, libraries.with_rust);
     assert_eq!(exports(&libraries.reference), exports(&libraries.with_rust));
@@ -229,9 +232,19 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
                 api: frontend.as_ref().unwrap(),
                 renderer: renderer.as_ref().unwrap(),
                 ffmpeg: ffmpeg.as_ref().unwrap(),
+                nvenc_helper: nvenc.as_ref().map(|nvenc| nvenc.helper.as_path()),
                 modules: &modules,
             },
-            &[&libraries.reference, &libraries.with_rust],
+            &[
+                application::Variant {
+                    core: &libraries.reference,
+                    nvenc: nvenc.as_ref().map(|nvenc| &nvenc.reference),
+                },
+                application::Variant {
+                    core: &libraries.with_rust,
+                    nvenc: nvenc.as_ref().map(|nvenc| &nvenc.with_rust),
+                },
+            ],
         )
         .unwrap();
     }

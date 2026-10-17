@@ -31,11 +31,12 @@ def profile(runtime: Path) -> Path:
     if os.environ.get("OBS_BUILD_APP_RECORD"):
         recordings = runtime / "recordings"
         recordings.mkdir()
+        encoder = "nvenc" if os.environ.get("OBS_BUILD_NVENC") else "x264"
         with (selected / "basic.ini").open("a") as output:
             output.write(
                 "[Output]\nMode=Simple\n[SimpleOutput]\n"
                 f"FilePath={recordings}\nRecFormat2=mkv\nRecQuality=Small\n"
-                "RecEncoder=x264\nRecAudioEncoder=aac\nRecTracks=1\n"
+                f"RecEncoder={encoder}\nRecAudioEncoder=aac\nRecTracks=1\n"
                 "StreamAudioEncoder=aac\nABitrate=128\nVBitrate=1000\n"
             )
     color = {"name": "Native white", "id": "color_source_v3", "uuid": str(uuid.uuid4()),
@@ -70,6 +71,8 @@ def main() -> None:
     env.pop("OBS_DATA_PATH", None)
     env.pop("WAYLAND_DISPLAY", None)
     recording = bool(os.environ.get("OBS_BUILD_APP_RECORD"))
+    if os.environ.get("OBS_BUILD_NVENC"):
+        assert (runtime / "bin/obs-nvenc-test").is_file(), "NVENC capability helper was not staged"
     command = [str(runtime / "bin/obs-studio-rust"), "--multi", "--only-bundled-plugins",
                "--disable-shutdown-check", "--disable-updater", "--disable-missing-files-check", "--unfiltered_log"]
     if recording:
@@ -120,6 +123,8 @@ def main() -> None:
         saved = json.loads((config / "basic/scenes/NativeSmoke.json").read_text())
         assert any(source.get("name") == "Native white" for source in saved["sources"]), "saved scene was lost"
         if recording:
+            if os.environ.get("OBS_BUILD_NVENC"):
+                assert b"[obs-nvenc: 'simple_video_recording'] settings:" in log, "frontend did not use NVENC"
             recordings = list((runtime / "recordings").glob("*.mkv"))
             assert len(recordings) == 1, "frontend did not create the requested recording"
             verify_recording(recordings[0], env)

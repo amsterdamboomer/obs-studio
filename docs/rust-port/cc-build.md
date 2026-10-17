@@ -345,6 +345,23 @@ the destruction queue before shutdown, matching the frontend sequence.
 
 Nix verification provides the installed driver libraries through
 `LD_LIBRARY_PATH=/run/opengl-driver/lib`. This checkpoint covers native module
-loading and soft-frame H.264 encoding. NVENC discovery/encoding in the staged
-GUI, OpenGL texture interoperability, HEVC/AV1 encoding and other platforms still
+loading and soft-frame H.264 encoding. OpenGL texture interoperability,
+HEVC/AV1 encoding and other platforms still
 need validation.
+
+## Linux staged GUI NVENC checkpoint
+
+Combining `OBS_BUILD_NVENC=1`, `OBS_BUILD_APP_GUI=1` and
+`OBS_BUILD_APP_RECORD=1` now stages fifteen modules and the NVENC capability
+helper. Explicit runtime variants select the C loader with the C core and the
+Rust loader with the Rust core. The core's bundled-module whitelist includes
+NVENC when this option is requested.
+
+The private frontend profile selects NVENC. In addition to the existing GUI
+checks, the test requires the staged NVENC module in the process map and the
+actual recording encoder's NVENC settings log. Both variants pass locally,
+producing 99/100 decoded H.264 frames at 640x360 with AAC audio and white images;
+screenshots show recording active and both apps shut down normally. On the
+isolated Mesa display, NVENC reports its expected fallback to frame upload.
+This demonstrates frontend hardware encoding through both loaders; it does
+not establish direct NVIDIA OpenGL texture interop.
