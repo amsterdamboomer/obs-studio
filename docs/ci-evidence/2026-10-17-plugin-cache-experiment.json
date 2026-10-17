@@ -1,7 +1,7 @@
 {
   "issue": 1286,
   "target": "linux-v4l2",
-  "stage": "Compiler reuse verified. Shared container apt attempts rejected; host-specific apt seeding/warm validation pending.",
+  "stage": "Compiler reuse and bounded trusted host apt seed verified; warm host-archive runtime pending.",
   "reference_commit": "01a48dce31676d020754c4fa6e943bf48686144b",
   "input_tree_fingerprint_sha256": "c6c646db3a1a93b7228aeb2584669938724bde126f6c05520a0eab7a824c40c0",
   "fingerprint_scope": "Git tree rows for plugin/libobs/shared/deps/cmake/rust/root build inputs, excluding Markdown. Generated Git version metadata can still differ.",
@@ -117,6 +117,23 @@
       "apt_fetched_mb": 142,
       "apt_fetch_seconds": 13,
       "limitation": "Different runner and network conditions; not a matched causal total-runtime speedup."
+    },
+    {
+      "run_id": 39066443172,
+      "job_id": 117495175835,
+      "kind": "host-specific-apt-cold",
+      "job_seconds": 165.0,
+      "cacheable_calls": 41,
+      "compiler_hits": 41,
+      "compiler_misses": 0,
+      "apt_available_before": 0,
+      "apt_retained_packages": 323,
+      "apt_retained_mib_reported": 142,
+      "apt_download_mb": 147,
+      "apt_download_seconds": 21,
+      "conclusion": "success",
+      "scope": "Cold host-package archive; not a warm apt runtime result.",
+      "target_build_step_seconds": 57.0
     }
   ],
   "notes": [
@@ -129,5 +146,21 @@
     "method": "SHA256 of git ls-tree -r rows for plugins/libobs/shared/deps/cmake/rust/CMakeLists.txt/CMakePresets.json/buildspec.json, excluding .md; newline terminated. Excludes generated version metadata.",
     "seed": "3020959b637cd21aa18357e6259cc1a797660d086c90a5cc60306c40ad4587ce",
     "prepared_warm_pr": "3020959b637cd21aa18357e6259cc1a797660d086c90a5cc60306c40ad4587ce"
+  },
+  "host_apt_seed": {
+    "run_id": 39067515267,
+    "job_id": 117498839985,
+    "source": "edf9d634948eb40a924fef8c95520ae37df26ff3",
+    "id": 9100778968,
+    "key": "targets-apt-ubuntu2604-20261012.163.1-4b192516ae468e684ede9156bd2ec6b0785131a2655c5e815e35db5b7c3bc809-edf9d634948eb40a924fef8c95520ae37df26ff3",
+    "ref": "refs/heads/master",
+    "size_in_bytes": 147542391,
+    "created_at": "2026-10-17T20:44:12.873390Z",
+    "snapshot_check": "success",
+    "save_step": "success",
+    "full_job": "still running when archive creation was verified",
+    "seed_compiler_inputs": "3020959b637cd21aa18357e6259cc1a797660d086c90a5cc60306c40ad4587ce",
+    "prepared_warm_pr_inputs": "3020959b637cd21aa18357e6259cc1a797660d086c90a5cc60306c40ad4587ce",
+    "fingerprint_method": "Same tracked-input method documented in seed_and_warm_pr_inputs."
   }
 }
