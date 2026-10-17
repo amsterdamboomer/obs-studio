@@ -17,7 +17,7 @@ def profile(runtime: Path) -> Path:
     config.mkdir(parents=True)
     (config / "global.ini").write_text("[General]\nLastVersion=4294967295\n")
     (config / "user.ini").write_text(
-        "[General]\nFirstRun=true\nConfirmOnExit=false\n"
+        "[General]\nLanguage=en-US\nFirstRun=true\nConfirmOnExit=false\n"
         "[Basic]\nProfile=NativeSmoke\nProfileDir=NativeSmoke\n"
         "SceneCollection=NativeSmoke\nSceneCollectionFile=NativeSmoke\n"
     )
@@ -45,9 +45,19 @@ def profile(runtime: Path) -> Path:
              "settings": {"items": [{"name": color["name"], "source_uuid": color["uuid"], "visible": True}]}}
     scenes = config / "basic/scenes"
     scenes.mkdir(parents=True)
+    modules = {}
+    manifest = runtime / "expected-scripting.json"
+    if manifest.exists():
+        scripts = runtime / "saved-scripts"
+        scripts.mkdir()
+        modules["scripts-tool"] = []
+        for language in json.loads(manifest.read_text())["languages"]:
+            path = scripts / ("native_gui.lua" if language == "lua" else "native_gui.py")
+            path.write_text(LUA_SCRIPT if language == "lua" else PYTHON_SCRIPT)
+            modules["scripts-tool"].append({"path": str(path), "settings": {"seed": 41}})
     (scenes / "NativeSmoke.json").write_text(json.dumps({
         "name": "NativeSmoke", "current_scene": "Native scene", "current_program_scene": "Native scene",
-        "scene_order": [{"name": "Native scene"}], "sources": [color, scene],
+        "scene_order": [{"name": "Native scene"}], "sources": [color, scene], "modules": modules,
     }))
     return config
 
@@ -67,6 +77,12 @@ def main() -> None:
     # Use the linked Qt library's own default plugin paths for this isolated test.
     env.pop("QT_PLUGIN_PATH", None)
     env.pop("QT_QPA_PLATFORM_PLUGIN_PATH", None)
+    for variable in ["PYTHONHOME", "PYTHONPATH", "LUA_PATH", "LUA_CPATH"]:
+        env.pop(variable, None)
+    manifest = runtime / "expected-scripting.json"
+    scripting = json.loads(manifest.read_text()) if manifest.exists() else None
+    env["OBS_BUILD_GUI_EVIDENCE"] = str(runtime)
+    env["OBS_BUILD_GUI_SCRIPT_COUNT"] = str(len(scripting["languages"])) if scripting else "-1"
     env["LD_LIBRARY_PATH"] = str(runtime / "lib64") + os.pathsep + env.get("LD_LIBRARY_PATH", "")
     env.pop("OBS_DATA_PATH", None)
     env.pop("WAYLAND_DISPLAY", None)
@@ -90,7 +106,8 @@ def main() -> None:
                 chunk = os.read(app.stdout.fileno(), 65536)
                 log.extend(chunk)
                 (runtime / "application.log").write_bytes(log)
-            if b"==== Startup complete" in log and (not recording or b"==== Recording Start" in log):
+            tools_ready = not os.environ.get("OBS_BUILD_FRONTEND_TOOLS") or b"cc::Build frontend Tools dialogs verified" in log
+            if b"==== Startup complete" in log and tools_ready and (not recording or b"==== Recording Start" in log):
                 found = subprocess.run([str(args.inspector), "find", str(app.pid)], env=env, capture_output=True)
                 if found.returncode == 0:
                     ready = True
@@ -105,6 +122,14 @@ def main() -> None:
             assert str(runtime / "lib64/obs-modules/core" / (name + ".so")) in maps, f"module {name} was not loaded"
         if os.environ.get("OBS_BUILD_NVENC"):
             assert str(runtime / "lib64/obs-modules/core/obs-nvenc.so") in maps, "staged NVENC was not loaded"
+        if scripting:
+            for relative in [scripting["library"], *scripting["modules"]]:
+                assert str(runtime / relative) in maps, f"staged scripting artifact was not loaded: {relative}"
+            for language in scripting["languages"]:
+                assert f"native-gui-{language}-loaded".encode() in log, f"saved {language} script did not run"
+        if os.environ.get("OBS_BUILD_FRONTEND_TOOLS"):
+            for name in ["tools-scene-switcher.png", "tools-output-timer.png", *(["tools-scripts.png"] if scripting else [])]:
+                assert (runtime / name).is_file(), f"missing Tools dialog evidence: {name}"
         assert b"Native white" in log, "saved color source was not restored"
         if recording:
             # Keep the actual frontend output running long enough to decode a
@@ -122,6 +147,13 @@ def main() -> None:
         assert b"==== Shutting down" in log, "frontend did not enter normal shutdown"
         saved = json.loads((config / "basic/scenes/NativeSmoke.json").read_text())
         assert any(source.get("name") == "Native white" for source in saved["sources"]), "saved scene was lost"
+        if scripting:
+            scripts = saved["modules"]["scripts-tool"]
+            assert len(scripts) == len(scripting["languages"]), "saved script list changed"
+            for script in scripts:
+                assert script["settings"]["updated"] == 42 and script["settings"]["saved"] == 43, "script callbacks did not persist settings"
+            for language in scripting["languages"]:
+                assert f"native-gui-{language}-unloaded".encode() in log, f"{language} unload callback did not run"
         if recording:
             if os.environ.get("OBS_BUILD_NVENC"):
                 assert b"[obs-nvenc: 'simple_video_recording'] settings:" in log, "frontend did not use NVENC"
@@ -162,6 +194,36 @@ def verify_recording(path: Path, env: dict[str, str]) -> None:
     ).stdout
     assert len(frame) == 3 and min(frame) >= 240, "frontend did not record the restored white source"
     print(f"Validated actual frontend H264/AAC recording and white frame: {path}")
+
+
+LUA_SCRIPT = """
+obs = obslua
+function script_description() return 'Native GUI Lua' end
+function script_defaults(settings) obs.obs_data_set_default_int(settings, 'seed', 41) end
+function script_update(settings) obs.obs_data_set_int(settings, 'updated', obs.obs_data_get_int(settings, 'seed') + 1) end
+function script_save(settings) obs.obs_data_set_int(settings, 'saved', obs.obs_data_get_int(settings, 'updated') + 1) end
+function script_load(settings) obs.script_log(obs.LOG_INFO, 'native-gui-lua-loaded') end
+function script_unload() obs.script_log(obs.LOG_INFO, 'native-gui-lua-unloaded') end
+function script_properties()
+    local props = obs.obs_properties_create()
+    obs.obs_properties_add_int(props, 'seed', 'Seed', 0, 100, 1)
+    return props
+end
+"""
+
+PYTHON_SCRIPT = """
+import obspython as obs
+def script_description(): return 'Native GUI Python'
+def script_defaults(settings): obs.obs_data_set_default_int(settings, 'seed', 41)
+def script_update(settings): obs.obs_data_set_int(settings, 'updated', obs.obs_data_get_int(settings, 'seed') + 1)
+def script_save(settings): obs.obs_data_set_int(settings, 'saved', obs.obs_data_get_int(settings, 'updated') + 1)
+def script_load(settings): obs.script_log(obs.LOG_INFO, 'native-gui-python-loaded')
+def script_unload(): obs.script_log(obs.LOG_INFO, 'native-gui-python-unloaded')
+def script_properties():
+    props = obs.obs_properties_create()
+    obs.obs_properties_add_int(props, 'seed', 'Seed', 0, 100, 1)
+    return props
+"""
 
 
 if __name__ == "__main__":

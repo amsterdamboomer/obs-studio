@@ -1,21 +1,13 @@
 //! Native OBS module builds using the same engine as bundled libobs.
 use crate::{NativeBuild, SharedLibrary, deps::shared_archive, libobs::add_package};
 use std::path::{Path, PathBuf};
+mod frontend_tools;
+pub use frontend_tools::build as build_frontend_tools;
 
 #[derive(Debug)]
 pub struct Module {
     pub library: PathBuf,
     pub data: PathBuf,
-}
-
-pub fn build_frontend_tools(
-    _build: &NativeBuild,
-    _root: &Path,
-    _core: &Path,
-    _api: &Path,
-    _scripting: Option<&crate::scripting::Artifacts>,
-) -> Result<Module, String> {
-    Err("frontend Tools native graph is not implemented".into())
 }
 
 #[derive(Debug)]

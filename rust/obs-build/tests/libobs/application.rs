@@ -1,5 +1,5 @@
 //! Full frontend runtime validation with an isolated profile and display.
-use obs_build::{NativeBuild, SharedLibrary, plugins};
+use obs_build::{NativeBuild, SharedLibrary, plugins, scripting};
 use std::path::{Path, PathBuf};
 
 pub struct Inputs<'a> {
@@ -11,6 +11,9 @@ pub struct Inputs<'a> {
     pub ffmpeg: &'a plugins::FfmpegArtifacts,
     pub nvenc_helper: Option<&'a Path>,
     pub modules: &'a [plugins::Module],
+    pub frontend_tools: Option<&'a plugins::Module>,
+    pub script_artifacts: Option<&'a scripting::Artifacts>,
+    pub gui_probe: Option<&'a plugins::Module>,
 }
 
 pub struct Variant<'a> {
@@ -44,6 +47,44 @@ pub fn exercise(inputs: Inputs<'_>, variants: &[Variant<'_>]) -> Result<(), Stri
             )?;
         }
         inputs.ffmpeg.deploy_muxer(&bin)?;
+        if let Some(scripts) = inputs.script_artifacts {
+            let library_name = scripts
+                .library
+                .file_name()
+                .ok_or("scripting library has no filename")?;
+            copy(&scripts.library, &libraries.join(library_name))?;
+            let mut modules = Vec::new();
+            let mut languages = Vec::new();
+            for (language, module) in [
+                ("lua", scripts.lua_module.as_deref()),
+                ("python", scripts.python_module.as_deref()),
+            ] {
+                if let Some(module) = module {
+                    let relative = module
+                        .strip_prefix(&scripts.runtime)
+                        .map_err(|e| e.to_string())?;
+                    copy(module, &runtime.join(relative))?;
+                    modules.push(relative.to_string_lossy().into_owned());
+                    languages.push(language);
+                }
+            }
+            if let Some(wrapper) = &scripts.python_wrapper {
+                copy(
+                    wrapper,
+                    &runtime.join(
+                        wrapper
+                            .strip_prefix(&scripts.runtime)
+                            .map_err(|e| e.to_string())?,
+                    ),
+                )?;
+            }
+            let metadata = serde_json::json!({"library": format!("lib64/{}", library_name.to_string_lossy()), "modules": modules, "languages": languages});
+            std::fs::write(
+                runtime.join("expected-scripting.json"),
+                serde_json::to_vec(&metadata).map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
+        }
         if let Some(helper) = inputs.nvenc_helper {
             copy(
                 helper,
@@ -63,7 +104,13 @@ pub fn exercise(inputs: Inputs<'_>, variants: &[Variant<'_>]) -> Result<(), Stri
             &runtime.join("share/obs/obs-studio/authors"),
         )?;
         let mut names = Vec::new();
-        for module in inputs.modules.iter().chain(variant.nvenc) {
+        for module in inputs
+            .modules
+            .iter()
+            .chain(variant.nvenc)
+            .chain(inputs.frontend_tools)
+            .chain(inputs.gui_probe)
+        {
             let name = module
                 .library
                 .file_stem()
@@ -126,6 +173,9 @@ pub fn exercise(inputs: Inputs<'_>, variants: &[Variant<'_>]) -> Result<(), Stri
 }
 
 fn copy(source: &Path, target: &Path) -> Result<(), String> {
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
     std::fs::copy(source, target)
         .map(|_| ())
         .map_err(|e| format!("copy {} to {}: {e}", source.display(), target.display()))

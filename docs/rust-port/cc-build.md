@@ -266,7 +266,8 @@ Build the GPU archive with
 `soldr cargo build -p obs-gpu-status-frontend --release`, then enable the integration
 check with `OBS_BUILD_APP=1` and `OBS_BUILD_GPU_ARCHIVE` pointing to the resulting
 `target/release/libobs_gpu_status_frontend.a`. The executable runs and reports
-`OBS-Studio-Rust 0.1.0 (based on OBS 33.0.0-cc-build)` through `--version`.
+`--version` identifies the OBS-Studio-Rust application version as `0.1.0`,
+based on OBS `33.0.0-cc-build`.
 This establishes compilation, linking and CLI execution; GUI startup, runtime
 staging and complete application behavior still need validation.
 
@@ -398,6 +399,48 @@ bindings, Lua-only with a relative native output path, and Python-only with
 frontend bindings, against both cores. The environment uses SWIG 4.4.1,
 LuaJIT and Python 3.13 development packages discovered through pkg-config.
 
-The frontend Tools plugin, scripting UI/application staging, other platforms
-and release packaging still require conversion and validation. This shared
-library checkpoint does not complete those application features.
+The shared-library check remains separate from the frontend Tools application
+check below. Other platforms and release packaging still require conversion
+and validation.
+
+
+## Linux frontend Tools and saved GUI scripts
+
+`plugins::build_frontend_tools` compiles the original scene-switcher,
+output-timer and optional scripting groups, their Linux/POSIX host sources,
+shared Qt widgets, generated forms and moc units. Supplying scripting artifacts
+enables the matching Lua/Python UI definitions and shared-library dependency.
+The graph reuses the application's shared Qt interface inventory.
+
+Set `OBS_BUILD_FRONTEND_TOOLS=1` with `OBS_BUILD_APP_GUI=1` to stage the plugin
+and enabled scripting artifacts in each private runtime. Saved Lua/Python
+scripts are restored from the scene collection. The app test checks their
+load/update/save/unload callbacks and persisted settings, as well as the
+actual staged scripting libraries in the process map. It copies only the
+selected language artifacts, excluding stale disabled-language output.
+
+A test-only Qt module opens Automatic Scene Switcher, Output Timer and Scripts,
+checks the saved script count and each script's description/Seed property,
+captures each dialog and closes it. Inspection
+runs inside Qt's event loop, including Scene Switcher's nested modal loop.
+The probe is part of the development test runtime and is not a release plugin.
+`OBS_BUILD_DISABLE_SCRIPTING=1` exercises Tools without the scripting library.
+Combine `OBS_BUILD_APP_RECORD=1` to retain the actual frontend recording checks.
+
+Local dual-language and scripting-disabled app checks pass against both cores,
+including real frontend H.264/AAC recording and the four native API recordings.
+The combined Tools, Lua/Python and NVENC configuration also passes against
+both cores, with the selected C/Rust NVENC loaders and helper staged together.
+All six dual-language dialog screenshots and the recording main window were
+visually inspected. The disabled case requires the Scripts action to be absent.
+
+Both configurations can print one outstanding allocation during shutdown in
+this headless desktop session. An allocation tracker identifies the original
+portal sleep-inhibitor object (`portal_inhibit_info_create`); a diagnostic
+nonblocking GLib main-context drain releases its pending callback and changes
+`bnum_allocs()` from one to zero. The diagnostic is external to the production
+build and app probe. This checkpoint establishes normal app exit and scripting
+cleanup, not a zero-allocation shutdown log or portal capture support.
+
+Windows/macOS Tools, remaining modules, full application/capture coverage and
+release packaging are still required.

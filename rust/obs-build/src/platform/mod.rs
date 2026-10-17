@@ -455,6 +455,25 @@ pub fn configure_scripting(target: &str, library: &mut crate::SharedLibrary) -> 
     Ok(())
 }
 
+pub fn configure_frontend_tools(
+    target: &str,
+    root: &Path,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    configure_cpp_module(target, library)?;
+    // configure_cpp_module currently admits only Linux.
+    for group in [
+        "frontend-tools.linux+.hpp.cpp",
+        "frontend-tools.host-posix+.h.c",
+    ] {
+        library
+            .sources
+            .push(root.join("plugins/frontend-tools/build").join(group));
+    }
+    crate::libobs::add_package(library, target, "x11")?;
+    Ok(())
+}
+
 pub fn python_library_name(target: &str, libraries: &[String]) -> Result<String, String> {
     if !target.contains("linux") {
         return Err("Python library discovery is currently Linux-only".into());

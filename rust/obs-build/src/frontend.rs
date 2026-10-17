@@ -206,7 +206,7 @@ pub fn build_application(
     build.executable(&library)
 }
 
-fn add_inputs(
+pub(crate) fn add_inputs(
     build: &NativeBuild,
     root: &Path,
     library: &mut SharedLibrary,
@@ -249,7 +249,7 @@ fn add_inputs(
     Ok(())
 }
 
-fn write(path: &Path, content: &str) -> Result<(), String> {
+pub(crate) fn write(path: &Path, content: &str) -> Result<(), String> {
     if std::fs::read_to_string(path).ok().as_deref() != Some(content) {
         std::fs::write(path, content).map_err(|e| e.to_string())?;
     }

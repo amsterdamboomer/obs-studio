@@ -9,6 +9,8 @@ mod qt;
 mod render;
 #[path = "libobs/scripting.rs"]
 mod script_tests;
+#[path = "libobs/tools.rs"]
+mod tools;
 
 #[test]
 fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
@@ -68,6 +70,15 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     };
     if enabled("OBS_BUILD_APP_GUI") && std::env::var_os("OBS_BUILD_NVENC").is_some() {
         options.core_modules.push("obs-nvenc".into());
+    }
+    if std::env::var_os("OBS_BUILD_FRONTEND_TOOLS").is_some() {
+        assert!(
+            std::env::var_os("OBS_BUILD_APP_GUI").is_some(),
+            "frontend Tools test requires OBS_BUILD_APP_GUI=1"
+        );
+        options
+            .core_modules
+            .extend(["frontend-tools".into(), "native-frontend-probe".into()]);
     }
     let libraries = libobs::build_pair(&build, &root, &options, &archive).unwrap();
     assert_ne!(libraries.reference, libraries.with_rust);
@@ -175,7 +186,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             .clone()
             .unwrap_or_else(|| frontend::build_api(&build, &root, &libraries.reference).unwrap())
     });
-    let _frontend_tools = tools_enabled.then(|| {
+    let frontend_tools = tools_enabled.then(|| {
         plugins::build_frontend_tools(
             &build,
             &root,
@@ -270,6 +281,14 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         .as_ref()
         .map(|_| render::build(&build, &root, &libraries.reference));
     if enabled("OBS_BUILD_APP_GUI") {
+        let gui_probe = frontend_tools.as_ref().map(|_| {
+            tools::build(
+                &build,
+                &root,
+                &libraries.reference,
+                frontend.as_ref().unwrap(),
+            )
+        });
         application::exercise(
             application::Inputs {
                 root: &root,
@@ -280,6 +299,13 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
                 ffmpeg: ffmpeg.as_ref().unwrap(),
                 nvenc_helper: nvenc.as_ref().map(|nvenc| nvenc.helper.as_path()),
                 modules: &modules,
+                frontend_tools: frontend_tools.as_ref(),
+                script_artifacts: if tools_enabled {
+                    script_artifacts.as_ref()
+                } else {
+                    None
+                },
+                gui_probe: gui_probe.as_ref(),
             },
             &[
                 application::Variant {
