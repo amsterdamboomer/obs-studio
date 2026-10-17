@@ -3,6 +3,81 @@
 Implementation and measurement tracker:
 [obs-studio#1286](https://github.com/obs-rust/obs-studio/issues/1286).
 
+## Executive assessment
+
+The janitor failed because a fork PR received a read-only Actions token:
+all 32 deletion requests returned HTTP 403. Maintenance also delayed useful
+work through its dependency graph. The merged fix keeps `ci-pre.yml` as the
+common pre-work entry point, runs only its janitor on trusted queue/master
+events, and keeps maintenance outside build, required-gate and cancellation
+dependencies. A maintenance failure remains visible without blocking a merge.
+
+Compiler caching is effective. The remaining speed work is reducing needless
+transfers, matching dependency snapshots to consumers, and shortening the test
+critical path. Preserve useful caches and required integrity coverage; judge
+changes by total gate time and runner cost rather than archive HIT messages.
+
+### Verified rollout results
+
+Master [39061960882](https://github.com/obs-rust/obs-studio/actions/runs/39061960882)
+completed successfully with the following results:
+
+| Area | Observation | Decision |
+| --- | --- | --- |
+| Linux Tier 2 | 774/775 compilations cached; build step 53 s; complete build job 162 s | Keep the working compiler cache |
+| Qt frontend | 295/297 cacheable hits; restore 10 s, build/tests 55 s, save 6 s | Keep the 1.2 GB cache bound and realistic retention allowance |
+| OFF/ON tests | 286 passed per mode; concurrent phase 327 s wall / 642 runner-seconds | Keep both implementations and parallelize independent modes |
+| Scheduling | Fast Gate 234 s; 3 s to build start; build 162 s; 3 s to test runners | Continue measuring runner waits as well as commands |
+| Rust compiler correctness | Pinned soldr 0.9.35 still returns a stale success in the nested-source probe | Retain the wrapper bypass pending the upstream fix |
+
+The earlier serial test job took 578 s for 283 tests per implementation; the
+first parallel trial spanned 366 s and consumed 715 runner-seconds. The newer
+327-second phase above covers 286 tests per mode. These are **unmatched phase
+observations**, not proof of overall queue throughput improvement. Source,
+runner placement and compiler-cache rollout conditions differ.
+
+[Machine-readable rollout results](ci-evidence/2026-10-17-master-cache-rollout.json)
+include job IDs, phase times and independent compiler counters. The isolated
+libobs results below remain separate from whole-app and CI build timings.
+
+### Queue admission and operating strategy
+
+1. Queue admission covers compilation and integrity: selected builds, lint,
+   tests, ABI/behavior and differential checks. Security scans and release
+   packaging validation run nightly or through explicit manual/release runs.
+   Automatic GitHub CodeQL setup is disabled; merged #1327 puts the same four
+   languages in the existing Scheduled workflow and reports nightly failures.
+2. Queue/master janitors own retention. PRs restore useful snapshots; remote
+   setup-soldr saves are master-only. Local development saves remain enabled.
+3. Protect correctness first: retain the Rust wrapper bypass and cross-lane
+   toolchain safeguards. Do not trade stale-output protection for headline hits.
+4. Preserve one active master warming build and the latest pending snapshot.
+   Catch-up scope must retain paths from superseded pushes; #1328 implements
+   that after the plugin seed exposed a lost-path case.
+5. Keep independent OFF/ON test runners and publish the extra runner cost.
+   Keep all applicable test coverage; no test sharding was introduced.
+
+### Measurement status and limits
+
+The before window is 2026-10-16 17:00 through 2026-10-17 17:00 UTC: 473 listed
+runs and 117 detailed samples. Successful code PRs (n=9) had median gate wall
+1,016 s; code merge groups (n=8) had median 954 s. Sampled canceled code PRs
+used 211.57 runner-minutes and sampled canceled code merge groups 194.45.
+These cancellation costs describe the sample, not an extrapolated population.
+Docs/configuration cohorts are kept separate.
+
+[Baseline log observations](ci-evidence/2026-10-16_17-ci-baseline-log-observations.json)
+preserve the observed compiler counters, archive sizes, saved keys and test
+counts. Logs were unavailable for 33 of 117 sampled attempts, all canceled;
+missing counters are unknown. Repeated archive messages and independent
+compiler scopes must not be summed into fictitious transfer/hit totals.
+
+The final after window must cover at least a full day of representative code
+PR and queue traffic following rollout. It has not elapsed. Plugin warming
+and a subsequent PR hit/timing comparison, the full nightly run, native-platform
+cache occupancy and this representative-day comparison remain acceptance work
+under #1286. This report does not claim those requirements are complete.
+
 ## Isolated C libobs build
 
 Measured the `libobs` target alone, with Rust libobs, frontend, scripting,
