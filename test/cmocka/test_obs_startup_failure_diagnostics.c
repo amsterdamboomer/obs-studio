@@ -15,7 +15,8 @@
  * real shared libobs, including the Rust-substituted implementation. */
 static bool injected_display_failure;
 
-Display *XOpenDisplay(const char *name)
+/* The test build uses hidden visibility; this hook must reach the loader. */
+EXPORT Display *XOpenDisplay(const char *name)
 {
 	(void)name;
 	injected_display_failure = true;
