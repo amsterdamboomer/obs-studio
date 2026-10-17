@@ -48,8 +48,8 @@ class BuildErrorsTest(unittest.TestCase):
         # Run the same helper through bash on hosts without /bin/bash.
         recovery = recovery.replace('"$SRC"/rust/tools/linux-validate/build-errors.sh',
                                     'bash "$SRC"/rust/tools/linux-validate/build-errors.sh')
-        for retry_status in (0, 1):
-            with self.subTest(retry_status=retry_status), tempfile.TemporaryDirectory() as directory:
+        for retry_status, daemon_status in ((0, 0), (0, 1), (1, 0), (1, 1)):
+            with self.subTest(retry_status=retry_status, daemon_status=daemon_status), tempfile.TemporaryDirectory() as directory:
                 prefix = '''
 cmake() {
   if [ ! -f "$build.calls" ]; then
@@ -63,19 +63,20 @@ cmake() {
   echo 'FAILED: [code=1] second.o'
   return "$retry_status"
 }
-zccache() { echo "daemon diagnostic: $*"; return 1; }
+zccache() { echo "daemon diagnostic: $*"; return "$daemon_status"; }
 '''
                 result = subprocess.run(
                     ['bash', '-eu', '-c', prefix + recovery],
                     env={**os.environ, 'SRC': str(ROOT),
-                         'build': directory + '/build', 'retry_status': str(retry_status)},
+                         'build': directory + '/build', 'retry_status': str(retry_status),
+                         'daemon_status': str(daemon_status)},
                     capture_output=True, text=True)
                 self.assertEqual(result.returncode, retry_status)
                 self.assertEqual(Path(directory, 'build.calls').read_text().strip(), '2')
                 self.assertIn('original daemon failure', result.stdout)
                 self.assertIn('daemon diagnostic: status', result.stdout)
                 self.assertIn('daemon diagnostic: stop', result.stdout)
-                self.assertIn('retry cache bypass: 1',
+                self.assertIn('retry cache bypass: ' + ('1' if daemon_status else 'unset'),
                               Path(directory, 'build.build.log').read_text())
                 self.assertIn('original daemon failure',
                               Path(directory, 'build.build-first-failure.log').read_text())
