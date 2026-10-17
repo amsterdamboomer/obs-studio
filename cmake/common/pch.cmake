@@ -18,6 +18,11 @@ set(_OBS_PCH_DIR "${CMAKE_CURRENT_LIST_DIR}/../pch")
 # such a macro in the PCH instead is not equivalent: with glibc 2.43,
 # _GNU_SOURCE makes strstr() return const char * for a const argument
 # (librtmp's parseurl.c then fails with -Werror=discarded-qualifiers).
+#
+# Likewise the sources that need the full <windows.h> (winsock's u_long):
+# on Windows arm64 the PCH's libobs headers (util/sse-intrin.h, then SIMDe's
+# x86/sse.h) include it with WIN32_LEAN_AND_MEAN first, making their own
+# include a no-op.
 set(
   _OBS_PCH_SKIP_SOURCES
   libobs/obs-nix.c
@@ -28,6 +33,8 @@ set(
   plugins/obs-outputs/librtmp/rtmp.c
   plugins/obs-outputs/net-if.c
   plugins/oss-audio/oss-input-freebsd.c
+  plugins/obs-browser/browser-app.cpp
+  plugins/obs-browser/obs-browser-page/obs-browser-page-main.cpp
 )
 
 # _obs_pch_profile: pick the header set from what <target> links.
@@ -235,15 +242,10 @@ function(_obs_target_build_speed target)
   if(_imported OR NOT _source_dir)
     return()
   endif()
-  # Third-party code (deps/), the unchanged C tests (test/), Corrosion's
-  # Cargo targets and the submodules (obs-browser, obs-websocket: their own
-  # upstreams, written for neither a shared header nor a shared translation
-  # unit) keep their own build.
+  # Third-party code (deps/), the unchanged C tests (test/) and Corrosion's
+  # Cargo targets keep their own build.
   cmake_path(RELATIVE_PATH _source_dir BASE_DIRECTORY "${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE _relative)
-  if(
-    _relative MATCHES "^(deps|test|rust|plugins/obs-browser|plugins/obs-websocket)(/|$)"
-    OR target MATCHES "^(_cargo|cargo-|corrosion)"
-  )
+  if(_relative MATCHES "^(deps|test|rust)(/|$)" OR target MATCHES "^(_cargo|cargo-|corrosion)")
     return()
   endif()
   obs_target_pch(${target})

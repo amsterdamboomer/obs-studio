@@ -28,6 +28,9 @@ set(OBS_UNITY_BUILD_BATCH_SIZE 8 CACHE STRING "Sources per unity translation uni
 #
 # The SAPI caption sources include <sapi.h>, whose `byte` is ambiguous next to
 # frontend-tools' `using namespace std` (std::byte) in the same batch.
+#
+# obs-browser-source.cpp declares DispatchJSEvent with a default argument
+# that obs-browser-plugin.cpp declares again.
 set(
   _OBS_UNITY_SKIP_SOURCES
   libobs-opengl/gl-wayland-egl.c
@@ -40,6 +43,7 @@ set(
   plugins/frontend-tools/captions.cpp
   plugins/frontend-tools/captions-mssapi.cpp
   plugins/frontend-tools/captions-mssapi-stream.cpp
+  plugins/obs-browser/obs-browser-source.cpp
 )
 
 # obs_target_unity: turn on unity builds for <target>.
