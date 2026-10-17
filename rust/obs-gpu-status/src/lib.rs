@@ -524,3 +524,19 @@ fn is_pci_address(s: &str) -> bool {
         && hex(device)
         && matches!(function.as_bytes(), [b'0'..=b'7'])
 }
+
+/// A GPU utilization sample, in percent of the whole adapter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Utilization {
+    Percent(u8),
+    /// The source has no reading for this adapter.
+    Unavailable,
+}
+
+/// amdgpu's whole-adapter busy percent (obs-rust/obs-studio#1024): the
+/// `gpu_busy_percent` file of the `card<n>` under `root`'s
+/// `sys/class/drm` whose PCI address is `pci` (from [`render_adapter`]).
+/// The cheapest AMD source; a fallback when fdinfo has no engine times.
+pub fn amdgpu_busy_percent(_root: &Path, _pci: &str) -> Utilization {
+    Utilization::Unavailable
+}
