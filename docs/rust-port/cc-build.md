@@ -143,3 +143,33 @@ This demonstrates the native renderer and basic frame delivery. It does not yet
 validate the full Qt application, recording, capture sources, all plugins,
 Wayland runtime behavior or packaged artifacts. The prototype OpenGL version
 number remains tied to the current OBS 33 configuration.
+
+
+## Linux recording checkpoint
+
+The native engine now links executables as well as shared libraries and archives.
+Its executable contract runs a program linked to a shared core that consumes a
+static helper. Windows dependency mapping preserves archive paths and converts
+DLL paths to import-library paths; runtime validation there remains outstanding.
+
+The module graph builds x264, the complete Linux obs-outputs groups and librtmp,
+and FFmpeg with media playback, VAAPI, optional MPEGTS/SRT/RIST, logging and legacy
+NVENC groups. It also builds the standalone FFmpeg mux executable. Shared
+opts-parser, happy-eyeballs, BPM and libcaption dependencies use native archives.
+The FFmpeg options follow current CMake defaults; the full option matrix and
+hardware-specific behavior remain unverified.
+
+Set `OBS_BUILD_RECORD=1` on the opt-in integration test, with native dependencies,
+ffprobe and an isolated DISPLAY available. This implies the graphics probe. Both
+variants load the encoder/output modules, verify registration and exactly one
+loaded SRT library, then encode an isolated blank scene using real obs_x264,
+ffmpeg_aac and mp4_output. The test stops the output, releases encoders, shuts
+down OBS, and validates tracks, dimensions, decoded-frame counts and duration
+with ffprobe. Local recordings each contain 18 H.264 frames at 64x64 and AAC
+audio, duration 0.6 seconds. They contain no desktop or device capture.
+
+This checkpoint exercises mp4_output. `ffmpeg_muxer` requires its helper beside
+the running app; the returned helper artifact still needs deployment and runtime
+validation through that output. The full Qt application, capture sources, other
+modules/platforms, complete test battery, packaging and controlled performance
+measurements remain required. Do not treat this checkpoint as a CMake retirement.

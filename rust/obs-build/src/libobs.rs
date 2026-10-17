@@ -93,33 +93,7 @@ fn prepare(build: &NativeBuild, root: &Path, options: &Options) -> Result<Plan, 
     ] {
         add_package(&mut library, &build.target, package)?;
     }
-    let mut caption = SharedLibrary {
-        name: "caption".into(),
-        include_dirs: vec![
-            root.join("deps/libcaption"),
-            root.join("deps/libcaption/caption"),
-        ],
-        compile_options: library.compile_options.clone(),
-        definitions: vec![("__STDC_CONSTANT_MACROS".into(), None)],
-        ..SharedLibrary::default()
-    };
-    for source in [
-        "caption",
-        "cea708",
-        "eia608",
-        "eia608_charmap",
-        "eia608_from_utf8",
-        "mpeg",
-        "scc",
-        "srt",
-        "utf8",
-        "xds",
-    ] {
-        caption
-            .sources
-            .push(root.join(format!("deps/libcaption/src/{source}.c")));
-    }
-    library.dependencies.push(build.static_library(&caption)?);
+    library.dependencies.push(build_caption(build, &root)?);
     let mut header = String::from(
         "#pragma once\n#define OBS_DATA_PATH \"share/obs\"\n#define OBS_PLUGIN_PATH \"lib64/obs-modules/core\"\n#define OBS_PLUGIN_DESTINATION \"lib64/obs-modules\"\n#define OBS_RELEASE_CANDIDATE 0\n#define OBS_BETA 6\n",
     );
@@ -249,6 +223,37 @@ pub(crate) fn add_package(
         }
     }
     Ok(())
+}
+
+pub(crate) fn build_caption(build: &NativeBuild, root: &Path) -> Result<PathBuf, String> {
+    let mut caption = SharedLibrary {
+        name: "caption".into(),
+        include_dirs: vec![
+            root.join("deps/libcaption"),
+            root.join("deps/libcaption/caption"),
+        ],
+        compile_options: vec![],
+        definitions: vec![("__STDC_CONSTANT_MACROS".into(), None)],
+        ..SharedLibrary::default()
+    };
+    crate::platform::configure_caption(&build.target, &mut caption)?;
+    for source in [
+        "caption",
+        "cea708",
+        "eia608",
+        "eia608_charmap",
+        "eia608_from_utf8",
+        "mpeg",
+        "scc",
+        "srt",
+        "utf8",
+        "xds",
+    ] {
+        caption
+            .sources
+            .push(root.join(format!("deps/libcaption/src/{source}.c")));
+    }
+    build.static_library(&caption)
 }
 
 fn write_if_changed(path: &Path, text: &str) -> Result<(), String> {

@@ -66,9 +66,64 @@ static void receive_frame(void *unused, struct video_data *frame)
     atomic_fetch_add(&frames, 1);
 }
 
-EXPORT int obs_fixture_render(const char *renderer, const char *data_path)
+static int record_clip(const char *path)
+{
+    obs_data_t *settings = obs_data_create();
+    obs_data_set_string(settings, "rate_control", "CBR");
+    obs_data_set_int(settings, "bitrate", 500);
+    obs_data_set_string(settings, "preset", "ultrafast");
+    obs_data_set_string(settings, "tune", "zerolatency");
+    obs_encoder_t *video = obs_video_encoder_create("obs_x264", "cc-build-video", settings, NULL);
+    obs_data_release(settings);
+    settings = obs_data_create();
+    obs_data_set_int(settings, "bitrate", 128);
+    obs_encoder_t *audio = obs_audio_encoder_create("ffmpeg_aac", "cc-build-audio", settings, 0, NULL);
+    obs_data_release(settings);
+    settings = obs_data_create();
+    obs_data_set_string(settings, "path", path);
+    obs_output_t *output = obs_output_create("mp4_output", "cc-build-recording", settings, NULL);
+    obs_data_release(settings);
+    int status = 0;
+    if (!video || !audio || !output) {
+        status = 85;
+        goto cleanup;
+    }
+    obs_encoder_set_video(video, obs_get_video());
+    obs_encoder_set_audio(audio, obs_get_audio());
+    obs_output_set_video_encoder(output, video);
+    obs_output_set_audio_encoder(output, audio, 0);
+    if (!obs_output_start(output)) {
+        blog(LOG_ERROR, "cc::Build recording start failed: %s", obs_output_get_last_error(output));
+        status = 86;
+        goto cleanup;
+    }
+    for (unsigned i = 0; i < 400 && obs_output_active(output) && obs_output_get_total_frames(output) < 15; ++i)
+        os_sleep_ms(10);
+    if (obs_output_get_total_frames(output) < 15)
+        status = 87;
+    obs_output_stop(output);
+    for (unsigned i = 0; i < 500 && obs_output_active(output); ++i)
+        os_sleep_ms(10);
+    if (obs_output_active(output)) {
+        obs_output_force_stop(output);
+        status = 88;
+    }
+    blog(LOG_INFO, "cc::Build recording: %s (status %d)", path, status);
+cleanup:
+    obs_output_release(output);
+    obs_encoder_release(video);
+    obs_encoder_release(audio);
+    return status;
+}
+
+EXPORT int obs_fixture_render(const char *renderer, const char *data_path, const char *record_path)
 {
     obs_add_data_path(data_path);
+    if (record_path) {
+        struct obs_audio_info audio = { .samples_per_sec = 48000, .speakers = SPEAKERS_STEREO };
+        if (!obs_reset_audio(&audio))
+            return 84;
+    }
     struct obs_video_info video = {
         .graphics_module = renderer,
         .fps_num = 30, .fps_den = 1,
@@ -96,12 +151,15 @@ EXPORT int obs_fixture_render(const char *renderer, const char *data_path)
     for (unsigned i = 0; i < 200 && atomic_load(&frames) < 3; ++i)
         os_sleep_ms(10);
     obs_remove_raw_video_callback(receive_frame, NULL);
+    int recording_status = record_path ? record_clip(record_path) : 0;
     obs_set_output_source(0, NULL);
     obs_scene_release(scene);
     /* The owning test calls obs_shutdown after this probe. */
     if (atomic_load(&frames) < 3)
         return 82;
-    return atomic_load(&invalid_frames) ? 83 : 0;
+    if (atomic_load(&invalid_frames))
+        return 83;
+    return recording_status;
 }
 
 EXPORT void obs_fixture_close_display(void)

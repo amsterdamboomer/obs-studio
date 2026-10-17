@@ -64,8 +64,10 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             .module,
         );
     }
-    let renderer = std::env::var_os("OBS_BUILD_RENDER")
-        .map(|_| graphics::build_opengl(&build, &root, &libraries.reference, &options).unwrap());
+    let wants_graphics = std::env::var_os("OBS_BUILD_RENDER").is_some()
+        || std::env::var_os("OBS_BUILD_RECORD").is_some();
+    let renderer = wants_graphics
+        .then(|| graphics::build_opengl(&build, &root, &libraries.reference, &options).unwrap());
     let probe = renderer
         .as_ref()
         .map(|_| render::build(&build, &root, &libraries.reference));
@@ -83,6 +85,19 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             command.env("OBS_BUILD_TEST_RENDERER", renderer);
             command.env("OBS_BUILD_TEST_PROBE", probe.as_ref().unwrap());
         }
+        let recording = std::env::var_os("OBS_BUILD_RECORD").map(|_| {
+            let variant = path
+                .parent()
+                .unwrap()
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap();
+            build.output.join(format!("recording-{variant}.mp4"))
+        });
+        if let Some(recording) = &recording {
+            command.env("OBS_BUILD_TEST_RECORDING", recording);
+        }
         let run = command
             .args([
                 "--exact",
@@ -94,7 +109,9 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             .output()
             .unwrap();
         for line in String::from_utf8_lossy(&run.stdout).lines().filter(|line| {
-            line.contains("Loading up OpenGL") || line.contains("cc::Build graphics device")
+            line.contains("Loading up OpenGL")
+                || line.contains("cc::Build graphics device")
+                || line.contains("cc::Build recording")
         }) {
             println!("{}: {line}", path.display());
         }
@@ -105,6 +122,9 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             String::from_utf8_lossy(&run.stdout),
             String::from_utf8_lossy(&run.stderr)
         );
+        if let Some(recording) = recording {
+            verify_recording(&recording);
+        }
     }
 }
 
@@ -178,11 +198,30 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
             assert_eq!(open(&mut handle, binary.as_ptr(), data_path.as_ptr()), 0);
             assert!(init(handle));
         }
-        for (symbol, expected) in [
+        let mut expected_types = vec![
             (b"obs_enum_transition_types".as_slice(), "fade_transition"),
             (b"obs_enum_filter_types".as_slice(), "noise_suppress_filter"),
             (b"obs_enum_filter_types".as_slice(), "gain_filter"),
-        ] {
+        ];
+        if std::env::var_os("OBS_BUILD_RECORD").is_some() {
+            expected_types.extend([
+                (b"obs_enum_encoder_types".as_slice(), "obs_x264"),
+                (b"obs_enum_encoder_types".as_slice(), "ffmpeg_aac"),
+                (b"obs_enum_output_types".as_slice(), "mp4_output"),
+            ]);
+            let maps = std::fs::read_to_string("/proc/self/maps").unwrap();
+            let srt: std::collections::BTreeSet<_> = maps
+                .lines()
+                .filter_map(|line| line.split_whitespace().last())
+                .filter(|path| path.contains("/libsrt.so"))
+                .collect();
+            assert_eq!(
+                srt.len(),
+                1,
+                "exactly one SRT shared library must be loaded"
+            );
+        }
+        for (symbol, expected) in expected_types {
             let enumerate = library
                 .get::<unsafe extern "C" fn(usize, *mut *const std::ffi::c_char) -> bool>(symbol)
                 .unwrap();
@@ -208,9 +247,24 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
                 .canonicalize()
                 .unwrap();
             let data_path = std::ffi::CString::new(format!("{}/", data_path.display())).unwrap();
-            let render = probe.get::<unsafe extern "C" fn(*const std::ffi::c_char, *const std::ffi::c_char) -> i32>(b"obs_fixture_render").unwrap();
+            let render = probe
+                .get::<unsafe extern "C" fn(
+                    *const std::ffi::c_char,
+                    *const std::ffi::c_char,
+                    *const std::ffi::c_char,
+                ) -> i32>(b"obs_fixture_render")
+                .unwrap();
+            let recording = std::env::var("OBS_BUILD_TEST_RECORDING")
+                .ok()
+                .map(|path| std::ffi::CString::new(path).unwrap());
             assert_eq!(
-                render(renderer.as_ptr(), data_path.as_ptr()),
+                render(
+                    renderer.as_ptr(),
+                    data_path.as_ptr(),
+                    recording
+                        .as_ref()
+                        .map_or(std::ptr::null(), |path| path.as_ptr())
+                ),
                 0,
                 "graphics/frame rendering failed"
             );
@@ -247,4 +301,62 @@ fn exports(path: &std::path::Path) -> std::collections::BTreeSet<String> {
         .filter_map(|line| line.split_whitespace().last())
         .map(|name| name.split('@').next().unwrap().to_owned())
         .collect()
+}
+
+fn verify_recording(path: &std::path::Path) {
+    let result = std::process::Command::new("ffprobe")
+        .args([
+            "-v",
+            "error",
+            "-count_frames",
+            "-show_entries",
+            "stream=codec_name,width,height,nb_read_frames:format=duration",
+            "-of",
+            "json",
+        ])
+        .arg(path)
+        .output()
+        .expect("ffprobe is required for recording integration");
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let document: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    let streams = document["streams"].as_array().unwrap();
+    let video = streams
+        .iter()
+        .find(|stream| stream["codec_name"] == "h264")
+        .expect("missing H.264 track");
+    assert_eq!(video["width"], 64);
+    assert_eq!(video["height"], 64);
+    assert!(
+        video["nb_read_frames"]
+            .as_str()
+            .unwrap()
+            .parse::<u32>()
+            .unwrap()
+            >= 10
+    );
+    let audio = streams
+        .iter()
+        .find(|stream| stream["codec_name"] == "aac")
+        .expect("missing AAC track");
+    assert!(
+        audio["nb_read_frames"]
+            .as_str()
+            .unwrap()
+            .parse::<u32>()
+            .unwrap()
+            > 0
+    );
+    assert!(
+        document["format"]["duration"]
+            .as_str()
+            .unwrap()
+            .parse::<f64>()
+            .unwrap()
+            >= 0.2
+    );
+    println!("validated recording: {}", path.display());
 }

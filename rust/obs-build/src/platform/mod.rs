@@ -262,6 +262,64 @@ pub fn configure_executable_link(
     Ok(())
 }
 
+pub fn configure_caption(target: &str, library: &mut crate::SharedLibrary) -> Result<(), String> {
+    configure_module(target, library)?;
+    library.compile_options.push("-fopenmp-simd".into());
+    Ok(())
+}
+
+pub fn configure_shared_dependency(
+    target: &str,
+    root: &Path,
+    name: &str,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    configure_module(target, library)?;
+    if name == "happy-eyeballs" {
+        library
+            .include_dirs
+            .push(root.join("shared/happy-eyeballs/hosts/posix"));
+    }
+    Ok(())
+}
+
+pub fn configure_outputs(
+    target: &str,
+    root: &Path,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    if !target.contains("linux") {
+        return Err(format!(
+            "native outputs graph for {target} is not implemented yet"
+        ));
+    }
+    library
+        .include_dirs
+        .push(root.join("shared/happy-eyeballs/hosts/posix"));
+    Ok(())
+}
+
+pub fn configure_ffmpeg(
+    target: &str,
+    root: &Path,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    if !target.contains("linux") {
+        return Err(format!(
+            "native FFmpeg graph for {target} is not implemented yet"
+        ));
+    }
+    for group in ["vaapi", "vaapi-device-select", "vaapi-probe-policy"] {
+        library
+            .sources
+            .push(root.join(format!("plugins/obs-ffmpeg/build/obs-ffmpeg.{group}+.h.c")));
+    }
+    for package in ["libva", "libva-drm", "libpci", "libdrm"] {
+        crate::libobs::add_package(library, target, package)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
