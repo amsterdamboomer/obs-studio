@@ -1162,10 +1162,10 @@ video/audio codecs as well as the output/service registrations.
 The explicit `DataChannelSdk` supplies include/library paths and the media
 and websocket interface definitions from that SDK's build. Media support is
 required and the headers must report libdatachannel >= 0.20, matching the
-original dependency requirement. The tested SDK is shared libdatachannel
-0.24.1 with both interface features enabled. Linux is implemented; other
-platforms return an explicit unsupported-graph error. Static SDK linkage and
-other SDK feature combinations have not been validated.
+original dependency requirement. The tested SDK is the shared build of
+libdatachannel version 0.24.1 with both interface features enabled. Linux is
+implemented; other platforms return an explicit unsupported-graph error.
+Static SDK linkage and other SDK feature combinations have not been validated.
 
 Enable the existing opt-in integration driver with `OBS_BUILD_WEBRTC=1`,
 `OBS_DATACHANNEL_INCLUDE_DIR` and `OBS_DATACHANNEL_LIBRARY`.
