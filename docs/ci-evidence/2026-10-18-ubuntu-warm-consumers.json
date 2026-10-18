@@ -1,7 +1,7 @@
 {
   "run": 39082733551,
   "revision": "2f9bf8d77f4c82dd7f8b4af653aee8f3a4a647d2",
-  "parent_run_status_at_capture": "in_progress",
+  "parent_run_status_at_capture": "completed",
   "observations": [
     {
       "mode": "OFF",
@@ -100,7 +100,7 @@
   ],
   "limits": [
     "Different revisions and runners; single cold/warm observations, not a matched causal benchmark",
-    "Both Ubuntu jobs passed; overall full-workflow success remains unproven",
     "Opposite-mode restore fallback must be established from each literal restored key, not assumed from hit rate"
-  ]
+  ],
+  "parent_run_conclusion": "success"
 }
