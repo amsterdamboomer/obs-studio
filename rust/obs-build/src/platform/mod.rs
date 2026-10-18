@@ -363,6 +363,9 @@ pub fn configure_source(
         ));
     }
     let groups: &[&str] = match source {
+        SourceModule::Jack | SourceModule::Sndio => {
+            return Err("optional native audio source build is not implemented".into());
+        }
         SourceModule::Vlc => &["core", "posix"],
         SourceModule::PipeWire => &["nix"],
         SourceModule::Image => &["core", "slideshow", "posix"],
@@ -383,6 +386,8 @@ pub fn configure_source(
         SourceModule::Image => &[],
         SourceModule::Text => &["freetype2", "fontconfig"],
         SourceModule::PulseAudio => &["libpulse"],
+        SourceModule::Jack => &["jack"],
+        SourceModule::Sndio => &["sndio"],
         SourceModule::Alsa => &["alsa"],
         SourceModule::V4l2 { .. } => &["libv4l2", "libavcodec", "libavformat", "libavutil"],
         SourceModule::X11Capture => &[

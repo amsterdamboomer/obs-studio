@@ -77,6 +77,14 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         );
         options.core_modules.push("obs-browser".into());
     }
+    for (flag, name) in [
+        ("OBS_BUILD_JACK", "linux-jack"),
+        ("OBS_BUILD_SNDIO", "sndio"),
+    ] {
+        if enabled("OBS_BUILD_APP_GUI") && std::env::var_os(flag).is_some() {
+            options.core_modules.push(name.into());
+        }
+    }
     if enabled("OBS_BUILD_APP_GUI") && std::env::var_os("OBS_BUILD_FDK").is_some() {
         options.core_modules.push("obs-libfdk".into());
     }
@@ -280,6 +288,15 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         plugins::build_transitions(&build, &root, &libraries.reference).unwrap(),
         plugins::build_filters(&build, &root, &libraries.reference, &filters).unwrap(),
     ];
+    for (flag, source) in [
+        ("OBS_BUILD_JACK", plugins::SourceModule::Jack),
+        ("OBS_BUILD_SNDIO", plugins::SourceModule::Sndio),
+    ] {
+        if std::env::var_os(flag).is_some() {
+            modules
+                .push(plugins::build_source(&build, &root, &libraries.reference, source).unwrap());
+        }
+    }
     if std::env::var_os("OBS_BUILD_FDK").is_some() {
         modules.push(plugins::build_fdk(&build, &root, &libraries.reference).unwrap());
     }
@@ -764,6 +781,14 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
             (b"obs_enum_filter_types".as_slice(), "noise_suppress_filter"),
             (b"obs_enum_filter_types".as_slice(), "gain_filter"),
         ];
+        for (flag, id) in [
+            ("OBS_BUILD_JACK", "jack_output_capture"),
+            ("OBS_BUILD_SNDIO", "sndio_output_capture"),
+        ] {
+            if std::env::var_os(flag).is_some() {
+                expected_types.push((b"obs_enum_input_types".as_slice(), id));
+            }
+        }
         if std::env::var_os("OBS_BUILD_FDK").is_some() {
             expected_types.push((b"obs_enum_encoder_types".as_slice(), "libfdk_aac"));
         }
