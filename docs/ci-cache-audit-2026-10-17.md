@@ -21,7 +21,7 @@ remain [recorded separately](ci-evidence/2026-10-18-full-warm-validation.json).
 | Warm Ubuntu ON | Full job 684 → 435 s; build 602 → 324 s, in unmatched observations | Keep the working ON seed; measure durability |
 | Ubuntu OFF fallback | 43/361 calls cached; mixed state 9,526 MiB; save skipped | #1371 verified: later OFF restored the exact seed and achieved 208/345 cacheable hits; remaining misses and retention unresolved |
 | Embedded Rust store | All eight expanded soldr lanes reported no embedded session | #1372 disables transport; #1380 retired retention and the queue janitor reclaimed 183,330,575 bytes |
-| Rust correctness | Pinned compiler-cache stale-source bug and separate restored-target hazard remain | Keep wrapper bypass; do not deploy deeper test reuse without freshness validation |
+| Compiler correctness | Rust stale-source/target blockers remain; a separate rapid-edit native C probe also returned stale output | Keep Rust bypass; follow native freshness upstream #1935 and avoid deeper reuse without validation |
 | Startup incident | Local reproduction plus PR, queue, master and full-run verification | #1365 verified; #1355 closed |
 | Storage headroom | Post-run listing summed to 12.43 GB; separate usage API disagrees; useful plugin seeds later absent | Resolve global-budget policy and preserve queue-useful seeds; no stable-headroom claim |
 | Representative queue throughput | Product-code queue observation 843 s; older unmatched median 954 s | Full post-rollout day still required; no causal speedup claim |
@@ -137,6 +137,34 @@ The save actions still compressed the stores on exact hits, taking 14 s OFF
 and 11 s ON, then warned that the immutable keys could not be reserved.
 PR #1381 adds a guard to skip this redundant work; it is not yet a verified
 runtime saving. Restore, build and integrity coverage remain required.
+
+### Native journal diagnostic and correctness limit
+
+Pinned zccache 1.15.5 supports private sessions with `--stats --journal
+<path>.jsonl --profile`, followed by offline `zccache analyze --json`. Raw
+journal records contain arguments, outcomes, `miss_reason` and `miss_diff`.
+This provides a diagnostic route beyond the current CI aggregate counters;
+no journal instrumentation has been enabled in production CI by this audit.
+
+An isolated GCC 15.2.0 fixture exposed a separate freshness failure: compile a
+function returning 7, warm it, then immediately write return 8 with equal
+size and a naturally changed nanosecond mtime. The journal reports a hit and
+the cached executable returns 7; a fresh compile returns 8. The unwrapped GCC
+binary reproduces the result, so it is not limited to the Nix compiler wrapper.
+A separate 200 ms settling control returns the correct value; the delay is
+not a production workaround. Private cache/endpoint ownership keeps these
+fixtures separate from the shared daemon.
+[Source, executable results, stamps and raw journals](ci-evidence/2026-10-18-native-journal-freshness.json)
+corroborate existing upstream [zccache#1935](https://github.com/zackees/zccache/issues/1935#issuecomment-6244827358).
+This does not establish wrong output in the GitHub runs, explain OFF's 137
+misses, or identify a specific internal shortcut from aggregate outcomes.
+The compiler-cache correctness recommendation now includes this native
+rapid-edit limit alongside the existing Rust and restored-target blockers.
+
+Upstream 1.15.6 contains a separate Clang PCH timestamp-isolation fix
+([#1958](https://github.com/zackees/zccache/pull/1958)). Neither that release
+nor a production version bump is qualified by the measurements here; it is
+not asserted to fix this GNU fixture or the observed CI misses.
 
 ## Executive assessment
 
