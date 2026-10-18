@@ -47,6 +47,12 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             .map(PathBuf::from)
             .unwrap_or_else(|| output.path().into()),
     };
+    // Snapshot before native builds: another Cargo invocation can replace the
+    // original integration executable while this long-running process lives.
+    let bin = build.output.join("test-bin");
+    std::fs::create_dir_all(&bin).unwrap();
+    let runner = bin.join("obs-native-integration");
+    std::fs::copy(std::env::current_exe().unwrap(), &runner).unwrap();
     let mut options = libobs::Options {
         pch: std::env::var_os("OBS_BUILD_PCH").is_some(),
         unity: std::env::var_os("OBS_BUILD_DISABLE_CORE_UNITY").is_none(),
@@ -576,22 +582,16 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         ffmpeg = Some(artifacts);
     }
     // Mirror the app layout: the module launches its helper beside the process.
-    let runner = if ffmpeg.is_some() || nvenc.is_some() {
-        let bin = build.output.join("test-bin");
-        std::fs::create_dir_all(&bin).unwrap();
+    if ffmpeg.is_some() || nvenc.is_some() {
+        let bin = runner.parent().unwrap();
         if let Some(ffmpeg) = &ffmpeg {
-            let helper = ffmpeg.deploy_muxer(&bin).unwrap();
+            let helper = ffmpeg.deploy_muxer(bin).unwrap();
             assert!(helper.is_file());
         }
         if let Some(nvenc) = &nvenc {
             std::fs::copy(&nvenc.helper, bin.join(nvenc.helper.file_name().unwrap())).unwrap();
         }
-        let runner = bin.join("obs-native-integration");
-        std::fs::copy(std::env::current_exe().unwrap(), &runner).unwrap();
-        runner
-    } else {
-        std::env::current_exe().unwrap()
-    };
+    }
     let wants_graphics = enabled("OBS_BUILD_RENDER")
         || enabled("OBS_BUILD_RECORD")
         || enabled("OBS_BUILD_SOURCES")

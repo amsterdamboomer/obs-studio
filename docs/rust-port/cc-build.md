@@ -1240,3 +1240,43 @@ test battery. A static inventory of this worktree's `test/cmocka/tests.d`
 finds 238 literal executable declarations before evaluating platform/option
 conditions; recent reference CI runs contain 299 configured tests. That
 inventory is a gap-finding aid, not an evaluated replacement for CTest.
+
+
+The consolidated helper test passes all eight cases again in 0.69 seconds,
+with one unrelated integration test filtered out. The workspace remains at
+its existing cap of 25 Cargo integration binaries; no cap increase is needed.
+
+A broader app/VLC/browser invocation exposed a harness error after 480.98
+seconds: it tried to copy its own integration executable only after lengthy
+native compilation, and that path no longer existed following concurrent
+Cargo rebuilds. All 104 core executable runs had completed before this
+failure; no GUI or WHIP-stream pass is claimed from that invocation. The
+fixture now snapshots its executable at parent startup, before native builds,
+and deploys FFmpeg/NVENC helpers beside that snapshot later. Review and Clippy
+pass for this staging change. The failed log is retained, and the full runtime
+battery is rerun with no overlapping Cargo commands in this worktree.
+
+
+The next broad invocation reaches renderer setup, then catches a second
+fixture bug: the WHIP guard required `OBS_BUILD_RECORD` to be explicitly set,
+while the parent enables recording implicitly for `OBS_BUILD_APP_GUI`.
+The guard now uses the parent's existing `enabled` helper, preserving the
+same recording requirement for both entry paths. That failed invocation
+passes all 104 core executions and both standalone WHIP executables first;
+it does not reach GUI, VLC/group-audio or streaming validation.
+
+At the user's request, the remaining conversion and broad validation are
+being deferred. A final focused app/streaming attempt is interrupted after
+the shared Soldr daemon loses its control connection; final Clippy also
+reports a daemon connection reset rather than a source diagnostic. The
+previous completed Clippy/review runs and streaming matrix remain valid for
+the code they exercised. The final guard change is reviewed locally, but a
+successful final-head app run and lint rerun remain outstanding. No shared
+broker or daemon is restarted. Keep the PR draft.
+
+Deferred work retains the original scope: remaining plugin graphs and full
+native test coverage; Windows/macOS graphs and runtime; physical capture and
+hardware codec paths; SDK acquisition, standalone obs-sys publishing and
+release installation/packaging; graph-wide unity/PCH controls and controlled
+full-app performance measurements. This checkpoint is not the completed
+CMake replacement and must not be merged as one.

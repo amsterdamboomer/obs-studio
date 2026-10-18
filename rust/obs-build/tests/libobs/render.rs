@@ -24,7 +24,7 @@ pub fn build(build: &NativeBuild, root: &Path, core: &Path) -> PathBuf {
     let mut packages = vec!["simde", "x11"];
     if std::env::var_os("OBS_BUILD_WHIP_ENDPOINT").is_some() {
         assert!(std::env::var_os("OBS_BUILD_WEBRTC").is_some());
-        assert!(std::env::var_os("OBS_BUILD_RECORD").is_some());
+        assert!(super::enabled("OBS_BUILD_RECORD"));
         library.definitions.push(("OBS_FIXTURE_WHIP".into(), None));
         library.link_options.push("-lm".into());
     }
