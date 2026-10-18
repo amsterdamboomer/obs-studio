@@ -43,8 +43,8 @@ class QtCacheIdentityTest(unittest.TestCase):
         subprocess.run(["git", "add", "--", name], cwd=self.root, check=True)
 
     def key(self, **overrides):
-        identity = re.search(r"id: qt-cache-identity\n.*?        run: \|\n((?:          .*\n|\n)*)",
-                             self.job, re.S)
+        identity = re.search(r"id: qt-cache-identity\n[\s\S]*?        run: \|\n((?:          [^\n]*\n|\n)*)",
+                             self.job)
         self.assertIsNotNone(identity, "Qt cache publication needs an input identity")
         script = "\n".join(line[10:] for line in identity[1].splitlines())
         output = self.root / "outputs"
