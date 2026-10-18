@@ -47,8 +47,10 @@ Full manual run [39074304012](https://github.com/obs-rust/obs-studio/actions/run
 at `d315ee9c6` passed all seven native app builds: Ubuntu OFF/ON, Windows
 x64/arm64, macOS x86/arm64 and Flatpak. This confirms native unity/PCH build
 success at that revision. The overall workflow **failed**: Linux OFF
-`test_slideshow_empty` returned `obs_startup=false` in group setup. The cause
-is unknown and tracked in [#1355](https://github.com/obs-rust/obs-studio/issues/1355).
+`test_slideshow_empty` returned `obs_startup=false` in group setup. The startup failure is tracked in
+[#1355](https://github.com/obs-rust/obs-studio/issues/1355). Subsequent local
+reproduction and the merged Xvfb lifetime fix are described below; that does
+not establish the cause of every historical startup incident.
 The X-display informational message also occurs in passing tests and does not
 diagnose that failure. No test assertion was relaxed.
 
@@ -82,6 +84,28 @@ cost even though its cause remains unresolved.
 [Job identities, times and observations](ci-evidence/2026-10-17-full-validation.json)
 keep the successful native builds, failed test setup, cold cache production
 and unresolved cache loss separate. The full-day comparison remains open.
+
+### Startup fix verified in the merge queue, 00:10 UTC October 18
+
+PR [#1365](https://github.com/obs-rust/obs-studio/pull/1365) merged at
+00:10:16 UTC after queue run
+[39081091301](https://github.com/obs-rust/obs-studio/actions/runs/39081091301)
+succeeded. Both implementations registered 295 tests with zero failures;
+CTest took 314.95 s OFF and 308.87 s ON. The slideshow test and the new
+startup-failure diagnostic test passed in both modes. These observations
+verify queue coverage of the Xvfb `-noreset` fix; they do not replace the
+pending full nightly run or establish a throughput improvement.
+
+[Machine-readable queue results](ci-evidence/2026-10-18-startup-queue-validation.json)
+keep this verification separate from the earlier PR results and local
+repeated-startup experiment.
+
+Linux release setup also now uses `linux-host-v1`: PR
+[#1367](https://github.com/obs-rust/obs-studio/pull/1367) merged at 00:11:16 UTC.
+All seven setup-soldr callsites now have explicit consumer profiles, and all
+Linux callsites distinguish host and container cache identities. The release
+workflow itself was not dispatched; its subsequent warm-consumer performance
+remains unmeasured.
 
 ### Subsequent consumers and availability failures
 
