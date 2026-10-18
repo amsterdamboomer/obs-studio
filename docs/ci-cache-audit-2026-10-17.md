@@ -19,7 +19,7 @@ remain [recorded separately](ci-evidence/2026-10-18-full-warm-validation.json).
 | --- | --- | --- |
 | Native compiler reuse | Linux Tier 2 784/785 cached; Windows Tier 2 308/309 cacheable hits | Preserve native compiler stores |
 | Warm Ubuntu ON | Full job 684 → 435 s; build 602 → 324 s, in unmatched observations | Keep the working ON seed; measure durability |
-| Ubuntu OFF fallback | 43/361 calls cached; mixed state 9,526 MiB; save skipped | #1371 verified: cold OFF saved a mode-specific seed below the size cap; later reuse remains pending |
+| Ubuntu OFF fallback | 43/361 calls cached; mixed state 9,526 MiB; save skipped | #1371 verified: later OFF restored the exact seed and achieved 208/345 cacheable hits; remaining misses and retention unresolved |
 | Embedded Rust store | All eight expanded soldr lanes reported no embedded session | #1372 disables transport; #1380 retired retention and the queue janitor reclaimed 183,330,575 bytes |
 | Rust correctness | Pinned compiler-cache stale-source bug and separate restored-target hazard remain | Keep wrapper bypass; do not deploy deeper test reuse without freshness validation |
 | Startup incident | Local reproduction plus PR, queue, master and full-run verification | #1365 verified; #1355 closed |
@@ -38,7 +38,7 @@ The plot shows all three trials and min–max ranges. Its warm panel excludes
 the initial seed build and uses a separately identified grouped revision.
 [Raw trials and reproducible plotting script](ci-evidence/libobs-2026-10-17/plot_trials.py).
 
-**Next priorities:** verify compatible Ubuntu seed consumption after #1371,
+**Next priorities:** investigate the remaining Ubuntu OFF misses,
 resolve the independently reproduced recording-wait race blocking #1362,
 restore durable retention of the measured plugin seeds, and collect at least
 one representative post-rollout day. Qt publication
@@ -96,7 +96,7 @@ calls cold (16 other calls noncacheable), and published its own snapshot:
 5,045 MiB raw, below the 8,192 MiB cap. The API confirmed both mode-specific
 seeds were present after the jobs completed. This verifies producer behavior
 under #1371, replacing the previous mixed-mode 9,526 MiB save failure. A later
-OFF consumer and stable retention are still required. The parent full run
+OFF consumer is recorded below; stable retention remains unverified. The parent full run
 subsequently passed all seven native app builds and the remaining checks.
 
 
@@ -110,6 +110,33 @@ this is a predicted future plan, not an observed deletion.
 Mode-compatible restores repair correctness of reuse and snapshot sizing,
 but cannot keep both modes warm under this allocation. Whole-budget policy
 remains unresolved under #1269; no global allocation change is claimed here.
+
+### Same-revision Ubuntu consumer results
+
+Both Ubuntu jobs passed in consumer run 39090099191, at the same source
+revision as the producer, and restored their exact new mode-specific keys.
+
+| Mode | Producer cached / cold | Consumer cached / cold | Build, producer → consumer | Whole job, producer → consumer |
+| --- | --- | --- | --- | --- |
+| OFF | 0 / 345 | 208 / 137 | 630 → 359 s | 661 → 405 s |
+| ON | 340 / 5 | 343 / 2 | 234 → 212 s | 340 → 324 s |
+
+Each job also reported 16 noncacheable calls. These are individual runner
+observations, not a controlled hardware comparison or queue-throughput result.
+[Consumer logs, counters and step timing metadata](ci-evidence/2026-10-18-ubuntu-compatible-consumer.json).
+The parent consumer workflow is still active at this capture.
+
+OFF's runner image, GNU 15.2.0, zccache 1.15.5 and all 306 logged installed
+package versions match the producer. That excludes the visible version
+differences; it does not explain the 137 cold calls. These logs lack
+per-compilation hit/miss records, so neither their affected units nor root
+cause are established. Keep this gap distinct from the now-verified cache
+transport and compatibility fix.
+
+The save actions still compressed the stores on exact hits, taking 14 s OFF
+and 11 s ON, then warned that the immutable keys could not be reserved.
+PR #1381 adds a guard to skip this redundant work; it is not yet a verified
+runtime saving. Restore, build and integrity coverage remain required.
 
 ## Executive assessment
 
@@ -700,7 +727,7 @@ has passed PR, queue, master and full native validation; #1355 is closed.
 | --- | --- |
 | 1. Match cook profiles and measure consumers | Explicit profiles landed in #1318; local dev/release/no-cook experiment and native consumers recorded. Representative post-rollout comparison remains pending. |
 | 2. Rust cache correctness | Reproduction still fails on pinned soldr; safeguard retained in #1290, upstream zccache#1943 linked. |
-| 3. Remove unused overhead | #1372 disables unused embedded transport in all seven callsites; #1380 reclaimed 183 MB of retired archives. Qt exact-key reuse skips duplicate publication. #1371 mode-compatible Ubuntu producers passed; later OFF reuse and whole-budget retention remain to verify. |
+| 3. Remove unused overhead | #1372 disables unused embedded transport in all seven callsites; #1380 reclaimed 183 MB of retired archives. Qt exact-key reuse skips duplicate publication. #1371 mode-compatible Ubuntu producers and later OFF reuse passed; remaining misses and whole-budget retention remain unresolved. |
 | 4. Warm scoped plugin builds | PR consumer verified 41/41 compiler hits, 323 packages and zero package download bytes; first unmatched job pair 165 → 148 s. Both seed families were later absent. Warming works; durable retention and day-scale benefit remain unresolved under #1269. |
 | 5. Persist test timing | Nonempty OFF/ON producer, save, later restore and CTest consumption verified across master runs (#1288/#1311). |
 | 6. Match remote save policy | All seven setup-soldr consumers use master-only remote saves; PR/queue/local-save behavior verified (#1291). |
