@@ -97,6 +97,18 @@ under #1371, replacing the previous mixed-mode 9,526 MiB save failure. A later
 OFF consumer and stable retention are still required; parent full-workflow
 success is not established at this capture.
 
+
+The two new Ubuntu archives total 1,508,547,016 bytes, exceeding their pooled
+zccache family footprint of 1,153,433,600 bytes (shared with AppImage and
+sanitizer entries). The pinned janitor, run offline on the saved inventory
+with a hypothetical clock beyond the grace window, plans deletion of the
+ON archive and retention of OFF. Both were present in the real inventory;
+this is a predicted future plan, not an observed deletion.
+[Exact entries, capacity and dry-run plan](ci-evidence/2026-10-18-ubuntu-retention-plan.json).
+Mode-compatible restores repair correctness of reuse and snapshot sizing,
+but cannot keep both modes warm under this allocation. Whole-budget policy
+remains unresolved under #1269; no global allocation change is claimed here.
+
 ## Executive assessment
 
 The janitor failed because a fork PR received a read-only Actions token:
