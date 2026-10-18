@@ -645,6 +645,12 @@ selection, isolated directories, cmocka environment, skip rejection and logs.
 The graphics lane writes `graphics-c-tests.json` and
 `graphics-c-test-runs/` under the selected output directory.
 
+The combined graphics/VLC run passes all fourteen executable/core combinations
+(58 cmocka cases), without skips, plus the lifecycle/render checks and four
+validated MP4/MKV recordings. It took 222.04 seconds including runtime checks;
+soldr reports 112 cache hits and zero misses. Formatting, all-target/all-feature
+Clippy and the primary review pass. This validates the shared runner extraction.
+
 The prior-head CI run `39091137249` fails this executable against the Rust
 core: all four cases report no program audio at line 216. Its log shows audio
 buffering growing from zero to the 960 ms maximum before the failures. The
