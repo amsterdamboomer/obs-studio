@@ -555,12 +555,23 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         || nvenc.is_some()
         || qsv_enabled
         || captures_audio()
-        || std::env::var_os("OBS_BUILD_VLC_C_TESTS").is_some();
+        || std::env::var_os("OBS_BUILD_VLC_C_TESTS").is_some()
+        || std::env::var_os("OBS_BUILD_GRAPHICS_C_TESTS").is_some();
     let renderer = wants_graphics
         .then(|| graphics::build_opengl(&build, &root, &libraries.reference, &options).unwrap());
     let probe = renderer
         .as_ref()
         .map(|_| render::build(&build, &root, &libraries.reference));
+    if std::env::var_os("OBS_BUILD_GRAPHICS_C_TESTS").is_some() {
+        let tests = obs_build::validation::build_graphics_tests(
+            &build,
+            &root,
+            &libraries.reference,
+            renderer.as_ref().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(tests.len(), 1);
+    }
     if std::env::var_os("OBS_BUILD_VLC_C_TESTS").is_some() {
         let vlc = modules
             .iter()

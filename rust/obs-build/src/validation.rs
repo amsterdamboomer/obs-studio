@@ -24,6 +24,16 @@ impl Default for Options {
     }
 }
 
+/// Build unchanged cmocka tests that require the native graphics module.
+pub fn build_graphics_tests(
+    _build: &NativeBuild,
+    _root: &Path,
+    _core: &Path,
+    _graphics: &Path,
+) -> Result<Vec<Executable>, String> {
+    Err("graphics compatibility test build is not implemented".into())
+}
+
 /// Build the unchanged VLC compatibility tests against the real native modules.
 pub fn build_vlc_tests(
     build: &NativeBuild,
