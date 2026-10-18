@@ -26,12 +26,41 @@ impl Default for Options {
 
 /// Build unchanged cmocka tests that require the native graphics module.
 pub fn build_graphics_tests(
-    _build: &NativeBuild,
-    _root: &Path,
-    _core: &Path,
-    _graphics: &Path,
+    build: &NativeBuild,
+    root: &Path,
+    core: &Path,
+    graphics: &Path,
 ) -> Result<Vec<Executable>, String> {
-    Err("graphics compatibility test build is not implemented".into())
+    let root = dunce::canonicalize(root).map_err(|e| e.to_string())?;
+    let graphics = dunce::canonicalize(graphics).map_err(|e| e.to_string())?;
+    let quoted = serde_json::to_string(graphics.to_str().ok_or("non-UTF8 graphics test path")?)
+        .map_err(|e| e.to_string())?;
+    let name = "test_group_hide_transition_audio";
+    let mut library = SharedLibrary {
+        name: name.into(),
+        sources: vec![root.join(format!("test/cmocka/{name}.c"))],
+        include_dirs: vec![
+            root.join("libobs"),
+            root.join("deps/libcaption"),
+            build.output.join("config"),
+        ],
+        definitions: vec![("GRAPHICS_MODULE_PATH".into(), Some(quoted))],
+        dependencies: vec![core.into(), crate::libobs::build_caption(build, &root)?],
+        ..SharedLibrary::default()
+    };
+    crate::platform::configure_c_tests(build, &mut library, None)?;
+    for package in ["cmocka", "simde"] {
+        add_package(&mut library, &build.target, package)?;
+    }
+    println!("cargo:rerun-if-changed={}", library.sources[0].display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        root.join("libobs/data").display()
+    );
+    Ok(vec![Executable {
+        name: name.into(),
+        path: build.executable(&library)?,
+    }])
 }
 
 /// Build the unchanged VLC compatibility tests against the real native modules.

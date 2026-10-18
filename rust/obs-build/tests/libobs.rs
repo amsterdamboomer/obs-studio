@@ -3,6 +3,8 @@ use obs_build::{NativeBuild, frontend, graphics, libobs, plugins, scripting};
 use std::{ffi::c_void, path::PathBuf};
 #[path = "libobs/application.rs"]
 mod application;
+#[path = "libobs/native_tests.rs"]
+mod native_tests;
 #[path = "libobs/qt.rs"]
 mod qt;
 #[path = "libobs/render.rs"]
@@ -571,6 +573,14 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         )
         .unwrap();
         assert_eq!(tests.len(), 1);
+        native_tests::exercise(
+            &build,
+            &root,
+            &libraries.reference,
+            &libraries.with_rust,
+            &tests,
+            "graphics",
+        );
     }
     if std::env::var_os("OBS_BUILD_VLC_C_TESTS").is_some() {
         let vlc = modules

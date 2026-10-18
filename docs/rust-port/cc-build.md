@@ -629,6 +629,43 @@ took 188.79 seconds. This is runtime compatibility evidence, not a build-speed
 benchmark. A local pass does not resolve the playlist audio-integrity failure
 seen in prior-head PR CI and tracked by #838.
 
+### Graphics-dependent unchanged C tests
+
+`OBS_BUILD_GRAPHICS_C_TESTS=1` adds the original
+`test_group_hide_transition_audio` executable to the Cargo graph. It retains
+the original core/caption/cmocka/math dependencies, graphics-module definition,
+effects and 120-second timeout. RED `60beca399` fails at the missing builder.
+The implemented lane passes all four cases against each core (eight total),
+with no skips, in a 40.15-second core/module/render invocation. The native
+compiler cache reports 62 hits and two misses for that invocation. This is not
+a controlled build benchmark.
+
+The VLC and graphics lanes share the same runner for canonical paths, core
+selection, isolated directories, cmocka environment, skip rejection and logs.
+The graphics lane writes `graphics-c-tests.json` and
+`graphics-c-test-runs/` under the selected output directory.
+
+The prior-head CI run `39091137249` fails this executable against the Rust
+core: all four cases report no program audio at line 216. Its log shows audio
+buffering growing from zero to the 960 ms maximum before the failures. The
+C-core Linux lane and Windows/macOS Tier 2 lanes pass. The local pass above
+does not resolve that failure.
+
+An isolated diagnostic of the original `add_audio_buffering` function found
+that a positive delay below one sample rounds to zero frames/ticks, leaving
+`new_ts.end` uninitialized before copying it to the caller. With GCC's pattern
+initialization enabled, verbatim function extraction reproduces invalid
+intervals for 1, 10000 and 20833 ns delays at 48 kHz. A second probe directly
+includes the original source, uses the real headers and links the native core
+with no dependency stubs; it reproduces all three invalid intervals and the
+valid one-frame case. A scratch copy with the local interval initialized from
+the incoming interval corrects all diagnostic cases while retaining the
+one-frame case, with the same real headers/core and compiler flags. This
+establishes a function-level defect, not causation of the full CI failure.
+No production audio source or existing C test is changed at this checkpoint.
+Reproduction source and results are retained in the local reports
+directory under `audio-buffering-probe/` for follow-up.
+
 ## Optional compiled PCH for Linux cores
 
 `libobs::Options::pch` defaults to false and is independent of `unity`.
