@@ -210,9 +210,19 @@ this single observation does not establish durable overall retention.
 [Runtime policy and consumer evidence](ci-evidence/2026-10-18-cache-policy-runtime.json).
 
 The mode/configuration restore restriction #1371 is also merged, but no
-post-change Ubuntu seed/consumer measurement is claimed. PR #1374 changes
-Qt publication identity so documentation-only SHAs can share a snapshot;
-its actual producer/exact-hit consumer verification remains pending.
+post-change Ubuntu seed/consumer measurement is claimed. PR #1374 merged and its master Qt producer (job 117551485401, run
+39084764880) passed: 298/300 cacheable hits, a new
+`qt-ccache-linux-inputs-v1-7d748b6e…` snapshot, and a 5-second save step.
+[Producer metadata](ci-evidence/2026-10-18-qt-identity-producer.json) records the
+exact key and bytes. A subsequent docs-only consumer must still prove exact
+reuse and skipped upload; the initial save is not that proof.
+
+The unchanged group-hide audio test passed three isolated and sixteen
+concurrent local invocations on four pinned CPUs (76 cases, no skips). This
+negative sample did not reproduce #838; serial execution preceded concurrent
+execution without cold/warm Mesa cache control, and local binaries were not
+matched to the GitHub revision. No scheduling or assertion change was made.
+[Local probe and limitations](ci-evidence/2026-10-18-audio-resource-probe.json).
 
 ### Subsequent consumers and availability failures
 
