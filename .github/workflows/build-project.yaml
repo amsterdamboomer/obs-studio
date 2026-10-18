@@ -1521,19 +1521,20 @@ jobs:
           inputs="$RUNNER_TEMP/qt-compiler-inputs"
           git ls-files --stage -z -- . ':!docs/**' ':!*.md' ':!**/*.md' > "$inputs"
           printf '\nimage=%s\nqt=%s\nffmpeg=%s\n' "${ImageVersion:-unknown}" "$QT_SHA256" "$FFMPEG_SHA256" >> "$inputs"
+          cc --version >> "$inputs"
           c++ --version >> "$inputs"
           cmake --version >> "$inputs"
           ccache --version >> "$inputs"
           ninja --version >> "$inputs"
           digest=$(sha256sum "$inputs" | cut -d' ' -f1)
-          echo "key=qt-ccache-linux-inputs-v1-$digest" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
       # Older snapshots remain useful fallbacks when actual inputs change.
       - uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         id: qt-compiler-cache
         with:
           path: ${{ github.workspace }}/.qt-ccache
-          key: ${{ steps.qt-cache-identity.outputs.key }}
+          key: qt-ccache-linux-inputs-v1-${{ steps.qt-cache-identity.outputs.digest }}
           restore-keys: qt-ccache-linux-
 
       - name: Set Qt Cache Limit 🗄️
@@ -1558,7 +1559,7 @@ jobs:
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && steps.qt-compiler-cache.outputs.cache-hit != 'true'
         with:
           path: ${{ github.workspace }}/.qt-ccache
-          key: ${{ steps.qt-cache-identity.outputs.key }}
+          key: qt-ccache-linux-inputs-v1-${{ steps.qt-cache-identity.outputs.digest }}
 
   rust-tier2:
     name: Rust Tier 2 ${{ matrix.os }}

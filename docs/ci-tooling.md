@@ -131,7 +131,7 @@ whose dependency and vendored zccache both include the new version.
 Qt compiler snapshots use `qt-ccache-linux-inputs-v1-<digest>` rather than a
 new key for every commit. On the clean CI checkout, the digest includes staged
 file identities except `docs/` and Markdown, the runner image, pinned Qt/FFmpeg
-archives, and installed C++, CMake, ccache and Ninja versions. An exact restore
+archives, and installed C, C++, CMake, ccache and Ninja versions. An exact restore
 skips the upload; changed inputs can restore the existing `qt-ccache-linux-`
 fallback and publish a new snapshot on master. Older archives are not purged.
 

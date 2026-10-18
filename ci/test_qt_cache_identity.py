@@ -29,7 +29,7 @@ class QtCacheIdentityTest(unittest.TestCase):
         self.env = dict(os.environ, PATH=f"{tools}{os.pathsep}{os.environ['PATH']}",
                         RUNNER_TEMP=str(self.root), GITHUB_OUTPUT=str(self.root / "outputs"),
                         QT_SHA256="qt-a", FFMPEG_SHA256="ff-a", ImageVersion="image-a")
-        for command, variable in (("c++", "TEST_CXX"), ("cmake", "TEST_CMAKE"),
+        for command, variable in (("cc", "TEST_CC"), ("c++", "TEST_CXX"), ("cmake", "TEST_CMAKE"),
                                   ("ccache", "TEST_CCACHE"), ("ninja", "TEST_NINJA")):
             tool = tools / command
             tool.write_text(f'#!/bin/sh\nprintf "%s\\n" "${{{variable}}}"\n')
@@ -52,7 +52,7 @@ class QtCacheIdentityTest(unittest.TestCase):
         subprocess.run(["bash", "-euo", "pipefail", "-c", script], cwd=self.root,
                        env={**self.env, **overrides}, capture_output=True, text=True, check=True)
         result = output.read_text().strip()
-        self.assertRegex(result, r"^key=qt-ccache-linux-inputs-v1-[0-9a-f]{64}$")
+        self.assertRegex(result, r"^digest=[0-9a-f]{64}$")
         return result
 
     def test_documentation_changes_keep_the_same_snapshot(self):
@@ -74,13 +74,13 @@ class QtCacheIdentityTest(unittest.TestCase):
 
     def test_compiler_tools_image_and_library_pins_change_identity(self):
         initial = self.key()
-        for variable in ("TEST_CXX", "TEST_CMAKE", "TEST_CCACHE", "TEST_NINJA",
+        for variable in ("TEST_CC", "TEST_CXX", "TEST_CMAKE", "TEST_CCACHE", "TEST_NINJA",
                          "ImageVersion", "QT_SHA256", "FFMPEG_SHA256"):
             with self.subTest(variable=variable):
                 self.assertNotEqual(self.key(**{variable: "changed"}), initial)
 
     def test_restore_and_save_share_identity_and_exact_hits_skip_upload(self):
-        reference = "key: ${{ steps.qt-cache-identity.outputs.key }}"
+        reference = "key: qt-ccache-linux-inputs-v1-${{ steps.qt-cache-identity.outputs.digest }}"
         self.assertEqual(self.job.count(reference), 2)
         self.assertIn("id: qt-compiler-cache", self.job)
         save = self.job.split("- name: Save Qt ccache", 1)[1]
