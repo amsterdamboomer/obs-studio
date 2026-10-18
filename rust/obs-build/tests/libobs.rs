@@ -88,6 +88,9 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     if enabled("OBS_BUILD_APP_GUI") && std::env::var_os("OBS_BUILD_FDK").is_some() {
         options.core_modules.push("obs-libfdk".into());
     }
+    if enabled("OBS_BUILD_APP_GUI") && std::env::var_os("OBS_BUILD_QSV").is_some() {
+        options.core_modules.push("obs-qsv11".into());
+    }
     if enabled("OBS_BUILD_APP_GUI") && std::env::var_os("OBS_BUILD_NVENC").is_some() {
         options.core_modules.push("obs-nvenc".into());
     }
@@ -299,6 +302,24 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     }
     if std::env::var_os("OBS_BUILD_FDK").is_some() {
         modules.push(plugins::build_fdk(&build, &root, &libraries.reference).unwrap());
+    }
+    let qsv_enabled = std::env::var_os("OBS_BUILD_QSV").is_some();
+    if qsv_enabled {
+        let module = plugins::build_qsv(
+            &build,
+            &root,
+            &libraries.reference,
+            &plugins::QsvOptions {
+                hevc: options.hevc,
+                unity: std::env::var_os("OBS_BUILD_DISABLE_QSV_UNITY").is_none(),
+                pch: std::env::var_os("OBS_BUILD_QSV_PCH").is_some(),
+            },
+        )
+        .unwrap();
+        if let Some(reference) = std::env::var_os("OBS_BUILD_QSV_REFERENCE") {
+            assert_eq!(exports(&module.library), exports(&PathBuf::from(reference)));
+        }
+        modules.push(module);
     }
     if std::env::var_os("OBS_BUILD_VLC").is_some() {
         let vlc = plugins::build_source(
@@ -524,6 +545,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         || enabled("OBS_BUILD_SOURCES")
         || enabled("OBS_BUILD_PIPEWIRE")
         || nvenc.is_some()
+        || qsv_enabled
         || captures_audio();
     let renderer = wants_graphics
         .then(|| graphics::build_opengl(&build, &root, &libraries.reference, &options).unwrap());
@@ -584,6 +606,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     } else {
         &[("mp4_output", "mp4")]
     };
+    let mut qsv_registrations = Vec::<Vec<String>>::new();
     for (path, (output_id, extension)) in [&libraries.reference, &libraries.with_rust]
         .into_iter()
         .flat_map(|path| outputs.iter().map(move |output| (path, output)))
@@ -646,6 +669,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
                 || line.contains("cc::Build audio encoder")
                 || line.contains("cc::Build JACK capture")
                 || line.contains("cc::Build sndio capture")
+                || line.contains("cc::Build QSV encoders")
         }) {
             println!("{}: {line}", path.display());
         }
@@ -656,6 +680,31 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             String::from_utf8_lossy(&run.stdout),
             String::from_utf8_lossy(&run.stderr)
         );
+        if qsv_enabled {
+            let stdout = String::from_utf8_lossy(&run.stdout);
+            let encoders: Vec<String> = serde_json::from_str(
+                stdout
+                    .lines()
+                    .find_map(|line| {
+                        line.split_once("cc::Build QSV encoders: ")
+                            .map(|(_, ids)| ids)
+                    })
+                    .expect("QSV capability inventory was not exercised"),
+            )
+            .unwrap();
+            if let Some(first) = qsv_registrations.first() {
+                assert_eq!(
+                    &encoders, first,
+                    "QSV registrations differ across core variants"
+                );
+            }
+            qsv_registrations.push(encoders);
+            std::fs::write(
+                build.output.join("qsv-registrations.json"),
+                serde_json::to_vec_pretty(&qsv_registrations).unwrap(),
+            )
+            .unwrap();
+        }
         if std::env::var_os("OBS_BUILD_FDK").is_some() && recording.is_some() {
             assert!(
                 String::from_utf8_lossy(&run.stdout)
@@ -867,6 +916,30 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
                 && (expected != "ffmpeg_nvenc"
                     || std::env::var_os("OBS_BUILD_DISABLE_NVENC_FFMPEG_IDS").is_none());
             assert_eq!(found, enabled, "unexpected registration of {expected}");
+        }
+        if std::env::var_os("OBS_BUILD_QSV").is_some() {
+            let enumerate = library
+                .get::<unsafe extern "C" fn(usize, *mut *const std::ffi::c_char) -> bool>(
+                    b"obs_enum_encoder_types",
+                )
+                .unwrap();
+            let mut ids = Vec::new();
+            for index in 0..1024 {
+                let mut id = std::ptr::null();
+                if !enumerate(index, &mut id) {
+                    break;
+                }
+                let id = std::ffi::CStr::from_ptr(id).to_str().unwrap();
+                if id.starts_with("obs_qsv11") {
+                    assert!(hevc || !id.contains("hevc"));
+                    ids.push(id.to_owned());
+                }
+            }
+            ids.sort();
+            println!(
+                "cc::Build QSV encoders: {}",
+                serde_json::to_string(&ids).unwrap()
+            );
         }
         if let Some(probe) = &probe {
             let render = probe

@@ -254,6 +254,33 @@ pub fn build_fdk(build: &NativeBuild, root: &Path, core: &Path) -> Result<Module
     finish(build, &root, library)
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct QsvOptions {
+    pub hevc: bool,
+    pub unity: bool,
+    pub pch: bool,
+}
+
+impl Default for QsvOptions {
+    fn default() -> Self {
+        Self {
+            hevc: true,
+            unity: true,
+            pch: false,
+        }
+    }
+}
+
+/// Build the original Intel Quick Sync encoder module.
+pub fn build_qsv(
+    _build: &NativeBuild,
+    _root: &Path,
+    _core: &Path,
+    _options: &QsvOptions,
+) -> Result<Module, String> {
+    Err("Intel QSV native module build is not implemented".into())
+}
+
 pub fn build_x264(build: &NativeBuild, root: &Path, core: &Path) -> Result<Module, String> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let mut library = module(build, &root, core, "obs-x264")?;
