@@ -908,6 +908,21 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
             ]);
         }
         if enabled("OBS_BUILD_RECORD") {
+            let codecs = library
+                .get::<unsafe extern "C" fn(*const std::ffi::c_char) -> *const std::ffi::c_char>(
+                    b"obs_get_output_supported_video_codecs",
+                )
+                .unwrap();
+            for id in [c"mp4_output", c"mov_output"] {
+                let supported = codecs(id.as_ptr());
+                assert!(!supported.is_null());
+                let supported = std::ffi::CStr::from_ptr(supported).to_str().unwrap();
+                assert_eq!(
+                    supported.split(';').any(|codec| codec == "hevc"),
+                    hevc,
+                    "output HEVC advertisement does not match the build option"
+                );
+            }
             expected_types.extend([
                 (b"obs_enum_encoder_types".as_slice(), "obs_x264"),
                 (b"obs_enum_encoder_types".as_slice(), "ffmpeg_aac"),
