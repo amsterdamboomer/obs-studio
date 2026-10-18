@@ -41,8 +41,11 @@ struct coreaudio_data {
 
 	pthread_t reconnect_thread;
 	os_event_t *exit_event;
+	os_event_t *wake_event;
 	volatile bool reconnecting;
+	volatile bool retry_reset;
 	unsigned long retry_time;
+	struct coreaudio_retry retry;
 
 	obs_source_t *source;
 };
@@ -454,16 +457,69 @@ static void coreaudio_stop(struct coreaudio_data *ca);
 static bool coreaudio_init(struct coreaudio_data *ca);
 static void coreaudio_uninit(struct coreaudio_data *ca);
 
+static const AudioObjectPropertyAddress reconnect_wake_addrs[] = {
+	{kAudioHardwarePropertyDevices, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain},
+	{PROPERTY_DEFAULT_DEVICE, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain},
+};
+
+static OSStatus reconnect_wake_callback(AudioObjectID id, UInt32 num_addresses,
+					const AudioObjectPropertyAddress addresses[], void *data)
+{
+	struct coreaudio_data *ca = data;
+
+	ca->retry_reset = true;
+	os_event_signal(ca->wake_event);
+
+	UNUSED_PARAMETER(id);
+	UNUSED_PARAMETER(num_addresses);
+	UNUSED_PARAMETER(addresses);
+	return noErr;
+}
+
 static void *reconnect_thread(void *param)
 {
 	struct coreaudio_data *ca = param;
 
 	ca->reconnecting = true;
+	ca->retry_reset = false;
+	os_event_reset(ca->wake_event);
+	coreaudio_retry_reset(&ca->retry, ca->retry_time);
 
-	while (os_event_timedwait(ca->exit_event, ca->retry_time) == ETIMEDOUT) {
+	/* A device-list or default-device change wakes the wait early and
+	 * restarts the backoff at its base (#1358). */
+	for (size_t i = 0; i < sizeof(reconnect_wake_addrs) / sizeof(reconnect_wake_addrs[0]); i++) {
+		AudioObjectAddPropertyListener(kAudioObjectSystemObject, &reconnect_wake_addrs[i],
+					       reconnect_wake_callback, ca);
+	}
+
+	for (;;) {
+		bool cap_first = false;
+		unsigned long wait = coreaudio_retry_next(&ca->retry, &cap_first);
+
+		if (cap_first) {
+			blog(LOG_INFO, "coreaudio: device '%s' still unavailable, retrying every %lu s",
+			     ca->device_name, COREAUDIO_RETRY_MAX_MS / 1000);
+		}
+
+		int ret = os_event_timedwait(ca->wake_event, wait);
+		if (os_event_try(ca->exit_event) == 0) {
+			break;
+		}
+		if (ret == 0) {
+			if (ca->retry_reset) {
+				ca->retry_reset = false;
+				coreaudio_retry_reset(&ca->retry, ca->retry_time);
+			}
+			continue;
+		}
 		if (coreaudio_init(ca)) {
 			break;
 		}
+	}
+
+	for (size_t i = 0; i < sizeof(reconnect_wake_addrs) / sizeof(reconnect_wake_addrs[0]); i++) {
+		AudioObjectRemovePropertyListener(kAudioObjectSystemObject, &reconnect_wake_addrs[i],
+						  reconnect_wake_callback, ca);
 	}
 
 	blog(LOG_DEBUG, "coreaudio: exit the reconnect thread");
@@ -789,6 +845,7 @@ static void coreaudio_shutdown(struct coreaudio_data *ca)
 {
 	if (ca->reconnecting) {
 		os_event_signal(ca->exit_event);
+		os_event_signal(ca->wake_event);
 		pthread_join(ca->reconnect_thread, NULL);
 		os_event_reset(ca->exit_event);
 	}
@@ -812,6 +869,7 @@ static void coreaudio_destroy(void *data)
 		}
 
 		os_event_destroy(ca->exit_event);
+		os_event_destroy(ca->wake_event);
 
 		if (ca->channel_map) {
 			bfree(ca->channel_map);
@@ -879,6 +937,13 @@ static void *coreaudio_create(obs_data_t *settings, obs_source_t *source, bool i
 		     "[coreaudio_create] failed to create "
 		     "semephore: %d",
 		     errno);
+		bfree(ca);
+		return NULL;
+	}
+
+	if (os_event_init(&ca->wake_event, OS_EVENT_TYPE_AUTO) != 0) {
+		blog(LOG_ERROR, "[coreaudio_create] failed to create wake event: %d", errno);
+		os_event_destroy(ca->exit_event);
 		bfree(ca);
 		return NULL;
 	}

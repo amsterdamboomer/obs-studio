@@ -47,9 +47,21 @@ static inline void coreaudio_retry_reset(struct coreaudio_retry *r, unsigned lon
  * per schedule: the first time the wait reaches COREAUDIO_RETRY_MAX_MS. */
 static inline unsigned long coreaudio_retry_next(struct coreaudio_retry *r, bool *cap_first)
 {
-	/* STUB (RED): today's fixed interval. */
-	*cap_first = false;
-	return r->base_ms;
+	unsigned long wait = r->next_ms;
+
+	if (wait >= COREAUDIO_RETRY_MAX_MS) {
+		wait = COREAUDIO_RETRY_MAX_MS;
+	} else if (r->next_ms > COREAUDIO_RETRY_MAX_MS / 2) {
+		r->next_ms = COREAUDIO_RETRY_MAX_MS;
+	} else {
+		r->next_ms *= 2;
+	}
+
+	*cap_first = wait == COREAUDIO_RETRY_MAX_MS && !r->cap_reported;
+	if (*cap_first) {
+		r->cap_reported = true;
+	}
+	return wait;
 }
 
 #ifdef __cplusplus
