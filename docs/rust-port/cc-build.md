@@ -879,3 +879,57 @@ the same six dynamic symbols. This verifies module exports; it is not a
 complete CMake application or a cross-platform runtime comparison. The default
 GUI/browser path is checked separately to ensure adding this optional encoder
 does not make it mandatory.
+
+
+## Optional JACK and sndio audio modules
+
+`SourceModule::Jack` and `SourceModule::Sndio` build the original Linux unity
+groups as dynamic modules through `cc::Build`, with pkg-config dependencies
+`jack` and `sndio`. Both remain disabled by default, including ordinary GUI
+runs. Select them independently with `OBS_BUILD_JACK=1` and
+`OBS_BUILD_SNDIO=1` in the integration driver. The GUI core-module whitelist
+includes each only when explicitly selected. The sndio target retains the
+original `-Wno-error=vla` option.
+
+RED `452911b5c` fails at the unimplemented optional audio module graph. With
+that graph implemented, both modules load and register their original
+`jack_output_capture` and `sndio_output_capture` input IDs against both C and
+Rust cores; the existing graphics and four-recording checks also pass (20.52 s).
+Reference builds invoke each original CMake target with the same SDKs (JACK
+1.9.22 and sndio 1.10.0). Each module exports exactly the same seven symbols as
+its Cargo-built counterpart. The JACK reference needs an explicit include path
+because its original finder's pkg-config include hint uses the singular name.
+No CMake source list was recreated for these reference builds.
+
+### Actual input capture
+
+The new C fixture uses unchanged public OBS headers and real audio clients. It
+sends distinct stereo samples (left 0.25, right -0.125) through each original
+source, requiring at least three matching packets at the public source audio
+capture callback. Event waits are bounded; JACK clients close, the sndio writer
+thread joins, callbacks are removed and sources are released before the local
+probe state is destroyed. No existing upstream C test or public header changes.
+
+- JACK: start a separately named non-realtime `jackd` dummy server, export its
+  `JACK_DEFAULT_SERVER`, and set `OBS_BUILD_JACK=1 OBS_BUILD_JACK_CAPTURE=1`.
+  The fixture connects its writer to the real OBS source's two JACK ports.
+- sndio: start an owned `sndiod` with playback/monitor mode (`-m play,mon`) and
+  a named sub-device, set `OBS_BUILD_SNDIO=1`, and pass its descriptor as
+  `OBS_BUILD_SNDIO_CAPTURE_DEVICE` (for example `snd,11/capture` for server
+  unit 11 and sub-device `capture`). The fixture writes through the real sndio
+  client API and observes the monitor source. Use a clocked audio backend.
+- Either capture flag requests the existing graphics probe and initializes
+  stereo audio; recording is optional. The existing probe still requires an
+  X11 display and an OpenGL implementation. These are Linux integration tests.
+
+A direct ALSA null backend did not drive sndiod: its watchdog timed out and the
+sample test failed. Keeping the assertions intact, the validated fixture routes
+sndiod through ALSA's PulseAudio plugin into a private PulseAudio null sink.
+No desktop audio service or physical input is used. The combined run passes
+against both cores, exercises both input captures in each of the four recording
+processes, and validates all recordings (33.67 s, 96 cache hits / zero misses).
+That interval includes runtime capture and recordings; it is not a compile-only
+benchmark. Capture-only validation with recording disabled also passes against
+both cores (15.53 s), exercising both inputs without relying on recording to
+initialize audio. Real physical-device routing, platform graphs and packaged audio
+runtime remain separate requirements of the full conversion.

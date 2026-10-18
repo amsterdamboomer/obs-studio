@@ -20,7 +20,16 @@ pub fn build(build: &NativeBuild, root: &Path, core: &Path) -> PathBuf {
         compile_options: vec!["-std=gnu17".into()],
         ..SharedLibrary::default()
     };
-    for package in ["simde", "x11"] {
+    let mut packages = vec!["simde", "x11"];
+    if std::env::var_os("OBS_BUILD_JACK_CAPTURE").is_some() {
+        packages.push("jack");
+        library.definitions.push(("OBS_FIXTURE_JACK".into(), None));
+    }
+    if std::env::var_os("OBS_BUILD_SNDIO_CAPTURE_DEVICE").is_some() {
+        packages.push("sndio");
+        library.definitions.push(("OBS_FIXTURE_SNDIO".into(), None));
+    }
+    for package in packages {
         let dependency = pkg_config::Config::new()
             .cargo_metadata(false)
             .probe(package)
@@ -43,12 +52,191 @@ const SOURCE: &str = r#"
 #include <obs.h>
 #include <obs-nix-platform.h>
 #include <util/platform.h>
+#include <util/threading.h>
+#ifdef OBS_FIXTURE_JACK
+#include <jack/jack.h>
+#endif
+#ifdef OBS_FIXTURE_SNDIO
+#include <sndio.h>
+#include <poll.h>
+#include <pthread.h>
+#endif
 
 static Display *test_display;
 static atomic_uint frames;
 static atomic_uint invalid_frames;
 static atomic_uint expected_y = 16;
 static uint32_t fixture_width = 64, fixture_height = 64;
+
+#if defined(OBS_FIXTURE_JACK) || defined(OBS_FIXTURE_SNDIO)
+struct capture_probe {
+    os_event_t *ready;
+    atomic_uint packets;
+#ifdef OBS_FIXTURE_JACK
+    jack_port_t *ports[2];
+#endif
+};
+
+static void receive_audio(void *opaque, obs_source_t *source,
+                          const struct audio_data *audio, bool muted)
+{
+    (void)source;
+    struct capture_probe *probe = opaque;
+    if (muted || !audio->frames || !audio->data[0] || !audio->data[1])
+        return;
+    const float left = ((const float *)audio->data[0])[0];
+    const float right = ((const float *)audio->data[1])[0];
+    if (left > 0.24f && left < 0.26f && right < -0.12f && right > -0.13f &&
+        atomic_fetch_add(&probe->packets, 1) + 1 >= 3)
+        os_event_signal(probe->ready);
+}
+#endif
+
+#ifdef OBS_FIXTURE_JACK
+static int send_jack_audio(jack_nframes_t frames, void *opaque)
+{
+    struct capture_probe *probe = opaque;
+    float *left = jack_port_get_buffer(probe->ports[0], frames);
+    float *right = jack_port_get_buffer(probe->ports[1], frames);
+    for (jack_nframes_t i = 0; i < frames; i++) {
+        left[i] = 0.25f;
+        right[i] = -0.125f;
+    }
+    return 0;
+}
+
+EXPORT int obs_fixture_capture_jack(void)
+{
+    struct capture_probe probe = {0};
+    if (os_event_init(&probe.ready, OS_EVENT_TYPE_AUTO))
+        return 90;
+    obs_source_t *source = obs_source_create_private("jack_output_capture",
+        "cc-build-jack-capture", NULL);
+    jack_client_t *writer = NULL;
+    int status = 91;
+    if (!source)
+        goto cleanup;
+    obs_source_add_audio_capture_callback(source, receive_audio, &probe);
+    writer = jack_client_open("cc-build-jack-writer", JackNoStartServer, NULL);
+    if (!writer)
+        goto cleanup;
+    for (unsigned i = 0; i < 2; i++) {
+        probe.ports[i] = jack_port_register(writer, i ? "right" : "left",
+            JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+        if (!probe.ports[i])
+            goto cleanup;
+    }
+    if (jack_set_process_callback(writer, send_jack_audio, &probe) || jack_activate(writer))
+        goto cleanup;
+    if (jack_connect(writer, jack_port_name(probe.ports[0]),
+                     "OBS Studio: cc-build-jack-capture:in_1") ||
+        jack_connect(writer, jack_port_name(probe.ports[1]),
+                     "OBS Studio: cc-build-jack-capture:in_2"))
+        goto cleanup;
+    status = os_event_timedwait(probe.ready, 5000) ? 92 : 0;
+    if (!status)
+        blog(LOG_INFO, "cc::Build JACK capture: %u packets with distinct stereo samples",
+             atomic_load(&probe.packets));
+cleanup:
+    if (writer)
+        jack_client_close(writer);
+    if (source) {
+        obs_source_remove_audio_capture_callback(source, receive_audio, &probe);
+        obs_source_release(source);
+        obs_wait_for_destroy_queue();
+    }
+    os_event_destroy(probe.ready);
+    return status;
+}
+#endif
+
+#ifdef OBS_FIXTURE_SNDIO
+struct sndio_writer {
+    struct sio_hdl *handle;
+    atomic_bool stop;
+};
+
+static void *send_sndio_audio(void *opaque)
+{
+    struct sndio_writer *writer = opaque;
+    int16_t samples[512 * 2];
+    for (size_t i = 0; i < 512; i++) {
+        samples[2 * i] = 8192;
+        samples[2 * i + 1] = -4096;
+    }
+    unsigned nfds = sio_nfds(writer->handle);
+    struct pollfd *fds = calloc(nfds, sizeof(*fds));
+    size_t offset = 0;
+    while (fds && !atomic_load(&writer->stop)) {
+        int count = sio_pollfd(writer->handle, fds, POLLOUT);
+        if (poll(fds, count, 100) < 0)
+            break;
+        int events = sio_revents(writer->handle, fds);
+        if (events & POLLHUP)
+            break;
+        if (events & POLLOUT) {
+            size_t written = sio_write(writer->handle,
+                (const uint8_t *)samples + offset, sizeof(samples) - offset);
+            offset = (offset + written) % sizeof(samples);
+        }
+    }
+    free(fds);
+    return NULL;
+}
+
+EXPORT int obs_fixture_capture_sndio(const char *device)
+{
+    struct capture_probe probe = {0};
+    struct sndio_writer writer = {0};
+    pthread_t thread;
+    bool started = false;
+    if (os_event_init(&probe.ready, OS_EVENT_TYPE_AUTO))
+        return 93;
+    obs_data_t *settings = obs_data_create();
+    obs_data_set_string(settings, "device", device);
+    obs_source_t *source = obs_source_create_private("sndio_output_capture",
+        "cc-build-sndio-capture", settings);
+    obs_data_release(settings);
+    int status = 94;
+    if (!source)
+        goto cleanup;
+    obs_source_add_audio_capture_callback(source, receive_audio, &probe);
+    writer.handle = sio_open(device, SIO_PLAY, 1);
+    if (!writer.handle)
+        goto cleanup;
+    struct sio_par parameters;
+    sio_initpar(&parameters);
+    parameters.bits = 16;
+    parameters.bps = 2;
+    parameters.sig = 1;
+    parameters.le = 1;
+    parameters.rate = 48000;
+    parameters.pchan = 2;
+    if (!sio_setpar(writer.handle, &parameters) || !sio_start(writer.handle))
+        goto cleanup;
+    if (pthread_create(&thread, NULL, send_sndio_audio, &writer))
+        goto cleanup;
+    started = true;
+    status = os_event_timedwait(probe.ready, 5000) ? 95 : 0;
+    if (!status)
+        blog(LOG_INFO, "cc::Build sndio capture: %u packets with distinct stereo samples",
+             atomic_load(&probe.packets));
+cleanup:
+    if (started) {
+        atomic_store(&writer.stop, true);
+        pthread_join(thread, NULL);
+    }
+    if (writer.handle)
+        sio_close(writer.handle);
+    if (source) {
+        obs_source_remove_audio_capture_callback(source, receive_audio, &probe);
+        obs_source_release(source);
+        obs_wait_for_destroy_queue();
+    }
+    os_event_destroy(probe.ready);
+    return status;
+}
+#endif
 
 EXPORT bool obs_fixture_open_display(void)
 {

@@ -363,9 +363,7 @@ pub fn configure_source(
         ));
     }
     let groups: &[&str] = match source {
-        SourceModule::Jack | SourceModule::Sndio => {
-            return Err("optional native audio source build is not implemented".into());
-        }
+        SourceModule::Jack | SourceModule::Sndio => &["nix"],
         SourceModule::Vlc => &["core", "posix"],
         SourceModule::PipeWire => &["nix"],
         SourceModule::Image => &["core", "slideshow", "posix"],
@@ -406,6 +404,9 @@ pub fn configure_source(
         add_package(library, target, package)?;
     }
     match source {
+        SourceModule::Sndio => {
+            library.compile_options.push("-Wno-error=vla".into());
+        }
         SourceModule::Vlc => {
             // Upstream loads libVLC at runtime and gracefully disables this
             // source when it is absent. Consume headers without a link edge.

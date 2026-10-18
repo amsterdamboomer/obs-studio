@@ -523,7 +523,8 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         || enabled("OBS_BUILD_RECORD")
         || enabled("OBS_BUILD_SOURCES")
         || enabled("OBS_BUILD_PIPEWIRE")
-        || nvenc.is_some();
+        || nvenc.is_some()
+        || captures_audio();
     let renderer = wants_graphics
         .then(|| graphics::build_opengl(&build, &root, &libraries.reference, &options).unwrap());
     let probe = renderer
@@ -643,6 +644,8 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
                 || line.contains("cc::Build recording")
                 || line.contains("cc::Build color source")
                 || line.contains("cc::Build audio encoder")
+                || line.contains("cc::Build JACK capture")
+                || line.contains("cc::Build sndio capture")
         }) {
             println!("{}: {line}", path.display());
         }
@@ -658,6 +661,12 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
                 String::from_utf8_lossy(&run.stdout)
                     .contains("cc::Build audio encoder: libfdk_aac")
             );
+        }
+        if std::env::var_os("OBS_BUILD_JACK_CAPTURE").is_some() {
+            assert!(String::from_utf8_lossy(&run.stdout).contains("cc::Build JACK capture:"));
+        }
+        if std::env::var_os("OBS_BUILD_SNDIO_CAPTURE_DEVICE").is_some() {
+            assert!(String::from_utf8_lossy(&run.stdout).contains("cc::Build sndio capture:"));
         }
         if let Some(recording) = recording {
             verify_recording(&recording);
@@ -754,7 +763,7 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
                 initialize(
                     renderer.as_ptr(),
                     data_path.as_ptr(),
-                    enabled("OBS_BUILD_RECORD")
+                    enabled("OBS_BUILD_RECORD") || captures_audio()
                 ),
                 0
             );
@@ -883,6 +892,29 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
                 0,
                 "graphics/frame rendering failed"
             );
+            if std::env::var_os("OBS_BUILD_JACK_CAPTURE").is_some() {
+                assert!(std::env::var_os("OBS_BUILD_JACK").is_some());
+                assert_eq!(
+                    probe
+                        .get::<unsafe extern "C" fn() -> i32>(b"obs_fixture_capture_jack")
+                        .unwrap()(),
+                    0,
+                    "JACK source did not receive the isolated writer's stereo samples"
+                );
+            }
+            if let Ok(device) = std::env::var("OBS_BUILD_SNDIO_CAPTURE_DEVICE") {
+                assert!(std::env::var_os("OBS_BUILD_SNDIO").is_some());
+                let device = std::ffi::CString::new(device).unwrap();
+                assert_eq!(
+                    probe
+                        .get::<unsafe extern "C" fn(*const std::ffi::c_char) -> i32>(
+                            b"obs_fixture_capture_sndio",
+                        )
+                        .unwrap()(device.as_ptr()),
+                    0,
+                    "sndio source did not receive the isolated writer's stereo samples"
+                );
+            }
         }
         let data = create();
         assert!(!data.is_null());
@@ -988,4 +1020,9 @@ fn verify_recording(path: &std::path::Path) {
 
 fn enabled(name: &str) -> bool {
     std::env::var_os(name).is_some() || std::env::var_os("OBS_BUILD_APP_GUI").is_some()
+}
+
+fn captures_audio() -> bool {
+    std::env::var_os("OBS_BUILD_JACK_CAPTURE").is_some()
+        || std::env::var_os("OBS_BUILD_SNDIO_CAPTURE_DEVICE").is_some()
 }

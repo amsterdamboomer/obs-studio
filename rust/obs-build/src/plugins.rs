@@ -441,6 +441,16 @@ pub fn build_source(
     let mut library = module(build, &root, core, source.name())?;
     library.sources.clear();
     crate::platform::configure_source(&build.target, &root, source, &mut library)?;
+    if matches!(source, SourceModule::Jack)
+        && build
+            .compiler(&library, &build.output, false)
+            .get_compiler()
+            .is_like_clang()
+    {
+        library
+            .c_compile_options
+            .push("-Wno-error=sign-compare".into());
+    }
     if matches!(source, SourceModule::X11Capture | SourceModule::PipeWire) {
         library
             .dependencies
