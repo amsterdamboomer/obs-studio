@@ -112,8 +112,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     }
     if std::env::var_os("OBS_BUILD_VLC").is_some() {
         assert!(
-            std::env::var_os("OBS_BUILD_VLC_C_TESTS").is_some()
-                || enabled("OBS_BUILD_APP_GUI"),
+            std::env::var_os("OBS_BUILD_VLC_C_TESTS").is_some() || enabled("OBS_BUILD_APP_GUI"),
             "VLC integration requires either C tests or the staged GUI"
         );
         if enabled("OBS_BUILD_APP_GUI") {

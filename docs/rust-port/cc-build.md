@@ -603,6 +603,32 @@ confirm the runtime is absent; a discovered system installation fails this
 fixture rather than weakening the check. This does not establish packaging
 of VLC, every codec/playlist mode or actual audio-device output.
 
+### Unchanged VLC compatibility tests through Cargo
+
+`validation::build_vlc_tests` builds all six original Linux VLC cmocka
+executables: drain gate, host path, channel order, audio tracks, audio pacing
+and playlist gaps. The pacing executable retains its FFmpeg dependencies.
+The C sources and their assertions are unchanged. Select the lane with
+`OBS_BUILD_VLC=1 OBS_BUILD_VLC_C_TESTS=1` and provide the real libVLC runtime.
+It does not require the staged GUI or websocket lane.
+
+The integration driver runs every executable against each core, checks the
+selected library with `ldd`, stages the original effects, and isolates each
+working directory and temporary/configuration/data/cache directory. It retains
+the original 60/120-second limits and rejects skipped tests, including exit 77.
+It clears inherited cmocka filters and forces standard output formatting so
+external settings cannot silently select fewer cases or hide skipped cases.
+Paths are canonicalized before changing the child working directory, including
+when `OBS_BUILD_TEST_OUTPUT` is relative. Results and raw logs are retained
+under the output directory in `vlc-c-tests.json` and `vlc-c-test-runs/`.
+
+RED `a616f3c57` fails at the missing native test builder. The implemented graph
+passes all twelve executions (50 cmocka cases) without skips using libVLC
+3.0.23. The combined core/module/render and four MP4/MKV recording validation
+took 188.79 seconds. This is runtime compatibility evidence, not a build-speed
+benchmark. A local pass does not resolve the playlist audio-integrity failure
+seen in prior-head PR CI and tracked by #838.
+
 ## Optional compiled PCH for Linux cores
 
 `libobs::Options::pch` defaults to false and is independent of `unity`.

@@ -188,7 +188,7 @@ fn copy(source: &Path, target: &Path) -> Result<(), String> {
         .map_err(|e| format!("copy {} to {}: {e}", source.display(), target.display()))
 }
 
-fn copy_tree(source: &Path, target: &Path) -> Result<(), String> {
+pub(super) fn copy_tree(source: &Path, target: &Path) -> Result<(), String> {
     std::fs::create_dir_all(target).map_err(|e| e.to_string())?;
     for entry in std::fs::read_dir(source).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;

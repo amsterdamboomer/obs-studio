@@ -26,13 +26,66 @@ impl Default for Options {
 
 /// Build the unchanged VLC compatibility tests against the real native modules.
 pub fn build_vlc_tests(
-    _build: &NativeBuild,
-    _root: &Path,
-    _core: &Path,
-    _vlc: &crate::plugins::Module,
-    _graphics: &Path,
+    build: &NativeBuild,
+    root: &Path,
+    core: &Path,
+    vlc: &crate::plugins::Module,
+    graphics: &Path,
 ) -> Result<Vec<Executable>, String> {
-    Err("VLC compatibility test build is not implemented".into())
+    let root = dunce::canonicalize(root).map_err(|e| e.to_string())?;
+    let mut base = SharedLibrary {
+        include_dirs: vec![
+            root.clone(),
+            root.join("libobs"),
+            root.join("test/cmocka"),
+            root.join("plugins/vlc-video"),
+            build.output.join("config"),
+        ],
+        dependencies: vec![core.into()],
+        ..SharedLibrary::default()
+    };
+    crate::platform::configure_c_tests(build, &mut base, None)?;
+    for package in ["cmocka", "simde"] {
+        add_package(&mut base, &build.target, package)?;
+    }
+    for (name, path) in [
+        ("VLC_MODULE_PATH", vlc.library.as_path()),
+        ("VLC_DATA_PATH", vlc.data.as_path()),
+        ("GRAPHICS_MODULE_PATH", graphics),
+    ] {
+        let path = dunce::canonicalize(path).map_err(|e| e.to_string())?;
+        let quoted = serde_json::to_string(path.to_str().ok_or("non-UTF8 VLC test path")?)
+            .map_err(|e| e.to_string())?;
+        base.definitions.push((name.into(), Some(quoted)));
+    }
+    let mut result = Vec::new();
+    for name in [
+        "test_vlc_drain_gate",
+        "test_vlc_host_path",
+        "test_vlc_channel_order",
+        "test_vlc_audio_track",
+        "test_vlc_audio_pacing",
+        "test_vlc_playlist_gap",
+    ] {
+        let mut library = SharedLibrary {
+            name: name.into(),
+            sources: vec![root.join(format!("test/cmocka/{name}.c"))],
+            ..base.clone()
+        };
+        if name == "test_vlc_audio_pacing" {
+            for package in ["libavcodec", "libavformat", "libavutil"] {
+                add_package(&mut library, &build.target, package)?;
+            }
+        }
+        result.push(Executable {
+            name: name.into(),
+            path: build.executable(&library)?,
+        });
+    }
+    for directory in ["test/cmocka", "plugins/vlc-video", "libobs/data"] {
+        println!("cargo:rerun-if-changed={}", root.join(directory).display());
+    }
+    Ok(result)
 }
 
 pub fn build_c_tests(
