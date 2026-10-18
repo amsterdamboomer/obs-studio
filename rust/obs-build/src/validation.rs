@@ -231,6 +231,20 @@ pub fn build_c_tests(
                 .into_iter()
                 .map(String::from),
         );
+        for flag in strings(&spec, "compile_options_if_supported")? {
+            if build
+                .compiler(&library, &build.output, false)
+                .is_flag_supported(flag)
+                .map_err(|e| e.to_string())?
+            {
+                library.compile_options.push(flag.into());
+            }
+        }
+        library.link_options.extend(
+            strings(&spec, "link_options")?
+                .into_iter()
+                .map(String::from),
+        );
         for archive in strings(&spec, "archives")? {
             if !archives.contains_key(archive) {
                 let path = if archive == "caption" {

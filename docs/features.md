@@ -150,11 +150,6 @@ not get a line.
   [#1103](https://github.com/obs-rust/obs-studio/issues/1103), PR
   [#1104](https://github.com/obs-rust/obs-studio/pull/1104).
 
-- Audio timestamp differences smaller than one sample no longer leave an
-  invalid interval in the mixer. *All*, pending merge. Issue
-  [#838](https://github.com/obs-rust/obs-studio/issues/838), PR
-  [#1385](https://github.com/obs-rust/obs-studio/pull/1385).
-
 ### Encoding, streaming and recording
 
 - **Codec availability follows the build.** MP4 and MOV outputs do not advertise
@@ -619,6 +614,11 @@ area.
 - The Expander filter at a 1:1 ratio no longer turns down the audio that
   follows silence. *All*, 2026-10-16. PR
   [#995](https://github.com/obs-rust/obs-studio/pull/995).
+
+- Audio timestamp differences smaller than one sample no longer leave an
+  invalid interval in the mixer. *All*, pending merge. Issue
+  [#838](https://github.com/obs-rust/obs-studio/issues/838), PR
+  [#1385](https://github.com/obs-rust/obs-studio/pull/1385).
 
 ### Encoding, streaming and recording
 

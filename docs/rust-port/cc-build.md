@@ -672,6 +672,33 @@ No production audio source or existing C test is changed at this checkpoint.
 Reproduction source and results are retained in the local reports
 directory under `audio-buffering-probe/` for follow-up.
 
+### Audio interval regression and scoped fix
+
+Draft [#1385](https://github.com/obs-rust/obs-studio/pull/1385) carries the
+follow-up to that diagnostic, and this branch carries the same change.
+RED `a720d011f` adds a new C regression that directly includes the original
+private audio implementation. Two of its five cases fail in each linked-core
+mode: empty and pending buffers with a sub-sample delay. The positive one/two
+tick and full-buffer controls pass. GREEN `52c577638` initializes the local
+interval from the incoming interval; all five cases then pass in both modes.
+Existing C tests and public headers remain unchanged. The CMake fragment
+configures, builds and passes CTest locally with real imported core/caption
+artifacts and headers, without dependency stubs.
+
+The Cargo test manifest adds the same regression. RED `d6388ca86` requires the
+missing executable and observes 51 instead of 52. The manifest supports
+compiler-checked optional flags and explicit linker options, preserving the
+test's optional pattern initialization and section garbage collection.
+The core battery now has 52 executables (51 with HEVC disabled). A full enabled
+run passes all 104 executable/core combinations, with 832 reported cmocka cases
+and no skip markers; the two standalone video-statistics executables do not
+emit cmocka summaries. The new regression contributes five cases per mode.
+
+This direct-include regression checks the original C algorithm even when it
+links the Rust core. It does not establish a Rust replacement for that helper,
+nor that the entire intermittent CI failure in #838 is resolved. The unchanged
+runtime tests and full CI remain necessary.
+
 ## Optional compiled PCH for Linux cores
 
 `libobs::Options::pch` defaults to false and is independent of `unity`.

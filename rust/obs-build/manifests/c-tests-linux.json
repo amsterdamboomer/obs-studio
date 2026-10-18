@@ -450,5 +450,23 @@
     "sources": [
       "test/cmocka/test_video_frame.c"
     ]
+  },
+  {
+    "name": "test_audio_buffering_subsample",
+    "sources": [
+      "test/cmocka/test_audio_buffering_subsample.c"
+    ],
+    "compile_options_if_supported": [
+      "-ftrivial-auto-var-init=pattern"
+    ],
+    "link_options": [
+      "-Wl,--gc-sections"
+    ],
+    "packages": [
+      "zlib"
+    ],
+    "archives": [
+      "caption"
+    ]
   }
 ]
