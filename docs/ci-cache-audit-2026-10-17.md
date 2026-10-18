@@ -128,8 +128,18 @@ daemon diagnostics, plus uncached real compilation during the existing single
 recovery attempt when daemon status confirms unavailability. Local testing
 with checksum-verified zccache 1.15.5 confirms unavailable status exits 1,
 valid C compiles with `ZCCACHE_DISABLE=1`, and deliberate invalid C still
-fails with its current diagnostic. Live CI verification remains pending;
-the daemon-death cause is unknown.
+fails with its current diagnostic. Latest PR run
+[39081664635](https://github.com/obs-rust/obs-studio/actions/runs/39081664635)
+passed the build but failed the unchanged `test_recording_shutdown_wait`
+state assertions in both modes: each registered 295 tests with one failing
+test executable. The startup diagnostic passed in both. Source inspection
+found a race candidate: the wait may return on `deactivate` before the output
+reports inactive. Evidence is posted under the existing claim in
+[#1283](https://github.com/obs-rust/obs-studio/issues/1283#issuecomment-6243649634);
+no rerun, skip, or assertion change was made. This is not evidence of a cache
+recovery failure. The daemon-death cause remains unknown, and #1362 is not
+yet merged. [Raw validation summary](ci-evidence/2026-10-18-recovery-pr-validation.json)
+keeps build success separate from test failures.
 
 The full dispatch's native Windows Tier 2 compiler cache hit 308/308
 cacheable calls, with 27 noncacheable calls. macOS Tier 2 passed 163
