@@ -320,7 +320,7 @@ class HostNamedFilesTest(unittest.TestCase):
         self.assertEqual((got.windows, got.macos, got.qt), (True, False, True))
         got = scope(["frontend/hosts/macos/x.mm"])
         self.assertEqual((got.windows, got.macos), (False, True))
-        self.assertTrue(scope(["hosts/windows/x.c"]).windows)
+        self.assertTrue(scope(["plugins/obs-filters/hosts/windows/x.c"]).windows)
 
     def test_qt_host_files_each_select_their_os(self):
         for path, win, mac in (
