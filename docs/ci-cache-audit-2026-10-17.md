@@ -127,6 +127,39 @@ are retained separately from the unchanged-test results. The follow-up is
 posted to the existing #1283 claim; production code and existing tests were
 not edited.
 
+### Warm Ubuntu consumers and full-run write pressure
+
+Full run [39082733551](https://github.com/obs-rust/obs-studio/actions/runs/39082733551)
+has passed both Ubuntu jobs; the overall workflow remains in progress at
+this checkpoint. Both restored the earlier ON archive (712,780,180 bytes).
+
+| Mode | Compiler results | Restore | Build, cold → warm | Job, cold → warm |
+| --- | --- | --- | --- | --- |
+| ON | 200 cached / 145 cold / 16 noncacheable | 23 s | 602 → 324 s | 684 → 435 s |
+| OFF, using ON fallback | 43 cached / 302 cold / 16 noncacheable | 28 s | 584 → 574 s | 629 → 619 s |
+
+These are individual unmatched observations across revisions and runners,
+not causal benchmarks. ON passed both Tier 4 checks and saved a 794,953,805-byte
+archive. OFF accumulated 9,526 MiB of mixed compiler state, exceeded the
+8,192 MiB save guard and published no OFF archive. The opposite-mode fallback
+therefore provided limited observed reuse and prevented seeding this mode in
+this run. Restore compatibility and snapshot growth must be addressed before
+claiming both modes are warm. [Raw observations](ci-evidence/2026-10-18-ubuntu-warm-consumers.json).
+
+A mid-run listing summed to 12,218,332,982 bytes, above the declared 10 GiB
+budget. Three Qt snapshots alone held approximately 3.48 GB; their observed
+jobs each had only 2–4 compiler misses. The separate usage endpoint reported
+8,389,095,940 bytes, so these are different observations, not proof of an
+atomic storage peak or a particular eviction actor. Avoiding redundant
+per-commit Qt snapshots is a remaining opportunity; preserve useful seeds.
+
+Fast Gate also missed its host release cook key, then received HTTP 409
+on reservation. Two later listings had no visible entry for that exact key.
+The cause remains unknown; it is tracked in
+[setup-soldr#581](https://github.com/zackees/setup-soldr/issues/581).
+[Inventory summaries and explicit limits](ci-evidence/2026-10-18-cache-pressure-and-cook-conflict.json)
+keep the publication conflict separate from compiler hits and storage totals.
+
 ### Subsequent consumers and availability failures
 
 [Consumer and capacity observations](ci-evidence/2026-10-17-cache-consumer-followup.json)
