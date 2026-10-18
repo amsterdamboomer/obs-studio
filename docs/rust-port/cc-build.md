@@ -933,3 +933,11 @@ benchmark. Capture-only validation with recording disabled also passes against
 both cores (15.53 s), exercising both inputs without relying on recording to
 initialize audio. Real physical-device routing, platform graphs and packaged audio
 runtime remain separate requirements of the full conversion.
+
+
+Independent JACK-only and sndio-only configurations also pass. The staged
+GUI/browser invocation with both optional modules selected passes against both
+cores, including native dock/source rendering, JavaScript/WebSocket checks,
+recordings, saved configuration and shutdown (102.18 s, 226 cache hits / two
+misses). This is a combined build/runtime interval, not a controlled compiler
+benchmark or proof of physical-device capture.
