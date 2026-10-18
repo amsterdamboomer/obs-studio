@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 import sys
+import json
+from types import SimpleNamespace
+from unittest import mock
 import tempfile
 import unittest
 from pathlib import Path
@@ -131,6 +134,40 @@ required-features = ["gpu"]
         write(crate / "src/bin/worker.rs")
         write(crate / "tests/accidental.rs")
         self.assertEqual(cap.workspace_test_targets(self.root), [("a", "suite", "test")])
+
+    def test_implicit_nested_workspace_path_member_is_counted(self):
+        crate = self.crate("a", '[dependencies]\nhelper = { path = "support/helper" }\n')
+        nested = crate / "support/helper"
+        write(nested / "Cargo.toml", '[package]\nname = "hidden-helper"\n')
+        write(nested / "src/lib.rs")
+        self.assertIn(("hidden-helper", "hidden_helper", "lib"), cap.workspace_test_targets(self.root))
+
+    def test_inherited_and_target_specific_path_dependencies_are_counted(self):
+        with (self.root / "Cargo.toml").open("a") as stream:
+            stream.write('[workspace.dependencies]\ninherited = { path = "support/inherited" }\n')
+        self.crate("a", '[dependencies]\ninherited = { workspace = true }\n[target.\'cfg(unix)\'.build-dependencies]\nhost = { path = "../../support/host" }\n')
+        for name in ("inherited", "host"):
+            write(self.root / f"support/{name}/Cargo.toml", f'[package]\nname = "{name}"\n')
+            write(self.root / f"support/{name}/src/lib.rs")
+        self.assertEqual(cap.workspace_test_targets(self.root), [
+            ("host", "host", "lib"), ("inherited", "inherited", "lib"),
+        ])
+
+    def test_explicit_bin_name_replaces_auto_source(self):
+        crate = self.crate("a", '[[bin]]\nname = "custom"\npath = "src/main.rs"\n')
+        write(crate / "src/main.rs")
+        self.assertEqual(cap.workspace_test_targets(self.root), [("a", "custom", "bin")])
+
+
+class MetadataGateTest(unittest.TestCase):
+    def test_build_gate_rejects_an_extra_metadata_target(self):
+        import local_gate
+        packages = [{"id": p, "name": p, "targets": [{"name": n, "kind": [k], "test": True}]} for p, n, k in cap.CATEGORY_OWNERS]
+        packages.append({"id": "implicit", "name": "implicit", "targets": [{"name": "hidden", "kind": ["lib"], "test": True}]})
+        metadata = {"workspace_members": [p["id"] for p in packages], "packages": packages}
+        with mock.patch.object(local_gate.subprocess, "run", return_value=SimpleNamespace(stdout=json.dumps(metadata))):
+            with self.assertRaisesRegex(RuntimeError, "implicit:hidden"):
+                local_gate.check_test_binary_inventory()
 
 
 

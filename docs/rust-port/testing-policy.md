@@ -408,6 +408,8 @@ Thread-safe cases run with libtest's normal parallelism. Serialize tests
 sharing the profiler with their existing common lock. Tests that change
 process-wide allocation counters, logging callbacks, or the working directory
 must re-exec the same category executable with an exact test selector.
+Pipe-spawning oracle checks also re-exec first: their C pipe-to-CLOEXEC
+window must not overlap unrelated child spawns in this process.
 Crash probes also re-exec before forking, so they cannot inherit live pipe
 handles from other tests. Do not serialize the whole suite or add another
 compiled binary to obtain a clean process. Use `module_path!()` for exact
@@ -439,10 +441,11 @@ time in a test executable to retain those checks.
   source files or crates.
 
 `ci/test_binary_cap.py` discovers unit harnesses and integration targets from
-manifests without requiring a Rust toolchain or compiling anything. It checks
-category ownership, rejects duplicate and missing categories, and rejects any
+manifests without requiring a Rust toolchain or compiling anything, including
+implicit workspace path dependencies. It checks category ownership,
+rejects duplicate and missing categories, and rejects any
 extra unit or integration harness. Cargo metadata provides an independent
-inventory check on build hosts. The guard runs through existing CI Python
+inventory check enforced by the lint lane on build hosts. The guard runs through existing CI Python
 test discovery; `uv run ci/test_binary_cap.py --report` prints the inventory.
 
 Use `soldr cargo test --workspace --locked` for the full suite. For focused

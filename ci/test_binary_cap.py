@@ -77,39 +77,69 @@ def category_violations(targets: list[tuple[str, str, str]]) -> list[str]:
     return errors
 
 
+def workspace_manifests(root: Path) -> list[Path]:
+    root = root.resolve()
+    document = tomllib.loads((root / "Cargo.toml").read_text())
+    workspace = document["workspace"]
+    excluded = {path.resolve() for pattern in workspace.get("exclude", []) for path in root.glob(pattern)}
+    pending = [path.resolve() for pattern in workspace.get("members", []) for path in root.glob(pattern)]
+    if "package" in document:
+        pending.append(root)
+    seen = set()
+    manifests = []
+    while pending:
+        crate = pending.pop()
+        manifest = crate / "Cargo.toml"
+        if crate in seen or crate in excluded or not crate.is_relative_to(root) or not manifest.is_file():
+            continue
+        seen.add(crate)
+        data = tomllib.loads(manifest.read_text())
+        if crate != root and "workspace" in data:
+            continue
+        manifests.append(manifest)
+        scopes = [data, *data.get("target", {}).values()]
+        for scope in scopes:
+            for kind in ("dependencies", "dev-dependencies", "build-dependencies"):
+                for name, entry in scope.get(kind, {}).items():
+                    base = crate
+                    if isinstance(entry, dict) and entry.get("workspace", False):
+                        entry = workspace.get("dependencies", {}).get(name, {})
+                        base = root
+                    if isinstance(entry, dict) and "path" in entry:
+                        pending.append((base / entry["path"]).resolve())
+    return sorted(manifests)
+
+
 def workspace_test_targets(root: Path = ROOT) -> list[tuple[str, str, str]]:
     """Read manifests without invoking a compiler or requiring soldr in Checks.
 
     Cargo metadata equivalence is tested separately on hosts with soldr.
     """
-    workspace = tomllib.loads((root / "Cargo.toml").read_text())["workspace"]
-    excluded = {(root / entry).resolve() for entry in workspace.get("exclude", [])}
     targets = []
-    seen = set()
-    for pattern in workspace.get("members", []):
-        for crate in sorted(root.glob(pattern)):
-            if crate.resolve() in excluded or crate.resolve() in seen or not (crate / "Cargo.toml").is_file():
-                continue
-            seen.add(crate.resolve())
-            manifest = tomllib.loads((crate / "Cargo.toml").read_text())
-            package = manifest["package"]
-            name = package["name"]
-            library = manifest.get("lib", {})
-            if ("lib" in manifest or package.get("autolib", True) and (crate / "src/lib.rs").exists()) and library.get("test", True):
-                kinds = ",".join(sorted(library.get("crate-type", ["proc-macro"] if library.get("proc-macro", False) else ["lib"])))
-                targets.append((name, library.get("name", name.replace("-", "_")), kinds))
-            binaries = {entry["name"]: entry for entry in manifest.get("bin", [])}
-            if package.get("autobins", True):
-                if (crate / "src/main.rs").exists():
-                    binaries.setdefault(name, {})
-                for path in sorted((crate / "src/bin").glob("*.rs")):
+    for manifest_path in workspace_manifests(root):
+        crate = manifest_path.parent
+        manifest = tomllib.loads((crate / "Cargo.toml").read_text())
+        package = manifest["package"]
+        name = package["name"]
+        library = manifest.get("lib", {})
+        if ("lib" in manifest or package.get("autolib", True) and (crate / "src/lib.rs").exists()) and library.get("test", True):
+            kinds = ",".join(sorted(library.get("crate-type", ["proc-macro"] if library.get("proc-macro", False) else ["lib"])))
+            targets.append((name, library.get("name", name.replace("-", "_")), kinds))
+        binaries = {entry["name"]: entry for entry in manifest.get("bin", [])}
+        explicit_bins = {(crate / entry["path"]).resolve() for entry in binaries.values() if "path" in entry}
+        if package.get("autobins", True):
+            if (crate / "src/main.rs").exists() and (crate / "src/main.rs").resolve() not in explicit_bins:
+                binaries.setdefault(name, {})
+            for path in sorted((crate / "src/bin").glob("*.rs")):
+                if path.resolve() not in explicit_bins:
                     binaries.setdefault(path.stem, {})
-                for path in sorted((crate / "src/bin").glob("*/main.rs")):
+            for path in sorted((crate / "src/bin").glob("*/main.rs")):
+                if path.resolve() not in explicit_bins:
                     binaries.setdefault(path.parent.name, {})
-            for binary, entry in binaries.items():
-                if entry.get("test", True):
-                    targets.append((name, binary, "bin"))
-            targets.extend((name, target, "test") for target in test_targets(crate))
+        for binary, entry in binaries.items():
+            if entry.get("test", True):
+                targets.append((name, binary, "bin"))
+        targets.extend((name, target, "test") for target in test_targets(crate))
     return sorted(targets)
 
 
