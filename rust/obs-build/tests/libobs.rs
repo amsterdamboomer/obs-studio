@@ -77,7 +77,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         );
         options.core_modules.push("obs-browser".into());
     }
-    if enabled("OBS_BUILD_APP_GUI") && enabled("OBS_BUILD_FDK") {
+    if enabled("OBS_BUILD_APP_GUI") && std::env::var_os("OBS_BUILD_FDK").is_some() {
         options.core_modules.push("obs-libfdk".into());
     }
     if enabled("OBS_BUILD_APP_GUI") && std::env::var_os("OBS_BUILD_NVENC").is_some() {
@@ -280,7 +280,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         plugins::build_transitions(&build, &root, &libraries.reference).unwrap(),
         plugins::build_filters(&build, &root, &libraries.reference, &filters).unwrap(),
     ];
-    if enabled("OBS_BUILD_FDK") {
+    if std::env::var_os("OBS_BUILD_FDK").is_some() {
         modules.push(plugins::build_fdk(&build, &root, &libraries.reference).unwrap());
     }
     if std::env::var_os("OBS_BUILD_VLC").is_some() {
@@ -636,7 +636,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             String::from_utf8_lossy(&run.stdout),
             String::from_utf8_lossy(&run.stderr)
         );
-        if enabled("OBS_BUILD_FDK") && recording.is_some() {
+        if std::env::var_os("OBS_BUILD_FDK").is_some() && recording.is_some() {
             assert!(
                 String::from_utf8_lossy(&run.stdout)
                     .contains("cc::Build audio encoder: libfdk_aac")
@@ -764,7 +764,7 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
             (b"obs_enum_filter_types".as_slice(), "noise_suppress_filter"),
             (b"obs_enum_filter_types".as_slice(), "gain_filter"),
         ];
-        if enabled("OBS_BUILD_FDK") {
+        if std::env::var_os("OBS_BUILD_FDK").is_some() {
             expected_types.push((b"obs_enum_encoder_types".as_slice(), "libfdk_aac"));
         }
         if std::env::var_os("OBS_BUILD_NVENC").is_some() {
@@ -937,7 +937,7 @@ fn verify_recording(path: &std::path::Path) {
         .iter()
         .find(|stream| stream["codec_name"] == "aac")
         .expect("missing AAC track");
-    if enabled("OBS_BUILD_FDK") {
+    if std::env::var_os("OBS_BUILD_FDK").is_some() {
         assert_eq!(audio["profile"], "LC");
         assert_eq!(audio["sample_rate"], "48000");
         assert_eq!(audio["channels"], 2);

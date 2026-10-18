@@ -247,8 +247,11 @@ impl FfmpegArtifacts {
 }
 
 /// Build the optional original FDK AAC encoder module.
-pub fn build_fdk(_build: &NativeBuild, _root: &Path, _core: &Path) -> Result<Module, String> {
-    Err("FDK AAC native build is not implemented".into())
+pub fn build_fdk(build: &NativeBuild, root: &Path, core: &Path) -> Result<Module, String> {
+    let root = root.canonicalize().map_err(|e| e.to_string())?;
+    let mut library = module(build, &root, core, "obs-libfdk")?;
+    add_package(&mut library, &build.target, "fdk-aac")?;
+    finish(build, &root, library)
 }
 
 pub fn build_x264(build: &NativeBuild, root: &Path, core: &Path) -> Result<Module, String> {

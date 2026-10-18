@@ -827,9 +827,13 @@ also aborts with the original module and exits successfully with the fix.
 The dependency draft [obs-browser#1](https://github.com/obs-rust/obs-browser/pull/1)
 proposes commit `0c3b700` (the current experimental pin). It waits for context readiness for ordinary tasks,
 handles source destruction before readiness, and coordinates unload with
-initialization success or failure. Its initialization-failure branch still
-needs runtime coverage. Browser-source rendering is now verified in the
-disposable Linux test profile described below.
+initialization success or failure. A follow-up dependency test at `4f26bda`
+now exercises real CEF initialization failure: a second process shares the
+first process's locked profile, waits for the actual initialization-failure
+message, then unloads cleanly. Both the original and fixed modules pass this
+failure-path characterization; it does not distinguish the startup-race fix.
+The parent's production pin remains `0c3b700`. Browser-source rendering is
+verified in the disposable Linux test profile described below.
 
 ### Isolated browser credential store
 
@@ -850,3 +854,28 @@ misses; it used the earlier uncapped native test environment and is not a
 controlled build benchmark. A warm repeat with both job limits explicitly set
 to 4 passes in 77.56 s, with 226 cache hits and zero misses. Its interval includes
 GUI checks and recordings against both cores; it is not a compile-only timing.
+
+
+## Optional FDK AAC encoder checkpoint
+
+`plugins::build_fdk` builds the original `obs-libfdk` unity group as a dynamically
+loaded module through `cc::Build`, discovering the `fdk-aac` SDK through
+pkg-config. This optional encoder remains disabled by default, matching the
+original CMake option. Set `OBS_BUILD_FDK=1` in the native integration driver to
+build, load and exercise it. GUI selection alone does not enable FDK.
+
+The RED commit `a0bc15642` fails at the unimplemented native builder. With the
+builder implemented, the integration test passes against both the C and Rust
+cores in 24.77 s. Each core records MP4 and MKV with the actual `libfdk_aac`
+encoder; ffprobe verifies AAC LC, 48 kHz stereo, decoded audio frames, H.264 video
+frames and recording duration. No usable soldr statistics were available for
+that invocation, so it does not establish cache performance. The existing
+headless path with FDK disabled also passes (12.80 s), using `ffmpeg_aac` for
+all four recordings.
+
+A reference build invokes the original `plugins/obs-libfdk/CMakeLists.txt`,
+using the same FDK 2.0.3 SDK and Cargo-built core. Both modules export exactly
+the same six dynamic symbols. This verifies module exports; it is not a
+complete CMake application or a cross-platform runtime comparison. The default
+GUI/browser path is checked separately to ensure adding this optional encoder
+does not make it mandatory.
