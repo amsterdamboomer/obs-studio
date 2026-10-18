@@ -53,7 +53,7 @@ else:
             (root / "CMakeLists.txt").write_text(
                 'cmake_minimum_required(VERSION 3.20)\nproject(CargoLock NONE)\n'
                 f'include("{MODULE.as_posix()}")\n'
-                f'set(probe "{Path(sys.executable).as_posix()}" "${{CMAKE_SOURCE_DIR}}/probe.py" "${{CMAKE_BINARY_DIR}}")\n'
+                f'set(probe uv run --no-project "{Path(sys.executable).as_posix()}" "${{CMAKE_SOURCE_DIR}}/probe.py" "${{CMAKE_BINARY_DIR}}")\n'
                 'foreach(crate IN ITEMS first second third)\n'
                 '  add_custom_target(cargo-prebuild_${crate})\n'
                 '  add_custom_target(cargo-build_${crate} ALL COMMAND ${probe} ${crate} VERBATIM)\n'
@@ -71,3 +71,15 @@ else:
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             for crate in ("first", "second", "third"):
                 self.assertTrue((build / (crate + "-done")).exists())
+
+    def test_every_corrosion_import_joins_the_cargo_build_order(self):
+        imports = {
+            "libobs/cmake/rust.cmake": "libobs-rust",
+            "frontend/cmake/feature-gpu-status.cmake": "obs-gpu-status-frontend",
+            "plugins/obs-nvenc/CMakeLists.txt": "obs-nvenc-plugin",
+        }
+        for path, crate in imports.items():
+            with self.subTest(path=path):
+                source = (ROOT / path).read_text()
+                self.assertIn(f"obs_serialize_cargo_build({crate})", source)
+                self.assertLess(source.index("corrosion_import_crate("), source.index(f"obs_serialize_cargo_build({crate})"))
