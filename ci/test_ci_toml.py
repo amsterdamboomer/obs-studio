@@ -111,7 +111,10 @@ class CiTomlTest(unittest.TestCase):
 
     def test_setup_soldr_and_uv_families_declared(self):
         vias = {fam.get("via") for fam in load()["cache"]["family"].values()}
-        self.assertLessEqual(set(VIA_PREFIXES), vias)
+        # build-cache is optional and disabled at every audited callsite;
+        # test_rust_cache_policy checks both that input and its retirement.
+        required = set(VIA_PREFIXES) - {"setup-soldr:build-cache"}
+        self.assertLessEqual(required, vias)
 
     def test_workflows_declare_their_triggers(self):
         allowed = load()["allow"]["workflows"]
