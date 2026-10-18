@@ -269,8 +269,9 @@ Tier 2 checks.
    `quat.c`, `matrix3.c`, `matrix4.c`, `plane.c`, `bounds.c`, `axisang.c`,
    `math-extra.c`.
 2. `media-io` in crate `obs-media-io`.
-3. obs-websocket Tier 4 suite, then the staged port described in
-   [websocket-port.md](websocket-port.md).
+3. obs-websocket Tier 4 suite against the unchanged C++ plugin. Preserve it
+   as the compatibility check required by `AGENTS.md`; the earlier
+   [port proposal](websocket-port.md) is superseded.
 
 - Tier 3 parity is exact bit equality (NaN == NaN) where the C is scalar and
   deterministic. Only where the C uses SIMD (`vec3`, `vec4`, `matrix4` via
@@ -445,8 +446,8 @@ manifests without requiring a Rust toolchain or compiling anything, including
 implicit workspace path dependencies. It checks category ownership,
 rejects duplicate and missing categories, and rejects any
 extra unit or integration harness. Cargo metadata provides an independent
-inventory check enforced by the lint lane on build hosts. The guard runs through existing CI Python
-test discovery; `uv run ci/test_binary_cap.py --report` prints the inventory.
+inventory check enforced by the lint lane on build hosts. The guard runs
+through existing CI Python test discovery; `uv run ci/test_binary_cap.py --report` prints the inventory.
 
 Use `soldr cargo test --workspace --locked` for the full suite. For focused
 work, select the owning category, for example
