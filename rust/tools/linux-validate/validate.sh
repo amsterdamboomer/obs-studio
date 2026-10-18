@@ -181,6 +181,9 @@ else
       if ! zccache status 2>&1 | head -60; then
         echo "::warning::zccache daemon unavailable; the single recovery build will compile without caching"
         daemon_unavailable=1
+        if [ -n "${GITHUB_OUTPUT:-}" ]; then
+          echo 'cache-healthy=false' >>"$GITHUB_OUTPUT"
+        fi
       fi
       echo "== zccache stop for recovery"
       zccache stop 2>&1 | head -40 || true
