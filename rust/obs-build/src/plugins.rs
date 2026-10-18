@@ -254,6 +254,40 @@ pub fn build_fdk(build: &NativeBuild, root: &Path, core: &Path) -> Result<Module
     finish(build, &root, library)
 }
 
+#[derive(Clone, Debug)]
+pub struct DataChannelSdk {
+    pub include_dir: PathBuf,
+    pub library: PathBuf,
+    pub media: bool,
+    pub websocket: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct WebRtcOptions {
+    pub unity: bool,
+    pub pch: bool,
+}
+
+impl Default for WebRtcOptions {
+    fn default() -> Self {
+        Self {
+            unity: true,
+            pch: false,
+        }
+    }
+}
+
+/// Build the original WebRTC WHIP output and service module.
+pub fn build_webrtc(
+    _build: &NativeBuild,
+    _root: &Path,
+    _core: &Path,
+    _sdk: &DataChannelSdk,
+    _options: &WebRtcOptions,
+) -> Result<Module, String> {
+    Err("WebRTC module build is not implemented".into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct QsvOptions {
     pub hevc: bool,

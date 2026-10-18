@@ -95,6 +95,9 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     if enabled("OBS_BUILD_APP_GUI") && std::env::var_os("OBS_BUILD_QSV").is_some() {
         options.core_modules.push("obs-qsv11".into());
     }
+    if enabled("OBS_BUILD_APP_GUI") && std::env::var_os("OBS_BUILD_WEBRTC").is_some() {
+        options.core_modules.push("obs-webrtc".into());
+    }
     if enabled("OBS_BUILD_APP_GUI") && std::env::var_os("OBS_BUILD_NVENC").is_some() {
         options.core_modules.push("obs-nvenc".into());
     }
@@ -314,6 +317,30 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         modules.push(plugins::build_fdk(&build, &root, &libraries.reference).unwrap());
     }
     let qsv_enabled = std::env::var_os("OBS_BUILD_QSV").is_some();
+    if std::env::var_os("OBS_BUILD_WEBRTC").is_some() {
+        modules.push(
+            plugins::build_webrtc(
+                &build,
+                &root,
+                &libraries.reference,
+                &plugins::DataChannelSdk {
+                    include_dir: std::env::var_os("OBS_DATACHANNEL_INCLUDE_DIR")
+                        .map(PathBuf::from)
+                        .expect("set OBS_DATACHANNEL_INCLUDE_DIR"),
+                    library: std::env::var_os("OBS_DATACHANNEL_LIBRARY")
+                        .map(PathBuf::from)
+                        .expect("set OBS_DATACHANNEL_LIBRARY"),
+                    media: true,
+                    websocket: std::env::var_os("OBS_DATACHANNEL_DISABLE_WEBSOCKET").is_none(),
+                },
+                &plugins::WebRtcOptions {
+                    unity: std::env::var_os("OBS_BUILD_DISABLE_WEBRTC_UNITY").is_none(),
+                    pch: std::env::var_os("OBS_BUILD_WEBRTC_PCH").is_some(),
+                },
+            )
+            .unwrap(),
+        );
+    }
     if qsv_enabled {
         let module = plugins::build_qsv(
             &build,
@@ -1014,6 +1041,12 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
         }
         if enabled("OBS_BUILD_QT") {
             expected_types.push((b"obs_enum_filter_types".as_slice(), "vst_filter"));
+        }
+        if std::env::var_os("OBS_BUILD_WEBRTC").is_some() {
+            expected_types.extend([
+                (b"obs_enum_output_types".as_slice(), "whip_output"),
+                (b"obs_enum_service_types".as_slice(), "whip_custom"),
+            ]);
         }
         for (symbol, expected) in expected_types {
             let enumerate = library
