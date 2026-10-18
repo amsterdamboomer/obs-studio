@@ -692,7 +692,7 @@ Keep the merged queue policy, Rust correctness safeguard, bounded useful
 compiler caches and parallel OFF/ON runners. Validate the observed host-package
 benefit over real traffic; an archive HIT alone is not a throughput result.
 Validate Ubuntu app reuse after removing the pre-build purge, and compare a
-full day of code PR/queue traffic after the final cache rollout. Track the
+full day of code PR/queue traffic after the final cache rollout. The
 macOS integrity failure was resolved by #1338. The startup fix in #1365
 has passed PR, queue, master and full native validation; #1355 is closed.
 
@@ -700,14 +700,14 @@ has passed PR, queue, master and full native validation; #1355 is closed.
 | --- | --- |
 | 1. Match cook profiles and measure consumers | Explicit profiles landed in #1318; local dev/release/no-cook experiment and native consumers recorded. Representative post-rollout comparison remains pending. |
 | 2. Rust cache correctness | Reproduction still fails on pinned soldr; safeguard retained in #1290, upstream zccache#1943 linked. |
-| 3. Remove unused overhead | Deferred Fast Gate layer removed in #1315; 13 Ubuntu restore/purge events fixed by #1337. Live Ubuntu reuse and budget behavior remain to verify. |
-| 4. Warm scoped plugin builds | Trusted compiler and host-package seeds consumed by a PR: 41/41 compiler hits, 323 packages, zero package bytes downloaded; job 165 → 148 s in the first host cold/warm pair. Day-scale validation remains. |
+| 3. Remove unused overhead | #1372 disables unused embedded transport in all seven callsites; #1380 reclaimed 183 MB of retired archives. Qt exact-key reuse skips duplicate publication. #1371 mode-compatible Ubuntu producers passed; later OFF reuse and whole-budget retention remain to verify. |
+| 4. Warm scoped plugin builds | PR consumer verified 41/41 compiler hits, 323 packages and zero package download bytes; first unmatched job pair 165 → 148 s. Both seed families were later absent. Warming works; durable retention and day-scale benefit remain unresolved under #1269. |
 | 5. Persist test timing | Nonempty OFF/ON producer, save, later restore and CTest consumption verified across master runs (#1288/#1311). |
 | 6. Match remote save policy | All seven setup-soldr consumers use master-only remote saves; PR/queue/local-save behavior verified (#1291). |
 | 7. Bound Qt cache | 1.2 GB compiler bound, 1.3 GB family, actual high hit rates and restore/save times verified (#1309). Overall repository headroom still needs the full-day view. |
-| 8. Unify nightly cleanup | Competing purge removed; original startup permission failure fixed (#1289). Real full dispatch started successfully; macOS test issue #1334 was resolved by #1338. Later startup failure #1355 has a merged fix, with full validation pending. |
+| 8. Unify nightly cleanup | Competing purge removed and startup permission failure fixed (#1289). #1338 resolved the macOS assertion; #1365 startup correction passed queue/master/full validation. Latest full run 39089156757 passed all seven app builds and nightly checks. |
 | 9. Isolated libobs measurements | Three trials per condition and raw wall/CPU/cache evidence published in #1306. Wall-time ranges overlap. |
-| 10. Shorten critical path | Independent OFF/ON runners landed (#1314); phase times, runner cost, skips and serial-test bottlenecks recorded. Overall queue gain remains unproven. |
+| 10. Shorten critical path | Independent OFF/ON runners and Fast Gate/build overlap landed. Product-code queue observation: required gate 843 s; Fast Gate 209 s entirely overlapped with build. Runner cost and coverage recorded; causal/day-scale gain remains unproven. |
 | 11. Durable before/after comparison | Full-day baseline and cohort-separated per-step collector ready. At least one full representative post-rollout day remains outstanding. |
 
 This checkpoint preserves the original scope. #1286 remains open while the
