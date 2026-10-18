@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import re
 import subprocess
 import unittest
 from pathlib import Path
@@ -14,6 +15,33 @@ SPEC.loader.exec_module(journal)
 
 
 class NativeCacheJournalTest(unittest.TestCase):
+    def test_workflow_starts_after_restore_and_keeps_diagnostics_nonblocking(self):
+        workflow = (ROOT / ".github/workflows/build-project.yaml").read_text()
+        block = workflow.split("  ubuntu-build:\n", 1)[1].split("\n  flatpak-build:", 1)[0]
+        self.assertIn("if: fromJSON(needs.check-event.outputs.full)", block)
+        self.assertLess(block.index("id: ubuntu-compiler-cache"), block.index("id: native-cache-journal"))
+        self.assertLess(block.index("- name: Set Up uv"), block.index("id: native-cache-journal"))
+        self.assertLess(block.index("id: native-cache-journal"), block.index("- name: Build OBS Studio"))
+        steps = re.split(r"(?m)^      - ", block)
+        start = next(s for s in steps if "id: native-cache-journal" in s)
+        summary = next(s for s in steps if "id: native-cache-summary" in s)
+        build = next(s for s in steps if s.startswith("name: Build OBS Studio"))
+        self.assertIn("continue-on-error: true", start)
+        self.assertIn("continue-on-error: true", summary)
+        self.assertIn("always()", summary)
+        self.assertNotIn("continue-on-error", build, "Compiler integrity failures must remain fatal")
+
+    def test_workflow_publishes_only_sanitized_json_not_raw_journals(self):
+        workflow = (ROOT / ".github/workflows/build-project.yaml").read_text()
+        block = workflow.split("  ubuntu-build:\n", 1)[1].split("\n  flatpak-build:", 1)[0]
+        step = next(s for s in re.split(r"(?m)^      - ", block)
+                    if s.startswith("name: Upload Native Cache Diagnostics"))
+        self.assertIn("steps.native-cache-summary.outcome == 'success'", step)
+        self.assertIn("continue-on-error: true", step)
+        self.assertIn("retention-days: 2", step)
+        self.assertIn("path: ${{ runner.temp }}/native-cache-${{ matrix.rust }}.json", step)
+        self.assertNotIn(".jsonl", step)
+
     def test_source_and_reason_survive_without_arguments_or_diff_values(self):
         record = {"outcome": "miss", "compiler": "/private/sdk/bin/gcc", "latency_ns": 12,
                   "args": ["-include", "/repo/build/pch.h", "-DKEY=SECRET_TOKEN.c",
