@@ -3,6 +3,39 @@
 Implementation and measurement tracker:
 [obs-studio#1286](https://github.com/obs-rust/obs-studio/issues/1286).
 
+## Current executive verdict — October 18 UTC
+
+**The full native validation is successful.** Run
+[39082733551](https://github.com/obs-rust/obs-studio/actions/runs/39082733551)
+at `2f9bf8d77` passed all seven app builds: Ubuntu OFF/ON, Windows x64/arm64,
+macOS x86/arm64 and Flatpak. Native Rust tests, Tier 2 and nightly scans also
+passed. Linux OFF/ON each registered 295 tests with zero failures and the
+three existing PulseAudio device skips; CTest took 302.01 / 308.84 s.
+[Full-run evidence](ci-evidence/2026-10-18-full-warm-validation.json).
+
+| Finding | Verified result | Recommendation/status |
+| --- | --- | --- |
+| Native compiler reuse | Linux Tier 2 784/785 cached; Windows Tier 2 308/309 cacheable hits | Preserve native compiler stores |
+| Warm Ubuntu ON | Full job 684 → 435 s; build 602 → 324 s, in unmatched observations | Keep the working ON seed; measure durability |
+| Ubuntu OFF fallback | 43/361 calls cached; mixed state 9,526 MiB; save skipped | #1371 restricts restores to compatible mode/configuration; runtime verification pending |
+| Embedded Rust store | All eight expanded soldr lanes reported no embedded session | #1372 removes unused transport; cook/registry/toolchain remain |
+| Rust correctness | Pinned compiler-cache stale-source bug and separate restored-target hazard remain | Keep wrapper bypass; do not deploy deeper test reuse without freshness validation |
+| Startup incident | Local reproduction plus PR, queue, master and full-run verification | #1365 verified; #1355 closed |
+| Storage headroom | Post-run listing summed to 12.43 GB; separate usage API disagrees | Resolve redundant writes and global-budget policy; no stable-headroom claim |
+| Representative queue throughput | Product-code queue observation 843 s; older unmatched median 954 s | Full post-rollout day still required; no causal speedup claim |
+
+**Build improvements are real but scoped.** The isolated libobs experiment
+measured median CPU 63.482 → 46.620 s (26.6% lower); uncached wall
+9.749 → 9.407 s had overlapping ranges. The broader app's historical
+315 → 198 s result is a different benchmark. Neither establishes the
+current merge queue's end-to-end improvement.
+
+**Next priorities:** finish #1371/#1372 verification, prevent redundant Qt
+snapshots, resolve the independently reproduced recording-wait race blocking
+#1362, and collect at least one representative post-rollout day. The proposed
+queue-only publisher needs a transport compatible with temporary queue refs;
+cross-run artifacts are feasible, but that architecture has not been deployed.
+
 ## Executive assessment
 
 The janitor failed because a fork PR received a read-only Actions token:
@@ -130,8 +163,7 @@ not edited.
 ### Warm Ubuntu consumers and full-run write pressure
 
 Full run [39082733551](https://github.com/obs-rust/obs-studio/actions/runs/39082733551)
-has passed both Ubuntu jobs; the overall workflow remains in progress at
-this checkpoint. Both restored the earlier ON archive (712,780,180 bytes).
+completed successfully, including both Ubuntu jobs. Both restored the earlier ON archive (712,780,180 bytes).
 
 | Mode | Compiler results | Restore | Build, cold → warm | Job, cold → warm |
 | --- | --- | --- | --- | --- |
@@ -543,7 +575,7 @@ benefit over real traffic; an archive HIT alone is not a throughput result.
 Validate Ubuntu app reuse after removing the pre-build purge, and compare a
 full day of code PR/queue traffic after the final cache rollout. Track the
 macOS integrity failure was resolved by #1338. The startup fix in #1365
-has passed PR, queue and master; full native confirmation remains pending.
+has passed PR, queue, master and full native validation; #1355 is closed.
 
 | #1286 requirement | Evidence/status at this checkpoint |
 | --- | --- |
