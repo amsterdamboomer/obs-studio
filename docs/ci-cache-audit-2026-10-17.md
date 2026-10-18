@@ -107,6 +107,26 @@ Linux callsites distinguish host and container cache identities. The release
 workflow itself was not dispatched; its subsequent warm-consumer performance
 remains unmeasured.
 
+### Master validation and controlled recording-wait reproduction
+
+Master run [39081770788](https://github.com/obs-rust/obs-studio/actions/runs/39081770788)
+passed after the startup fix: both modes registered 295 tests with zero
+failures; CTest took 314.72 s OFF and 308.66 s ON. Both the startup diagnostic
+and recording-shutdown test passed. [Raw master observations](ci-evidence/2026-10-18-startup-master-validation.json)
+do not disprove the recording race seen in a different run.
+
+The unchanged recording-shutdown test passed 20 local repetitions. A separate
+minimal fixture using the production helper, a real signal handler and an
+atomic active flag demonstrated the inspected race: after `deactivate`, a
+controlled 100 ms worker pause before the inactive store lets the UI helper
+return `stopped=true` while `active=true`. Both signals were registered and
+the worker joined cleanly. This confirms a possible ordering failure under
+controlled scheduling; it does not prove that pause occurred in historical
+CI. [Fixture source, source identities and results](ci-evidence/2026-10-18-recording-wait-race-probe.json)
+are retained separately from the unchanged-test results. The follow-up is
+posted to the existing #1283 claim; production code and existing tests were
+not edited.
+
 ### Subsequent consumers and availability failures
 
 [Consumer and capacity observations](ci-evidence/2026-10-17-cache-consumer-followup.json)
@@ -489,8 +509,8 @@ compiler caches and parallel OFF/ON runners. Validate the observed host-package
 benefit over real traffic; an archive HIT alone is not a throughput result.
 Validate Ubuntu app reuse after removing the pre-build purge, and compare a
 full day of code PR/queue traffic after the final cache rollout. Track the
-macOS integrity failure was resolved by #1338; track the separate, unresolved
-startup failure through #1355.
+macOS integrity failure was resolved by #1338. The startup fix in #1365
+has passed PR, queue and master; full native confirmation remains pending.
 
 | #1286 requirement | Evidence/status at this checkpoint |
 | --- | --- |
@@ -501,7 +521,7 @@ startup failure through #1355.
 | 5. Persist test timing | Nonempty OFF/ON producer, save, later restore and CTest consumption verified across master runs (#1288/#1311). |
 | 6. Match remote save policy | All seven setup-soldr consumers use master-only remote saves; PR/queue/local-save behavior verified (#1291). |
 | 7. Bound Qt cache | 1.2 GB compiler bound, 1.3 GB family, actual high hit rates and restore/save times verified (#1309). Overall repository headroom still needs the full-day view. |
-| 8. Unify nightly cleanup | Competing purge removed; original startup permission failure fixed (#1289). Real full dispatch completed; separate macOS test failure remains #1334. |
+| 8. Unify nightly cleanup | Competing purge removed; original startup permission failure fixed (#1289). Real full dispatch started successfully; macOS test issue #1334 was resolved by #1338. Later startup failure #1355 has a merged fix, with full validation pending. |
 | 9. Isolated libobs measurements | Three trials per condition and raw wall/CPU/cache evidence published in #1306. Wall-time ranges overlap. |
 | 10. Shorten critical path | Independent OFF/ON runners landed (#1314); phase times, runner cost, skips and serial-test bottlenecks recorded. Overall queue gain remains unproven. |
 | 11. Durable before/after comparison | Full-day baseline and cohort-separated per-step collector ready. At least one full representative post-rollout day remains outstanding. |
