@@ -673,6 +673,33 @@ case. PCH preparation and per-header compilation batches still need performance
 work. This does not establish full application build time, clean-cache
 performance, a CMake comparison or Cargo no-op behavior.
 
+### Audit of duplicate PCH generation
+
+At the user's request, the GCC Linux core-pair build was audited with temporary
+request tracing and forwarding C/C++ compiler wrappers. Both audited invocations
+passed the real core integration test. The first invocation used the audit
+wrappers' compiler identity; the next reused the same artifacts and flags.
+
+| Invocation | PCH requests | Distinct PCH artifacts | Compiler executions |
+| --- | ---: | ---: | ---: |
+| Initial audited build | 18 | 14 | 14 |
+| Warm repeat | 18 | 14 | 0 |
+
+Some headers recur in nonadjacent source batches and across the common/C/Rust
+variant stages. There are four redundant compiler-cache requests per core-pair
+build, but the trace did not find duplicate compiler generation: each initial
+artifact was compiled once, and soldr served every warm request from cache
+(the whole warm invocation reported 64 hits and zero misses).
+
+The PCH path signature selects an artifact namespace; it is not a freshness
+check. Generation must not be skipped merely because that file exists: direct
+headers, transitive headers, flags and compiler identity still require correct
+dependency validation. An optimization can deduplicate requests within an
+immutable build invocation while preserving source/constructor order. Persistent
+reuse needs a separate validity check. Temporary tracing was removed after the
+audit. The earlier PCH timings describe this implementation, including cache
+request and batch overhead; they do not establish an intrinsic PCH speed limit.
+
 ## Bundled obs-sys configuration and Cargo scheduling
 
 The `bundled` feature exposes the core build modes through environment variables:
