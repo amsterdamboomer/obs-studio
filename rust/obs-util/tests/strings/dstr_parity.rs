@@ -18,12 +18,20 @@
 //! `const char *` arguments are NUL-terminated buffers of arbitrary bytes, so
 //! an embedded NUL truncates the string on both sides.
 //!
-//! Aliasing (#1297, the shims edit the C buffer in place): `dstr_cat_dstr`
-//! and `dstr_ncat_dstr` with the destination as source, `dstr_ncat` from a
-//! pointer into the destination's own buffer (only when C would not
-//! `brealloc` it away first) and `dstr_copy` from inside the own buffer.
-//! The snapshot compares `capacity` after every step, so the growth rule
-//! must match C exactly.
+//! Intentional difference (#1297): a source that points into the
+//! destination's own buffer. `dstr_ncat` (and `dstr_cat_strref` through it)
+//! with a pointer into `dst->array`, `dstr_cat_dstr(d, d)` and `dstr_copy`
+//! from inside `dst->array`. When the buffer grows, C `brealloc`s it and then
+//! `memcpy`s from the old pointer, reading freed memory. `dstr_cat_dstr(d, d)`
+//! and `dstr_copy` from inside the buffer also `memcpy` overlapping ranges.
+//! Both are undefined behavior. Rust takes the source's offset before the
+//! grow, finds the source again in the new buffer and copies with `memmove`,
+//! so the result is the source bytes as they were before the call. The
+//! oracle never gets the aliasing pointer: these ops give C a private copy
+//! of the same bytes, which is defined in C, and compare bytes, terminator,
+//! `len` and `capacity` as usual. `dstr_ncat_dstr(d, d, n)` is defined in C
+//! (it re-reads `str->array` after the realloc, and the ranges do not
+//! overlap), so both sides get the aliasing pointer.
 //!
 //! Mutation check (run by the integrator): replace one `Dstr` method body in
 //! `src/dstr.rs` with `todo!()`, or change the growth rule of
@@ -362,15 +370,25 @@ fn apply(op: &Op, d: &mut Pair, s: &mut Pair) {
                 r::dstr_cat_dstr(&mut d.r, &s.r);
                 c::oracle_dstr_cat_dstr(&mut d.c, &s.c);
             }
+            // The three aliasing ops below are intentional differences
+            // (see the header): only the Rust side gets the aliasing
+            // pointer. C gets a private copy of the same source bytes, which
+            // is defined and has the same result and capacity growth.
             Op::CatSelf => {
-                if d.rust_bytes().contains(&0) {
-                    return; // C memcpy copies the source terminator over an overlapping range
-                }
-                let (pr, pc) = (&raw mut d.r, &raw mut d.c);
+                // C copies `len + 1` bytes, the terminator included.
+                let own = nt(d.rust_bytes());
+                let pr = &raw mut d.r;
                 r::dstr_cat_dstr(pr, pr);
-                c::oracle_dstr_cat_dstr(pc, pc);
+                let src = OracleDstr {
+                    array: own.as_ptr() as *mut c_char,
+                    len: own.len() - 1,
+                    capacity: own.len(),
+                };
+                c::oracle_dstr_cat_dstr(&mut d.c, &src);
             }
             Op::NcatDstrSelf(raw) => {
+                // Defined in C: `str == dst` is re-read after the realloc and
+                // the ranges do not overlap.
                 let len = raw % (ld + 3);
                 let (pr, pc) = (&raw mut d.r, &raw mut d.c);
                 r::dstr_ncat_dstr(pr, pr, len);
@@ -381,20 +399,22 @@ fn apply(op: &Op, d: &mut Pair, s: &mut Pair) {
                     return;
                 }
                 let start = a % ld;
+                // Lengths past the spare capacity make Rust move the buffer
+                // and re-find the source.
                 let len = b % (ld - start + 1);
-                if ld + len + 1 > d.r.capacity {
-                    return; // C would read the source after brealloc freed it
-                }
+                // NUL-terminated: C reads the first byte even when `len == 0`.
+                let own = nt(&d.rust_bytes()[start..start + len]);
                 r::dstr_ncat(&mut d.r, d.r.array.add(start), len);
-                c::oracle_dstr_ncat(&mut d.c, d.c.array.add(start), len);
+                c::oracle_dstr_ncat(&mut d.c, own.as_ptr() as *const c_char, len);
             }
             Op::CopyFromOwn(raw) => {
                 if ld == 0 {
                     return;
                 }
                 let start = raw % ld;
+                let own = nt(cstr(&d.rust_bytes()[start..]));
                 r::dstr_copy(&mut d.r, d.r.array.add(start));
-                c::oracle_dstr_copy(&mut d.c, d.c.array.add(start));
+                c::oracle_dstr_copy(&mut d.c, own.as_ptr() as *const c_char);
             }
             Op::CatStrref(v, raw) => {
                 let sr = Sr::new(v, *raw);
