@@ -392,6 +392,27 @@ pub fn configure_qsv(
     Ok(())
 }
 
+pub fn configure_webrtc(
+    target: &str,
+    root: &Path,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    if !target.contains("linux") {
+        return Err(format!(
+            "WebRTC native graph for {target} is not implemented yet"
+        ));
+    }
+    for group in ["posix", "core"] {
+        library.sources.push(root.join(format!(
+            "plugins/obs-webrtc/build/obs-webrtc.{group}+.hpp.cpp"
+        )));
+    }
+    library
+        .cpp_compile_options
+        .extend(["-std=gnu++17".into(), "-fvisibility-inlines-hidden".into()]);
+    Ok(())
+}
+
 pub fn configure_source(
     target: &str,
     root: &Path,

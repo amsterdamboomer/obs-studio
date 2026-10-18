@@ -5,8 +5,9 @@ use std::path::{Path, PathBuf};
 pub fn build(build: &NativeBuild, root: &Path, core: &Path) -> PathBuf {
     std::fs::create_dir_all(&build.output).unwrap();
     let source = build.output.join("graphics-probe.c");
-    if std::fs::read_to_string(&source).ok().as_deref() != Some(SOURCE) {
-        std::fs::write(&source, SOURCE).unwrap();
+    let content = SOURCE.replace("/* WHIP_PROBE */", include_str!("whip-probe.c"));
+    if std::fs::read_to_string(&source).ok().as_deref() != Some(&content) {
+        std::fs::write(&source, content).unwrap();
     }
     let mut library = SharedLibrary {
         name: "graphics-probe".into(),
@@ -21,6 +22,12 @@ pub fn build(build: &NativeBuild, root: &Path, core: &Path) -> PathBuf {
         ..SharedLibrary::default()
     };
     let mut packages = vec!["simde", "x11"];
+    if std::env::var_os("OBS_BUILD_WHIP_ENDPOINT").is_some() {
+        assert!(std::env::var_os("OBS_BUILD_WEBRTC").is_some());
+        assert!(std::env::var_os("OBS_BUILD_RECORD").is_some());
+        library.definitions.push(("OBS_FIXTURE_WHIP".into(), None));
+        library.link_options.push("-lm".into());
+    }
     if std::env::var_os("OBS_BUILD_JACK_CAPTURE").is_some() {
         packages.push("jack");
         library.definitions.push(("OBS_FIXTURE_JACK".into(), None));
@@ -260,6 +267,8 @@ static void receive_frame(void *unused, struct video_data *frame)
     atomic_fetch_add(&frames, 1);
 }
 
+/* WHIP_PROBE */
+
 static int record_clip(const char *path, const char *output_id)
 {
     obs_data_t *settings = obs_data_create();
@@ -382,6 +391,11 @@ EXPORT int obs_fixture_render(const char *record_path, const char *output_id)
             blog(LOG_INFO, "cc::Build color source rendered %u white frames", atomic_load(&frames));
         }
     }
+    int streaming_status = 0;
+#ifdef OBS_FIXTURE_WHIP
+    if (getenv("OBS_BUILD_WHIP_ENDPOINT"))
+        streaming_status = stream_whip(getenv("OBS_BUILD_WHIP_ENDPOINT"));
+#endif
     int recording_status = record_path ? record_clip(record_path, output_id) : 0;
     obs_set_output_source(0, NULL);
     if (color) {
@@ -399,7 +413,7 @@ EXPORT int obs_fixture_render(const char *record_path, const char *output_id)
         return 82;
     if (atomic_load(&invalid_frames))
         return 83;
-    return source_status ? source_status : recording_status;
+    return source_status ? source_status : (streaming_status ? streaming_status : recording_status);
 }
 
 EXPORT void obs_fixture_close_display(void)

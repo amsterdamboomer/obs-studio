@@ -717,6 +717,11 @@ lines 121/142, tracked by #1283); three PulseAudio tests are skipped in that CI
 environment. This audio interval fix does not claim to fix that separate wait
 race or to explain all intermittent audio failures.
 
+The separate fix PR CI run `39093013032` also finishes with a failed gate:
+mode ON passes, while mode OFF fails the same two recording-shutdown wait
+cases at lines 121/142 (one executable out of 299). The interval regression
+passes. This is not a green CI result and no retry was used to hide it.
+
 ## Optional compiled PCH for Linux cores
 
 `libobs::Options::pch` defaults to false and is independent of `unity`.
@@ -1133,3 +1138,73 @@ contain H.264/AAC and the QuickTime `qt  ` major brand. Six additional CMake QSV
 reference runtime comparisons pass. This interval includes native compilation
 and application checks; it is not a compile-only or controlled cache benchmark.
 Intel hardware encoding remains unverified.
+
+
+## Linux WebRTC / WHIP Cargo graph
+
+RED `2923db820` requires the real WebRTC output and service module and fails
+at the missing builder. `plugins::build_webrtc` now compiles the original
+POSIX and core C++ groups in their original order through `cc::Build`, links
+to the selected shared libobs, libdatachannel SDK and libcurl, and retains the
+original module data. Unity defaults on and compiled PCH defaults off; both
+can be selected independently through `WebRtcOptions`. Its HEVC setting
+follows the global option. The integration fixture checks WHIP's advertised
+video/audio codecs as well as the output/service registrations.
+
+The explicit `DataChannelSdk` supplies include/library paths and the media
+and websocket interface definitions from that SDK's build. Media support is
+required and the headers must report libdatachannel >= 0.20, matching the
+original dependency requirement. The tested SDK is shared libdatachannel
+0.24.1 with both interface features enabled. Linux is implemented; other
+platforms return an explicit unsupported-graph error. Static SDK linkage and
+other SDK feature combinations have not been validated.
+
+Enable the existing opt-in integration driver with `OBS_BUILD_WEBRTC=1`,
+`OBS_DATACHANNEL_INCLUDE_DIR` and `OBS_DATACHANNEL_LIBRARY`.
+`OBS_DATACHANNEL_DISABLE_WEBSOCKET` describes an SDK built without that feature;
+it must match the supplied SDK. `OBS_BUILD_DISABLE_WEBRTC_UNITY` and
+`OBS_BUILD_WEBRTC_PCH` select the module's build modes.
+
+The new `tests/libobs/whip_receiver.py` wraps the native test command and
+provides a real localhost WHIP receiver using pinned aiortc/aiohttp/numpy.
+It authenticates the SDP POST and resource DELETE, negotiates a real peer,
+and decodes received media. The native fixture uses the public OBS service,
+output and encoder APIs, x264 video and FFmpeg Opus audio; no transport stub
+or mocked encoder is involved. Each core sends a rendered 64x64 scene and a
+48 kHz stereo 1 kHz tone. The receiver checks decoded pixels, advancing
+media timestamps, audio format, tone frequency/RMS, connected state and
+resource deletion. The existing four MP4/MKV recording assertions remain.
+The wrapper propagates command failures and bounds its owned process group
+with a configurable timeout; it does not stop shared services.
+
+The first stream run passes against both cores (20.71 seconds, 96 compiler
+cache hits and zero misses). An actual reference module built using the
+original `plugins/obs-webrtc/CMakeLists.txt` has the same 26 dynamic exports
+as the native module, including seven public OBS module entry points.
+Both link dynamically to libobs, libdatachannel and libcurl. The integration
+driver compares those exports when `OBS_BUILD_WEBRTC_REFERENCE` is supplied;
+`OBS_BUILD_WEBRTC_USE_REFERENCE` explicitly selects that module for a separate
+reference runtime run. That flag requires a reference path and never counts
+as native-module streaming coverage.
+
+This checkpoint validates H.264/Opus streaming on Linux. Actual HEVC/AV1
+streaming, simulcast, external services, Windows/macOS and release packaging
+remain required work; codec registration alone does not prove those paths.
+
+The four unity/PCH combinations each pass two native-module WHIP streams and
+four MP4/MKV recordings. The separate CMake reference run passes the same
+receiver and recording checks against both cores:
+
+| WebRTC unity | WebRTC compiled PCH | Module used at runtime | Native invocation | Cache hits / misses |
+| --- | --- | --- | ---: | ---: |
+| On | Off | Cargo | 56.62 s | 12 / 84 |
+| Off | Off | Cargo | 25.73 s | 94 / 4 |
+| On | On | Cargo | 29.10 s | 93 / 4 |
+| Off | On | Cargo | 25.17 s | 96 / 4 |
+| On | Off | CMake reference | 19.52 s | 95 / 0 |
+
+These are complete native test invocations including runtime/recording checks,
+using a shared host/cache in table order. They do not measure isolated compile
+time, a cold cache or an intrinsic PCH performance difference. Each native
+mode compares its complete export set with the original CMake module before
+runtime; the reference row explicitly substitutes that original module.

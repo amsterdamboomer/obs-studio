@@ -264,6 +264,7 @@ pub struct DataChannelSdk {
 
 #[derive(Clone, Copy, Debug)]
 pub struct WebRtcOptions {
+    pub hevc: bool,
     pub unity: bool,
     pub pch: bool,
 }
@@ -271,6 +272,7 @@ pub struct WebRtcOptions {
 impl Default for WebRtcOptions {
     fn default() -> Self {
         Self {
+            hevc: true,
             unity: true,
             pch: false,
         }
@@ -279,13 +281,67 @@ impl Default for WebRtcOptions {
 
 /// Build the original WebRTC WHIP output and service module.
 pub fn build_webrtc(
-    _build: &NativeBuild,
-    _root: &Path,
-    _core: &Path,
-    _sdk: &DataChannelSdk,
-    _options: &WebRtcOptions,
+    build: &NativeBuild,
+    root: &Path,
+    core: &Path,
+    sdk: &DataChannelSdk,
+    options: &WebRtcOptions,
 ) -> Result<Module, String> {
-    Err("WebRTC module build is not implemented".into())
+    if !sdk.media {
+        return Err("OBS WebRTC requires libdatachannel media support".into());
+    }
+    let root = root.canonicalize().map_err(|e| e.to_string())?;
+    let include = sdk.include_dir.canonicalize().map_err(|e| e.to_string())?;
+    let version = std::fs::read_to_string(include.join("rtc/version.h"))
+        .map_err(|e| format!("read libdatachannel version: {e}"))?;
+    let mut numbers = Vec::new();
+    for field in [
+        "RTC_VERSION_MAJOR",
+        "RTC_VERSION_MINOR",
+        "RTC_VERSION_PATCH",
+    ] {
+        let number = version
+            .lines()
+            .find_map(|line| {
+                let mut words = line.split_whitespace();
+                (words.next() == Some("#define") && words.next() == Some(field))
+                    .then(|| words.next().and_then(|word| word.parse::<u32>().ok()))
+                    .flatten()
+            })
+            .ok_or_else(|| format!("invalid libdatachannel version field {field}"))?;
+        numbers.push(number);
+    }
+    if (numbers[0], numbers[1], numbers[2]) < (0, 20, 0) {
+        return Err("OBS WebRTC requires libdatachannel >= 0.20".into());
+    }
+    let mut library = module(build, &root, core, "obs-webrtc")?;
+    library.sources.clear();
+    library.include_dirs.push(include);
+    library
+        .dependencies
+        .push(sdk.library.canonicalize().map_err(|e| e.to_string())?);
+    for (name, enabled) in [
+        ("RTC_ENABLE_MEDIA", sdk.media),
+        ("RTC_ENABLE_WEBSOCKET", sdk.websocket),
+    ] {
+        library
+            .definitions
+            .push((name.into(), Some(u8::from(enabled).to_string())));
+    }
+    add_package(&mut library, &build.target, "libcurl")?;
+    if options.hevc {
+        library.definitions.push(("ENABLE_HEVC".into(), None));
+    }
+    crate::platform::configure_webrtc(&build.target, &root, &mut library)?;
+    if !options.unity {
+        library.sources = build.separate_group_sources(&root, &library.sources)?;
+    }
+    if options.pch {
+        library.precompiled_headers = crate::groups::headers(&root, &library.sources)?;
+    }
+    println!("cargo:rerun-if-changed={}", sdk.include_dir.display());
+    println!("cargo:rerun-if-changed={}", sdk.library.display());
+    finish(build, &root, library)
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -318,28 +318,41 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     }
     let qsv_enabled = std::env::var_os("OBS_BUILD_QSV").is_some();
     if std::env::var_os("OBS_BUILD_WEBRTC").is_some() {
-        modules.push(
-            plugins::build_webrtc(
-                &build,
-                &root,
-                &libraries.reference,
-                &plugins::DataChannelSdk {
-                    include_dir: std::env::var_os("OBS_DATACHANNEL_INCLUDE_DIR")
-                        .map(PathBuf::from)
-                        .expect("set OBS_DATACHANNEL_INCLUDE_DIR"),
-                    library: std::env::var_os("OBS_DATACHANNEL_LIBRARY")
-                        .map(PathBuf::from)
-                        .expect("set OBS_DATACHANNEL_LIBRARY"),
-                    media: true,
-                    websocket: std::env::var_os("OBS_DATACHANNEL_DISABLE_WEBSOCKET").is_none(),
-                },
-                &plugins::WebRtcOptions {
-                    unity: std::env::var_os("OBS_BUILD_DISABLE_WEBRTC_UNITY").is_none(),
-                    pch: std::env::var_os("OBS_BUILD_WEBRTC_PCH").is_some(),
-                },
-            )
-            .unwrap(),
-        );
+        let mut module = plugins::build_webrtc(
+            &build,
+            &root,
+            &libraries.reference,
+            &plugins::DataChannelSdk {
+                include_dir: std::env::var_os("OBS_DATACHANNEL_INCLUDE_DIR")
+                    .map(PathBuf::from)
+                    .expect("set OBS_DATACHANNEL_INCLUDE_DIR"),
+                library: std::env::var_os("OBS_DATACHANNEL_LIBRARY")
+                    .map(PathBuf::from)
+                    .expect("set OBS_DATACHANNEL_LIBRARY"),
+                media: true,
+                websocket: std::env::var_os("OBS_DATACHANNEL_DISABLE_WEBSOCKET").is_none(),
+            },
+            &plugins::WebRtcOptions {
+                hevc: options.hevc,
+                unity: std::env::var_os("OBS_BUILD_DISABLE_WEBRTC_UNITY").is_none(),
+                pch: std::env::var_os("OBS_BUILD_WEBRTC_PCH").is_some(),
+            },
+        )
+        .unwrap();
+        if let Some(reference) = std::env::var_os("OBS_BUILD_WEBRTC_REFERENCE") {
+            let reference = PathBuf::from(reference).canonicalize().unwrap();
+            assert_eq!(exports(&module.library), exports(&reference));
+            if std::env::var_os("OBS_BUILD_WEBRTC_USE_REFERENCE").is_some() {
+                module.library = reference;
+                println!("WebRTC runtime uses original CMake module");
+            }
+        } else {
+            assert!(
+                std::env::var_os("OBS_BUILD_WEBRTC_USE_REFERENCE").is_none(),
+                "set OBS_BUILD_WEBRTC_REFERENCE before selecting its runtime"
+            );
+        }
+        modules.push(module);
     }
     if qsv_enabled {
         let module = plugins::build_qsv(
@@ -703,6 +716,9 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         }
         let serialized = serde_json::to_string(&selected).unwrap();
         let mut command = std::process::Command::new(&runner);
+        if *output_id != "mp4_output" {
+            command.env_remove("OBS_BUILD_WHIP_ENDPOINT");
+        }
         command.env("OBS_BUILD_TEST_OUTPUT_ID", output_id);
         if let Some(frontend) = &frontend {
             command.env("OBS_BUILD_TEST_FRONTEND_API", frontend);
@@ -751,6 +767,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
                 || line.contains("cc::Build JACK capture")
                 || line.contains("cc::Build sndio capture")
                 || line.contains("cc::Build QSV encoders")
+                || line.contains("cc::Build WHIP")
         }) {
             println!("{}: {line}", path.display());
         }
@@ -1043,6 +1060,23 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
             expected_types.push((b"obs_enum_filter_types".as_slice(), "vst_filter"));
         }
         if std::env::var_os("OBS_BUILD_WEBRTC").is_some() {
+            for (symbol, expected) in [
+                (
+                    b"obs_get_output_supported_video_codecs".as_slice(),
+                    if hevc { "h264;hevc;av1" } else { "h264;av1" },
+                ),
+                (b"obs_get_output_supported_audio_codecs".as_slice(), "opus"),
+            ] {
+                let codecs = library
+                    .get::<unsafe extern "C" fn(*const std::ffi::c_char) -> *const std::ffi::c_char>(symbol)
+                    .unwrap();
+                let supported = codecs(c"whip_output".as_ptr());
+                assert!(!supported.is_null());
+                assert_eq!(
+                    std::ffi::CStr::from_ptr(supported).to_str().unwrap(),
+                    expected
+                );
+            }
             expected_types.extend([
                 (b"obs_enum_output_types".as_slice(), "whip_output"),
                 (b"obs_enum_service_types".as_slice(), "whip_custom"),
