@@ -176,6 +176,11 @@ not get a line.
   [#1103](https://github.com/obs-rust/obs-studio/issues/1103), PR
   [#1104](https://github.com/obs-rust/obs-studio/pull/1104).
 
+- Audio timestamp differences smaller than one sample no longer leave an
+  invalid interval in the mixer. *All*, pending merge. Issue
+  [#838](https://github.com/obs-rust/obs-studio/issues/838), PR
+  [#1385](https://github.com/obs-rust/obs-studio/pull/1385).
+
 ### Encoding, streaming and recording
 
 - **let buffered queues fit one chunk.** Large buffered recording chunks complete when the configured queue limit is smaller than a chunk. *All*, 2026-10-20. Issue [#1526](https://github.com/obs-rust/obs-studio/issues/1526), PR [#1527](https://github.com/obs-rust/obs-studio/pull/1527).
