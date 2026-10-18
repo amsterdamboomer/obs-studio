@@ -637,38 +637,34 @@ includes native compilation and runtime checks and is not a build benchmark.
 
 ### Scoped core build measurements
 
-Local GCC measurements used fixed opt-level 2 with debug information, one fresh
-output directory per mode and three repeated builds. The wrapper requested four
-Cargo jobs, but did not set `NUM_JOBS` for the standalone native integration
-process. That process has no inherited Cargo jobserver, so cc 1.6 falls back to
-machine parallelism. The original claim of four native jobs is withdrawn; these
-observations do not provide a controlled native concurrency comparison. Future
-standalone runs must set `NUM_JOBS` explicitly as well as `CARGO_BUILD_JOBS`.
-The interval covers the C/Rust core pair and caption, excluding plugin builds,
-GUI checks and Cargo startup. The host and compiler cache were shared; no cache
-was reset. Fresh output is therefore not a cold-cache measurement. Trials ran
-in the table's order, so these observations are not an isolated benchmark.
-The integration driver writes the interval and selected options to
-`core-build-timing.json` under `OBS_BUILD_TEST_OUTPUT`; repeat the same invocation
-with that output directory to collect additional samples.
+Corrected local GCC measurements explicitly set `NUM_JOBS=4` for the standalone
+native integration process and `CARGO_BUILD_JOBS=4`. The active process
+environment was inspected: both values were 4 and no Cargo jobserver was
+inherited. The earlier wrapper only set Cargo's limit, so its claim of four
+native jobs is withdrawn; its original observations are retained separately.
+
+The corrected matrix uses fixed opt-level 2 with debug information, one fresh
+output directory per mode and three repeated builds. The interval covers the
+C/Rust core pair and caption, excluding plugin builds, GUI checks and Cargo
+startup. The host and compiler cache were shared; no cache was reset. Fresh
+output is therefore not a cold-cache measurement. Trials ran in table order.
+The integration driver writes `core-build-timing.json` under
+`OBS_BUILD_TEST_OUTPUT`; repeat that invocation with the same directory for
+additional samples.
 
 | Unity | Compiled PCH | Fresh output | Repeat median | Repeat range |
 | --- | --- | ---: | ---: | ---: |
-| On | Off | 15.65 s | 1.98 s | 1.91–2.08 s |
-| On | On | 33.30 s | 6.90 s | 4.59–8.64 s |
-| Off | Off | 11.66 s | 3.35 s | 3.28–4.56 s |
-| Off | On | 25.62 s | 7.01 s | 6.81–8.71 s |
+| On | Off | 12.60 s | 2.55 s | 2.50–2.94 s |
+| On | On | 38.39 s | 5.72 s | 4.70–8.67 s |
+| Off | Off | 26.38 s | 5.82 s | 5.30–6.34 s |
+| Off | On | 44.18 s | 9.83 s | 9.07–11.65 s |
 
-The final repeat in each mode reported zero compiler-cache misses. Two earlier
-repeat invocations lacked usable soldr summary statistics; their elapsed times
-remain recorded, without an inferred hit count. Cache summaries cover the
-whole integration invocation, not just the timed core pair.
-
-PCH does not improve these measured runs. Unity remains enabled and PCH disabled
-by default. PCH preparation and its per-header compilation batches still need
-performance work before recommending it. These results do not establish full
-application build time, clean-cache performance, a CMake comparison or Cargo
-no-op behavior.
+All twelve repeat invocations reported zero compiler-cache misses. Cache
+summaries cover the whole integration invocation, not just the timed core pair.
+These results support unity on / PCH off as the default for this measured core
+case. PCH preparation and per-header compilation batches still need performance
+work. This does not establish full application build time, clean-cache
+performance, a CMake comparison or Cargo no-op behavior.
 
 ## Bundled obs-sys configuration and Cargo scheduling
 
@@ -817,5 +813,6 @@ the original dock editor, actual native dock pixels, local source HTML/JavaScrip
 callback, staged helper subprocesses, saved configuration, recordings and normal
 shutdown. The full invocation took 510.62 s and reported 27 cache hits / 199
 misses; it used the earlier uncapped native test environment and is not a
-controlled build benchmark. A warm repeat under an explicit native job limit
-remains necessary for cache evidence.
+controlled build benchmark. A warm repeat with both job limits explicitly set
+to 4 passes in 77.56 s, with 226 cache hits and zero misses. Its interval includes
+GUI checks and recordings against both cores; it is not a compile-only timing.
