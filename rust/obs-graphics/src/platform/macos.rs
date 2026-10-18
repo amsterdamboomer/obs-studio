@@ -1,20 +1,20 @@
-//! Clang combines sinf/cosf pairs into this system libm entry point.
-//! Apple's paired implementation can differ from separate sinf/cosf calls
-//! by one ULP, including for large arguments. Match the shipped C operation.
+//! Preserve the C source's individual sinf/cosf operations.
+//!
+//! Apple's paired __sincosf_stret can differ by one ULP from separate calls.
+//! LLVM combines Rust intrinsics at opt-level 3, whereas the unchanged C
+//! oracle uses individual calls. Separate non-inlined scalar functions keep
+//! that optimization from silently changing the source operation's precision.
 
-#[repr(C)]
-struct SinCos {
-    sin: f32,
-    cos: f32,
+#[inline(never)]
+fn sin(x: f32) -> f32 {
+    x.sin()
 }
 
-unsafe extern "C" {
-    fn __sincosf_stret(x: f32) -> SinCos;
+#[inline(never)]
+fn cos(x: f32) -> f32 {
+    x.cos()
 }
 
 pub(crate) fn sin_cos(x: f32) -> (f32, f32) {
-    // SAFETY: system libm accepts every f32 and returns two floats by value;
-    // repr(C) preserves Apple's homogeneous floating-point aggregate ABI.
-    let result = unsafe { __sincosf_stret(x) };
-    (result.sin, result.cos)
+    (sin(x), cos(x))
 }

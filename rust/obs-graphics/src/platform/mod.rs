@@ -2,7 +2,6 @@
 
 cfg_select! {
     target_os = "macos" => {
-        #[allow(unsafe_code)] // system libm's value-only C ABI
         mod macos;
         pub(crate) use macos::sin_cos;
     }
