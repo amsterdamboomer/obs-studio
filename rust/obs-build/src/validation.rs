@@ -24,6 +24,11 @@ impl Default for Options {
     }
 }
 
+/// Build the unchanged standalone WHIP clock and POSIX host tests.
+pub fn build_webrtc_tests(_build: &NativeBuild, _root: &Path) -> Result<Vec<Executable>, String> {
+    Err("standalone WebRTC test graph is not implemented".into())
+}
+
 /// Build unchanged cmocka tests that require the native graphics module.
 pub fn build_graphics_tests(
     build: &NativeBuild,

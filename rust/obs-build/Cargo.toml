@@ -23,3 +23,7 @@ tempfile = "=3.27.0"
 [[test]]
 name = "libobs"
 required-features = ["libobs-integration"]
+
+[[test]]
+name = "webrtc"
+required-features = ["libobs-integration"]
