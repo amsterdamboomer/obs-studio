@@ -13,6 +13,7 @@ extern "C" {
 #include <thread>
 
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QTimer>
 
 #include "RecordingShutdownWait.hpp"
@@ -22,6 +23,7 @@ struct Result {
 	bool active;
 	bool ui_processed;
 	bool checked_after_deactivate;
+	qint64 elapsed_ms;
 };
 
 /* No sleeps or scheduler-dependent gap: the inactive store is a later UI
@@ -61,6 +63,8 @@ static Result run_wait(bool become_inactive)
 		}
 		condition.notify_one();
 	});
+	QElapsedTimer elapsed;
+	elapsed.start();
 	bool stopped = WaitForOutputToStop(handler, 100, [&]() {
 		if (deactivated.load() && !checked_after_deactivate) {
 			checked_after_deactivate = true;
@@ -70,7 +74,7 @@ static Result run_wait(bool become_inactive)
 		}
 		return active;
 	});
-	Result result{stopped, active, ui_processed, checked_after_deactivate};
+	Result result{stopped, active, ui_processed, checked_after_deactivate, elapsed.elapsed()};
 	worker.join();
 	signal_handler_destroy(handler);
 	return result;
@@ -92,12 +96,13 @@ static void test_deactivate_without_inactive_times_out(void **)
 	assert_true(result.active);
 	assert_true(result.ui_processed);
 	assert_true(result.checked_after_deactivate);
+	assert_true(result.elapsed_ms >= 80);
 }
 
 int main(int argc, char **argv)
 {
 	QCoreApplication app(argc, argv);
 	const CMUnitTest tests[] = {cmocka_unit_test(test_deactivate_before_inactive),
-				  cmocka_unit_test(test_deactivate_without_inactive_times_out)};
+				    cmocka_unit_test(test_deactivate_without_inactive_times_out)};
 	return cmocka_run_group_tests(tests, nullptr, nullptr);
 }
