@@ -7,6 +7,13 @@ and `cc::Build`, including shared libraries, plugins, generated files, graphics,
 Qt, resources, tests and platform packaging. A core-only archive or test fixture
 does not complete the conversion.
 
+## Default build mode
+
+The user selected **unity on, compiled PCH off**. Keep both settings optional.
+`libobs::Options::default()` uses that mode; bundled `obs-sys` exposes the same
+choice as `OBS_SYS_UNITY=1` and `OBS_SYS_PCH=0` when no override is supplied.
+Components that already list explicit unity groups preserve those boundaries.
+
 ## Requirements carried forward
 
 - Native C/C++ builds must be very fast. Reuse explicit unity groups, make unity
