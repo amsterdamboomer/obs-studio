@@ -318,13 +318,15 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             .unwrap(),
         );
     }
-    let frontend = (enabled("OBS_BUILD_QT") || enabled("OBS_BUILD_APP")).then(|| {
-        qt::exercise(&build, &root);
-        modules.push(plugins::build_vst(&build, &root, &libraries.reference).unwrap());
-        scripting_api
-            .clone()
-            .unwrap_or_else(|| frontend::build_api(&build, &root, &libraries.reference).unwrap())
-    });
+    let browser_enabled = std::env::var_os("OBS_BUILD_BROWSER").is_some();
+    let frontend =
+        (enabled("OBS_BUILD_QT") || enabled("OBS_BUILD_APP") || browser_enabled).then(|| {
+            qt::exercise(&build, &root);
+            modules.push(plugins::build_vst(&build, &root, &libraries.reference).unwrap());
+            scripting_api.clone().unwrap_or_else(|| {
+                frontend::build_api(&build, &root, &libraries.reference).unwrap()
+            })
+        });
     let frontend_tools = tools_enabled.then(|| {
         plugins::build_frontend_tools(
             &build,
@@ -351,6 +353,48 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         )
         .unwrap()
     });
+    let browser = browser_enabled.then(|| {
+        let artifacts = plugins::build_browser(
+            &build,
+            &root,
+            &libraries.reference,
+            frontend.as_ref().unwrap(),
+            &plugins::BrowserOptions {
+                cef_root: PathBuf::from(
+                    std::env::var_os("OBS_CEF_ROOT").expect("set OBS_CEF_ROOT to the CEF SDK"),
+                ),
+                panels: std::env::var_os("OBS_BUILD_DISABLE_BROWSER_PANELS").is_none(),
+                unity: std::env::var_os("OBS_BUILD_DISABLE_BROWSER_UNITY").is_none(),
+            },
+        )
+        .unwrap();
+        assert!(artifacts.helper.is_file());
+        assert!(artifacts.cef_root.join("include/cef_version.h").is_file());
+        let symbols = exports(&artifacts.module.library);
+        for symbol in [
+            "obs_module_load",
+            "obs_module_set_pointer",
+            "obs_module_ver",
+        ] {
+            assert!(
+                symbols.contains(symbol),
+                "missing browser entry point {symbol}"
+            );
+        }
+        for path in [&artifacts.helper, &artifacts.module.library] {
+            let deps = std::process::Command::new("readelf")
+                .args(["-d"])
+                .arg(path)
+                .output()
+                .unwrap();
+            assert!(deps.status.success());
+            assert!(String::from_utf8_lossy(&deps.stdout).contains("libcef.so"));
+        }
+        artifacts
+    });
+    if let Some(browser) = &browser {
+        std::fs::write(build.output.join("browser-build.json"), serde_json::to_vec_pretty(&serde_json::json!({"module":browser.module.library,"helper":browser.helper,"cef_root":browser.cef_root})).unwrap()).unwrap();
+    }
     if let (Some(frontend), Some(reference)) =
         (&frontend, std::env::var_os("OBS_BUILD_FRONTEND_REFERENCE"))
     {

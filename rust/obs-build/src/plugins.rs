@@ -1,8 +1,12 @@
 //! Native OBS module builds using the same engine as bundled libobs.
 use crate::{NativeBuild, SharedLibrary, deps::shared_archive, libobs::add_package};
 use std::path::{Path, PathBuf};
+mod browser;
 mod frontend_tools;
 mod websocket;
+pub use browser::{
+    Artifacts as BrowserArtifacts, Options as BrowserOptions, build as build_browser,
+};
 pub use frontend_tools::build as build_frontend_tools;
 pub use websocket::{Options as WebsocketOptions, build as build_websocket};
 
