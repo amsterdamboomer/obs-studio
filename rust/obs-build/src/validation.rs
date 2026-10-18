@@ -25,8 +25,33 @@ impl Default for Options {
 }
 
 /// Build the unchanged standalone WHIP clock and POSIX host tests.
-pub fn build_webrtc_tests(_build: &NativeBuild, _root: &Path) -> Result<Vec<Executable>, String> {
-    Err("standalone WebRTC test graph is not implemented".into())
+pub fn build_webrtc_tests(build: &NativeBuild, root: &Path) -> Result<Vec<Executable>, String> {
+    let root = dunce::canonicalize(root).map_err(|e| e.to_string())?;
+    let mut base = SharedLibrary {
+        include_dirs: vec![root.clone(), root.join("plugins/obs-webrtc")],
+        ..SharedLibrary::default()
+    };
+    crate::platform::configure_webrtc_tests(&build.target, &mut base)?;
+    add_package(&mut base, &build.target, "cmocka")?;
+    let mut result = Vec::new();
+    for (name, extension) in [
+        ("test_whip_rtp_timestamp", "c"),
+        ("test_whip_host_os_name", "cpp"),
+    ] {
+        let library = SharedLibrary {
+            name: name.into(),
+            sources: vec![root.join(format!("test/cmocka/{name}.{extension}"))],
+            ..base.clone()
+        };
+        result.push(Executable {
+            name: name.into(),
+            path: build.executable(&library)?,
+        });
+    }
+    for directory in ["test/cmocka", "plugins/obs-webrtc"] {
+        println!("cargo:rerun-if-changed={}", root.join(directory).display());
+    }
+    Ok(result)
 }
 
 /// Build unchanged cmocka tests that require the native graphics module.

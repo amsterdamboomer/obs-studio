@@ -392,6 +392,21 @@ pub fn configure_qsv(
     Ok(())
 }
 
+pub fn configure_webrtc_tests(
+    target: &str,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    if !target.contains("linux") {
+        return Err(format!(
+            "standalone WHIP test graph for {target} is not implemented yet"
+        ));
+    }
+    library.c_compile_options.push("-std=gnu17".into());
+    library.cpp_compile_options.push("-std=gnu++17".into());
+    library.link_options.push("-lm".into());
+    Ok(())
+}
+
 pub fn configure_webrtc(
     target: &str,
     root: &Path,

@@ -1208,3 +1208,35 @@ using a shared host/cache in table order. They do not measure isolated compile
 time, a cold cache or an intrinsic PCH performance difference. Each native
 mode compares its complete export set with the original CMake module before
 runtime; the reference row explicitly substitutes that original module.
+
+
+With global HEVC disabled, a further native-module run passes the advertised
+`h264;av1` video/`opus` audio codec checks, two real H.264/Opus streams and four
+recordings against both cores (55.70 seconds, 41 cache hits / 54 misses).
+This does not exercise actual HEVC or AV1 media. The original WHIP service's
+own codec list remains unchanged; it advertises HEVC independently of the
+output option, which is existing behavior rather than a newly fixed path.
+
+### Existing standalone WHIP tests
+
+A focused test in the existing opt-in Cargo target `libobs` builds the unchanged
+`test_whip_rtp_timestamp.c` and `test_whip_host_os_name.cpp` sources using
+`validation::build_webrtc_tests`. RED `a425f96d8` fails at the missing builder;
+the implemented graph passes all six RTP-clock cases and both POSIX host-name
+cases, with no skips, in 1.27 seconds. These helpers require neither libobs
+nor libdatachannel. They run once, not once per core, and do not establish
+coverage of a Rust replacement. C and C++ language options are separate,
+matching the original test source languages. Each executable has a bounded
+60-second runtime; cmocka filters are removed and explicit case totals are
+checked. The helper graph currently supports Linux.
+
+```sh
+soldr cargo test -p obs-build --features libobs-integration --test libobs -- webrtc_tests::original_whip_clock_and_host_tests_pass_without_a_core_or_sdk --exact --nocapture
+```
+
+The selected native graph now contains 52 core executables, six VLC tests,
+one graphics test and two standalone WHIP tests. It is not the complete OBS
+test battery. A static inventory of this worktree's `test/cmocka/tests.d`
+finds 238 literal executable declarations before evaluating platform/option
+conditions; recent reference CI runs contain 299 configured tests. That
+inventory is a gap-finding aid, not an evaluated replacement for CTest.
