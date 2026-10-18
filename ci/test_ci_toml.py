@@ -94,6 +94,20 @@ def triggers(path: Path) -> list[str]:
 
 
 class CiTomlTest(unittest.TestCase):
+    def test_disabled_store_has_no_retention_protection(self):
+        prefixes = family_prefixes(load())
+        for platform in ("linux-x64", "macos-arm64", "windows-x64"):
+            key = f"setup-soldr-buildcache-v2-{platform}-legacy"
+            with self.subTest(key=key):
+                self.assertFalse(any(key.startswith(prefix) for prefix in prefixes),
+                                 "Disabled archives must be eligible for unmatched-family cleanup")
+        for key in ("cook-base-v2-linux-x64-current", "setup-soldr-cargoregistry-v1-linux-current",
+                    "solo-toolchain-v3-linux-current", "zccache-tier2-linux-current",
+                    "targets-ccache-linux-current", "targets-apt-current"):
+            with self.subTest(key=key):
+                self.assertTrue(any(key.startswith(prefix) for prefix in prefixes),
+                                "Preserve useful dependency and native cache families")
+
     def test_schema_and_pin(self):
         ci = load()
         self.assertEqual(ci["schema"], 3)

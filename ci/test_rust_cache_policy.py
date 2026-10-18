@@ -4,27 +4,11 @@ import re
 import unittest
 from pathlib import Path
 
-from ci.test_ci_toml import family_prefixes, load
-
 ROOT = Path(__file__).resolve().parent.parent
 WORKFLOWS = ("build-project.yaml", "release-rust.yaml")
 
 
 class RustCachePolicyTest(unittest.TestCase):
-    def test_disabled_store_has_no_retention_protection(self):
-        prefixes = family_prefixes(load())
-        for platform in ("linux-x64", "macos-arm64", "windows-x64"):
-            key = f"setup-soldr-buildcache-v2-{platform}-legacy"
-            with self.subTest(key=key):
-                self.assertFalse(any(key.startswith(prefix) for prefix in prefixes),
-                                 "Disabled archives must be eligible for unmatched-family cleanup")
-        for key in ("cook-base-v2-linux-x64-current", "setup-soldr-cargoregistry-v1-linux-current",
-                    "solo-toolchain-v3-linux-current", "zccache-tier2-linux-current",
-                    "targets-ccache-linux-current", "targets-apt-current"):
-            with self.subTest(key=key):
-                self.assertTrue(any(key.startswith(prefix) for prefix in prefixes),
-                                "Preserve useful dependency and native cache families")
-
     def test_bypassed_compiler_store_is_not_transferred(self):
         found = 0
         for name in WORKFLOWS:
