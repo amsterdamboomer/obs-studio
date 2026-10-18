@@ -361,6 +361,9 @@ pub fn configure_qsv(
             "QSV native graph for {target} is not implemented yet"
         ));
     }
+    if !target.starts_with("x86_64-") {
+        return Err(format!("QSV requires an x86_64 target, received {target}"));
+    }
     pkg_config::Config::new()
         .cargo_metadata(false)
         .atleast_version("2.9")

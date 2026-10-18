@@ -152,6 +152,10 @@ not get a line.
 
 ### Encoding, streaming and recording
 
+- **Codec availability follows the build.** MP4 and MOV outputs do not advertise
+  HEVC when it was disabled at build time. *Linux*, pending merge. PR
+  [#1333](https://github.com/obs-rust/obs-studio/pull/1333).
+
 - **Enhanced Broadcasting encoder controls.** Enhanced Broadcasting stream
   settings can turn off B-frames and lookahead and set the preset and
   tuning, for lower latency than the service settings give, and show a

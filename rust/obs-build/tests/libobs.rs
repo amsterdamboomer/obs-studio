@@ -601,7 +601,17 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         .iter()
         .map(|module| (&module.library, &module.data))
         .collect();
-    let outputs: &[(&str, &str)] = if ffmpeg.is_some() {
+    let mov_recording = std::env::var_os("OBS_BUILD_MOV_RECORD").is_some();
+    if mov_recording {
+        assert!(enabled("OBS_BUILD_RECORD") && ffmpeg.is_some());
+    }
+    let outputs: &[(&str, &str)] = if mov_recording {
+        &[
+            ("mp4_output", "mp4"),
+            ("ffmpeg_muxer", "mkv"),
+            ("mov_output", "mov"),
+        ]
+    } else if ffmpeg.is_some() {
         &[("mp4_output", "mp4"), ("ffmpeg_muxer", "mkv")]
     } else {
         &[("mp4_output", "mp4")]

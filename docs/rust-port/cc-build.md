@@ -941,3 +941,81 @@ cores, including native dock/source rendering, JavaScript/WebSocket checks,
 recordings, saved configuration and shutdown (102.18 s, 226 cache hits / two
 misses). This is a combined build/runtime interval, not a controlled compiler
 benchmark or proof of physical-device capture.
+
+
+## Intel QSV native module
+
+`plugins::build_qsv` builds the original Linux x86_64 QSV C/C++ groups in CMake source
+order, using oneVPL >= 2.9, libva and libva-drm. It retains the host-definition
+header, language standards, switch warning exception and inline visibility.
+`QsvOptions` supports HEVC, unity and compiled PCH independently; its default is
+HEVC on, unity on, PCH off. The integration driver selects the target with
+`OBS_BUILD_QSV=1`, with `OBS_BUILD_DISABLE_QSV_UNITY` and `OBS_BUILD_QSV_PCH`
+controlling its compilation. Its HEVC setting follows `OBS_BUILD_DISABLE_HEVC`.
+The full CMake graph enables QSV by default; the integration driver's opt-in is
+not a change to that product default.
+
+RED `3f0a49d4f` fails at the missing builder; implementation `5c511b9d2` adds the
+native graph and isolated CMake runtime comparison. The initial build/load and
+four H.264/AAC recordings pass against both cores (34.56 s). The controlled
+reference uses each original QSV CMake target, matching the project's inline
+visibility and optimization, against the same SDKs (oneVPL 2.16 and libva 2.23).
+The finder needs the pkg-config include root explicitly on this Nix host.
+`OBS_BUILD_QSV_REFERENCE` requires exact dynamic exports and compares encoder
+registrations after loading that actual reference module with each core in a
+fresh process. Reference runs preserve the real graphics/module/lifecycle
+checks; their recording is omitted to avoid overwriting the validated clips.
+
+The first unity/PCH-off case passes with seven matching exports and matching
+registrations. Both cores and the CMake reference expose no QSV encoders on this
+host. This proves graceful loading without a detected implementation; Intel
+hardware encoding and texture interoperability remain unverified. The complete option matrix passes, with seven matching exports and four fresh
+CMake reference runtime comparisons per row:
+
+| QSV unity | QSV PCH | HEVC | Full invocation | Cache hits / misses |
+| --- | --- | --- | ---: | ---: |
+| On | Off | On | 25.46 s | 96 / 1 |
+| Off | Off | Off | 25.98 s | 97 / 1 |
+| On | On | On | 30.56 s | 93 / 8 |
+| Off | On | Off | 29.90 s | 91 / 12 |
+
+Each invocation includes both cores, native compilation, real MP4/MKV recordings
+and reference runtime checks. These are functional validation intervals with a
+shared cache, not controlled PCH performance measurements. Disabled rows also
+check the public MP4/MOV codec lists. Compiled PCH remains off by default.
+
+### HEVC-disabled MP4 build regression
+
+The QSV matrix's HEVC-disabled recording case exposed unconditional HEVC calls
+in the existing MP4 muxer. Both Cargo and the original CMake output target fail
+to link against the disabled core, with unresolved `obs_parse_hevc_header` and
+`obs_parse_hevc_packet`. The original CMake reference uses its actual target,
+SDK libraries and shared dependencies, and `--no-undefined` to require a valid
+module. The failure is not QSV-specific.
+
+RED `0c73e4776` additionally requires MP4/MOV advertised codecs to agree with the
+build option. The fix gates the HEVC-only helpers, call sites and recognition
+with `ENABLE_HEVC`, and removes HEVC from the disabled outputs' codec lists,
+following the existing FLV output pattern. Enabled source bodies remain intact.
+The original CMake output target now links successfully with HEVC disabled.
+The next disabled recording run exposes one VA-API codec switch case calling
+`vaapi_device_hevc_supported` despite that helper's declaration and definition
+being conditional. Guarding the case with the same feature macro makes it use
+the existing unsupported-codec fallback when disabled. Enabled behavior stays
+unchanged. These regressions were found by keeping real recordings in the
+HEVC-disabled option matrix.
+No public header or existing upstream C test is edited. Full application,
+physical Intel hardware, cross-platform and release packaging parity remain
+requirements of the complete conversion.
+
+
+The full staged GUI/browser invocation with global HEVC disabled and QSV
+selected passes against both cores (424.83 s, 110 cache hits / 118 misses).
+It verifies native dock/source pixels, JavaScript/WebSocket behavior, saved
+configuration, frontend recording and normal shutdown. With
+`OBS_BUILD_MOV_RECORD=1` (requiring recording/FFmpeg targets), the API fixture
+also records and decodes MP4, MKV and MOV against each core. Both MOV artifacts
+contain H.264/AAC and the QuickTime `qt  ` major brand. Six additional CMake QSV
+reference runtime comparisons pass. This interval includes native compilation
+and application checks; it is not a compile-only or controlled cache benchmark.
+Intel hardware encoding remains unverified.
