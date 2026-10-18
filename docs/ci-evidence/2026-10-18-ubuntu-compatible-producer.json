@@ -2,7 +2,6 @@
   "run": 39089156757,
   "revision": "df8699502218f2090e7aac47b98740b5555cdc02",
   "captured_at": "2026-10-18T02:22:42.489771+00:00",
-  "parent_run_status_at_capture": "in_progress",
   "observations": [
     {
       "mode": "ON",
@@ -106,8 +105,7 @@
   ],
   "limitations": [
     "Both Ubuntu jobs passed and published mode-specific seeds; later compatible OFF consumption and durable retention remain unverified.",
-    "Unmatched historical revisions/runners do not establish causal speedup.",
-    "A successful native app job is not proof of parent full workflow success."
+    "Unmatched historical revisions/runners do not establish causal speedup."
   ],
   "mode_archives_present_after_both_jobs": [
     {
@@ -119,6 +117,186 @@
       "id": 9107248593,
       "key": "zccache-ubuntu-ubuntu-26.04-x86_64-rustON-RelWithDebInfo-df8699502218f2090e7aac47b98740b5555cdc02",
       "size_in_bytes": 795699586
+    }
+  ],
+  "parent_status_at_initial_capture": "in_progress",
+  "parent_final_status": "completed",
+  "parent_final_conclusion": "success",
+  "full_run_jobs": [
+    {
+      "id": 117561950048,
+      "name": "Nightly CodeQL (c-cpp)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117561950152,
+      "name": "Build \ud83e\uddf1 / CI Mode \ud83d\udec2",
+      "conclusion": "success"
+    },
+    {
+      "id": 117561950164,
+      "name": "Nightly CodeQL (actions)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117561950222,
+      "name": "Nightly CodeQL (python)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117561950244,
+      "name": "Build \ud83e\uddf1 / Event Data \ud83d\udd0e",
+      "conclusion": "success"
+    },
+    {
+      "id": 117561950277,
+      "name": "Analyze \ud83d\udd2c / macOS \ud83c\udf4f (clang-analyze)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117561950285,
+      "name": "Nightly CodeQL (rust)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117561950925,
+      "name": "Check Service Availability \ud83d\udedc",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 117561950981,
+      "name": "Upload Language Files \ud83c\udf10",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 117561951000,
+      "name": "Analyze \ud83d\udd2c / Windows \ud83e\ude9f (PVS-Studio)",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 117562006069,
+      "name": "Build \ud83e\uddf1 / Ubuntu \ud83d\udc27",
+      "conclusion": "success"
+    },
+    {
+      "id": 117562006077,
+      "name": "Build \ud83e\uddf1 / Rust Cross Lint \ud83e\udd80 (release targets)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117562006078,
+      "name": "Build \ud83e\uddf1 / Flatpak \ud83d\udce6",
+      "conclusion": "success"
+    },
+    {
+      "id": 117562006085,
+      "name": "Build \ud83e\uddf1 / Ubuntu \ud83d\udc27 (OBS-Studio-Rust)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117562006089,
+      "name": "Build \ud83e\uddf1 / Windows \ud83e\ude9f (arm64)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117562006097,
+      "name": "Build \ud83e\uddf1 / macOS \ud83c\udf4f (arm64)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117562006101,
+      "name": "Build \ud83e\uddf1 / macOS \ud83c\udf4f (x86_64)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117562006112,
+      "name": "Build \ud83e\uddf1 / Windows \ud83e\ude9f (x64)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117562015621,
+      "name": "Build \ud83e\uddf1 / Rust Tier 2 Linux \ud83d\udc27 (build)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117562015657,
+      "name": "Build \ud83e\uddf1 / Fast Gate \u26a1",
+      "conclusion": "success"
+    },
+    {
+      "id": 117563054867,
+      "name": "Build \ud83e\uddf1 / Rust Tier 2 windows-2025-vs2026",
+      "conclusion": "success"
+    },
+    {
+      "id": 117563054873,
+      "name": "Build \ud83e\uddf1 / Rust Tier 2 Linux \ud83d\udc27 (tests ON)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117563054877,
+      "name": "Build \ud83e\uddf1 / Rust Cross Lint \ud83e\udd80 (Windows, macOS)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117563054885,
+      "name": "Build \ud83e\uddf1 / Qt Frontend Linux \ud83d\udc27",
+      "conclusion": "success"
+    },
+    {
+      "id": 117563054901,
+      "name": "Build \ud83e\uddf1 / Rust Tests \ud83e\udd80 (windows-2025-vs2026)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117563054902,
+      "name": "Build \ud83e\uddf1 / Rust Tier 2 macos-26",
+      "conclusion": "success"
+    },
+    {
+      "id": 117563054921,
+      "name": "Build \ud83e\uddf1 / Rust Tier 2 Linux \ud83d\udc27 (tests OFF)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117563054927,
+      "name": "Build \ud83e\uddf1 / Rust Tests \ud83e\udd80 (macos-26)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117564247795,
+      "name": "Build \ud83e\uddf1 / Rust Tier 2 Linux \ud83d\udc27",
+      "conclusion": "success"
+    },
+    {
+      "id": 117564713347,
+      "name": "Report Nightly Failure \ud83d\udea8",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 117564713408,
+      "name": "Upload Steam Builds \ud83d\ude82",
+      "conclusion": "skipped"
+    }
+  ],
+  "linux_ctest_observations": [
+    {
+      "job": 117563054873,
+      "name": "Build \ud83e\uddf1 / Rust Tier 2 Linux \ud83d\udc27 (tests ON)",
+      "conclusion": "success",
+      "test_summary": [
+        "2026-10-18T02:22:50.8618575Z 100% tests passed, 0 tests failed out of 296",
+        "2026-10-18T02:22:50.8618990Z Total Test time (real) = 304.42 sec"
+      ]
+    },
+    {
+      "job": 117563054921,
+      "name": "Build \ud83e\uddf1 / Rust Tier 2 Linux \ud83d\udc27 (tests OFF)",
+      "conclusion": "success",
+      "test_summary": [
+        "2026-10-18T02:23:19.8038388Z 100% tests passed, 0 tests failed out of 296",
+        "2026-10-18T02:23:19.8038983Z Total Test time (real) = 314.80 sec"
+      ]
     }
   ]
 }

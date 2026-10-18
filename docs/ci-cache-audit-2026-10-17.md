@@ -5,13 +5,15 @@ Implementation and measurement tracker:
 
 ## Current executive verdict — October 18 UTC
 
-**The full native validation is successful.** Run
-[39082733551](https://github.com/obs-rust/obs-studio/actions/runs/39082733551)
-at `2f9bf8d77` passed all seven app builds: Ubuntu OFF/ON, Windows x64/arm64,
+**The latest full native validation is successful.** Run
+[39089156757](https://github.com/obs-rust/obs-studio/actions/runs/39089156757)
+at `df86995022` passed all seven app builds: Ubuntu OFF/ON, Windows x64/arm64,
 macOS x86/arm64 and Flatpak. Native Rust tests, Tier 2 and nightly scans also
-passed. Linux OFF/ON each registered 295 tests with zero failures and the
-three existing PulseAudio device skips; CTest took 302.01 / 308.84 s.
-[Full-run evidence](ci-evidence/2026-10-18-full-warm-validation.json).
+passed. Linux OFF/ON each registered 296 tests with zero failures; CTest took
+314.80 / 304.42 s. Both Ubuntu modes published compatible snapshots.
+[Current full-run and producer evidence](ci-evidence/2026-10-18-ubuntu-compatible-producer.json).
+The earlier full run at `2f9bf8d77` also passed; its distinct 295-test results
+remain [recorded separately](ci-evidence/2026-10-18-full-warm-validation.json).
 
 | Finding | Verified result | Recommendation/status |
 | --- | --- | --- |
@@ -94,8 +96,8 @@ calls cold (16 other calls noncacheable), and published its own snapshot:
 5,045 MiB raw, below the 8,192 MiB cap. The API confirmed both mode-specific
 seeds were present after the jobs completed. This verifies producer behavior
 under #1371, replacing the previous mixed-mode 9,526 MiB save failure. A later
-OFF consumer and stable retention are still required; parent full-workflow
-success is not established at this capture.
+OFF consumer and stable retention are still required. The parent full run
+subsequently passed all seven native app builds and the remaining checks.
 
 
 The two new Ubuntu archives total 1,508,547,016 bytes, exceeding their pooled
