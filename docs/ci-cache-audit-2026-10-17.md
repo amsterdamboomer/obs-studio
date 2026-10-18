@@ -17,7 +17,7 @@ three existing PulseAudio device skips; CTest took 302.01 / 308.84 s.
 | --- | --- | --- |
 | Native compiler reuse | Linux Tier 2 784/785 cached; Windows Tier 2 308/309 cacheable hits | Preserve native compiler stores |
 | Warm Ubuntu ON | Full job 684 → 435 s; build 602 → 324 s, in unmatched observations | Keep the working ON seed; measure durability |
-| Ubuntu OFF fallback | 43/361 calls cached; mixed state 9,526 MiB; save skipped | #1371 restricts restores to compatible mode/configuration; runtime verification pending |
+| Ubuntu OFF fallback | 43/361 calls cached; mixed state 9,526 MiB; save skipped | #1371 verified: cold OFF saved a mode-specific seed below the size cap; later reuse remains pending |
 | Embedded Rust store | All eight expanded soldr lanes reported no embedded session | #1372 disables transport; #1380 retired retention and the queue janitor reclaimed 183,330,575 bytes |
 | Rust correctness | Pinned compiler-cache stale-source bug and separate restored-target hazard remain | Keep wrapper bypass; do not deploy deeper test reuse without freshness validation |
 | Startup incident | Local reproduction plus PR, queue, master and full-run verification | #1365 verified; #1355 closed |
@@ -36,7 +36,7 @@ The plot shows all three trials and min–max ranges. Its warm panel excludes
 the initial seed build and uses a separately identified grouped revision.
 [Raw trials and reproducible plotting script](ci-evidence/libobs-2026-10-17/plot_trials.py).
 
-**Next priorities:** verify compatible Ubuntu seed publication after #1371,
+**Next priorities:** verify compatible Ubuntu seed consumption after #1371,
 resolve the independently reproduced recording-wait race blocking #1362,
 restore durable retention of the measured plugin seeds, and collect at least
 one representative post-rollout day. Qt publication
@@ -57,6 +57,13 @@ exactly those three additional IDs, leaving its other decisions unchanged.
 This is verified storage reclamation, not a measured CI speedup or proof of
 stable headroom.
 
+The subsequent master run 39088999741 passed. Its Tier 2 build restored
+compiler, apt and timing snapshots and reported 785 cached / 1 cold native
+compilations; OFF and ON each registered 296 tests with zero failures.
+[Post-retirement master observations](ci-evidence/2026-10-18-retired-embedded-master-validation.json)
+verify useful native reuse survived this change. A single passing run does
+not establish durable retention or resolve the separate recording race.
+
 The useful touched-plugin compiler and apt seeds were present in the saved
 00:32 UTC inventory (28,117,319 and 147,539,809 bytes), but absent in the
 01:56 inventory. Seventeen completed janitor logs inspected from 00:42 to
@@ -71,6 +78,24 @@ assertions in ON (296 registered CTests, one failing executable); OFF passed
 all 296. The successful full native run above predates this recurrence.
 The proposed helper patch has not been applied, and no tests were skipped or
 relaxed. See [the #1283 recurrence](https://github.com/obs-rust/obs-studio/issues/1283#issuecomment-6244581047).
+
+### Post-compatibility Ubuntu producer validation
+
+In full run 39089156757 on `df86995022`, Ubuntu ON passed with 340 cached,
+5 cold and 16 noncacheable compiler calls. It restored the compatible ON
+archive, then saved a new 795,699,586-byte archive from 5,488 MiB of raw
+state, below the 8,192 MiB guard. Restore/build/save took 19/234/18 s; the
+whole job took 340 s, including successful GPU and app Tier 4 checks.
+[Producer metadata](ci-evidence/2026-10-18-ubuntu-compatible-producer.json)
+keeps this separate from the earlier unmatched warm observations.
+
+OFF also passed. It found no compatible archive, built all 345 cacheable
+calls cold (16 other calls noncacheable), and published its own snapshot:
+5,045 MiB raw, below the 8,192 MiB cap. The API confirmed both mode-specific
+seeds were present after the jobs completed. This verifies producer behavior
+under #1371, replacing the previous mixed-mode 9,526 MiB save failure. A later
+OFF consumer and stable retention are still required; parent full-workflow
+success is not established at this capture.
 
 ## Executive assessment
 

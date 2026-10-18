@@ -1,0 +1,124 @@
+{
+  "run": 39089156757,
+  "revision": "df8699502218f2090e7aac47b98740b5555cdc02",
+  "captured_at": "2026-10-18T02:22:42.489771+00:00",
+  "parent_run_status_at_capture": "in_progress",
+  "observations": [
+    {
+      "mode": "ON",
+      "job": 117562006085,
+      "conclusion": "success",
+      "job_seconds": 340.0,
+      "steps": [
+        {
+          "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+          "conclusion": "success",
+          "seconds": 19.0
+        },
+        {
+          "name": "Build OBS Studio \ud83e\uddf1",
+          "conclusion": "success",
+          "seconds": 234.0
+        },
+        {
+          "name": "Tier 4 GPU Acceleration Check \ud83c\udfae",
+          "conclusion": "success",
+          "seconds": 12.0
+        },
+        {
+          "name": "Tier 4 Suite (Rust libobs app) \ud83d\udd0c",
+          "conclusion": "success",
+          "seconds": 36.0
+        },
+        {
+          "name": "Run actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+          "conclusion": "success",
+          "seconds": 18.0
+        }
+      ],
+      "compiler": {
+        "total": 361,
+        "cached": 340,
+        "cold": 5,
+        "noncacheable": 16
+      },
+      "restored_key": "zccache-ubuntu-ubuntu-26.04-x86_64-rustON-RelWithDebInfo-2f9bf8d77f4c82dd7f8b4af653aee8f3a4a647d2",
+      "restored_archive_bytes": 794953805,
+      "snapshot_save": {
+        "saved": true,
+        "raw_mib": 5488,
+        "limit_mib": 8192,
+        "key": "zccache-ubuntu-ubuntu-26.04-x86_64-rustON-RelWithDebInfo-df8699502218f2090e7aac47b98740b5555cdc02",
+        "archive_bytes": 795699586,
+        "archive_id": 9107248593
+      }
+    },
+    {
+      "mode": "OFF",
+      "job": 117562006069,
+      "conclusion": "success",
+      "job_seconds": 661.0,
+      "steps": [
+        {
+          "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+          "conclusion": "success",
+          "seconds": 0.0
+        },
+        {
+          "name": "Build OBS Studio \ud83e\uddf1",
+          "conclusion": "success",
+          "seconds": 630.0
+        },
+        {
+          "name": "Tier 4 GPU Acceleration Check \ud83c\udfae",
+          "conclusion": "skipped",
+          "seconds": 0.0
+        },
+        {
+          "name": "Tier 4 Suite (Rust libobs app) \ud83d\udd0c",
+          "conclusion": "skipped",
+          "seconds": 0.0
+        },
+        {
+          "name": "Run actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+          "conclusion": "success",
+          "seconds": 16.0
+        }
+      ],
+      "compiler": {
+        "total": 361,
+        "cached": 0,
+        "cold": 345,
+        "noncacheable": 16
+      },
+      "restored_key": null,
+      "restored_archive_bytes": 0,
+      "restore_log": "2026-10-18T02:11:17.4059121Z Cache not found for input keys: zccache-ubuntu-ubuntu-26.04-x86_64-rustOFF-RelWithDebInfo-df8699502218f2090e7aac47b98740b5555cdc02, zccache-ubuntu-ubuntu-26.04-x86_64-rustOFF-RelWithDebInfo-",
+      "snapshot_save": {
+        "saved": true,
+        "raw_mib": 5045,
+        "limit_mib": 8192,
+        "key": "zccache-ubuntu-ubuntu-26.04-x86_64-rustOFF-RelWithDebInfo-df8699502218f2090e7aac47b98740b5555cdc02",
+        "archive_id": 9107347839,
+        "archive_bytes": 712847430
+      }
+    }
+  ],
+  "limitations": [
+    "Both Ubuntu jobs passed and published mode-specific seeds; later compatible OFF consumption and durable retention remain unverified.",
+    "Unmatched historical revisions/runners do not establish causal speedup.",
+    "A successful native app job is not proof of parent full workflow success."
+  ],
+  "mode_archives_present_after_both_jobs": [
+    {
+      "id": 9107347839,
+      "key": "zccache-ubuntu-ubuntu-26.04-x86_64-rustOFF-RelWithDebInfo-df8699502218f2090e7aac47b98740b5555cdc02",
+      "size_in_bytes": 712847430
+    },
+    {
+      "id": 9107248593,
+      "key": "zccache-ubuntu-ubuntu-26.04-x86_64-rustON-RelWithDebInfo-df8699502218f2090e7aac47b98740b5555cdc02",
+      "size_in_bytes": 795699586
+    }
+  ]
+}
