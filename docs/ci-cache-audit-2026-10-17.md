@@ -124,7 +124,8 @@ revision as the producer, and restored their exact new mode-specific keys.
 Each job also reported 16 noncacheable calls. These are individual runner
 observations, not a controlled hardware comparison or queue-throughput result.
 [Consumer logs, counters and step timing metadata](ci-evidence/2026-10-18-ubuntu-compatible-consumer.json).
-The parent consumer workflow is still active at this capture.
+The parent consumer workflow subsequently passed, including all seven native
+app builds and the remaining checks.
 
 OFF's runner image, GNU 15.2.0, zccache 1.15.5 and all 306 logged installed
 package versions match the producer. That excludes the visible version
@@ -135,8 +136,8 @@ transport and compatibility fix.
 
 The save actions still compressed the stores on exact hits, taking 14 s OFF
 and 11 s ON, then warned that the immutable keys could not be reserved.
-PR #1381 adds a guard to skip this redundant work; it is not yet a verified
-runtime saving. Restore, build and integrity coverage remain required.
+Merged #1381 adds a guard to skip this redundant work; subsequent Ubuntu
+execution of that guard is not yet a verified runtime saving. Restore, build and integrity coverage remain required.
 
 ### Native journal diagnostic and correctness limit
 

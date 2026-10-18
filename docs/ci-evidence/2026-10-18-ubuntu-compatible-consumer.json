@@ -2,7 +2,6 @@
   "run": 39090099191,
   "producer_run": 39089156757,
   "revision": "df8699502218f2090e7aac47b98740b5555cdc02",
-  "parent_run_status_at_capture": "in_progress",
   "captured_at": "2026-10-18T02:36:12.278417+00:00",
   "observations": [
     {
@@ -109,8 +108,48 @@
   "limitations": [
     "Same source revision and logged environment; different runner instances, no controlled hardware/load comparison.",
     "Aggregate counters prove partial reuse, not the cause or affected translation units of misses.",
-    "Parent workflow is not terminal at this capture.",
     "Exact-key save actions compressed state then warned on existing reservations; PR #1381 proposes skipping them.",
     "No repository-wide durable retention or representative-day throughput claim."
-  ]
+  ],
+  "parent_status_at_initial_capture": "in_progress",
+  "parent_final_status": "completed",
+  "parent_final_conclusion": "success",
+  "native_app_jobs": [
+    {
+      "id": 117564891081,
+      "name": "Build \ud83e\uddf1 / Windows \ud83e\ude9f (arm64)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117564891083,
+      "name": "Build \ud83e\uddf1 / Flatpak \ud83d\udce6",
+      "conclusion": "success"
+    },
+    {
+      "id": 117564891086,
+      "name": "Build \ud83e\uddf1 / Ubuntu \ud83d\udc27",
+      "conclusion": "success"
+    },
+    {
+      "id": 117564891103,
+      "name": "Build \ud83e\uddf1 / macOS \ud83c\udf4f (x86_64)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117564891135,
+      "name": "Build \ud83e\uddf1 / Windows \ud83e\ude9f (x64)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117564891140,
+      "name": "Build \ud83e\uddf1 / macOS \ud83c\udf4f (arm64)",
+      "conclusion": "success"
+    },
+    {
+      "id": 117564891385,
+      "name": "Build \ud83e\uddf1 / Ubuntu \ud83d\udc27 (OBS-Studio-Rust)",
+      "conclusion": "success"
+    }
+  ],
+  "follow_up_save_guard_merged": true
 }
