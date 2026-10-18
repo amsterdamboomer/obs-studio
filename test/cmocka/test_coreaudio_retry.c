@@ -87,12 +87,48 @@ static void test_device_change_resets_to_base(void **state)
 	assert_int_equal(run.cap_logs, 1);
 }
 
+/* The listener callback runs on a CoreAudio thread and may still be running
+ * after the source let go: it must find a live context, and the last unref
+ * (here the listener's) frees it exactly once. */
+static void test_wake_outlives_source(void **state)
+{
+	(void)state;
+	struct coreaudio_wake *w = coreaudio_wake_create();
+	assert_non_null(w);
+	size_t frees = 0;
+
+	coreaudio_wake_ref(w);            /* registered listener */
+	frees += coreaudio_wake_unref(w); /* source destroyed */
+	assert_int_equal(frees, 0);
+
+	coreaudio_wake_signal(w); /* late callback */
+	assert_true(w->reset);
+	assert_int_equal(os_event_try(w->event), 0);
+
+	frees += coreaudio_wake_unref(w); /* listener removed */
+	assert_int_equal(frees, 1);
+}
+
+static void test_wake_source_last(void **state)
+{
+	(void)state;
+	struct coreaudio_wake *w = coreaudio_wake_create();
+	assert_non_null(w);
+	coreaudio_wake_ref(w);
+	coreaudio_wake_ref(w);
+	assert_false(coreaudio_wake_unref(w));
+	assert_false(coreaudio_wake_unref(w));
+	assert_true(coreaudio_wake_unref(w));
+}
+
 int main(void)
 {
 	const struct CMUnitTest tests[] = {
 		cmocka_unit_test(test_backoff_from_300ms),
 		cmocka_unit_test(test_backoff_from_2s),
 		cmocka_unit_test(test_device_change_resets_to_base),
+		cmocka_unit_test(test_wake_outlives_source),
+		cmocka_unit_test(test_wake_source_last),
 	};
 	return cmocka_run_group_tests(tests, NULL, NULL);
 }

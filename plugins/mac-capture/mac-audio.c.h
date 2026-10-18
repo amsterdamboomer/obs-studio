@@ -41,9 +41,8 @@ struct coreaudio_data {
 
 	pthread_t reconnect_thread;
 	os_event_t *exit_event;
-	os_event_t *wake_event;
+	struct coreaudio_wake *wake;
 	volatile bool reconnecting;
-	volatile bool retry_reset;
 	unsigned long retry_time;
 	struct coreaudio_retry retry;
 
@@ -465,10 +464,8 @@ static const AudioObjectPropertyAddress reconnect_wake_addrs[] = {
 static OSStatus reconnect_wake_callback(AudioObjectID id, UInt32 num_addresses,
 					const AudioObjectPropertyAddress addresses[], void *data)
 {
-	struct coreaudio_data *ca = data;
-
-	ca->retry_reset = true;
-	os_event_signal(ca->wake_event);
+	/* Only the refcounted wake context, never the source (#1358). */
+	coreaudio_wake_signal(data);
 
 	UNUSED_PARAMETER(id);
 	UNUSED_PARAMETER(num_addresses);
@@ -481,15 +478,22 @@ static void *reconnect_thread(void *param)
 	struct coreaudio_data *ca = param;
 
 	ca->reconnecting = true;
-	ca->retry_reset = false;
-	os_event_reset(ca->wake_event);
+	bool listening[sizeof(reconnect_wake_addrs) / sizeof(reconnect_wake_addrs[0])] = {false};
+
+	ca->wake->reset = false;
+	os_event_reset(ca->wake->event);
 	coreaudio_retry_reset(&ca->retry, ca->retry_time);
 
 	/* A device-list or default-device change wakes the wait early and
 	 * restarts the backoff at its base (#1358). */
 	for (size_t i = 0; i < sizeof(reconnect_wake_addrs) / sizeof(reconnect_wake_addrs[0]); i++) {
-		AudioObjectAddPropertyListener(kAudioObjectSystemObject, &reconnect_wake_addrs[i],
-					       reconnect_wake_callback, ca);
+		/* The registered listener holds its own reference. */
+		coreaudio_wake_ref(ca->wake);
+		listening[i] = AudioObjectAddPropertyListener(kAudioObjectSystemObject, &reconnect_wake_addrs[i],
+							      reconnect_wake_callback, ca->wake) == noErr;
+		if (!listening[i]) {
+			coreaudio_wake_unref(ca->wake);
+		}
 	}
 
 	for (;;) {
@@ -501,13 +505,13 @@ static void *reconnect_thread(void *param)
 			     ca->device_name, COREAUDIO_RETRY_MAX_MS / 1000);
 		}
 
-		int ret = os_event_timedwait(ca->wake_event, wait);
+		int ret = os_event_timedwait(ca->wake->event, wait);
 		if (os_event_try(ca->exit_event) == 0) {
 			break;
 		}
 		if (ret == 0) {
-			if (ca->retry_reset) {
-				ca->retry_reset = false;
+			if (ca->wake->reset) {
+				ca->wake->reset = false;
 				coreaudio_retry_reset(&ca->retry, ca->retry_time);
 			}
 			continue;
@@ -518,8 +522,12 @@ static void *reconnect_thread(void *param)
 	}
 
 	for (size_t i = 0; i < sizeof(reconnect_wake_addrs) / sizeof(reconnect_wake_addrs[0]); i++) {
-		AudioObjectRemovePropertyListener(kAudioObjectSystemObject, &reconnect_wake_addrs[i],
-						  reconnect_wake_callback, ca);
+		if (listening[i]) {
+			AudioObjectRemovePropertyListener(kAudioObjectSystemObject, &reconnect_wake_addrs[i],
+							  reconnect_wake_callback, ca->wake);
+			/* Dropped only once the listener is unregistered. */
+			coreaudio_wake_unref(ca->wake);
+		}
 	}
 
 	blog(LOG_DEBUG, "coreaudio: exit the reconnect thread");
@@ -845,7 +853,7 @@ static void coreaudio_shutdown(struct coreaudio_data *ca)
 {
 	if (ca->reconnecting) {
 		os_event_signal(ca->exit_event);
-		os_event_signal(ca->wake_event);
+		os_event_signal(ca->wake->event);
 		pthread_join(ca->reconnect_thread, NULL);
 		os_event_reset(ca->exit_event);
 	}
@@ -869,7 +877,8 @@ static void coreaudio_destroy(void *data)
 		}
 
 		os_event_destroy(ca->exit_event);
-		os_event_destroy(ca->wake_event);
+		/* The source's reference; the last one frees the context. */
+		coreaudio_wake_unref(ca->wake);
 
 		if (ca->channel_map) {
 			bfree(ca->channel_map);
@@ -941,7 +950,8 @@ static void *coreaudio_create(obs_data_t *settings, obs_source_t *source, bool i
 		return NULL;
 	}
 
-	if (os_event_init(&ca->wake_event, OS_EVENT_TYPE_AUTO) != 0) {
+	ca->wake = coreaudio_wake_create();
+	if (!ca->wake) {
 		blog(LOG_ERROR, "[coreaudio_create] failed to create wake event: %d", errno);
 		os_event_destroy(ca->exit_event);
 		bfree(ca);

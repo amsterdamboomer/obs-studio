@@ -21,6 +21,9 @@
 
 #include <stdbool.h>
 
+#include <util/bmem.h>
+#include <util/threading.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -62,6 +65,54 @@ static inline unsigned long coreaudio_retry_next(struct coreaudio_retry *r, bool
 		r->cap_reported = true;
 	}
 	return wait;
+}
+
+/* Wake context shared by the source and the reconnect listeners. The
+ * CoreAudio listener callback touches only this object, never the source,
+ * and holds its own reference while registered: a callback that still runs
+ * after the source let go finds a live context. The last unref destroys the
+ * event and frees the context. */
+struct coreaudio_wake {
+	volatile long refs;
+	volatile bool reset;
+	os_event_t *event;
+};
+
+/* One reference, for the caller (the source). NULL when the event cannot be
+ * created. */
+static inline struct coreaudio_wake *coreaudio_wake_create(void)
+{
+	struct coreaudio_wake *w = bzalloc(sizeof(*w));
+
+	if (os_event_init(&w->event, OS_EVENT_TYPE_AUTO) != 0) {
+		bfree(w);
+		return NULL;
+	}
+	w->refs = 1;
+	return w;
+}
+
+static inline void coreaudio_wake_ref(struct coreaudio_wake *w)
+{
+	os_atomic_inc_long(&w->refs);
+}
+
+/* Returns true when this was the last reference and the context is gone. */
+static inline bool coreaudio_wake_unref(struct coreaudio_wake *w)
+{
+	if (os_atomic_dec_long(&w->refs) != 0) {
+		return false;
+	}
+	os_event_destroy(w->event);
+	bfree(w);
+	return true;
+}
+
+/* What the listener callback does: ask for a reset and wake the waiter. */
+static inline void coreaudio_wake_signal(struct coreaudio_wake *w)
+{
+	w->reset = true;
+	os_event_signal(w->event);
 }
 
 #ifdef __cplusplus
