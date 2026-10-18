@@ -182,12 +182,9 @@ impl Quat {
     #[must_use]
     pub fn exp(self) -> Self {
         let length = ((self.x * self.x) + (self.y * self.y) + (self.z * self.z)).sqrt();
-        let scale = if length > EPSILON {
-            length.sin() / length
-        } else {
-            1.0
-        };
-        Self::new(self.x * scale, self.y * scale, self.z * scale, length.cos())
+        let (sine, cosine) = crate::platform::sin_cos(length);
+        let scale = if length > EPSILON { sine / length } else { 1.0 };
+        Self::new(self.x * scale, self.y * scale, self.z * scale, cosine)
     }
 
     /// `quat_interpolate`. Spherical when `acos(dot) >= EPSILON`, otherwise
