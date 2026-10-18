@@ -29,22 +29,32 @@ struct xcomp_presence {
  * tick asks the server. */
 static inline void xcomp_presence_invalidate(struct xcomp_presence *st)
 {
-	(void)st;
+	st->known = false;
 }
 
 /* An X event on the captured window. */
 static inline void xcomp_presence_event(struct xcomp_presence *st, enum xcomp_presence_event ev)
 {
-	(void)st;
-	(void)ev;
+	switch (ev) {
+	case XCOMP_PRESENCE_MAPPED:
+		st->viewable = true;
+		break;
+	case XCOMP_PRESENCE_UNMAPPED:
+	case XCOMP_PRESENCE_DESTROYED:
+		st->viewable = false;
+		break;
+	case XCOMP_PRESENCE_OTHER:
+		return;
+	}
+	st->known = true;
+	st->since_check = 0.0;
 }
 
 /* Called every tick. True when the tick must ask the server now. */
 static inline bool xcomp_presence_check_due(struct xcomp_presence *st, double seconds)
 {
-	(void)st;
-	(void)seconds;
-	return true;
+	st->since_check += seconds;
+	return !st->known || st->since_check >= XCOMP_PRESENCE_RECHECK;
 }
 
 /* The answer of a round trip (xcomp_window_exists). */

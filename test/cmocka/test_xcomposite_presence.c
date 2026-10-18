@@ -105,7 +105,7 @@ static void test_invalidate_asks_next_tick(void **state)
 	(void)state;
 	struct sim s;
 	init(&s);
-	run(&s, 2.0);
+	run(&s, 2.5); /* half-way between two safety-net checks */
 	int before = s.round_trips;
 	tick(&s);
 	assert_int_equal(s.round_trips, before);
