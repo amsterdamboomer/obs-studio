@@ -273,12 +273,22 @@ impl Default for QsvOptions {
 
 /// Build the original Intel Quick Sync encoder module.
 pub fn build_qsv(
-    _build: &NativeBuild,
-    _root: &Path,
-    _core: &Path,
-    _options: &QsvOptions,
+    build: &NativeBuild,
+    root: &Path,
+    core: &Path,
+    options: &QsvOptions,
 ) -> Result<Module, String> {
-    Err("Intel QSV native module build is not implemented".into())
+    let root = root.canonicalize().map_err(|e| e.to_string())?;
+    let mut library = module(build, &root, core, "obs-qsv11")?;
+    library.sources.clear();
+    crate::platform::configure_qsv(&build.target, &root, options, &mut library)?;
+    if !options.unity {
+        library.sources = build.separate_group_sources(&root, &library.sources)?;
+    }
+    if options.pch {
+        library.precompiled_headers = crate::groups::headers(&root, &library.sources)?;
+    }
+    finish(build, &root, library)
 }
 
 pub fn build_x264(build: &NativeBuild, root: &Path, core: &Path) -> Result<Module, String> {

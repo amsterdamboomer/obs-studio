@@ -692,6 +692,56 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
                     .expect("QSV capability inventory was not exercised"),
             )
             .unwrap();
+            if let Some(reference) = std::env::var_os("OBS_BUILD_QSV_REFERENCE") {
+                let reference = PathBuf::from(reference);
+                let mut replaced = false;
+                for (binary, _) in &mut selected {
+                    if binary.file_name() == Some(std::ffi::OsStr::new("obs-qsv11.so")) {
+                        *binary = &reference;
+                        replaced = true;
+                    }
+                }
+                assert!(replaced, "QSV reference did not replace the built module");
+                let mut oracle = std::process::Command::new(command.get_program());
+                oracle.args(command.get_args());
+                for (key, value) in command.get_envs() {
+                    if let Some(value) = value {
+                        oracle.env(key, value);
+                    } else {
+                        oracle.env_remove(key);
+                    }
+                }
+                let oracle = oracle
+                    .env(
+                        "OBS_BUILD_TEST_MODULES",
+                        serde_json::to_string(&selected).unwrap(),
+                    )
+                    .env_remove("OBS_BUILD_TEST_RECORDING")
+                    .output()
+                    .unwrap();
+                assert!(
+                    oracle.status.success(),
+                    "{}\n{}",
+                    String::from_utf8_lossy(&oracle.stdout),
+                    String::from_utf8_lossy(&oracle.stderr)
+                );
+                let oracle_stdout = String::from_utf8_lossy(&oracle.stdout);
+                let reference_ids: Vec<String> = serde_json::from_str(
+                    oracle_stdout
+                        .lines()
+                        .find_map(|line| {
+                            line.split_once("cc::Build QSV encoders: ")
+                                .map(|(_, ids)| ids)
+                        })
+                        .expect("reference QSV inventory was not exercised"),
+                )
+                .unwrap();
+                assert_eq!(
+                    encoders, reference_ids,
+                    "QSV registrations differ from CMake"
+                );
+                println!("QSV reference runtime matched for {}", path.display());
+            }
             if let Some(first) = qsv_registrations.first() {
                 assert_eq!(
                     &encoders, first,

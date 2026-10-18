@@ -350,6 +350,45 @@ pub fn configure_ffmpeg(
     Ok(())
 }
 
+pub fn configure_qsv(
+    target: &str,
+    root: &Path,
+    options: &crate::plugins::QsvOptions,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    if !target.contains("linux") {
+        return Err(format!(
+            "QSV native graph for {target} is not implemented yet"
+        ));
+    }
+    pkg_config::Config::new()
+        .cargo_metadata(false)
+        .atleast_version("2.9")
+        .probe("vpl")
+        .map_err(|e| e.to_string())?;
+    for package in ["vpl", "libva", "libva-drm"] {
+        crate::libobs::add_package(library, target, package)?;
+    }
+    for group in ["linux+.hpp.cpp", "linux-c+.h.c", "core+.hpp.cpp", "c+.h.c"] {
+        library
+            .sources
+            .push(root.join(format!("plugins/obs-qsv11/build/obs-qsv11.{group}")));
+    }
+    library.cpp_compile_options.push("-std=gnu++17".into());
+    library
+        .cpp_compile_options
+        .push("-fvisibility-inlines-hidden".into());
+    library.compile_options.push("-Wno-error=switch".into());
+    library.definitions.push((
+        "OBS_QSV_HOST_DEFS".into(),
+        Some("\"plugins/obs-qsv11/bits/linux_defs.h\"".into()),
+    ));
+    if options.hevc {
+        library.definitions.push(("ENABLE_HEVC".into(), None));
+    }
+    Ok(())
+}
+
 pub fn configure_source(
     target: &str,
     root: &Path,
