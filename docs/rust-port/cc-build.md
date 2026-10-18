@@ -699,6 +699,24 @@ links the Rust core. It does not establish a Rust replacement for that helper,
 nor that the entire intermittent CI failure in #838 is resolved. The unchanged
 runtime tests and full CI remain necessary.
 
+With the source fix, the combined core battery, unchanged group-audio test and
+browser-enabled OBS GUI pass against both cores. The app verifies actual
+browser pixels/JavaScript, websocket behavior, saved configuration, frontend
+H.264/AAC recording, rendering and clean OBS shutdown; the API fixture verifies
+four additional MP4/MKV recordings. Runtime directories are
+`app-runtime-VCOfty` and `app-runtime-BwMSdi`. The whole invocation takes
+489.49 seconds, with 164 compiler-cache hits and 165 misses; it includes native
+compilation and runtime tests and is not a controlled build benchmark.
+
+A subsequent run of all six unchanged VLC executables against both fixed cores
+passes all 50 cases without skips: 180.83 seconds including runtime checks,
+52 cache hits and eight misses. Formatting, Clippy and primary review pass.
+The prior parent-head CI run `39092443140` (`b547ea121`) fails the unchanged
+recording-shutdown wait test in mode OFF (one failing executable out of 296,
+lines 121/142, tracked by #1283); three PulseAudio tests are skipped in that CI
+environment. This audio interval fix does not claim to fix that separate wait
+race or to explain all intermittent audio failures.
+
 ## Optional compiled PCH for Linux cores
 
 `libobs::Options::pch` defaults to false and is independent of `unity`.
