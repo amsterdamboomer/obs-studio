@@ -156,7 +156,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             },
         )
         .unwrap();
-        assert_eq!(executables.len(), if options.hevc { 51 } else { 50 });
+        assert_eq!(executables.len(), if options.hevc { 52 } else { 51 });
         let mut results = Vec::new();
         for core in [&libraries.reference, &libraries.with_rust] {
             let variant = core
