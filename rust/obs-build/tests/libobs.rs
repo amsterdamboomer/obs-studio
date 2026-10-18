@@ -77,6 +77,9 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         );
         options.core_modules.push("obs-browser".into());
     }
+    if enabled("OBS_BUILD_APP_GUI") && enabled("OBS_BUILD_FDK") {
+        options.core_modules.push("obs-libfdk".into());
+    }
     if enabled("OBS_BUILD_APP_GUI") && std::env::var_os("OBS_BUILD_NVENC").is_some() {
         options.core_modules.push("obs-nvenc".into());
     }
@@ -277,6 +280,9 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         plugins::build_transitions(&build, &root, &libraries.reference).unwrap(),
         plugins::build_filters(&build, &root, &libraries.reference, &filters).unwrap(),
     ];
+    if enabled("OBS_BUILD_FDK") {
+        modules.push(plugins::build_fdk(&build, &root, &libraries.reference).unwrap());
+    }
     if std::env::var_os("OBS_BUILD_VLC").is_some() {
         let vlc = plugins::build_source(
             &build,
@@ -619,6 +625,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
                 || line.contains("cc::Build graphics device")
                 || line.contains("cc::Build recording")
                 || line.contains("cc::Build color source")
+                || line.contains("cc::Build audio encoder")
         }) {
             println!("{}: {line}", path.display());
         }
@@ -629,6 +636,12 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             String::from_utf8_lossy(&run.stdout),
             String::from_utf8_lossy(&run.stderr)
         );
+        if enabled("OBS_BUILD_FDK") && recording.is_some() {
+            assert!(
+                String::from_utf8_lossy(&run.stdout)
+                    .contains("cc::Build audio encoder: libfdk_aac")
+            );
+        }
         if let Some(recording) = recording {
             verify_recording(&recording);
         }
@@ -751,6 +764,9 @@ fn exercise(path: &std::path::Path, modules: &[plugins::Module], hevc: bool) {
             (b"obs_enum_filter_types".as_slice(), "noise_suppress_filter"),
             (b"obs_enum_filter_types".as_slice(), "gain_filter"),
         ];
+        if enabled("OBS_BUILD_FDK") {
+            expected_types.push((b"obs_enum_encoder_types".as_slice(), "libfdk_aac"));
+        }
         if std::env::var_os("OBS_BUILD_NVENC").is_some() {
             expected_types.extend([
                 (b"obs_enum_encoder_types".as_slice(), "obs_nvenc_h264_soft"),
@@ -884,7 +900,7 @@ fn verify_recording(path: &std::path::Path) {
             "error",
             "-count_frames",
             "-show_entries",
-            "stream=codec_name,width,height,nb_read_frames:format=duration",
+            "stream=codec_name,profile,sample_rate,channels,width,height,nb_read_frames:format=duration",
             "-of",
             "json",
         ])
@@ -921,6 +937,11 @@ fn verify_recording(path: &std::path::Path) {
         .iter()
         .find(|stream| stream["codec_name"] == "aac")
         .expect("missing AAC track");
+    if enabled("OBS_BUILD_FDK") {
+        assert_eq!(audio["profile"], "LC");
+        assert_eq!(audio["sample_rate"], "48000");
+        assert_eq!(audio["channels"], 2);
+    }
     assert!(
         audio["nb_read_frames"]
             .as_str()

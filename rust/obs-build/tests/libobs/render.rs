@@ -87,7 +87,10 @@ static int record_clip(const char *path, const char *output_id)
     obs_data_release(settings);
     settings = obs_data_create();
     obs_data_set_int(settings, "bitrate", 128);
-    obs_encoder_t *audio = obs_audio_encoder_create("ffmpeg_aac", "cc-build-audio", settings, 0, NULL);
+    const char *audio_id = getenv("OBS_BUILD_FDK") ? "libfdk_aac" : "ffmpeg_aac";
+    obs_encoder_t *audio = obs_audio_encoder_create(audio_id, "cc-build-audio", settings, 0, NULL);
+    if (audio)
+        blog(LOG_INFO, "cc::Build audio encoder: %s", obs_encoder_get_id(audio));
     obs_data_release(settings);
     settings = obs_data_create();
     obs_data_set_string(settings, "path", path);
