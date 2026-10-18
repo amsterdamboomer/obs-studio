@@ -18,6 +18,13 @@
 //! `const char *` arguments are NUL-terminated buffers of arbitrary bytes, so
 //! an embedded NUL truncates the string on both sides.
 //!
+//! Aliasing (#1297, the shims edit the C buffer in place): `dstr_cat_dstr`
+//! and `dstr_ncat_dstr` with the destination as source, `dstr_ncat` from a
+//! pointer into the destination's own buffer (only when C would not
+//! `brealloc` it away first) and `dstr_copy` from inside the own buffer.
+//! The snapshot compares `capacity` after every step, so the growth rule
+//! must match C exactly.
+//!
 //! Mutation check (run by the integrator): replace one `Dstr` method body in
 //! `src/dstr.rs` with `todo!()`, or change the growth rule of
 //! `ensure_capacity` (for example always allocate exactly `new_size`); this
@@ -227,6 +234,15 @@ enum Op {
     Ncopy(Vec<u8>, usize),
     NcopyDstr(usize),
     CatDstr,
+    /// `dstr_cat_dstr(d, d)`: the source aliases the destination.
+    CatSelf,
+    /// `dstr_ncat_dstr(d, d, len)`.
+    NcatDstrSelf(usize),
+    /// `dstr_ncat(d, d->array + start, len)` with room to spare, so the
+    /// source stays valid in C (no `brealloc` moves it).
+    NcatFromOwn(usize, usize),
+    /// `dstr_copy(d, d->array + start)`: copy from inside the buffer.
+    CopyFromOwn(usize),
     CatStrref(Option<Vec<u8>>, usize),
     Ncat(Option<Vec<u8>>, usize),
     NcatDstr(usize),
@@ -259,6 +275,10 @@ fn op() -> impl Strategy<Value = Op> {
             .boxed(),
         n().prop_map(Op::NcopyDstr).boxed(),
         Just(Op::CatDstr).boxed(),
+        Just(Op::CatSelf).boxed(),
+        n().prop_map(Op::NcatDstrSelf).boxed(),
+        (n(), n()).prop_map(|(a, b)| Op::NcatFromOwn(a, b)).boxed(),
+        n().prop_map(Op::CopyFromOwn).boxed(),
         (opt(any_bytes()), n())
             .prop_map(|(v, l)| Op::CatStrref(v, l))
             .boxed(),
@@ -296,8 +316,9 @@ fn apply(op: &Op, d: &mut Pair, s: &mut Pair) {
     // SAFETY: both pairs hold valid dstrs of identical state that are only
     // changed through these functions; strings are NUL-terminated buffers
     // that outlive the calls; indices and counts are reduced to ranges C
-    // defines; `src` and `dst` are distinct unless the operation is the
-    // in-place `dstr_left`.
+    // defines; `src` and `dst` are distinct unless the operation is one of
+    // the aliasing cases (`dstr_left` in place, the `*Self` and `*FromOwn`
+    // operations), which pass both sides the same aliasing.
     unsafe {
         match op {
             Op::SetSrc(v) => {
@@ -340,6 +361,40 @@ fn apply(op: &Op, d: &mut Pair, s: &mut Pair) {
             Op::CatDstr => {
                 r::dstr_cat_dstr(&mut d.r, &s.r);
                 c::oracle_dstr_cat_dstr(&mut d.c, &s.c);
+            }
+            Op::CatSelf => {
+                if d.rust_bytes().contains(&0) {
+                    return; // C memcpy copies the source terminator over an overlapping range
+                }
+                let (pr, pc) = (&raw mut d.r, &raw mut d.c);
+                r::dstr_cat_dstr(pr, pr);
+                c::oracle_dstr_cat_dstr(pc, pc);
+            }
+            Op::NcatDstrSelf(raw) => {
+                let len = raw % (ld + 3);
+                let (pr, pc) = (&raw mut d.r, &raw mut d.c);
+                r::dstr_ncat_dstr(pr, pr, len);
+                c::oracle_dstr_ncat_dstr(pc, pc, len);
+            }
+            Op::NcatFromOwn(a, b) => {
+                if ld == 0 {
+                    return;
+                }
+                let start = a % ld;
+                let len = b % (ld - start + 1);
+                if ld + len + 1 > d.r.capacity {
+                    return; // C would read the source after brealloc freed it
+                }
+                r::dstr_ncat(&mut d.r, d.r.array.add(start), len);
+                c::oracle_dstr_ncat(&mut d.c, d.c.array.add(start), len);
+            }
+            Op::CopyFromOwn(raw) => {
+                if ld == 0 {
+                    return;
+                }
+                let start = raw % ld;
+                r::dstr_copy(&mut d.r, d.r.array.add(start));
+                c::oracle_dstr_copy(&mut d.c, d.c.array.add(start));
             }
             Op::CatStrref(v, raw) => {
                 let sr = Sr::new(v, *raw);
