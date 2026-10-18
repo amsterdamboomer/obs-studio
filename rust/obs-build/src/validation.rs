@@ -24,6 +24,17 @@ impl Default for Options {
     }
 }
 
+/// Build the unchanged VLC compatibility tests against the real native modules.
+pub fn build_vlc_tests(
+    _build: &NativeBuild,
+    _root: &Path,
+    _core: &Path,
+    _vlc: &crate::plugins::Module,
+    _graphics: &Path,
+) -> Result<Vec<Executable>, String> {
+    Err("VLC compatibility test build is not implemented".into())
+}
+
 pub fn build_c_tests(
     build: &NativeBuild,
     root: &Path,

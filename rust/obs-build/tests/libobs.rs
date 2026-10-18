@@ -11,6 +11,8 @@ mod render;
 mod script_tests;
 #[path = "libobs/tools.rs"]
 mod tools;
+#[path = "libobs/vlc.rs"]
+mod vlc_tests;
 
 #[test]
 fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
@@ -110,10 +112,17 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     }
     if std::env::var_os("OBS_BUILD_VLC").is_some() {
         assert!(
-            enabled("OBS_BUILD_APP_GUI") && std::env::var_os("OBS_BUILD_WEBSOCKET").is_some(),
-            "VLC integration requires the staged GUI and websocket client"
+            std::env::var_os("OBS_BUILD_VLC_C_TESTS").is_some()
+                || enabled("OBS_BUILD_APP_GUI"),
+            "VLC integration requires either C tests or the staged GUI"
         );
-        options.core_modules.push("vlc-video".into());
+        if enabled("OBS_BUILD_APP_GUI") {
+            assert!(
+                std::env::var_os("OBS_BUILD_WEBSOCKET").is_some(),
+                "VLC GUI integration requires the websocket client"
+            );
+            options.core_modules.push("vlc-video".into());
+        }
     }
     if std::env::var_os("OBS_BUILD_FRONTEND_TOOLS").is_some()
         || std::env::var_os("OBS_BUILD_WEBSOCKET").is_some()
@@ -546,12 +555,27 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         || enabled("OBS_BUILD_PIPEWIRE")
         || nvenc.is_some()
         || qsv_enabled
-        || captures_audio();
+        || captures_audio()
+        || std::env::var_os("OBS_BUILD_VLC_C_TESTS").is_some();
     let renderer = wants_graphics
         .then(|| graphics::build_opengl(&build, &root, &libraries.reference, &options).unwrap());
     let probe = renderer
         .as_ref()
         .map(|_| render::build(&build, &root, &libraries.reference));
+    if std::env::var_os("OBS_BUILD_VLC_C_TESTS").is_some() {
+        let vlc = modules
+            .iter()
+            .find(|module| module.library.file_name() == Some(std::ffi::OsStr::new("vlc-video.so")))
+            .expect("VLC compatibility tests require OBS_BUILD_VLC=1");
+        vlc_tests::exercise(
+            &build,
+            &root,
+            &libraries.reference,
+            &libraries.with_rust,
+            vlc,
+            renderer.as_ref().unwrap(),
+        );
+    }
     if enabled("OBS_BUILD_APP_GUI") {
         let gui_probe = (frontend_tools.is_some() || websocket.is_some()).then(|| {
             tools::build(
