@@ -87,6 +87,8 @@ async def verify(runtime: Path, recording: bool) -> None:
             else:
                 assert "vlc_source" in kinds["inputKinds"], "VLC runtime did not register its source"
                 await verify_vlc(runtime, request)
+        if os.environ.get("OBS_BUILD_BROWSER"):
+            evidence["browser"] = await verify_browser(runtime, request)
         if recording:
             await request("StartRecord")
             deadline = asyncio.get_running_loop().time() + 5
@@ -102,6 +104,59 @@ async def verify(runtime: Path, recording: bool) -> None:
         print("Staged obs-websocket auth, requests, event, batch, recording status and white screenshot passed")
     finally:
         await client.close_conn()
+
+
+async def verify_browser(runtime: Path, request) -> dict:
+    page = runtime / "browser-source.html"
+    page.write_text('''<html><body style="margin:0;width:100vw;height:100vh;background:#e91177">
+<script>
+window.onerror = function(message) { console.error("Native browser fixture: " + message); };
+function verifyBridge() {
+  if (!window.obsstudio) { setTimeout(verifyBridge, 20); return; }
+  window.obsstudio.getCurrentScene(function(scene) {
+    if (scene.name === "Native scene") {
+      document.documentElement.style.background = "#11cb4d";
+      document.body.style.background = "#11cb4d";
+    }
+  });
+}
+verifyBridge();
+</script></body></html>''')
+    kinds = await request("GetInputKindList")
+    assert "browser_source" in kinds["inputKinds"], "browser source was not registered"
+    await request("CreateInput", {
+        "sceneName": "Native scene", "inputName": "Native browser", "inputKind": "browser_source",
+        "sceneItemEnabled": True,
+        "inputSettings": {"is_local_file": True, "local_file": str(page), "width": 128,
+                          "height": 72, "webpage_control_level": 2, "shutdown": False},
+    })
+    item = await request("GetSceneItemId", {"sceneName": "Native scene", "sourceName": "Native browser"})
+    deadline = asyncio.get_running_loop().time() + 20
+    expected = (17, 203, 77)
+    while True:
+        image = await request("GetSourceScreenshot", {
+            "sourceName": "Native browser", "imageFormat": "png", "imageWidth": 64, "imageHeight": 36,
+        })
+        screenshot = runtime / "browser-bridge.png"
+        screenshot.write_bytes(base64.b64decode(image["imageData"].split(",", 1)[1], validate=True))
+        frame = subprocess.run([
+            "ffmpeg", "-v", "error", "-i", str(screenshot), "-frames:v", "1",
+            "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
+        ], capture_output=True, check=True, timeout=15).stdout
+        if len(frame) == 64 * 36 * 3 and all(abs(value - expected[index % 3]) <= 4 for index, value in enumerate(frame)):
+            break
+        if asyncio.get_running_loop().time() >= deadline:
+            state = {
+                "active": await request("GetSourceActive", {"sourceName": "Native browser"}),
+                "settings": await request("GetInputSettings", {"inputName": "Native browser"}),
+                "transform": await request("GetSceneItemTransform", {"sceneName": "Native scene", "sceneItemId": item["sceneItemId"]}),
+            }
+            (runtime / "browser-failure.json").write_text(json.dumps(state, indent=2))
+            raise AssertionError(f"browser did not render the JavaScript API success color; see {screenshot}")
+        await asyncio.sleep(0.1)
+    await request("SetSceneItemEnabled", {"sceneName": "Native scene", "sceneItemId": item["sceneItemId"], "sceneItemEnabled": False})
+    print("Native browser rendered local HTML and window.obsstudio.getCurrentScene callback passed")
+    return {"local_file": str(page), "bridge_scene": "Native scene", "rendered_rgb": list(frame[:3])}
 
 
 async def verify_vlc(runtime: Path, request) -> None:

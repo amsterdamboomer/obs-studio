@@ -637,8 +637,13 @@ includes native compilation and runtime checks and is not a build benchmark.
 
 ### Scoped core build measurements
 
-Local GCC measurements used four compilation jobs, fixed opt-level 2 with debug
-information, one fresh output directory per mode and three repeated builds.
+Local GCC measurements used fixed opt-level 2 with debug information, one fresh
+output directory per mode and three repeated builds. The wrapper requested four
+Cargo jobs, but did not set `NUM_JOBS` for the standalone native integration
+process. That process has no inherited Cargo jobserver, so cc 1.6 falls back to
+machine parallelism. The original claim of four native jobs is withdrawn; these
+observations do not provide a controlled native concurrency comparison. Future
+standalone runs must set `NUM_JOBS` explicitly as well as `CARGO_BUILD_JOBS`.
 The interval covers the C/Rust core pair and caption, excluding plugin builds,
 GUI checks and Cargo startup. The host and compiler cache were shared; no cache
 was reset. Fresh output is therefore not a cold-cache measurement. Trials ran
@@ -715,4 +720,102 @@ plugin, SDK or packaging dependency. The full conversion remains incomplete.
 
 PR CI run `39080352730` on `5f04b9f0a` completed successfully after the PCH
 checkpoint, including both Linux core test modes and the selected Windows/macOS
-lanes. The subsequent bundled-mode changes require their own remote run.
+lanes. Run `39081209344` on `352bac56d` also completed successfully for the
+bundled-mode changes, including both Linux modes and selected Windows/macOS lanes.
+
+## Linux browser build
+
+`plugins::build_browser` builds the pinned `obs-browser` module and its
+`obs-browser-page` subprocess helper. It uses the existing CEF SDK's shared
+library and wrapper archive; it does not build Chromium. The SDK must provide
+`include/`, `Release/`, `Resources/` and the prebuilt CEF wrapper archive.
+`BrowserOptions` selects the SDK directory, Qt panels and unity compilation.
+The Linux implementation requires CEF >=95, nlohmann_json >=3.11, X11 and libdrm.
+The pinned browser source unconditionally includes `QApplication` and uses
+`QToolTip`, so Qt Widgets headers and libraries are required even with panels
+disabled. That mode omits panel sources and exports. Enabled panels use the
+original Qt sources and generated MOCs.
+
+Browser unity compilation uses three explicit, ordered groups to avoid duplicate
+Base64 declarations and default arguments in the untouched submodule sources.
+Individual compilation uses the same source inventory. The helper has its own
+source list and CEF dependencies. `BrowserArtifacts::deploy_runtime` copies the
+CEF Release and Resources trees and the helper beside the browser module,
+including locales, data packs and auxiliary shared libraries. These SDK resource
+directories are Cargo build inputs.
+
+`frontend::build_application_with_options` enables the original custom-browser
+dock implementation and generated Qt interfaces through `browser_panels`.
+The existing `build_application` entry point retains its default configuration.
+For the integration driver, set `OBS_BUILD_BROWSER=1` and `OBS_CEF_ROOT` to the
+SDK root. `OBS_BUILD_DISABLE_BROWSER_UNITY=1` selects individual browser
+compilation; `OBS_BUILD_DISABLE_BROWSER_PANELS=1` disables the panel interfaces.
+The GUI browser tests also require `OBS_BUILD_WEBSOCKET=1` to exercise the
+JavaScript bridge through the public source and scene APIs.
+
+The SDK used locally is the Linux x86_64 CEF 7871 archive pinned by
+`CMakePresets.json`, with SHA256
+`8ffc64d06ea74da613eeda7f2aa5d4e98661af6fa3ed8c68724c9a6e4e89ea8e`.
+Its CEF header reports 150.0.19. Host verification supplies installed CEF runtime
+dependencies through a private loader path; it does not modify system libraries.
+This browser implementation currently targets Linux. Other platforms, production
+SDK acquisition, installation and packaged runtime validation remain unfinished.
+
+Browser validation is in progress. The module/helper build contracts pass with
+unity and panels independently enabled or disabled, including helper execution,
+CEF linkage and panel export selection. The panels-enabled unity and individual
+modules each export the same 22 symbols. In the staged GUI, the original custom
+dock editor accepts real delegate edits, creates a browser dock, navigates to a
+local page and receives its JavaScript-generated readiness title.
+
+During development, the full browser GUI test failed at the browser source's
+local-file navigation. The input is active and showing at the requested 128×72 dimensions,
+but its screenshots remain transparent. A diagnostic CEF DevTools session finds
+the requested `http://absolute/…` target with an `about:blank` page context; an
+owned-process trace observes the initial paint but no call to the local-file
+scheme handler. Individual compilation reproduces this failure. An additional
+diagnostic run caught `CefTask_0_CToCpp called with invalid version -1` during
+cold panel initialization. The dependency fix and isolated credential-store
+fixture correction below resolve these observed failures in the tested Linux
+runtime; this does not establish all-platform or packaged application parity. The new checks
+retain their rendering, JavaScript bridge, helper-process and saved-profile
+requirements. Existing C tests and public headers remain unchanged.
+
+### Browser startup investigation
+
+A CMake reference build of the original browser module and helper reproduces
+the local-file failure inside the same Cargo-built frontend and core. This
+rules out browser unity compilation as its cause; it does not establish what
+a complete CMake-built application does. Explicitly selecting the global CEF
+request context did not fix it and was discarded.
+
+The cold-start API-version abort has a separate focused regression in a sister
+`obs-browser` checkout. Linking the real browser objects and queuing a task
+before initialization aborts with the original module and safely rejects the
+task with the proposed fix. Real module startup followed by immediate unload
+also aborts with the original module and exits successfully with the fix.
+The dependency draft [obs-browser#1](https://github.com/obs-rust/obs-browser/pull/1)
+proposes commit `0c3b700` (the current experimental pin). It waits for context readiness for ordinary tasks,
+handles source destruction before readiness, and coordinates unload with
+initialization success or failure. Its initialization-failure branch still
+needs runtime coverage. Browser-source rendering is now verified in the
+disposable Linux test profile described below.
+
+### Isolated browser credential store
+
+A CEF network trace narrows the blank local source to an unfinished global
+persistent-cookie key load in the isolated desktop session. The custom panel's
+separate cookie store completes. Selecting Chromium's basic password store
+inside a fresh disposable test profile completes the global cookie load and
+passes the existing browser source color/JavaScript callback, WebSocket,
+recording, saved-scene and shutdown checks. A second runtime-only run with the
+basic store and no network tracing also passes. This diagnoses the isolated
+credential-service integration; it does not verify normal desktop keyring
+integration. No production credential-store option is changed. Full native
+Cargo GUI validation now passes against both C and Rust core variants, including
+the original dock editor, actual native dock pixels, local source HTML/JavaScript
+callback, staged helper subprocesses, saved configuration, recordings and normal
+shutdown. The full invocation took 510.62 s and reported 27 cache hits / 199
+misses; it used the earlier uncapped native test environment and is not a
+controlled build benchmark. A warm repeat under an explicit native job limit
+remains necessary for cache evidence.

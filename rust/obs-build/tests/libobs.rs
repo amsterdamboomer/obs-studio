@@ -70,6 +70,13 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         },
         ..libobs::Options::default()
     };
+    if enabled("OBS_BUILD_APP_GUI") && std::env::var_os("OBS_BUILD_BROWSER").is_some() {
+        assert!(
+            std::env::var_os("OBS_BUILD_WEBSOCKET").is_some(),
+            "browser GUI validation requires websocket"
+        );
+        options.core_modules.push("obs-browser".into());
+    }
     if enabled("OBS_BUILD_APP_GUI") && std::env::var_os("OBS_BUILD_NVENC").is_some() {
         options.core_modules.push("obs-nvenc".into());
     }
@@ -371,6 +378,12 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         assert!(artifacts.helper.is_file());
         assert!(artifacts.cef_root.join("include/cef_version.h").is_file());
         let symbols = exports(&artifacts.module.library);
+        for symbol in ["obs_browser_create_qcef", "obs_browser_qcef_version_export"] {
+            assert_eq!(
+                symbols.contains(symbol),
+                std::env::var_os("OBS_BUILD_DISABLE_BROWSER_PANELS").is_none()
+            );
+        }
         for symbol in [
             "obs_module_load",
             "obs_module_set_pointer",
@@ -388,8 +401,20 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
                 .output()
                 .unwrap();
             assert!(deps.status.success());
-            assert!(String::from_utf8_lossy(&deps.stdout).contains("libcef.so"));
+            let deps = String::from_utf8_lossy(&deps.stdout);
+            assert!(deps.contains("libcef.so"));
         }
+        let result = std::process::Command::new(&artifacts.helper)
+            .output()
+            .unwrap();
+        // CEF documents -1 when no subprocess type was requested. Linux main
+        // exposes that as 255; executing it also checks runtime library loading.
+        assert_eq!(
+            result.status.code(),
+            Some(255),
+            "CEF helper: {}",
+            String::from_utf8_lossy(&result.stderr)
+        );
         artifacts
     });
     if let Some(browser) = &browser {
@@ -406,12 +431,16 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             std::env::var_os("OBS_BUILD_GPU_ARCHIVE")
                 .expect("build obs-gpu-status-frontend in release mode first"),
         );
-        let executable = frontend::build_application(
+        let executable = frontend::build_application_with_options(
             &build,
             &root,
             &libraries.reference,
             frontend.as_ref().unwrap(),
             &gpu_archive,
+            &frontend::ApplicationOptions {
+                browser_panels: browser_enabled
+                    && std::env::var_os("OBS_BUILD_DISABLE_BROWSER_PANELS").is_none(),
+            },
         )
         .unwrap();
         let output = std::process::Command::new(&executable)
@@ -498,6 +527,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
                 modules: &modules,
                 frontend_tools: frontend_tools.as_ref(),
                 websocket: websocket.as_ref(),
+                browser: browser.as_ref(),
                 script_artifacts: if tools_enabled {
                     script_artifacts.as_ref()
                 } else {

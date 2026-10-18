@@ -1269,6 +1269,11 @@ area.
   [#1109](https://github.com/obs-rust/obs-studio/pull/1109), upstream
   [obsproject/obs-studio#12213](https://github.com/obsproject/obs-studio/issues/12213).
 
+- Browser panels no longer crash during cold startup with CEF 150, and
+  closing OBS while its browser engine starts no longer hangs. *Linux*,
+  2026-10-17. PR [#1333](https://github.com/obs-rust/obs-studio/pull/1333),
+  dependency [obs-browser#1](https://github.com/obs-rust/obs-browser/pull/1).
+
 ### Security hardening
 
 - Malformed data from an RTMP server (a zero or negative chunk size, deep or

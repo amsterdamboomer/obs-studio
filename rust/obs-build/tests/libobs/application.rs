@@ -12,6 +12,7 @@ pub struct Inputs<'a> {
     pub nvenc_helper: Option<&'a Path>,
     pub modules: &'a [plugins::Module],
     pub websocket: Option<&'a plugins::Module>,
+    pub browser: Option<&'a plugins::BrowserArtifacts>,
     pub frontend_tools: Option<&'a plugins::Module>,
     pub script_artifacts: Option<&'a scripting::Artifacts>,
     pub gui_probe: Option<&'a plugins::Module>,
@@ -111,6 +112,7 @@ pub fn exercise(inputs: Inputs<'_>, variants: &[Variant<'_>]) -> Result<(), Stri
             .chain(variant.nvenc)
             .chain(inputs.frontend_tools)
             .chain(inputs.websocket)
+            .chain(inputs.browser.map(|browser| &browser.module))
             .chain(inputs.gui_probe)
         {
             let name = module
@@ -135,6 +137,9 @@ pub fn exercise(inputs: Inputs<'_>, variants: &[Variant<'_>]) -> Result<(), Stri
             serde_json::to_vec(&names).map_err(|e| e.to_string())?,
         )
         .map_err(|e| e.to_string())?;
+        if let Some(browser) = inputs.browser {
+            browser.deploy_runtime(&runtime.join("lib64/obs-modules/core"))?;
+        }
         // D-Bus activated services can inherit standard streams after the
         // launcher exits. Files let us wait for the owned launcher without
         // waiting indefinitely for every inherited pipe writer to disappear.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import configparser
 import json
 import os
 from pathlib import Path
@@ -15,9 +16,15 @@ import uuid
 
 
 def profile(runtime: Path) -> Path:
+    if os.environ.get("OBS_BUILD_BROWSER"):
+        (runtime / "browser-panel.html").write_text(
+            '<html><body style="background:#11cb4d"><script>'
+            'document.title="Native CEF Panel Ready";</script></body></html>'
+        )
     config = runtime / "user-config/obs-studio-rust"
     config.mkdir(parents=True)
-    (config / "global.ini").write_text("[General]\nLastVersion=4294967295\n")
+    browser_accel = "BrowserHWAccel=false\n" if os.environ.get("LIBGL_ALWAYS_SOFTWARE") == "1" else ""
+    (config / "global.ini").write_text(f"[General]\nLastVersion=4294967295\n{browser_accel}")
     (config / "user.ini").write_text(
         "[General]\nLanguage=en-US\nFirstRun=true\nConfirmOnExit=false\n"
         "[Basic]\nProfile=NativeSmoke\nProfileDir=NativeSmoke\n"
@@ -105,6 +112,11 @@ def main() -> None:
         assert (runtime / "bin/obs-nvenc-test").is_file(), "NVENC capability helper was not staged"
     command = [str(runtime / "bin/obs-studio-rust"), "--multi", "--only-bundled-plugins",
                "--disable-shutdown-check", "--disable-updater", "--disable-missing-files-check", "--unfiltered_log"]
+    if os.environ.get("OBS_BUILD_BROWSER"):
+        # This fresh disposable profile contains no user credentials. Avoid an
+        # interactive desktop keyring unlock blocking CEF's initial cookie load
+        # in the isolated Xvfb/D-Bus session. Production launch is unaffected.
+        command.append("--password-store=basic")
     # The wire probe starts recording after its other protocol checks, keeping
     # dependency setup and network checks outside the timed recording interval.
     wire_recording = recording and bool(os.environ.get("OBS_BUILD_WEBSOCKET"))
@@ -123,6 +135,8 @@ def main() -> None:
                 chunk = os.read(app.stdout.fileno(), 65536)
                 log.extend(chunk)
                 (runtime / "application.log").write_bytes(log)
+            if b"error: cc::Build" in log:
+                raise RuntimeError(f"frontend GUI probe failed; see {runtime / 'application.log'}")
             tools_ready = not (os.environ.get("OBS_BUILD_FRONTEND_TOOLS") or os.environ.get("OBS_BUILD_WEBSOCKET")) or b"cc::Build frontend Tools dialogs verified" in log
             if b"==== Startup complete" in log and tools_ready and (not recording or wire_recording or b"==== Recording Start" in log):
                 found = subprocess.run([str(args.inspector), "find", str(app.pid)], env=env, capture_output=True)
@@ -137,6 +151,8 @@ def main() -> None:
             assert str(runtime / "lib64" / name) in maps, f"staged {name} was not loaded"
         for name in json.loads((runtime / "expected-modules.json").read_text()):
             assert str(runtime / "lib64/obs-modules/core" / (name + ".so")) in maps, f"module {name} was not loaded"
+        if os.environ.get("OBS_BUILD_BROWSER"):
+            assert str(runtime / "lib64/obs-modules/core/libcef.so") in maps, "staged CEF was not loaded"
         if os.environ.get("OBS_BUILD_VLC"):
             if os.environ.get("OBS_BUILD_VLC_ABSENT"):
                 assert "libvlc.so.5" not in maps, "VLC absence fixture found a runtime"
@@ -161,6 +177,8 @@ def main() -> None:
             if recording:
                 wire.append("--recording")
             subprocess.run(wire, env=env, check=True, timeout=60)
+        if os.environ.get("OBS_BUILD_BROWSER"):
+            verify_browser_helpers(runtime, app.pid)
         assert b"Native white" in log, "saved color source was not restored"
         if recording:
             # Keep the actual frontend output running long enough to decode a
@@ -181,6 +199,14 @@ def main() -> None:
         if os.environ.get("OBS_BUILD_VLC") and not os.environ.get("OBS_BUILD_VLC_ABSENT"):
             source = next(source for source in saved["sources"] if source.get("name") == "Native VLC")
             assert source["settings"]["playlist"][0]["value"] == str(runtime / "vlc-white.mkv"), "VLC playlist was not saved"
+        if os.environ.get("OBS_BUILD_BROWSER"):
+            source = next(source for source in saved["sources"] if source.get("name") == "Native browser")
+            assert source["settings"]["local_file"] == str(runtime / "browser-source.html")
+            if not os.environ.get("OBS_BUILD_DISABLE_BROWSER_PANELS"):
+                settings = configparser.ConfigParser(interpolation=None)
+                settings.read(config / "user.ini")
+                docks = json.loads(settings["BasicWindow"]["ExtraBrowserDocks"])
+                assert any(dock["title"] == "Native CEF Panel" and dock["url"] == (runtime / "browser-panel.html").as_uri() for dock in docks), "browser dock was not saved"
         if scripting:
             scripts = saved["modules"]["scripts-tool"]
             assert len(scripts) == len(scripting["languages"]), "saved script list changed"
@@ -206,6 +232,35 @@ def main() -> None:
                 remainder, _ = app.communicate(timeout=5)
             log.extend(remainder)
         (runtime / "application.log").write_bytes(log)
+
+
+def verify_browser_helpers(runtime: Path, parent: int) -> None:
+    descendants = {parent}
+    found = {}
+    for _ in range(8):
+        children = set()
+        for pid in descendants:
+            for entry in Path(f"/proc/{pid}/task").glob("*/children"):
+                try:
+                    children.update(int(value) for value in entry.read_text().split())
+                except FileNotFoundError:
+                    pass
+        new = children - descendants
+        descendants.update(new)
+        if not new:
+            break
+    helper = str(runtime / "lib64/obs-modules/core/obs-browser-page")
+    for pid in descendants - {parent}:
+        try:
+            command = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode()
+            if helper in command and "--type=renderer" in command:
+                maps = Path(f"/proc/{pid}/maps").read_text()
+                assert str(runtime / "lib64/obs-modules/core/libcef.so") in maps, "renderer used an unstaged CEF"
+                found[pid] = command
+        except FileNotFoundError:
+            pass
+    assert found, "staged browser renderer helper was not running"
+    (runtime / "browser-helpers.json").write_text(json.dumps(found, indent=2))
 
 
 def verify_recording(path: Path, env: dict[str, str]) -> None:

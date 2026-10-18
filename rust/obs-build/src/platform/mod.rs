@@ -746,6 +746,41 @@ pub fn configure_application(
     Ok(())
 }
 
+pub fn configure_browser(
+    target: &str,
+    root: &Path,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    configure_cpp_module(target, library)?;
+    library
+        .cpp_compile_options
+        .retain(|flag| !flag.starts_with("-std="));
+    library.cpp_compile_options.push("-std=c++20".into());
+    library.sources.extend([
+        root.join("plugins/obs-browser/drm-format.cpp"),
+        root.join("plugins/obs-browser/deps/ip-string-posix.cpp"),
+    ]);
+    for package in ["x11", "libdrm"] {
+        crate::libobs::add_package(library, target, package)?;
+    }
+    library.link_options.push("-ldl".into());
+    Ok(())
+}
+
+pub fn configure_browser_helper(
+    target: &str,
+    library: &mut crate::SharedLibrary,
+) -> Result<(), String> {
+    if !target.contains("linux") {
+        return Err(format!("browser helper for {target} is not implemented"));
+    }
+    library.cpp_compile_options.push("-std=c++20".into());
+    library
+        .link_options
+        .extend(["-pthread".into(), "-ldl".into()]);
+    Ok(())
+}
+
 pub fn configure_websocket(target: &str, library: &mut crate::SharedLibrary) -> Result<(), String> {
     configure_cpp_module(target, library)?;
     fn include(variable: &str, header: &str) -> Result<PathBuf, String> {

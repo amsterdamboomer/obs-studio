@@ -25,7 +25,7 @@ pub fn build(build: &NativeBuild, root: &Path, core: &Path, api: &Path) -> plugi
         ],
         ..SharedLibrary::default()
     };
-    for package in ["simde", "Qt6Widgets"] {
+    for package in ["simde", "Qt6Widgets", "Qt6Test"] {
         let dependency = pkg_config::Config::new()
             .cargo_metadata(false)
             .probe(package)
@@ -70,6 +70,14 @@ const SOURCE: &str = r#"
 #include <QEventLoop>
 #include <QPointer>
 #include <QPixmap>
+#include <QTableView>
+#include <QLineEdit>
+#include <QDockWidget>
+#include <QTest>
+#include <QSignalSpy>
+#include <QElapsedTimer>
+#include <QUrl>
+#include <QScreen>
 #include <cstdlib>
 
 OBS_DECLARE_MODULE()
@@ -161,6 +169,87 @@ static bool open_dialog(QMenu *menu, const char *label, const char *type, const 
     return passed;
 }
 
+static bool verify_browser_panel(QMainWindow *main)
+{
+    QAction *action = nullptr;
+    for (QAction *candidate : main->findChildren<QAction *>()) {
+        QString text = candidate->text(); text.remove('&');
+        if (text == "Custom Browser Docks") { action = candidate; break; }
+    }
+    const char *directory = std::getenv("OBS_BUILD_GUI_EVIDENCE");
+    if (!action || !directory) { blog(LOG_ERROR, "cc::Build browser dock action missing"); return false; }
+    blog(LOG_INFO, "cc::Build opening browser dock editor");
+    action->trigger();
+    QPointer<QWidget> dialog;
+    for (QWidget *widget : QApplication::topLevelWidgets())
+        if (widget->inherits("OBSExtraBrowsers") && widget->isVisible()) { dialog = widget; break; }
+    auto *table = dialog ? dialog->findChild<QTableView *>("table") : nullptr;
+    auto *apply = dialog ? dialog->findChild<QPushButton *>("apply") : nullptr;
+    if (!table || !table->model() || !apply) { blog(LOG_ERROR, "cc::Build browser dock editor missing"); return false; }
+    auto *model = table->model();
+    // This model commits through its line-edit delegate, not setData(). Drive
+    // the actual editor so validation and new-row insertion also run.
+    auto edit_cell = [&](int column, const QString &text) {
+        const auto index = model->index(0, column);
+        table->setCurrentIndex(index);
+        table->openPersistentEditor(index);
+        QApplication::processEvents();
+        QLineEdit *editor = nullptr;
+        const auto center = table->viewport()->mapToGlobal(table->visualRect(index).center());
+        for (auto *candidate : table->findChildren<QLineEdit *>())
+            if (candidate->isVisible() && candidate->rect().contains(candidate->mapFromGlobal(center))) editor = candidate;
+        if (!editor) { blog(LOG_ERROR, "cc::Build browser dock cell editor missing"); return false; }
+        editor->selectAll(); QTest::keyClicks(editor, text); QTest::keyClick(editor, Qt::Key_Return);
+        QApplication::processEvents();
+        const bool committed = model->index(0, column).data().toString() == text;
+        table->closePersistentEditor(index);
+        if (!committed) blog(LOG_ERROR, "cc::Build browser dock cell %d edit was not committed", column);
+        return committed;
+    };
+    if (!edit_cell(0, "Native CEF Panel") || !edit_cell(1, "about:blank")) return false;
+    blog(LOG_INFO, "cc::Build creating browser dock");
+    apply->click();
+    QDockWidget *dock = nullptr;
+    for (auto *candidate : main->findChildren<QDockWidget *>())
+        if (candidate->windowTitle() == "Native CEF Panel") { dock = candidate; break; }
+    if (!dock || !dock->widget()) { blog(LOG_ERROR, "cc::Build browser dock was not created"); return false; }
+    QSignalSpy titles(dock->widget(), SIGNAL(titleChanged(QString)));
+    if (!titles.isValid()) { blog(LOG_ERROR, "cc::Build browser title signal missing"); return false; }
+    const QString url = QUrl::fromLocalFile(QString::fromUtf8(directory) + "/browser-panel.html").toString();
+    if (!edit_cell(1, url)) return false;
+    blog(LOG_INFO, "cc::Build navigating browser dock");
+    apply->click();
+    bool loaded = false;
+    QElapsedTimer timer; timer.start();
+    while (!loaded && timer.elapsed() < 20000) {
+        for (const auto &signal : titles)
+            if (!signal.isEmpty() && signal.front().toString() == "Native CEF Panel Ready") loaded = true;
+        if (!loaded) {
+            const auto remaining = 20000 - timer.elapsed();
+            if (remaining <= 0 || !titles.wait(static_cast<int>(remaining))) break;
+        }
+    }
+    bool saved = dialog->grab().save(QString::fromUtf8(directory) + "/browser-dock-editor.png");
+    // CEF uses a native child window, which QWidget::grab() cannot capture.
+    dialog->hide(); dock->raise(); dock->activateWindow();
+    QImage pixels;
+    bool rendered = false;
+    timer.restart();
+    while (!rendered && timer.elapsed() < 5000) {
+        QTest::qWait(50);
+        pixels = dock->screen()->grabWindow(dock->winId()).toImage();
+        if (!pixels.isNull()) {
+            const auto color = pixels.pixelColor(pixels.width() / 2, pixels.height() / 2);
+            rendered = std::abs(color.red() - 17) <= 4 && std::abs(color.green() - 203) <= 4 && std::abs(color.blue() - 77) <= 4;
+        }
+    }
+    saved = !pixels.isNull() && pixels.save(QString::fromUtf8(directory) + "/browser-panel.png") && saved;
+    dialog->close(); dock->hide();
+    if (!loaded || !rendered || !saved) { blog(LOG_ERROR, "cc::Build browser dock page readiness or rendered pixels failed"); return false; }
+    blog(LOG_INFO, "cc::Build browser dock creation, URL update, CEF JavaScript title and rendered pixels verified");
+    return true;
+}
+
 static void verify_dialogs()
 {
     auto *main = static_cast<QMainWindow *>(obs_frontend_get_main_window());
@@ -185,6 +274,8 @@ static void verify_dialogs()
     }
     if (std::getenv("OBS_BUILD_WEBSOCKET") &&
         !open_dialog(tools, "WebSocket Server Settings", "SettingsDialog", "websocket-settings.png", -1, true)) return;
+    if (std::getenv("OBS_BUILD_BROWSER") && !std::getenv("OBS_BUILD_DISABLE_BROWSER_PANELS") &&
+        !verify_browser_panel(main)) return;
     blog(LOG_INFO, "cc::Build frontend Tools dialogs verified");
 }
 

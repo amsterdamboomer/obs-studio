@@ -56,8 +56,12 @@ pub fn add_spinbox(
     Ok(())
 }
 
-/// Build the Linux frontend graph without browser panels; broader platform and
-/// feature configurations remain under conversion.
+#[derive(Default)]
+pub struct ApplicationOptions {
+    pub browser_panels: bool,
+}
+
+/// Build the Linux frontend with the default optional features.
 pub fn build_application(
     build: &NativeBuild,
     root: &Path,
@@ -65,12 +69,31 @@ pub fn build_application(
     api: &Path,
     gpu_status_archive: &Path,
 ) -> Result<PathBuf, String> {
+    build_application_with_options(
+        build,
+        root,
+        core,
+        api,
+        gpu_status_archive,
+        &ApplicationOptions::default(),
+    )
+}
+
+/// Build the Linux frontend graph with its optional browser-panel interface.
+pub fn build_application_with_options(
+    build: &NativeBuild,
+    root: &Path,
+    core: &Path,
+    api: &Path,
+    gpu_status_archive: &Path,
+    options: &ApplicationOptions,
+) -> Result<PathBuf, String> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let manifest_path = root.join("frontend/build/cargo-sources.json");
     let manifest: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&manifest_path).map_err(|e| e.to_string())?)
             .map_err(|e| e.to_string())?;
-    let common: Vec<String> =
+    let mut common: Vec<String> =
         serde_json::from_value(manifest["common"].clone()).map_err(|e| e.to_string())?;
     let interfaces: std::collections::BTreeMap<String, Vec<String>> =
         serde_json::from_value(manifest["interfaces"].clone()).map_err(|e| e.to_string())?;
@@ -95,6 +118,23 @@ pub fn build_application(
         ..SharedLibrary::default()
     };
     crate::platform::configure_application(&build.target, &root, &manifest, &config, &mut library)?;
+    if options.browser_panels {
+        library.definitions.push(("BROWSER_AVAILABLE".into(), None));
+        library
+            .include_dirs
+            .push(root.join("plugins/obs-browser/panel"));
+        common.extend(
+            [
+                "frontend/build/frontend.browserpanels+.hpp.cpp",
+                "frontend/dialogs/OBSExtraBrowsers.hpp",
+                "frontend/docks/BrowserDock.hpp",
+                "frontend/utility/ExtraBrowsersDelegate.hpp",
+                "frontend/utility/ExtraBrowsersModel.hpp",
+                "plugins/obs-browser/panel/browser-panel.hpp",
+            ]
+            .map(str::to_owned),
+        );
+    }
     for package in [
         "simde",
         "Qt6Widgets",
