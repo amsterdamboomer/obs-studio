@@ -18,10 +18,10 @@ three existing PulseAudio device skips; CTest took 302.01 / 308.84 s.
 | Native compiler reuse | Linux Tier 2 784/785 cached; Windows Tier 2 308/309 cacheable hits | Preserve native compiler stores |
 | Warm Ubuntu ON | Full job 684 → 435 s; build 602 → 324 s, in unmatched observations | Keep the working ON seed; measure durability |
 | Ubuntu OFF fallback | 43/361 calls cached; mixed state 9,526 MiB; save skipped | #1371 restricts restores to compatible mode/configuration; runtime verification pending |
-| Embedded Rust store | All eight expanded soldr lanes reported no embedded session | #1372 merged; queue logs confirm disabled transport with cook/registry/toolchain retained |
+| Embedded Rust store | All eight expanded soldr lanes reported no embedded session | #1372 disables transport; #1380 retired retention and the queue janitor reclaimed 183,330,575 bytes |
 | Rust correctness | Pinned compiler-cache stale-source bug and separate restored-target hazard remain | Keep wrapper bypass; do not deploy deeper test reuse without freshness validation |
 | Startup incident | Local reproduction plus PR, queue, master and full-run verification | #1365 verified; #1355 closed |
-| Storage headroom | Post-run listing summed to 12.43 GB; separate usage API disagrees | Resolve redundant writes and global-budget policy; no stable-headroom claim |
+| Storage headroom | Post-run listing summed to 12.43 GB; separate usage API disagrees; useful plugin seeds later absent | Resolve global-budget policy and preserve queue-useful seeds; no stable-headroom claim |
 | Representative queue throughput | Product-code queue observation 843 s; older unmatched median 954 s | Full post-rollout day still required; no causal speedup claim |
 
 **Build improvements are real but scoped.** The isolated libobs experiment
@@ -38,10 +38,39 @@ the initial seed build and uses a separately identified grouped revision.
 
 **Next priorities:** verify compatible Ubuntu seed publication after #1371,
 resolve the independently reproduced recording-wait race blocking #1362,
-and collect at least one representative post-rollout day. Qt publication
+restore durable retention of the measured plugin seeds, and collect at least
+one representative post-rollout day. Qt publication
 reuse and skipped upload are verified for one docs-only pair. The proposed
 queue-only publisher needs a transport compatible with temporary queue refs;
 cross-run artifacts are feasible, but that architecture has not been deployed.
+
+## Retention verification after the full run
+
+PR #1380 merged after successful queue run
+[39088853334](https://github.com/obs-rust/obs-studio/actions/runs/39088853334).
+All seven setup-soldr callsites already disabled embedded compiler-store
+transport; retiring its unused family allowed the actual queue janitor to
+delete all three remaining archives, totaling **183,330,575 bytes**. A fresh
+inventory contained zero such archives. The pinned offline executor selected
+exactly those three additional IDs, leaving its other decisions unchanged.
+[Executor and runtime evidence](ci-evidence/2026-10-18-retired-embedded-cache.json).
+This is verified storage reclamation, not a measured CI speedup or proof of
+stable headroom.
+
+The useful touched-plugin compiler and apt seeds were present in the saved
+00:32 UTC inventory (28,117,319 and 147,539,809 bytes), but absent in the
+01:56 inventory. Seventeen completed janitor logs inspected from 00:42 to
+01:55 record no deletion of those IDs. These observations establish a retention
+gap; they do not identify the deletion actor or prove GitHub eviction.
+[Entries, inspected jobs and limitations](ci-evidence/2026-10-18-plugin-cache-retention-gap.json).
+The earlier 41/41-hit warm consumer remains valid historical evidence, while
+retention durability remains unresolved under #1269.
+
+A later master run, 39088389865, failed the independent recording-wait
+assertions in ON (296 registered CTests, one failing executable); OFF passed
+all 296. The successful full native run above predates this recurrence.
+The proposed helper patch has not been applied, and no tests were skipped or
+relaxed. See [the #1283 recurrence](https://github.com/obs-rust/obs-studio/issues/1283#issuecomment-6244581047).
 
 ## Executive assessment
 
