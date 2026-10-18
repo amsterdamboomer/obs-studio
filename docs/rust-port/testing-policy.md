@@ -411,6 +411,8 @@ process-wide allocation counters, logging callbacks, or the working directory
 must re-exec the same category executable with an exact test selector.
 Pipe-spawning oracle checks also re-exec first: their C pipe-to-CLOEXEC
 window must not overlap unrelated child spawns in this process.
+File-replacement parity checks re-exec too: a concurrent Windows child can
+inherit an open C stdio handle and prevent replacement after C closes it.
 Crash probes also re-exec before forking, so they cannot inherit live pipe
 handles from other tests. Do not serialize the whole suite or add another
 compiled binary to obtain a clean process. Use `module_path!()` for exact
