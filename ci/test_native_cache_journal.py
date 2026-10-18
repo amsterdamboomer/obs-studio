@@ -96,10 +96,22 @@ class NativeCacheJournalTest(unittest.TestCase):
         self.assertIn("--stats", args)
         self.assertIn("--profile", args)
         self.assertEqual(args[args.index("--cache-dir") + 1], "/repo/.zccache")
-        writer().write.assert_called_once_with(f"ZCCACHE_SESSION_ID={session}\n")
+        self.assertEqual(args[args.index("--endpoint") + 1], "/repo/.zccache/native-journal.sock")
+        writer().write.assert_called_once_with(
+            f"ZCCACHE_CACHE_DIR=/repo/.zccache\nZCCACHE_ENDPOINT=/repo/.zccache/native-journal.sock\n"
+            f"ZCCACHE_SESSION_ID={session}\n")
         with self.assertRaises(ValueError):
             journal.start(Path("/tool/zccache"), Path("/repo"), Path("/shared/cache"),
                           Path("/runner/journal.jsonl"), Path("/runner/env"))
+
+    def test_invalid_session_cannot_write_runner_environment(self):
+        completed = subprocess.CompletedProcess([], 0, json.dumps({"session_id": "bad\nINJECT=value"}), "")
+        writer = mock.mock_open()
+        with mock.patch.object(journal.subprocess, "run", return_value=completed), \
+                mock.patch.object(Path, "open", writer), self.assertRaises(ValueError):
+            journal.start(Path("/tool/zccache"), Path("/repo"), Path("/repo/.zccache"),
+                          Path("/runner/journal.jsonl"), Path("/runner/env"))
+        writer.assert_not_called()
 
 
 if __name__ == "__main__":
