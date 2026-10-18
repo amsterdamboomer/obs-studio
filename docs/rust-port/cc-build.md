@@ -7,6 +7,14 @@ and `cc::Build`, including shared libraries, plugins, generated files, graphics,
 Qt, resources, tests and platform packaging. A core-only archive or test fixture
 does not complete the conversion.
 
+## Maintainer-directed wrap-up
+
+The maintainer requested stopping further expansion and deferring remaining
+C/Rust parity validation when it delays prototype launch. Follow-up
+[#1390](https://github.com/obs-rust/obs-studio/issues/1390) owns that remaining
+validation. Existing tests remain intact; this is not a claim of complete
+parity, release readiness or completion of the full conversion in #1332.
+
 ## Default build mode
 
 The user selected **unity on, compiled PCH off**. Keep both settings optional.
