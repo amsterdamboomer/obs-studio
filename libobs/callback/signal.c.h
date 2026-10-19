@@ -27,7 +27,7 @@ struct signal_info {
 	struct decl_info func;
 	DARRAY(struct signal_callback) callbacks;
 	pthread_mutex_t mutex;
-	bool signalling;
+	size_t signalling;
 
 	struct signal_info *next;
 };
@@ -37,7 +37,7 @@ static inline struct signal_info *signal_info_create(struct decl_info *info)
 	struct signal_info *si = bmalloc(sizeof(struct signal_info));
 	si->func = *info;
 	si->next = NULL;
-	si->signalling = false;
+	si->signalling = 0;
 	da_init(si->callbacks);
 
 	if (pthread_mutex_init_recursive(&si->mutex) != 0) {
@@ -292,7 +292,7 @@ void signal_handler_signal(signal_handler_t *handler, const char *signal, callda
 		return;
 
 	pthread_mutex_lock(&sig->mutex);
-	sig->signalling = true;
+	sig->signalling++;
 
 	for (size_t i = 0; i < sig->callbacks.num; i++) {
 		struct signal_callback *cb = sig->callbacks.array + i;
@@ -307,17 +307,18 @@ void signal_handler_signal(signal_handler_t *handler, const char *signal, callda
 		}
 	}
 
-	for (size_t i = sig->callbacks.num; i > 0; i--) {
-		struct signal_callback *cb = sig->callbacks.array + i - 1;
-		if (cb->remove) {
-			if (cb->keep_ref)
-				remove_refs++;
+	if (--sig->signalling == 0) {
+		for (size_t i = sig->callbacks.num; i > 0; i--) {
+			struct signal_callback *cb = sig->callbacks.array + i - 1;
+			if (cb->remove) {
+				if (cb->keep_ref)
+					remove_refs++;
 
-			da_erase(sig->callbacks, i - 1);
+				da_erase(sig->callbacks, i - 1);
+			}
 		}
 	}
 
-	sig->signalling = false;
 	pthread_mutex_unlock(&sig->mutex);
 
 	pthread_mutex_lock(&handler->global_callbacks_mutex);
