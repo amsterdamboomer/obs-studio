@@ -112,7 +112,8 @@ not get a line.
   [#1226](https://github.com/obs-rust/obs-studio/pull/1226).
 - **`GPU: x%` label.** The light shows the render GPU's utilization next to
   the CPU usage, or `CPU rendering` in software; obs-websocket gets the same
-  reading. Sources: NVML for NVIDIA and `gpu_busy_percent` for AMD on
+  reading. NVML process sampling keeps a separate window for each GPU and PID.
+  Sources: NVML for NVIDIA and `gpu_busy_percent` for AMD on
   Linux, IOKit on macOS, the PDH `GPU Engine` counters on Windows (every
   vendor). *All*, 2026-10-17. Issues
   [#1020](https://github.com/obs-rust/obs-studio/issues/1020),

@@ -98,9 +98,9 @@ pub struct Nvml {
     processes_utilization_info: Option<ProcessesUtilizationInfoFn>,
     /// Optional fallback for drivers without the newer function.
     process_utilization: Option<ProcessUtilizationFn>,
-    /// Per PID, the newest process sample seen, so each call reads only
+    /// Per device and PID, the newest process sample seen, so each call reads only
     /// newer ones and reading one PID does not use up another's samples.
-    last_seen: std::sync::Mutex<std::collections::HashMap<u32, u64>>,
+    last_seen: std::sync::Mutex<std::collections::HashMap<(usize, u32), u64>>,
     /// Keeps the library loaded while the function pointers are in use.
     _lib: Box<dyn Symbols>,
 }
@@ -260,14 +260,15 @@ impl Nvml {
     pub fn process_utilization(&self, adapter: &RenderAdapter, pid: u32) -> Option<u32> {
         let device = self.device(adapter)?;
         let mut seen = self.last_seen.lock().unwrap_or_else(|e| e.into_inner());
-        let last_seen = seen.get(&pid).copied().unwrap_or(0);
+        let key = (device as usize, pid);
+        let last_seen = seen.get(&key).copied().unwrap_or(0);
         let samples = match (self.processes_utilization_info, self.process_utilization) {
             (Some(get), _) => samples_v1_info(get, device, last_seen)?,
             (None, Some(get)) => samples_v0(get, device, last_seen)?,
             (None, None) => return None,
         };
         if let Some(newest) = samples.iter().map(|&(_, ts, _)| ts).max() {
-            seen.insert(pid, last_seen.max(newest));
+            seen.insert(key, last_seen.max(newest));
         }
         let own: Vec<u32> = samples
             .iter()
