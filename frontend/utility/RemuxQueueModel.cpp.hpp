@@ -312,9 +312,8 @@ void RemuxQueueModel::beginProcessing()
 
 	// Signal that the insertion point no longer exists.
 	beginRemoveRows(QModelIndex(), queue.length(), queue.length());
-	endRemoveRows();
-
 	isProcessing = true;
+	endRemoveRows();
 
 	emit dataChanged(index(0, RemuxEntryColumn::State), index(queue.length(), RemuxEntryColumn::State));
 }
@@ -328,10 +327,12 @@ void RemuxQueueModel::endProcessing()
 	}
 
 	// Signal that the insertion point exists again.
-	isProcessing = false;
 	if (!autoRemux) {
 		beginInsertRows(QModelIndex(), queue.length(), queue.length());
+		isProcessing = false;
 		endInsertRows();
+	} else {
+		isProcessing = false;
 	}
 
 	emit dataChanged(index(0, RemuxEntryColumn::State), index(queue.length(), RemuxEntryColumn::State));
