@@ -234,7 +234,7 @@ void RemuxQueueModel::checkInputPath(int row)
 		entry.state = RemuxEntryState::Pending;
 	}
 
-	emit dataChanged(index(row, 0), index(row, RemuxEntryColumn::Count));
+	emit dataChanged(index(row, 0), index(row, RemuxEntryColumn::Count - 1));
 }
 
 QFileInfoList RemuxQueueModel::checkForOverwrites() const
@@ -315,7 +315,9 @@ void RemuxQueueModel::beginProcessing()
 	isProcessing = true;
 	endRemoveRows();
 
-	emit dataChanged(index(0, RemuxEntryColumn::State), index(queue.length(), RemuxEntryColumn::State));
+	if (!queue.isEmpty()) {
+		emit dataChanged(index(0, RemuxEntryColumn::State), index(queue.length() - 1, RemuxEntryColumn::State));
+	}
 }
 
 void RemuxQueueModel::endProcessing()
@@ -335,7 +337,9 @@ void RemuxQueueModel::endProcessing()
 		isProcessing = false;
 	}
 
-	emit dataChanged(index(0, RemuxEntryColumn::State), index(queue.length(), RemuxEntryColumn::State));
+	if (!queue.isEmpty()) {
+		emit dataChanged(index(0, RemuxEntryColumn::State), index(queue.length() - 1, RemuxEntryColumn::State));
+	}
 }
 
 bool RemuxQueueModel::beginNextEntry(QString &inputPath, QString &outputPath)
