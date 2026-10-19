@@ -297,9 +297,13 @@ void signal_handler_signal(signal_handler_t *handler, const char *signal, callda
 	for (size_t i = 0; i < sig->callbacks.num; i++) {
 		struct signal_callback *cb = sig->callbacks.array + i;
 		if (!cb->remove) {
+			struct signal_callback *previous_signal_cb = current_signal_cb;
+			struct global_callback_info *previous_global_cb = current_global_cb;
 			current_signal_cb = cb;
+			current_global_cb = NULL;
 			cb->callback(cb->data, params);
-			current_signal_cb = NULL;
+			current_signal_cb = previous_signal_cb;
+			current_global_cb = previous_global_cb;
 		}
 	}
 
@@ -324,9 +328,13 @@ void signal_handler_signal(signal_handler_t *handler, const char *signal, callda
 
 			if (!cb->remove) {
 				cb->signaling++;
+				struct signal_callback *previous_signal_cb = current_signal_cb;
+				struct global_callback_info *previous_global_cb = current_global_cb;
+				current_signal_cb = NULL;
 				current_global_cb = cb;
 				cb->callback(cb->data, signal, params);
-				current_global_cb = NULL;
+				current_signal_cb = previous_signal_cb;
+				current_global_cb = previous_global_cb;
 				cb->signaling--;
 			}
 		}
