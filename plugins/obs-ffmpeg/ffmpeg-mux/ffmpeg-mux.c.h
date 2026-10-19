@@ -1185,7 +1185,7 @@ int main(int argc, char *argv[])
 		free(argv[i]);
 	free(argv);
 #endif
-	return 0;
+	return fail ? FFM_ERROR : FFM_SUCCESS;
 }
 
 /* File-local macros (BUILD.md): out of the next file in the unity group. */
