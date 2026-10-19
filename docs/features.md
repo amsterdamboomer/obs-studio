@@ -1402,3 +1402,4 @@ area.
 
 - **Buffered recording writes.** Large write chunks complete even when the configured queue limit is smaller than a chunk. *All*, pending.
 - **Failed buffered writes.** Recording writers stop waiting for queue space when a disk write fails. *All*, pending.
+- **File-copy errors.** Copies report failure if buffered data cannot be written when the destination closes. *Linux, macOS*, pending.
