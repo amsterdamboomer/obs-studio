@@ -1107,12 +1107,11 @@ static inline bool read_change_file(struct ffmpeg_mux *ffm, uint32_t size, struc
 	ffmpeg_mux_free(ffm);
 
 	ret = ffmpeg_mux_init(ffm, argc, argv);
+	argv[1] = argv1_backup;
 	if (ret != FFM_SUCCESS) {
 		fprintf(stderr, "Couldn't initialize muxer\n");
 		return false;
 	}
-
-	argv[1] = argv1_backup;
 
 	return true;
 }
