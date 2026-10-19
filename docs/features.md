@@ -167,6 +167,8 @@ not get a line.
 ### Encoding, streaming and recording
 
 - **let buffered queues fit one chunk.** Large buffered recording chunks complete when the configured queue limit is smaller than a chunk. *All*, 2026-10-20. Issue [#1526](https://github.com/obs-rust/obs-studio/issues/1526), PR [#1527](https://github.com/obs-rust/obs-studio/pull/1527).
+- The FFmpeg muxer cleans up safely when the recording file cannot be opened. *All*.
+
 - Missing FFmpeg video encoders report an error using initialized message storage. *All*.
 
 - The FFmpeg recording muxer reports seek positions and rejects unsupported seeks correctly. *All*.

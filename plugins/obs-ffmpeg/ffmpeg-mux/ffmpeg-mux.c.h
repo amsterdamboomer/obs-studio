@@ -158,7 +158,7 @@ static void free_avformat(struct ffmpeg_mux *ffm)
 	if (ffm->output) {
 		avcodec_free_context(&ffm->video_ctx);
 
-		if ((ffm->output->oformat->flags & AVFMT_NOFILE) == 0) {
+		if ((ffm->output->oformat->flags & AVFMT_NOFILE) == 0 && ffm->output->pb) {
 			if (!ffmpeg_mux_is_network(ffm)) {
 				av_free(ffm->output->pb->buffer);
 				avio_context_free(&ffm->output->pb);
