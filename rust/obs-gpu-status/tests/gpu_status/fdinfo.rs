@@ -204,3 +204,28 @@ fn cycles_without_total_do_not_count_as_nanoseconds() {
         Utilization::Percent(20)
     );
 }
+
+#[test]
+fn duplicated_fds_use_the_latest_counter_snapshot() {
+    // /proc fdinfo is read one file at a time. Two dup'ed descriptors can
+    // show different points of the same client's advancing counters.
+    let before = [
+        parse_fdinfo(&amdgpu(9, 0)).unwrap(),
+        parse_fdinfo(&amdgpu(9, 100_000_000)).unwrap(),
+    ];
+    let after = [
+        parse_fdinfo(&amdgpu(9, 300_000_000)).unwrap(),
+        parse_fdinfo(&amdgpu(9, 500_000_000)).unwrap(),
+    ];
+    let expected = Utilization::Percent(40);
+    assert_eq!(
+        fdinfo_utilization(&before, &after, AMD_PDEV, 1_000_000_000),
+        expected
+    );
+    let mut reversed = after.clone();
+    reversed.reverse();
+    assert_eq!(
+        fdinfo_utilization(&before, &reversed, AMD_PDEV, 1_000_000_000),
+        expected
+    );
+}

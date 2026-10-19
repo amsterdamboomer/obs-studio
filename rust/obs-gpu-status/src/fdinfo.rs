@@ -130,10 +130,18 @@ pub fn read_fdinfo(dir: &Path) -> Vec<FdinfoClient> {
 
 /// Each client on `pdev` once, by client id: fds of one client carry the
 /// same counters.
-fn clients_on<'a>(clients: &'a [FdinfoClient], pdev: &str) -> BTreeMap<u64, &'a FdinfoClient> {
-    let mut by_id = BTreeMap::new();
+fn clients_on(clients: &[FdinfoClient], pdev: &str) -> BTreeMap<u64, FdinfoClient> {
+    let mut by_id: BTreeMap<u64, FdinfoClient> = BTreeMap::new();
     for c in clients.iter().filter(|c| c.pdev.as_deref() == Some(pdev)) {
-        by_id.entry(c.client_id).or_insert(c);
+        let client = by_id.entry(c.client_id).or_insert_with(|| c.clone());
+        for (name, e) in &c.engines {
+            let previous = client.engines.entry(name.clone()).or_insert(*e);
+            // Duplicate descriptors are read at different instants. Keep
+            // the furthest counter, with its matching clock-domain sample.
+            if e.busy > previous.busy || (e.busy == previous.busy && e.total > previous.total) {
+                *previous = *e;
+            }
+        }
     }
     by_id
 }
