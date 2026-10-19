@@ -42,6 +42,8 @@ not get a line.
 
 ## Features
 
+- Rust libobs process pipes fill reads across kernel pipe chunks, matching the C API on Linux and macOS.
+
 - Failed libobs startup reports the initializer that failed; Linux X11
   hotkey initialization reports a failed display connection and its display
   name. *All* (X11 detail on Linux), 2026-10-17. Issue
