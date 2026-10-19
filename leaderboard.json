@@ -1,12 +1,12 @@
 {
   "repo": "obs-rust/obs-studio",
-  "generated_at": "2026-10-18T22:34:16Z",
-  "generated_pacific": "Oct 18, 2026 03:34 PM PDT",
+  "generated_at": "2026-10-19T04:55:03Z",
+  "generated_pacific": "Oct 18, 2026 09:55 PM PDT",
   "since": "2026-10-18T07:00:00Z",
   "since_caption": "new since 12:00 AM Pacific (America/Los_Angeles)",
-  "today_total": 27,
+  "today_total": 31,
   "ranked_by": "merged_prs",
-  "merged_pr_total": 813,
+  "merged_pr_total": 817,
   "unattributed_prs": [],
   "contributors": [
     {
@@ -1457,13 +1457,13 @@
     {
       "login": "swilk19",
       "avatar_url": "https://github.com/swilk19.png?size=200",
-      "merged_prs": 9,
+      "merged_prs": 13,
       "issues_filed": 2,
-      "today_prs": 1,
-      "today_badge": "<span class=\"delta delta-up\" title=\"+1 new since 12:00 AM Pacific (America/Los_Angeles)\"><svg viewBox=\"0 0 10 9\" width=\"14\" height=\"12\" aria-label=\"up\"><polygon points=\"5,0 10,9 0,9\"/></svg>+1</span>",
-      "score": 9,
+      "today_prs": 5,
+      "today_badge": "<span class=\"delta delta-up\" title=\"+5 new since 12:00 AM Pacific (America/Los_Angeles)\"><svg viewBox=\"0 0 10 9\" width=\"14\" height=\"12\" aria-label=\"up\"><polygon points=\"5,0 10,9 0,9\"/></svg>+5</span>",
+      "score": 13,
       "first_contribution": "2026-10-10T17:06:13Z",
-      "last_contribution": "2026-10-18T20:31:31Z",
+      "last_contribution": "2026-10-19T01:37:37Z",
       "pr_numbers": [
         97,
         106,
@@ -1473,7 +1473,11 @@
         179,
         182,
         184,
-        1432
+        1432,
+        1443,
+        1444,
+        1445,
+        1446
       ],
       "issue_numbers": [
         1428,
