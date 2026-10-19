@@ -787,15 +787,22 @@ static int64_t ffmpeg_mux_seek_av_buffer(void *opaque, int64_t offset, int whenc
 	if (os_atomic_load_bool(&ffm->io.output_error))
 		return -1;
 
-	// Update where the next write should go
+	whence &= ~AVSEEK_FORCE;
+	if (whence != SEEK_SET && whence != SEEK_CUR)
+		return -1;
+
+	// Update where the next write should go and report the resulting position.
 	pthread_mutex_lock(&ffm->io.data_mutex);
-	if (whence == SEEK_SET)
-		ffm->io.next_pos = offset;
-	else if (whence == SEEK_CUR)
-		ffm->io.next_pos += offset;
+	int64_t base = whence == SEEK_CUR ? (int64_t)ffm->io.next_pos : 0;
+	if (offset < -base || (offset > 0 && base > INT64_MAX - offset)) {
+		pthread_mutex_unlock(&ffm->io.data_mutex);
+		return -1;
+	}
+	int64_t position = base + offset;
+	ffm->io.next_pos = position;
 	pthread_mutex_unlock(&ffm->io.data_mutex);
 
-	return 0;
+	return position;
 }
 
 static int ffmpeg_mux_write_av_buffer(void *opaque, const uint8_t *buf, int buf_size)
