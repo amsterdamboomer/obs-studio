@@ -1,12 +1,12 @@
 {
   "repo": "obs-rust/obs-studio",
-  "generated_at": "2026-10-19T15:52:50Z",
-  "generated_pacific": "Oct 19, 2026 08:52 AM PDT",
+  "generated_at": "2026-10-19T21:14:32Z",
+  "generated_pacific": "Oct 19, 2026 02:14 PM PDT",
   "since": "2026-10-19T07:00:00Z",
   "since_caption": "new since 12:00 AM Pacific (America/Los_Angeles)",
-  "today_total": 4,
+  "today_total": 5,
   "ranked_by": "merged_prs",
-  "merged_pr_total": 824,
+  "merged_pr_total": 825,
   "unattributed_prs": [],
   "contributors": [
     {
@@ -1369,13 +1369,13 @@
     {
       "login": "nathan-v",
       "avatar_url": "https://github.com/nathan-v.png?size=200",
-      "merged_prs": 28,
-      "issues_filed": 8,
-      "today_prs": 1,
-      "today_badge": "<span class=\"delta delta-up\" title=\"+1 new since 12:00 AM Pacific (America/Los_Angeles)\"><svg viewBox=\"0 0 10 9\" width=\"14\" height=\"12\" aria-label=\"up\"><polygon points=\"5,0 10,9 0,9\"/></svg>+1</span>",
-      "score": 28,
+      "merged_prs": 29,
+      "issues_filed": 9,
+      "today_prs": 2,
+      "today_badge": "<span class=\"delta delta-up\" title=\"+2 new since 12:00 AM Pacific (America/Los_Angeles)\"><svg viewBox=\"0 0 10 9\" width=\"14\" height=\"12\" aria-label=\"up\"><polygon points=\"5,0 10,9 0,9\"/></svg>+2</span>",
+      "score": 29,
       "first_contribution": "2026-10-10T00:51:06Z",
-      "last_contribution": "2026-10-19T13:26:15Z",
+      "last_contribution": "2026-10-19T20:27:02Z",
       "pr_numbers": [
         61,
         66,
@@ -1404,9 +1404,11 @@
         1447,
         1448,
         1454,
-        1455
+        1455,
+        1460
       ],
       "issue_numbers": [
+        1459,
         784,
         744,
         728,
