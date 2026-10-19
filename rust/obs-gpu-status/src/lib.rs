@@ -175,9 +175,10 @@ pub fn is_graphics_log_line(line: &str) -> bool {
     {
         return false;
     }
-    const PHRASES: [&str; 5] = [
+    const PHRASES: [&str; 6] = [
         "loading up opengl",
         "loading up direct3d",
+        "loading up d3d11",
         "drm render node",
         "failed to initialize video",
         "graphics module",
