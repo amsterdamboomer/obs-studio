@@ -254,6 +254,8 @@ not get a line.
 ### Stability
 
 - **preserve empty item types for defaults.** Empty settings items retain their type when an incompatible default is supplied. *All*, 2026-10-20. Issue [#1528](https://github.com/obs-rust/obs-studio/issues/1528), PR [#1530](https://github.com/obs-rust/obs-studio/pull/1530).
+- Signal callbacks can register additional callbacks and then remove themselves safely. *All*.
+
 - Recursive emission of a signal no longer skips remaining subscribers after a callback removes itself. *All*.
 
 - Callbacks that emit nested signals can still remove the currently executing callback. *All*.

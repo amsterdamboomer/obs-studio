@@ -272,13 +272,18 @@ void signal_handler_disconnect(signal_handler_t *handler, const char *signal, si
 	}
 }
 
-static THREAD_LOCAL struct signal_callback *current_signal_cb = NULL;
+struct signal_callback_context {
+	struct signal_info *signal;
+	size_t index;
+};
+
+static THREAD_LOCAL struct signal_callback_context *current_signal_cb = NULL;
 static THREAD_LOCAL struct global_callback_info *current_global_cb = NULL;
 
 void signal_handler_remove_current(void)
 {
 	if (current_signal_cb)
-		current_signal_cb->remove = true;
+		current_signal_cb->signal->callbacks.array[current_signal_cb->index].remove = true;
 	else if (current_global_cb)
 		current_global_cb->remove = true;
 }
@@ -295,13 +300,14 @@ void signal_handler_signal(signal_handler_t *handler, const char *signal, callda
 	sig->signalling++;
 
 	for (size_t i = 0; i < sig->callbacks.num; i++) {
-		struct signal_callback *cb = sig->callbacks.array + i;
-		if (!cb->remove) {
-			struct signal_callback *previous_signal_cb = current_signal_cb;
+		struct signal_callback cb = sig->callbacks.array[i];
+		if (!cb.remove) {
+			struct signal_callback_context *previous_signal_cb = current_signal_cb;
 			struct global_callback_info *previous_global_cb = current_global_cb;
-			current_signal_cb = cb;
+			struct signal_callback_context context = {sig, i};
+			current_signal_cb = &context;
 			current_global_cb = NULL;
-			cb->callback(cb->data, params);
+			cb.callback(cb.data, params);
 			current_signal_cb = previous_signal_cb;
 			current_global_cb = previous_global_cb;
 		}
@@ -329,7 +335,7 @@ void signal_handler_signal(signal_handler_t *handler, const char *signal, callda
 
 			if (!cb->remove) {
 				cb->signaling++;
-				struct signal_callback *previous_signal_cb = current_signal_cb;
+				struct signal_callback_context *previous_signal_cb = current_signal_cb;
 				struct global_callback_info *previous_global_cb = current_global_cb;
 				current_signal_cb = NULL;
 				current_global_cb = cb;
