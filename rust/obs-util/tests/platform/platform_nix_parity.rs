@@ -1,6 +1,9 @@
 //! Tier 3: the Rust C ABI shim matches `libobs/util/platform-nix.c`.
 //!
 //! Intentional differences, excluded here:
+//! - A buffered destination close failure in `os_copyfile`: Rust returns -1;
+//!   C discards fclose's error and can report success for a truncated copy.
+//!   `copy_reports_buffered_close_failure` checks the corrected result.
 //! - A null pointer C would crash on returns an error or null.
 //! - `os_opendir` copies the path. C keeps the caller's pointer. Both sides
 //!   are called with a path that stays alive.

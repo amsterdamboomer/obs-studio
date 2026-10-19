@@ -3,6 +3,10 @@
 //! The video thread, the cache, and the input list live here. The C ABI
 //! shims and the FFmpeg scaler calls live in [`crate::ffi::video_io`].
 //!
+//! Reentrant callbacks may remove or replace inputs. Delivery tracks registration
+//! identities so removal cannot skip the next input and a replacement cannot
+//! inherit the old scaler's buffers. Scaler creation rechecks duplicate inputs.
+//!
 //! Intentional differences from the C file, also listed in `rust/README.md`:
 //! cache frames are zeroed (`VideoFrame` allocates with `vec`), where C's
 //! `bmalloc` leaves them uninitialized. `close` on a frame-rate-divisor
@@ -126,6 +130,7 @@ enum Prep {
         param: usize,
     },
     Scale {
+        identity: Arc<()>,
         callback: usize,
         param: usize,
         cur: usize,
@@ -495,6 +500,7 @@ fn cur_frame(shared: &Shared, frame_time: u64) -> bool {
                     shared.host.deliver(callback, param, &source);
                 }
                 Prep::Scale {
+                    identity,
                     callback,
                     param,
                     cur,
@@ -507,7 +513,7 @@ fn cur_frame(shared: &Shared, frame_time: u64) -> bool {
                     let scaled = guard.with_mut(|inputs| {
                         let Some(input) = inputs
                             .iter_mut()
-                            .find(|input| input.callback == callback && input.param == param)
+                            .find(|input| Arc::ptr_eq(&input.identity, &identity))
                         else {
                             return Scaled::Gone;
                         };
@@ -574,6 +580,7 @@ fn prepare_input(input: &mut Input) -> Prep {
     let cur = input.cur;
     let buffer = Box::new(input.buffers.remove(cur));
     Prep::Scale {
+        identity: Arc::clone(&input.identity),
         callback,
         param,
         cur,
@@ -637,6 +644,7 @@ mod tests {
         output: AtomicPtr<VideoOutput>,
         reenter_creation: AtomicBool,
         self_remove: AtomicBool,
+        replace_on_scale: AtomicBool,
         hit: Mutex<Vec<usize>>,
         lock: Mutex<usize>,
         cv: Condvar,
@@ -657,6 +665,10 @@ mod tests {
                 // SAFETY: the test stores this pointer before `connect` and
                 // joins the video thread, via `stop`, before the output drops.
                 let output = unsafe { &*ptr };
+                if self.state.replace_on_scale.swap(false, Ordering::SeqCst) {
+                    assert!(output.disconnect(1, 0));
+                    assert!(output.connect(None, 1, 1, 0));
+                }
                 assert!(output.connect(None, 1, 2, 0));
             }
             let _ = dst.linesize(0);
@@ -706,6 +718,7 @@ mod tests {
             output: AtomicPtr::new(std::ptr::null_mut()),
             reenter_creation: AtomicBool::new(false),
             self_remove: AtomicBool::new(false),
+            replace_on_scale: AtomicBool::new(false),
             hit: Mutex::new(Vec::new()),
             lock: Mutex::new(0),
             cv: Condvar::new(),
@@ -758,6 +771,7 @@ mod tests {
             output: AtomicPtr::new(std::ptr::null_mut()),
             reenter_creation: AtomicBool::new(true),
             self_remove: AtomicBool::new(false),
+            replace_on_scale: AtomicBool::new(false),
             hit: Mutex::new(Vec::new()),
             lock: Mutex::new(0),
             cv: Condvar::new(),
@@ -796,6 +810,7 @@ mod tests {
             output: AtomicPtr::new(std::ptr::null_mut()),
             reenter_creation: AtomicBool::new(false),
             self_remove: AtomicBool::new(true),
+            replace_on_scale: AtomicBool::new(false),
             hit: Mutex::new(Vec::new()),
             lock: Mutex::new(0),
             cv: Condvar::new(),
@@ -830,5 +845,58 @@ mod tests {
         output.stop();
         assert_eq!(delivered, 2, "self removal skipped the next input");
         assert_eq!(*state.hit.lock().unwrap(), vec![1, 2]);
+    }
+    #[test]
+    fn replaced_input_does_not_receive_old_scaler_buffers() {
+        let state = Arc::new(State {
+            output: AtomicPtr::new(std::ptr::null_mut()),
+            reenter_creation: AtomicBool::new(false),
+            self_remove: AtomicBool::new(false),
+            replace_on_scale: AtomicBool::new(true),
+            hit: Mutex::new(Vec::new()),
+            lock: Mutex::new(0),
+            cv: Condvar::new(),
+        });
+        let output = VideoOutput::open(
+            OpenInfo {
+                format: VideoFormat::Rgba as i32,
+                width: 4,
+                height: 4,
+                cache_size: 1,
+                range: 0,
+                colorspace: 0,
+            },
+            33_333_333,
+            Box::new(TestHost(Arc::clone(&state))),
+        )
+        .unwrap();
+        state
+            .output
+            .store(std::ptr::from_ref(&output).cast_mut(), Ordering::Release);
+        let conversion = RawScale {
+            format: VideoFormat::Rgba as i32,
+            width: 2,
+            height: 4,
+            range: 0,
+            colorspace: 0,
+        };
+        assert!(output.connect(Some(conversion), 1, 1, 0));
+        assert!(output.lock_frame(1, 1_000).is_some());
+        output.unlock_frame();
+        let count = state.lock.lock().unwrap();
+        let (count, _) = state
+            .cv
+            .wait_timeout_while(count, Duration::from_secs(2), |n| *n < 2)
+            .unwrap();
+        let delivered = *count;
+        drop(count);
+        output.stop();
+        assert_eq!(delivered, 2, "replacement stopped video delivery");
+        let mut guard = output.shared.inputs.lock();
+        guard.with_mut(|inputs| {
+            let replacement = inputs.iter().find(|input| input.callback == 1).unwrap();
+            assert!(replacement.scaler.is_none());
+            assert!(replacement.buffers.is_empty());
+        });
     }
 }
