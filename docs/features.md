@@ -1404,3 +1404,4 @@ area.
 - **Failed buffered writes.** Recording writers stop waiting for queue space when a disk write fails. *All*, pending.
 - **File-copy errors.** Copies report failure if buffered data cannot be written when the destination closes. *Linux, macOS*, pending.
 - **Video input registration.** Reentrant logging during scaler creation cannot register the same video callback twice. *All*, pending.
+- **Video callback removal.** A callback can disconnect during delivery without making another subscriber miss its frame. *All*, pending.
