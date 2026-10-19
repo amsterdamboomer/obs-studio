@@ -184,7 +184,10 @@ proptest! {
 fn empty_item_keeps_type_when_setting_default() {
     unsafe extern "C" {
         fn oracle_obs_data_unset_user_value(data: *mut c_void, name: *const c_char);
-        fn oracle_obs_data_get_default_string(data: *mut c_void, name: *const c_char) -> *const c_char;
+        fn oracle_obs_data_get_default_string(
+            data: *mut c_void,
+            name: *const c_char,
+        ) -> *const c_char;
     }
     let rust = Data::new();
     rust.set_int("value", 7);
@@ -197,7 +200,10 @@ fn empty_item_keeps_type_when_setting_default() {
         oracle_obs_data_unset_user_value(c, c"value".as_ptr());
         oracle_obs_data_set_default_string(c, c"value".as_ptr(), c"wrong type".as_ptr());
         let expected = CStr::from_ptr(oracle_obs_data_get_default_string(c, c"value".as_ptr()));
-        assert_eq!(rust.get_default_string("value").as_bytes(), expected.to_bytes());
+        assert_eq!(
+            rust.get_default_string("value").as_bytes(),
+            expected.to_bytes()
+        );
         oracle_obs_data_release(c);
     }
 }

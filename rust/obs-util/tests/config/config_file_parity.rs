@@ -810,7 +810,10 @@ fn hex_integer_prefix_after_config_prefix() {
     // SAFETY: the config is live throughout the calls, with valid C strings.
     unsafe {
         let mut c = std::ptr::null_mut();
-        assert_eq!(oracle_config_open_string(&mut c, c"[s]\npos=0x0X2a\nneg=0x-0x2a\n".as_ptr()), 0);
+        assert_eq!(
+            oracle_config_open_string(&mut c, c"[s]\npos=0x0X2a\nneg=0x-0x2a\n".as_ptr()),
+            0
+        );
         for key in [c"pos", c"neg"] {
             let int = oracle_config_get_int(c, c"s".as_ptr(), key.as_ptr());
             let uint = oracle_config_get_uint(c, c"s".as_ptr(), key.as_ptr());
