@@ -174,3 +174,33 @@ fn reads_drm_clients_from_a_directory() {
     let _ = fs::remove_dir_all(PathBuf::from(&dir));
     assert_eq!(ids, [2, 7, 7]);
 }
+
+#[test]
+fn cycle_and_time_counters_do_not_mix_units_or_depend_on_line_order() {
+    let header = "drm-driver: xe\ndrm-client-id: 7\ndrm-pdev: 0000:03:00.0\n";
+    let time = "drm-engine-rcs: 900000000 ns\n";
+    let cycles = "drm-cycles-rcs: 250\ndrm-total-cycles-rcs: 1000\n";
+    let first = parse_fdinfo(&format!("{header}{time}{cycles}")).unwrap();
+    let last = parse_fdinfo(&format!("{header}{cycles}{time}")).unwrap();
+    assert_eq!(first, last);
+    assert_eq!(first.engines["rcs"].busy, 250);
+    assert_eq!(first.engines["rcs"].total, Some(1000));
+}
+
+#[test]
+fn cycles_without_total_do_not_count_as_nanoseconds() {
+    let header = "drm-driver: test\ndrm-client-id: 7\ndrm-pdev: 0000:03:00.0\n";
+    let parsed = parse_fdinfo(&format!("{header}drm-cycles-rcs: 900000000\n")).unwrap();
+    assert_eq!(
+        fdinfo_utilization(&[], &[parsed], "0000:03:00.0", 1_000_000_000),
+        Utilization::Unavailable
+    );
+    let parsed = parse_fdinfo(&format!(
+        "{header}drm-engine-rcs: 200000000 ns\ndrm-cycles-rcs: 900000000\n"
+    ))
+    .unwrap();
+    assert_eq!(
+        fdinfo_utilization(&[], &[parsed], "0000:03:00.0", 1_000_000_000),
+        Utilization::Percent(20)
+    );
+}
