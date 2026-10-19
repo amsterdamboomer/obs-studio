@@ -243,6 +243,8 @@ pub fn is_software_renderer(adapter: &str) -> bool {
         "softpipe",
         "microsoft basic render driver",
         "swiftshader",
+        "software rasterizer",
+        "apple software renderer",
     ]
     .iter()
     .any(|s| a.contains(s))

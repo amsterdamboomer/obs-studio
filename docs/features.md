@@ -87,7 +87,8 @@ not get a line.
   renders on a hardware GPU (green), in software on a machine without a GPU
   (yellow), or in software although a GPU is present, after a graphics
   failure or over the frame budget (red). Clicking it explains the state and
-  quotes the graphics log lines. The startup log and
+  quotes the graphics log lines. Legacy Mesa Software Rasterizer and Apple
+  Software Renderer are recognized as CPU rendering. The startup log and
   `GetStats.gpuAcceleration` in obs-websocket have the same state
   ([gpu-status.md](gpu-status.md)). *All*, 2026-10-15. Issues
   [#846](https://github.com/obs-rust/obs-studio/issues/846),
