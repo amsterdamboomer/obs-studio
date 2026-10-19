@@ -481,3 +481,17 @@ fn each_adapter_keeps_its_own_process_window() {
     );
     assert_eq!(nvml.process_utilization(&pci(BUS_ID), OBS_PID), None);
 }
+
+extern "C" fn info_not_supported(_: *mut c_void, _: *mut InfoV1) -> i32 {
+    3 // NVML_ERROR_NOT_SUPPORTED
+}
+
+#[test]
+fn unsupported_new_process_api_falls_back_to_old_api() {
+    let lib = with_process(FakeLib::full(init_ok as *const (), rates_37 as *const ())).with(
+        c"nvmlDeviceGetProcessesUtilizationInfo",
+        info_not_supported as *const (),
+    );
+    let nvml = Nvml::load(Box::new(lib)).unwrap();
+    assert_eq!(nvml.process_utilization(&pci(BUS_ID), OBS_PID), Some(25));
+}

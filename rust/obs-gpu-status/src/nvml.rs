@@ -27,6 +27,8 @@ pub trait Symbols: Send + Sync {
 }
 
 const NVML_SUCCESS: i32 = 0;
+const NVML_ERROR_NOT_SUPPORTED: i32 = 3;
+const NVML_ERROR_ARGUMENT_VERSION_MISMATCH: i32 = 25;
 const NVML_ERROR_INSUFFICIENT_SIZE: i32 = 7;
 
 /// `nvmlUtilization_t`.
@@ -184,7 +186,7 @@ fn samples_v1_info(
     get: ProcessesUtilizationInfoFn,
     device: *mut c_void,
     last_seen: u64,
-) -> Option<Vec<ProcessSample>> {
+) -> Result<Vec<ProcessSample>, i32> {
     let mut info = NvmlProcessesUtilizationInfo {
         version: PROCESSES_UTILIZATION_INFO_V1,
         count: 0,
@@ -192,22 +194,25 @@ fn samples_v1_info(
         array: std::ptr::null_mut(),
     };
     // SAFETY: a versioned struct with a null array asks for the size.
-    if unsafe { get(device, &mut info) } != NVML_ERROR_INSUFFICIENT_SIZE || info.count == 0 {
-        return None;
+    let ret = unsafe { get(device, &mut info) };
+    if ret != NVML_ERROR_INSUFFICIENT_SIZE {
+        return Err(ret);
+    }
+    if info.count == 0 {
+        return Ok(Vec::new());
     }
     let mut buffer = vec![NvmlProcessUtilizationInfo::default(); info.count as usize];
     info.array = buffer.as_mut_ptr();
     // SAFETY: `array` holds `count` writable entries.
-    if unsafe { get(device, &mut info) } != NVML_SUCCESS {
-        return None;
+    let ret = unsafe { get(device, &mut info) };
+    if ret != NVML_SUCCESS {
+        return Err(ret);
     }
     buffer.truncate(info.count as usize);
-    Some(
-        buffer
-            .iter()
-            .map(|s| (s.pid, s.time_stamp, s.sm_util))
-            .collect(),
-    )
+    Ok(buffer
+        .iter()
+        .map(|s| (s.pid, s.time_stamp, s.sm_util))
+        .collect())
 }
 
 /// Samples newer than `last_seen` from the older
@@ -263,7 +268,14 @@ impl Nvml {
         let key = (device as usize, pid);
         let last_seen = seen.get(&key).copied().unwrap_or(0);
         let samples = match (self.processes_utilization_info, self.process_utilization) {
-            (Some(get), _) => samples_v1_info(get, device, last_seen)?,
+            (Some(get), fallback) => match samples_v1_info(get, device, last_seen) {
+                Ok(samples) => samples,
+                // A symbol can exist while this GPU or struct version is unsupported.
+                Err(NVML_ERROR_NOT_SUPPORTED | NVML_ERROR_ARGUMENT_VERSION_MISMATCH) => {
+                    samples_v0(fallback?, device, last_seen)?
+                }
+                Err(_) => return None,
+            },
             (None, Some(get)) => samples_v0(get, device, last_seen)?,
             (None, None) => return None,
         };
