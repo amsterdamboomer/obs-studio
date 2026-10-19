@@ -159,6 +159,8 @@ not get a line.
 
 ### Audio
 
+- Stopping ALSA capture before its worker starts no longer revives the worker and hangs shutdown. *Linux*.
+
 - JACK timestamp fallback uses the active server sample rate instead of an uninitialized zero rate. *Linux*.
 
 - Unchanged JACK source settings no longer restart audio capture. *Linux*.
