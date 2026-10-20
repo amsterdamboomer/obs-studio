@@ -780,6 +780,7 @@ mod tests {
             output: AtomicPtr::new(std::ptr::null_mut()),
             reenter_creation: AtomicBool::new(true),
             self_remove: AtomicBool::new(false),
+            reconnects_left: AtomicUsize::new(0),
             hit: Mutex::new(Vec::new()),
             lock: Mutex::new(0),
             cv: Condvar::new(),
@@ -858,6 +859,7 @@ mod tests {
     fn self_reconnect_waits_for_the_next_frame() {
         let state = Arc::new(State {
             output: AtomicPtr::new(std::ptr::null_mut()),
+            reenter_creation: AtomicBool::new(false),
             self_remove: AtomicBool::new(true),
             reconnects_left: AtomicUsize::new(3),
             hit: Mutex::new(Vec::new()),
