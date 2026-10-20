@@ -326,3 +326,25 @@ proptest! {
         assert_parity(&text);
     }
 }
+
+#[test]
+fn terminal_splices_exclude_only_comment_and_string_tokens() {
+    for suffix in [b"\\\n".as_slice(), b"\\\r\n", b"\\\r", b"\\\n\r"] {
+        for prefix in [
+            b"void f/*open".as_slice(),
+            b"void f//open",
+            b"void f(\"open",
+        ] {
+            let mut text = prefix.to_vec();
+            text.extend_from_slice(suffix);
+            assert!(excluded(&text), "{text:?}");
+        }
+        let mut text = b"void f()".to_vec();
+        text.extend_from_slice(suffix);
+        assert!(!excluded(&text), "ordinary terminal splice: {text:?}");
+    }
+    assert!(!excluded(b"void f/* open"));
+    assert!(!excluded(b"void f(\"open"));
+    assert!(!excluded(b"void f/* closed */\\\n"));
+    assert!(!excluded(b"void f(\"closed\"\\\n"));
+}
