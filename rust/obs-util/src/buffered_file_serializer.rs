@@ -305,7 +305,7 @@ impl Drop for Output {
 
 /// `os_fseeki64(..., SEEK_SET)` takes an `int64_t`. A wrapped position is
 /// negative and the seek fails, leaving the file offset where it was.
-fn seek_set(file: &mut File, pos: u64) {
+fn seek_set<W: Seek>(file: &mut W, pos: u64) {
     let off = pos as i64;
     if off < 0 {
         return;
@@ -313,7 +313,7 @@ fn seek_set(file: &mut File, pos: u64) {
     let _ = file.seek(SeekFrom::Start(off as u64));
 }
 
-fn write_full(file: &mut File, mut buf: &[u8]) -> bool {
+fn write_full<W: Write>(file: &mut W, mut buf: &[u8]) -> bool {
     while !buf.is_empty() {
         match file.write(buf) {
             Ok(0) => return false,
@@ -325,7 +325,7 @@ fn write_full(file: &mut File, mut buf: &[u8]) -> bool {
     true
 }
 
-fn io_thread(inner: Arc<Inner>, mut file: File) {
+fn io_thread<W: Write + Seek>(inner: Arc<Inner>, mut file: W) {
     let chunk_size = inner.shared.lock().unwrap().chunk_size;
     let mut chunk = vec![0u8; chunk_size];
     let mut chunk_used = 0usize;
@@ -394,5 +394,88 @@ fn io_thread(inner: Arc<Inner>, mut file: File) {
         if shutting_down {
             break 'outer;
         }
+    }
+}
+
+#[cfg(test)]
+mod failure_tests {
+    use super::*;
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    struct FailingWriter(mpsc::SyncSender<()>, mpsc::Receiver<()>);
+
+    impl Write for FailingWriter {
+        fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+            self.0.send(()).unwrap();
+            self.1.recv().unwrap();
+            Err(std::io::Error::other("disk full"))
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    impl Seek for FailingWriter {
+        fn seek(&mut self, _: SeekFrom) -> std::io::Result<u64> {
+            Ok(0)
+        }
+    }
+
+    #[test]
+    fn write_error_wakes_backpressured_producer() {
+        let inner = Arc::new(Inner {
+            output_error: AtomicBool::new(false),
+            shutdown_requested: AtomicBool::new(false),
+            space: AutoEvent::new(),
+            new_data: AutoEvent::new(),
+            shared: Mutex::new(Shared {
+                buf: ByteBuf::with_capacity(INITIAL_CAPACITY),
+                next_pos: 0,
+                buffer_size: INITIAL_CAPACITY,
+                chunk_size: SMALL_WRITE,
+            }),
+        });
+        let (entered_tx, entered_rx) = mpsc::sync_channel(1);
+        let (resume_tx, resume_rx) = mpsc::sync_channel(1);
+        let worker_inner = Arc::clone(&inner);
+        let join = std::thread::spawn(move || {
+            io_thread(worker_inner, FailingWriter(entered_tx, resume_rx))
+        });
+        let out = Output {
+            inner: Arc::clone(&inner),
+            join: Some(join),
+        };
+        assert_eq!(out.write(&vec![1; SMALL_WRITE]), SMALL_WRITE);
+        entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let (done_tx, done_rx) = mpsc::sync_channel(1);
+        let producer = std::thread::spawn(move || {
+            let result = out.write(&vec![2; 2 * INITIAL_CAPACITY]);
+            done_tx.send(result).unwrap();
+        });
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            // The writer signalled space before entering write. Seeing the
+            // producer reset it with a full queue proves it reached backpressure.
+            let shared = inner.shared.lock().unwrap();
+            if shared.buf.len() > INITIAL_CAPACITY - SMALL_WRITE
+                && !*inner.space.flag.lock().unwrap()
+            {
+                break;
+            }
+            drop(shared);
+            assert!(
+                Instant::now() < deadline,
+                "producer did not reach backpressure"
+            );
+            std::thread::yield_now();
+        }
+        resume_tx.send(()).unwrap();
+        assert_eq!(
+            done_rx
+                .recv_timeout(Duration::from_secs(5))
+                .expect("producer stuck after write error"),
+            0
+        );
+        producer.join().unwrap();
     }
 }
