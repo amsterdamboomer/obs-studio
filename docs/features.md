@@ -1492,3 +1492,5 @@ area.
 - Rust graphics preserves separate C trigonometric calls on macOS and signaling
   NaN rounding on macOS/Windows. *macOS, Windows*, 2026-10-18.
   PR [#1398](https://github.com/obs-rust/obs-studio/pull/1398).
+
+- **wake buffered producers after disk errors.** Buffered recording producers wake and report failure after a disk write error. *Rust implementation*, 2026-10-20. Refs #1533.

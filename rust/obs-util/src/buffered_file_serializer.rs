@@ -1,4 +1,5 @@
 //! Intentional C difference: Large buffered recording chunks complete when the configured queue limit is smaller than a chunk.
+//! Intentional C difference: Buffered recording producers wake and report failure after a disk write error.
 //!
 //! Safe core for `libobs/util/buffered-file-serializer.c`.
 //!
@@ -224,10 +225,10 @@ impl Output {
         }
         let mut offset = 0;
         while offset < buf.len() {
+            let mut shared = self.inner.shared.lock().unwrap();
             if self.inner.output_error.load(Ordering::SeqCst) {
                 return 0;
             }
-            let mut shared = self.inner.shared.lock().unwrap();
             let chunk_size = shared.chunk_size;
             let next_chunk = (buf.len() - offset).min(chunk_size);
             // Even an empty queue must fit one chunk and its header.
@@ -385,7 +386,11 @@ fn io_thread<W: Write + Seek>(inner: Arc<Inner>, mut file: W) {
                 }
             }
             if !write_full(&mut file, &chunk[..chunk_used]) {
+                // Pair error publication and the wake with the producer's
+                // check/reset under the queue lock to prevent lost wakeups.
+                let _shared = inner.shared.lock().unwrap();
                 inner.output_error.store(true, Ordering::SeqCst);
+                inner.space.signal();
                 return;
             }
             chunk_used = 0;
