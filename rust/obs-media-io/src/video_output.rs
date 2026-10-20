@@ -624,6 +624,7 @@ mod tests {
 
     struct State {
         output: AtomicPtr<VideoOutput>,
+        reenter_creation: AtomicBool,
         hit: Mutex<Vec<usize>>,
         lock: Mutex<usize>,
         cv: Condvar,
@@ -670,6 +671,11 @@ mod tests {
             _dst: &RawScale,
             _src: &RawScale,
         ) -> Result<Box<dyn Scaler>, ScalerFail> {
+            if self.0.reenter_creation.swap(false, Ordering::SeqCst) {
+                let ptr = self.0.output.load(Ordering::Acquire);
+                // SAFETY: the test keeps its output alive throughout connect.
+                assert!(unsafe { &*ptr }.connect(None, 1, 1, 0));
+            }
             Ok(Box::new(Reenter {
                 state: Arc::clone(&self.0),
                 once: AtomicBool::new(true),
@@ -681,6 +687,7 @@ mod tests {
     fn scale_reenter_connects() {
         let state = Arc::new(State {
             output: AtomicPtr::new(std::ptr::null_mut()),
+            reenter_creation: AtomicBool::new(false),
             hit: Mutex::new(Vec::new()),
             lock: Mutex::new(0),
             cv: Condvar::new(),
@@ -726,5 +733,42 @@ mod tests {
         drop(count);
         output.stop();
         assert_eq!(state.hit.lock().unwrap().as_slice(), &[1, 2]);
+    }
+    #[test]
+    fn scaler_creation_reentry_does_not_duplicate_input() {
+        let state = Arc::new(State {
+            output: AtomicPtr::new(std::ptr::null_mut()),
+            reenter_creation: AtomicBool::new(true),
+            hit: Mutex::new(Vec::new()),
+            lock: Mutex::new(0),
+            cv: Condvar::new(),
+        });
+        let output = VideoOutput::open(
+            OpenInfo {
+                format: VideoFormat::Rgba as i32,
+                width: 4,
+                height: 4,
+                cache_size: 1,
+                range: 0,
+                colorspace: 0,
+            },
+            33_333_333,
+            Box::new(TestHost(Arc::clone(&state))),
+        )
+        .unwrap();
+        state
+            .output
+            .store(std::ptr::from_ref(&output).cast_mut(), Ordering::Release);
+        let conversion = RawScale {
+            format: VideoFormat::Rgba as i32,
+            width: 2,
+            height: 4,
+            range: 0,
+            colorspace: 0,
+        };
+        assert!(!output.connect(Some(conversion), 1, 1, 0));
+        assert!(output.disconnect(1, 0));
+        assert!(!output.active(), "duplicate input survived disconnect");
+        output.stop();
     }
 }
