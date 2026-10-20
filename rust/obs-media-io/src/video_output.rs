@@ -645,6 +645,7 @@ mod tests {
         output: AtomicPtr<VideoOutput>,
         reenter_creation: AtomicBool,
         self_remove: AtomicBool,
+        replace_on_scale: AtomicBool,
         reconnects_left: AtomicUsize,
         hit: Mutex<Vec<usize>>,
         lock: Mutex<usize>,
@@ -666,6 +667,10 @@ mod tests {
                 // SAFETY: the test stores this pointer before `connect` and
                 // joins the video thread, via `stop`, before the output drops.
                 let output = unsafe { &*ptr };
+                if self.state.replace_on_scale.swap(false, Ordering::SeqCst) {
+                    assert!(output.disconnect(1, 0));
+                    assert!(output.connect(None, 1, 1, 0));
+                }
                 assert!(output.connect(None, 1, 2, 0));
             }
             let _ = dst.linesize(0);
@@ -727,6 +732,7 @@ mod tests {
             output: AtomicPtr::new(std::ptr::null_mut()),
             reenter_creation: AtomicBool::new(false),
             self_remove: AtomicBool::new(false),
+            replace_on_scale: AtomicBool::new(false),
             reconnects_left: AtomicUsize::new(0),
             hit: Mutex::new(Vec::new()),
             lock: Mutex::new(0),
@@ -780,6 +786,7 @@ mod tests {
             output: AtomicPtr::new(std::ptr::null_mut()),
             reenter_creation: AtomicBool::new(true),
             self_remove: AtomicBool::new(false),
+            replace_on_scale: AtomicBool::new(false),
             reconnects_left: AtomicUsize::new(0),
             hit: Mutex::new(Vec::new()),
             lock: Mutex::new(0),
@@ -819,6 +826,7 @@ mod tests {
             output: AtomicPtr::new(std::ptr::null_mut()),
             reenter_creation: AtomicBool::new(false),
             self_remove: AtomicBool::new(true),
+            replace_on_scale: AtomicBool::new(false),
             reconnects_left: AtomicUsize::new(0),
             hit: Mutex::new(Vec::new()),
             lock: Mutex::new(0),
@@ -861,6 +869,7 @@ mod tests {
             output: AtomicPtr::new(std::ptr::null_mut()),
             reenter_creation: AtomicBool::new(false),
             self_remove: AtomicBool::new(true),
+            replace_on_scale: AtomicBool::new(false),
             reconnects_left: AtomicUsize::new(3),
             hit: Mutex::new(Vec::new()),
             lock: Mutex::new(0),
@@ -899,5 +908,74 @@ mod tests {
             "reconnection changed the frame delivery count"
         );
         assert_eq!(*state.hit.lock().unwrap(), vec![1, 2]);
+    }
+
+    #[test]
+    fn replaced_input_does_not_receive_old_scaler_buffers() {
+        let state = Arc::new(State {
+            output: AtomicPtr::new(std::ptr::null_mut()),
+            reenter_creation: AtomicBool::new(false),
+            self_remove: AtomicBool::new(false),
+            reconnects_left: AtomicUsize::new(0),
+            replace_on_scale: AtomicBool::new(true),
+            hit: Mutex::new(Vec::new()),
+            lock: Mutex::new(0),
+            cv: Condvar::new(),
+        });
+        let output = VideoOutput::open(
+            OpenInfo {
+                format: VideoFormat::Rgba as i32,
+                width: 4,
+                height: 4,
+                cache_size: 2,
+                range: 0,
+                colorspace: 0,
+            },
+            33_333_333,
+            Box::new(TestHost(Arc::clone(&state))),
+        )
+        .unwrap();
+        state
+            .output
+            .store(std::ptr::from_ref(&output).cast_mut(), Ordering::Release);
+        let conversion = RawScale {
+            format: VideoFormat::Rgba as i32,
+            width: 2,
+            height: 4,
+            range: 0,
+            colorspace: 0,
+        };
+        assert!(output.connect(Some(conversion), 1, 1, 0));
+        assert!(output.lock_frame(1, 1_000).is_some());
+        output.unlock_frame();
+        let count = state.lock.lock().unwrap();
+        let (count, _) = state
+            .cv
+            .wait_timeout_while(count, Duration::from_secs(2), |n| *n < 1)
+            .unwrap();
+        let delivered = *count;
+        drop(count);
+        if delivered != 1 {
+            output.stop();
+        }
+        assert_eq!(delivered, 1, "other subscriber lost the first frame");
+        assert!(output.lock_frame(1, 2_000).is_some());
+        output.unlock_frame();
+        let count = state.lock.lock().unwrap();
+        let (count, _) = state
+            .cv
+            .wait_timeout_while(count, Duration::from_secs(2), |n| *n < 3)
+            .unwrap();
+        let delivered = *count;
+        drop(count);
+        output.stop();
+        assert_eq!(delivered, 3, "replacement missed the next frame");
+        assert_eq!(*state.hit.lock().unwrap(), vec![2, 1, 2]);
+        let mut guard = output.shared.inputs.lock();
+        guard.with_mut(|inputs| {
+            let replacement = inputs.iter().find(|input| input.callback == 1).unwrap();
+            assert!(replacement.scaler.is_none());
+            assert!(replacement.buffers.is_empty());
+        });
     }
 }
