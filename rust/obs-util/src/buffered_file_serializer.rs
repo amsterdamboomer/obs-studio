@@ -50,6 +50,8 @@ pub fn seek_type_from_c(code: i32) -> Option<SeekType> {
 struct AutoEvent {
     flag: Mutex<bool>,
     cv: Condvar,
+    #[cfg(test)]
+    waiters: std::sync::atomic::AtomicUsize,
 }
 
 impl AutoEvent {
@@ -57,13 +59,19 @@ impl AutoEvent {
         Self {
             flag: Mutex::new(false),
             cv: Condvar::new(),
+            #[cfg(test)]
+            waiters: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
     fn wait(&self) {
         let mut flag = self.flag.lock().unwrap();
         while !*flag {
+            #[cfg(test)]
+            self.waiters.fetch_add(1, Ordering::SeqCst);
             flag = self.cv.wait(flag).unwrap();
+            #[cfg(test)]
+            self.waiters.fetch_sub(1, Ordering::SeqCst);
         }
         *flag = false;
     }
@@ -426,8 +434,7 @@ mod failure_tests {
         }
     }
 
-    #[test]
-    fn write_error_wakes_backpressured_producer() {
+    fn error_wakes_producers(producers: usize) {
         let inner = Arc::new(Inner {
             output_error: AtomicBool::new(false),
             shutdown_requested: AtomicBool::new(false),
@@ -446,41 +453,55 @@ mod failure_tests {
         let join = std::thread::spawn(move || {
             io_thread(worker_inner, FailingWriter(entered_tx, resume_rx))
         });
-        let out = Output {
+        let out = Arc::new(Output {
             inner: Arc::clone(&inner),
             join: Some(join),
-        };
+        });
         assert_eq!(out.write(&vec![1; SMALL_WRITE]), SMALL_WRITE);
         entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
         let (done_tx, done_rx) = mpsc::sync_channel(1);
-        let producer = std::thread::spawn(move || {
-            let result = out.write(&vec![2; 2 * INITIAL_CAPACITY]);
-            done_tx.send(result).unwrap();
-        });
+        let mut handles = Vec::new();
+        for _ in 0..producers {
+            let out = Arc::clone(&out);
+            let done_tx = done_tx.clone();
+            handles.push(std::thread::spawn(move || {
+                let result = out.write(&vec![2; 2 * INITIAL_CAPACITY]);
+                done_tx.send(result).unwrap();
+            }));
+        }
+        drop(done_tx);
         let deadline = Instant::now() + Duration::from_secs(5);
-        loop {
-            // The writer signalled space before entering write. Seeing the
-            // producer reset it with a full queue proves it reached backpressure.
-            let shared = inner.shared.lock().unwrap();
-            if shared.buf.len() > INITIAL_CAPACITY - SMALL_WRITE
-                && !*inner.space.flag.lock().unwrap()
-            {
-                break;
-            }
-            drop(shared);
+        // The test-only waiter count proves every producer entered its
+        // condition-variable wait before the writer publishes the disk error.
+        while inner.space.waiters.load(Ordering::SeqCst) < producers {
             assert!(
                 Instant::now() < deadline,
-                "producer did not reach backpressure"
+                "producers did not reach backpressure"
             );
             std::thread::yield_now();
         }
         resume_tx.send(()).unwrap();
-        assert_eq!(
-            done_rx
-                .recv_timeout(Duration::from_secs(5))
-                .expect("producer stuck after write error"),
-            0
-        );
-        producer.join().unwrap();
+        for _ in 0..producers {
+            assert_eq!(
+                done_rx
+                    .recv_timeout(Duration::from_secs(5))
+                    .expect("producer stuck after write error"),
+                0
+            );
+        }
+        for handle in handles {
+            handle.join().unwrap();
+        }
+        drop(out);
+    }
+
+    #[test]
+    fn write_error_wakes_backpressured_producer() {
+        error_wakes_producers(1);
+    }
+
+    #[test]
+    fn write_error_wakes_every_backpressured_producer() {
+        error_wakes_producers(4);
     }
 }
