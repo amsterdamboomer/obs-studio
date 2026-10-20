@@ -100,8 +100,11 @@ static void test_failed_open_cleanup(void **state)
 	ffm.params.acodec = "pcm_s16le";
 	ffm.params.muxer_settings = "";
 	ffm.audio = calloc(1, sizeof(*ffm.audio));
-	ffm.audio[0] = (struct audio_params){.name = "a", .abitrate = 128, .sample_rate = 48000,
-					     .frame_size = 1024, .channels = 2};
+	ffm.audio[0] = (struct audio_params){.name = "a",
+					     .abitrate = 128,
+					     .sample_rate = 48000,
+					     .frame_size = 1024,
+					     .channels = 2};
 	ffm.audio_header = calloc(1, sizeof(*ffm.audio_header));
 
 	assert_int_equal(ffmpeg_mux_init_context(&ffm), FFM_ERROR);
