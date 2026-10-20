@@ -1486,3 +1486,5 @@ area.
 - Rust graphics preserves separate C trigonometric calls on macOS and signaling
   NaN rounding on macOS/Windows. *macOS, Windows*, 2026-10-18.
   PR [#1398](https://github.com/obs-rust/obs-studio/pull/1398).
+
+- **report buffered close errors when copying files.** File copies report buffered close failures instead of success for truncated output. *Rust implementation*, 2026-10-20. Refs #1537.
