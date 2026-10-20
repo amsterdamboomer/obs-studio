@@ -21,5 +21,7 @@ if(TARGET Qt6::Widgets)
   target_link_libraries(test_remux_queue_model PRIVATE Qt6::Widgets ${CMOCKA_LIBRARIES})
   add_dependencies(cmocka-tests test_remux_queue_model)
   add_test(test_remux_queue_model ${CMAKE_CURRENT_BINARY_DIR}/test_remux_queue_model)
+  # Runs in well under a second; a stuck Qt start fails the test, not the CI job.
+  set_tests_properties(test_remux_queue_model PROPERTIES TIMEOUT 120)
   cmocka_qt_runtime(test_remux_queue_model Qt6::Core)
 endif()

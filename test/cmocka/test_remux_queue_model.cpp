@@ -11,10 +11,13 @@
  * against rowCount()/columnCount(). Qt's offscreen platform, no display. */
 
 #include <QApplication>
+#include <QDir>
+#include <QLibraryInfo>
 #include <QModelIndex>
 #include "frontend/utility/RemuxQueueModel.hpp"
 
 #include <stdarg.h>
+#include <stdio.h>
 #include <stddef.h>
 #include <setjmp.h>
 #include <stdint.h>
@@ -125,9 +128,49 @@ static void empty_queue_sends_no_invalid_range(void **)
 	assert_int_equal(w.badDataChanged, 0);
 }
 
+#ifdef _WIN32
+/* With no platform plugin, a release Qt on Windows shows a modal message box
+ * before it exits when the process has no console window, and under ctest on
+ * a CI runner nobody closes it. Look for the plugin where Qt does
+ * (QT_QPA_PLATFORM_PLUGIN_PATH, then <library path>/platforms) and fail on
+ * stderr instead. Same check as test_close_top_level. */
+static bool platform_plugin_found(const char *name)
+{
+	const QString file =
+		QStringLiteral("q%1%2.dll")
+			.arg(QString::fromLatin1(name), QLibraryInfo::isDebugBuild() ? QStringLiteral("d") : QString());
+	QStringList dirs;
+	const QString plugin_path = qEnvironmentVariable("QT_QPA_PLATFORM_PLUGIN_PATH");
+	if (!plugin_path.isEmpty()) {
+		dirs.append(plugin_path);
+	}
+	for (const QString &dir : QCoreApplication::libraryPaths()) {
+		dirs.append(dir + QStringLiteral("/platforms"));
+	}
+	for (const QString &dir : dirs) {
+		if (QDir(dir).exists(file)) {
+			return true;
+		}
+	}
+	fprintf(stderr, "Qt platform plugin %s not found; looked in:\n", qPrintable(file));
+	for (const QString &dir : dirs) {
+		fprintf(stderr, "  %s\n", qPrintable(QDir::toNativeSeparators(dir)));
+	}
+	return false;
+}
+#endif
+
 int main(int argc, char **argv)
 {
+#ifdef _WIN32
+	/* The Windows Qt from obs-deps ships no qoffscreen.dll (no FreeType). */
+	qputenv("QT_QPA_PLATFORM", "minimal");
+	if (!platform_plugin_found("minimal")) {
+		return 1;
+	}
+#else
 	qputenv("QT_QPA_PLATFORM", "offscreen");
+#endif
 	QApplication app(argc, argv);
 
 	const struct CMUnitTest tests[] = {
