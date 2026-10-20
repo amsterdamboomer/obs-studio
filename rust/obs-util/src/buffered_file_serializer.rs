@@ -64,9 +64,9 @@ impl AutoEvent {
         }
     }
 
-    fn wait(&self) {
+    fn wait(&self, error: Option<&AtomicBool>) {
         let mut flag = self.flag.lock().unwrap();
-        while !*flag {
+        while !*flag && !error.is_some_and(|error| error.load(Ordering::SeqCst)) {
             #[cfg(test)]
             self.waiters.fetch_add(1, Ordering::SeqCst);
             flag = self.cv.wait(flag).unwrap();
@@ -80,6 +80,12 @@ impl AutoEvent {
         let mut flag = self.flag.lock().unwrap();
         *flag = true;
         self.cv.notify_one();
+    }
+
+    fn signal_all(&self) {
+        let mut flag = self.flag.lock().unwrap();
+        *flag = true;
+        self.cv.notify_all();
     }
 
     fn reset(&self) {
@@ -251,7 +257,7 @@ impl Output {
                 // thread signals `space` under that same lock.
                 self.inner.space.reset();
                 drop(shared);
-                self.inner.space.wait();
+                self.inner.space.wait(Some(&self.inner.output_error));
                 continue;
             }
             let mut num_chunks = free / (next_chunk + HEADER_LEN);
@@ -346,7 +352,7 @@ fn io_thread<W: Write + Seek>(inner: Arc<Inner>, mut file: W) {
     let mut shutting_down;
 
     'outer: loop {
-        inner.new_data.wait();
+        inner.new_data.wait(None);
         'chunks: loop {
             {
                 let mut shared = inner.shared.lock().unwrap();
@@ -398,7 +404,7 @@ fn io_thread<W: Write + Seek>(inner: Arc<Inner>, mut file: W) {
                 // check/reset under the queue lock to prevent lost wakeups.
                 let _shared = inner.shared.lock().unwrap();
                 inner.output_error.store(true, Ordering::SeqCst);
-                inner.space.signal();
+                inner.space.signal_all();
                 return;
             }
             chunk_used = 0;
