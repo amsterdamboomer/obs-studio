@@ -248,6 +248,8 @@ not get a line.
 
 ### Platforms and packages
 
+- **report buffered close errors when copying files.** File copies report buffered close failures instead of success for truncated output. *Linux, macOS*, 2026-10-20. Issue [#1537](https://github.com/obs-rust/obs-studio/issues/1537), PR [#1538](https://github.com/obs-rust/obs-studio/pull/1538).
+
 - **Own app identity.** The fork runs as OBS-Studio-Rust with its own logo,
   settings folder (`obs-studio-rust`) and version, next to the upstream OBS
   version it is based on, in the window title, log, About dialog,
@@ -1486,5 +1488,3 @@ area.
 - Rust graphics preserves separate C trigonometric calls on macOS and signaling
   NaN rounding on macOS/Windows. *macOS, Windows*, 2026-10-18.
   PR [#1398](https://github.com/obs-rust/obs-studio/pull/1398).
-
-- **report buffered close errors when copying files.** File copies report buffered close failures instead of success for truncated output. *Rust implementation*, 2026-10-20. Refs #1537.
