@@ -1,3 +1,5 @@
+//! Intentional C difference: replacements do not inherit old scaler buffers.
+//!
 //! Intentional C differences: scaler creation rechecks duplicate inputs,
 //! and self-disconnection does not skip the following video subscriber.
 //!
@@ -129,6 +131,7 @@ enum Prep {
         param: usize,
     },
     Scale {
+        identity: Arc<()>,
         callback: usize,
         param: usize,
         cur: usize,
@@ -503,6 +506,7 @@ fn cur_frame(shared: &Shared, frame_time: u64) -> bool {
                     shared.host.deliver(callback, param, &source);
                 }
                 Prep::Scale {
+                    identity,
                     callback,
                     param,
                     cur,
@@ -515,7 +519,7 @@ fn cur_frame(shared: &Shared, frame_time: u64) -> bool {
                     let scaled = guard.with_mut(|inputs| {
                         let Some(input) = inputs
                             .iter_mut()
-                            .find(|input| input.callback == callback && input.param == param)
+                            .find(|input| Arc::ptr_eq(&input.identity, &identity))
                         else {
                             return Scaled::Gone;
                         };
@@ -582,6 +586,7 @@ fn prepare_input(input: &mut Input) -> Prep {
     let cur = input.cur;
     let buffer = Box::new(input.buffers.remove(cur));
     Prep::Scale {
+        identity: Arc::clone(&input.identity),
         callback,
         param,
         cur,
