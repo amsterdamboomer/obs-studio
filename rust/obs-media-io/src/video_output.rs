@@ -1,4 +1,5 @@
-//! Intentional C difference: One disconnect removes a video input even when scaler creation reenters registration.
+//! Intentional C differences: scaler creation rechecks duplicate inputs,
+//! and self-disconnection does not skip the following video subscriber.
 //!
 //! Safe core of `libobs/media-io/video-io.c`.
 //!
@@ -107,6 +108,7 @@ struct Data {
 }
 
 struct Input {
+    identity: Arc<()>,
     callback: usize,
     param: usize,
     divisor: u32,
@@ -347,6 +349,7 @@ impl VideoOutput {
             }
             let first = inputs.is_empty();
             inputs.push(Input {
+                identity: Arc::new(()),
                 callback,
                 param,
                 divisor,
@@ -473,24 +476,26 @@ fn cur_frame(shared: &Shared, frame_time: u64) -> bool {
 
     {
         let mut guard = shared.inputs.lock();
-        let mut index = 0;
+        // Callbacks may remove any input, shifting every later array index.
+        // Remember registrations already visited, while still visiting new ones.
+        let mut visited = Vec::new();
         loop {
             let prep = guard.with_mut(|inputs| {
-                if index >= inputs.len() {
-                    return None;
-                }
-                Some(prepare_input(&mut inputs[index]))
+                let input = inputs
+                    .iter_mut()
+                    .find(|input| !visited.iter().any(|id| Arc::ptr_eq(id, &input.identity)))?;
+                visited.push(Arc::clone(&input.identity));
+                Some(prepare_input(input))
             });
             let Some(prep) = prep else {
                 break;
             };
             match prep {
-                Prep::Next => index += 1,
+                Prep::Next => {}
                 Prep::Direct { callback, param } => {
                     // The `&mut` has ended. The guard stays held, so other
                     // threads still wait. This thread's callback may connect.
                     shared.host.deliver(callback, param, &source);
-                    index += 1;
                 }
                 Prep::Scale {
                     callback,
@@ -522,7 +527,6 @@ fn cur_frame(shared: &Shared, frame_time: u64) -> bool {
                         Scaled::Failed => shared.host.warn_scale_failed(),
                         Scaled::Gone => {}
                     }
-                    index += 1;
                 }
             }
         }
