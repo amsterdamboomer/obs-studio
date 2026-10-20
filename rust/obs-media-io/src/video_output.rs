@@ -1,3 +1,5 @@
+//! Intentional C difference: One disconnect removes a video input even when scaler creation reenters registration.
+//!
 //! Safe core of `libobs/media-io/video-io.c`.
 //!
 //! The video thread, the cache, and the input list live here. The C ABI
@@ -335,6 +337,14 @@ impl VideoOutput {
             (None, Vec::new())
         };
         guard.with_mut(|inputs| {
+            // Scaler creation may reenter connect through a log callback.
+            // Recheck after it returns so the same input is stored only once.
+            if inputs
+                .iter()
+                .any(|input| input.callback == callback && input.param == param)
+            {
+                return false;
+            }
             let first = inputs.is_empty();
             inputs.push(Input {
                 callback,
@@ -351,8 +361,8 @@ impl VideoOutput {
                 }
                 self.shared.raw_active.store(true, Ordering::SeqCst);
             }
-        });
-        true
+            true
+        })
     }
 
     pub(crate) fn disconnect(&self, callback: usize, param: usize) -> bool {

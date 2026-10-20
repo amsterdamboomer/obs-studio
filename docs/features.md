@@ -1486,3 +1486,5 @@ area.
 - Rust graphics preserves separate C trigonometric calls on macOS and signaling
   NaN rounding on macOS/Windows. *macOS, Windows*, 2026-10-18.
   PR [#1398](https://github.com/obs-rust/obs-studio/pull/1398).
+
+- **reject duplicate inputs after scaler reentry.** One disconnect removes a video input even when scaler creation reenters registration. *Rust implementation*, 2026-10-20. Refs #1529.
