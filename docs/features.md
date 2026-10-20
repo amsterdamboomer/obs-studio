@@ -233,6 +233,8 @@ not get a line.
 
 ### Stability
 
+- **preserve empty item types for defaults.** Empty settings items retain their type when an incompatible default is supplied. *All*, 2026-10-20. Issue [#1528](https://github.com/obs-rust/obs-studio/issues/1528), PR [#1530](https://github.com/obs-rust/obs-studio/pull/1530).
+
 - **Diagnostics when video fails to start.** When video fails to start on
   Wayland, the log shows the EGL error and the display variables, and OBS
   cleans up without leaks. *Linux*, 2026-10-13. Issue
@@ -1486,5 +1488,3 @@ area.
 - Rust graphics preserves separate C trigonometric calls on macOS and signaling
   NaN rounding on macOS/Windows. *macOS, Windows*, 2026-10-18.
   PR [#1398](https://github.com/obs-rust/obs-studio/pull/1398).
-
-- **preserve empty item types for defaults.** Empty settings items retain their type when an incompatible default is supplied. *Rust implementation*, 2026-10-20. Refs #1528.
