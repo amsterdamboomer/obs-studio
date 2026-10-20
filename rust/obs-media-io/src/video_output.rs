@@ -476,15 +476,20 @@ fn cur_frame(shared: &Shared, frame_time: u64) -> bool {
 
     {
         let mut guard = shared.inputs.lock();
-        // Callbacks may remove any input, shifting every later array index.
-        // Remember registrations already visited, while still visiting new ones.
+        // Callbacks may remove inputs and reconnect the same callback/param.
+        // Visit each registration at most once, and defer a replacement of an
+        // already visited callback/param until the next frame. New subscribers
+        // with a different callback/param still receive this frame.
         let mut visited = Vec::new();
         loop {
             let prep = guard.with_mut(|inputs| {
-                let input = inputs
-                    .iter_mut()
-                    .find(|input| !visited.iter().any(|id| Arc::ptr_eq(id, &input.identity)))?;
-                visited.push(Arc::clone(&input.identity));
+                let input = inputs.iter_mut().find(|input| {
+                    !visited.iter().any(|(id, callback, param)| {
+                        Arc::ptr_eq(id, &input.identity)
+                            || (*callback == input.callback && *param == input.param)
+                    })
+                })?;
+                visited.push((Arc::clone(&input.identity), input.callback, input.param));
                 Some(prepare_input(input))
             });
             let Some(prep) = prep else {
