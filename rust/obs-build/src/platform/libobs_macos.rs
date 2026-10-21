@@ -29,10 +29,14 @@ pub fn configure(
     append_sources(sets, "LIBOBS_MACOS_SOURCES", root, library)?;
     library.file_name = Some("libobs.dylib".into());
     library.c_compile_options.push("-std=gnu17".into());
+    library
+        .definitions
+        .push(("SIMDE_ENABLE_OPENMP".into(), None));
     library.compile_options.extend(
         [
             "-fno-strict-aliasing",
             "-fvisibility=hidden",
+            "-fopenmp-simd",
             "-mmacosx-version-min=13.0",
             "-Wno-strict-prototypes",
             "-Wno-shorten-64-to-32",
