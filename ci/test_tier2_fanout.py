@@ -61,6 +61,16 @@ class ValidateStagesTest(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("OBS_TIER2_STAGE", r.stdout + r.stderr)
 
+    def test_invalid_shard_never_reaches_environment_setup(self):
+        for shard in ("0/2", "3/2", "1/0", "garbage", "1/2/3"):
+            with self.subTest(shard=shard):
+                result = subprocess.run(["bash", str(VALIDATE)],
+                                        env={"OBS_TIER2_STAGE": "test", "OBS_CTEST_SHARD": shard,
+                                             "PATH": "/usr/bin:/bin"},
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("OBS_CTEST_SHARD must be index/count", result.stderr)
+
 
 class WorkflowTest(unittest.TestCase):
     def test_build_job_builds_one_tree_and_uploads_it(self):

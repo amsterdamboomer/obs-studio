@@ -16,6 +16,7 @@ import re
 import json
 import subprocess
 import sys
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -23,6 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PLAN = ROOT / "rust" / "tools" / "linux-validate" / "shard-plan.sh"
 VALIDATE = ROOT / "rust" / "tools" / "linux-validate" / "validate.sh"
+CHECK = PLAN.parent / "check-plan.py"
 
 # Shaped like the real data: a few long real-time tests, many short ones.
 COSTS = {
@@ -103,7 +105,7 @@ class ValidateUsesPlanTest(unittest.TestCase):
 
     def test_sharded_execution_checks_complete_plan_and_rejects_missing_plan(self):
         text = VALIDATE.read_text(encoding="utf-8")
-        self.assertIn('uv run "$SRC/ci/tier2_plan.py"', text)
+        self.assertIn('uv run "$SRC/rust/tools/linux-validate/check-plan.py"', text)
         self.assertIn('FAIL: missing Tier 2 shard plan', text)
 
 
@@ -115,7 +117,7 @@ class PlanCoverageTest(unittest.TestCase):
             listing.write_text(json.dumps({"tests": [{"name": name} for name in ("test_a", "test_ab", "test_serial")]}))
             for index, pattern in enumerate(patterns, 1):
                 (root / f"{index}-of-2.regex").write_text(pattern + "\n")
-            return subprocess.run([sys.executable, str(ROOT / "ci/tier2_plan.py"),
+            return subprocess.run([sys.executable, str(CHECK),
                                    str(listing), str(root), "2"], capture_output=True, text=True)
 
     def test_complete_disjoint_plan_passes(self):
@@ -135,6 +137,34 @@ class PlanCoverageTest(unittest.TestCase):
                 result = self.check_plan(patterns)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(diagnostic, result.stderr)
+
+    @unittest.skipUnless(shutil.which("ctest"), "requires CTest")
+    def test_real_ctest_filters_partition_registry_and_preserve_serial_property(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            names = ["test_a", "test_ab", "test_serial"]
+            (root / "CTestTestfile.cmake").write_text(
+                "".join(f'add_test({name} "{sys.executable}" "-c" "pass")\n' for name in names)
+                + 'set_tests_properties(test_serial PROPERTIES RUN_SERIAL TRUE)\n'
+            )
+            def listing(*args):
+                result = subprocess.run(["ctest", "--test-dir", str(root), "--show-only=json-v1", *args],
+                                        check=True, capture_output=True, text=True)
+                return json.loads(result.stdout)
+            registry = listing()
+            serial = next(test for test in registry["tests"] if test["name"] == "test_serial")
+            self.assertIn({"name": "RUN_SERIAL", "value": True}, serial["properties"])
+            plans = run_plan({"test_serial": 20}, names, 2)
+            selected = []
+            for index, group in plans.items():
+                pattern = "^(" + "|".join(group) + ")$"
+                (root / f"{index}-of-2.regex").write_text(pattern)
+                selected.extend(test["name"] for test in listing("-R", pattern)["tests"])
+            self.assertEqual(sorted(selected), sorted(names))
+            (root / "tests.json").write_text(json.dumps(registry))
+            checked = subprocess.run([sys.executable, str(CHECK),
+                                      str(root / "tests.json"), str(root), "2"], capture_output=True, text=True)
+            self.assertEqual(checked.returncode, 0, checked.stderr)
 
 
 if __name__ == "__main__":
