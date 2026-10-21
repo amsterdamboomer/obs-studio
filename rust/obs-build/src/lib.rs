@@ -35,6 +35,9 @@ pub struct SourceCompileOptions {
 pub struct SharedLibrary {
     pub name: String,
     pub sources: Vec<PathBuf>,
+    /// Native resource scripts, compiled separately from C-family unity/PCH batches.
+    pub resource_files: Vec<PathBuf>,
+    pub resource_compile_options: Vec<String>,
     /// Objects compiled once and reused by multiple shared-library variants.
     pub precompiled_objects: Vec<PathBuf>,
     pub include_dirs: Vec<PathBuf>,

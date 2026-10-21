@@ -169,6 +169,106 @@ fn executable_runs_against_its_shared_core_dependency() {
 const EXPORT: &str = "\n#if defined(_WIN32)\n__declspec(dllexport)\n#endif\n";
 
 #[test]
+fn windows_resource_payload_tracks_headers_definitions_and_unity() {
+    let requested = std::env::var("OBS_NATIVE_WINDOWS_TARGET")
+        .unwrap_or_else(|_| obs_build::BUILD_TARGET.into());
+    if !requested.contains("windows-msvc") {
+        return;
+    }
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    let source = root.join("resource-probe.c");
+    let script = root.join("payload.rc");
+    let header = root.join("resource-values.h");
+    fs::write(
+        &source,
+        r#"
+#include <windows.h>
+__declspec(dllexport) int obs_fixture_resource(void) {
+    HMODULE owner = NULL;
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+            GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            (LPCWSTR)&obs_fixture_resource, &owner)) return -1;
+    HRSRC resource = FindResourceW(owner, MAKEINTRESOURCEW(17), MAKEINTRESOURCEW(10));
+    if (!resource) return -2;
+    HGLOBAL loaded = LoadResource(owner, resource);
+    const WORD *value = loaded ? LockResource(loaded) : NULL;
+    return value ? *value : -3;
+}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        &script,
+        "#include \"resource-values.h\"\n17 RCDATA { HEADER_VALUE + RESOURCE_VALUE }\n",
+    )
+    .unwrap();
+    for unity in [false, true] {
+        fs::write(&header, "#define HEADER_VALUE 2\n").unwrap();
+        let build = NativeBuild {
+            host: obs_build::BUILD_HOST.into(),
+            target: requested.clone(),
+            output: root.join(format!("resources-{unity}")),
+        };
+        let mut library = target("fixture-resources", &source, vec![]);
+        library.unity = unity;
+        library.resource_files.push(script.clone());
+        library.include_dirs.push(root.into());
+        library
+            .definitions
+            .push(("RESOURCE_VALUE".into(), Some("40".into())));
+        // RC must receive resource options, not C-only compiler options.
+        library.c_compile_options.push("/std:c17".into());
+        library.resource_compile_options.push("/c65001".into());
+        let artifact = build.shared_library(&library).unwrap();
+        assert_windows_resource(&artifact, 42, &requested);
+        fs::write(&header, "#define HEADER_VALUE 10\n").unwrap();
+        let artifact = build.shared_library(&library).unwrap();
+        assert_windows_resource(&artifact, 50, &requested);
+        library.definitions[0].1 = Some("50".into());
+        let artifact = build.shared_library(&library).unwrap();
+        assert_windows_resource(&artifact, 60, &requested);
+    }
+}
+
+fn assert_windows_resource(library: &Path, expected: i32, target: &str) {
+    if target == obs_build::BUILD_TARGET {
+        // SAFETY: the fixture exports this no-argument C ABI function, and the
+        // resource lookup does not retain an extra reference to the DLL.
+        assert_eq!(
+            unsafe { answer(library, b"obs_fixture_resource", &[]) },
+            expected
+        );
+    } else {
+        // Cross compilation proves the PE payload; native CI also calls the
+        // exported lookup above against the loaded DLL.
+        let result = std::process::Command::new(
+            std::env::var_os("OBS_NATIVE_WINDOWS_READOBJ").unwrap_or_else(|| "llvm-readobj".into()),
+        )
+        .arg("--coff-resources")
+        .arg(library)
+        .output()
+        .unwrap();
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let output = String::from_utf8(result.stdout).unwrap();
+        let payload = format!("{:02X}{:02X}", expected & 255, expected >> 8);
+        assert!(output.contains("Total Number of Resources: 1"), "{output}");
+        assert!(output.contains("Name: (ID 17)"), "{output}");
+        assert!(output.contains("DataSize: 2"), "{output}");
+        assert!(
+            output
+                .lines()
+                .any(|line| line.split_whitespace().nth(1) == Some(&payload)),
+            "{output}"
+        );
+    }
+}
+
+#[test]
 fn pch_preserves_mixed_languages_unity_and_header_flag_invalidation() {
     if !obs_build::BUILD_TARGET.contains("linux") && !obs_build::BUILD_TARGET.contains("apple") {
         eprintln!("compiled PCH integration covers Linux GCC/Clang and Apple Clang");
