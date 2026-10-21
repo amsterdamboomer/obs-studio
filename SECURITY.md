@@ -61,6 +61,9 @@ also affects upstream OBS Studio:
   entry with the date and channel. You are credited in the report unless
   you ask us not to.
 - Advisories still in triage are never listed there.
+- obs-rust does not follow the OBS Project's 120-day confidentiality
+  request. We disclose on our own timeline (above), whether or not the
+  report has been sent upstream yet.
 - If you have already reported it upstream, tell us, so that we follow
   the same disclosure timeline.
 
