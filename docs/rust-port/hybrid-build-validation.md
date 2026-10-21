@@ -108,6 +108,10 @@ Flatpak debug extraction corrupted the prebuilt Rust compiler's ELF libraries.
 The compiler module now disables stripping and debug extraction, as described by
 the [Flatpak build options reference](https://docs.flatpak.org/en/latest/flatpak-builder-command-reference.html).
 Local locked Cargo vendoring also succeeded and its generated configuration parsed.
+A further cold-CI run found rustup's welcome text in soldr's stdout before Cargo's
+TOML. Preparation now separates raw console output, extracts source configuration,
+and validates the rewritten TOML before entering Flatpak. A focused cold-output
+regression failed before that fix and passes afterward.
 
 Supported-platform and final offline Flatpak verification results are tracked on
 the PR. Hardware recording performance and fourteen consecutive daily stability
