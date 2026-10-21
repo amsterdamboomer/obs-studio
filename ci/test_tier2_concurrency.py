@@ -80,9 +80,9 @@ set(OBS_OUTPUT_DIR "${CMAKE_BINARY_DIR}/output")
                     name = test["name"]
                     properties = {p["name"]: p["value"] for p in test["properties"]}
                     with self.subTest(test=name):
-                        exclusive = name == "test_xshm_resolution_change" and not wrapper
+                        exclusive = name == "test_deinterlace_2x_field_order" or (name == "test_xshm_resolution_change" and not wrapper)
                         self.assertEqual(bool(properties.get("RUN_SERIAL")), exclusive,
-                                         "Require exclusivity only for an unisolated mutable display")
+                                         "Retain timing isolation and unisolated display mutation")
                         self.assertEqual(properties["TIMEOUT"], TIMEOUTS[name])
                         self.assertIn("LP_NUM_THREADS=1", properties.get("ENVIRONMENT", []),
                                       "Concurrent renderers must share the CPU budget")

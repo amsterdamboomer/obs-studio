@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 @unittest.skipUnless(shutil.which("cmake") and shutil.which("ctest") and shutil.which("cc"),
                      "requires CMake, CTest and a C compiler")
 class DeinterlaceScheduling(unittest.TestCase):
-    def test_field_order_shares_cpus_with_bounded_software_renderers(self):
+    def test_field_order_retains_timing_isolation_and_renderer_budget(self):
         # Configure the real registration with stand-in link targets. No OBS
         # compilation or change to the C test's assertions is needed.
         with tempfile.TemporaryDirectory() as scratch:
@@ -43,8 +43,8 @@ class DeinterlaceScheduling(unittest.TestCase):
             tests = json.loads(result.stdout)["tests"]
             self.assertEqual([test["name"] for test in tests], ["test_deinterlace_2x_field_order"])
             properties = {p["name"]: p["value"] for p in tests[0]["properties"]}
-            self.assertFalse(properties.get("RUN_SERIAL"),
-                             "Bounded rendering replaces whole-suite serialization")
+            self.assertTrue(properties.get("RUN_SERIAL"),
+                            "CI still drops fields under concurrent CPU load")
             self.assertIn("LP_NUM_THREADS=1", properties.get("ENVIRONMENT", []))
             self.assertEqual(properties["TIMEOUT"], 300.0)
 
