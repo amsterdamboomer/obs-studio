@@ -166,6 +166,14 @@ class VstPlatformFacadeTest(unittest.TestCase):
                     result=subprocess.run([compiler,'-E','-P','-x','c++',*flags,str(file)],capture_output=True,text=True,check=True)
                     self.assertEqual(re.sub(r'\s+','',result.stdout),re.sub(r'\s+','',expected))
 
+    def test_alternate_build_consumers_select_host_headers(self):
+        # Both compile the real VST groups independently from the plugin target.
+        cmake=(ROOT/'test/cmocka/tests.d/test_vst_editor_close.cmake').read_text()
+        self.assertRegex(cmake,r'target_include_directories\(\s*test_vst_editor_close_module\s+PRIVATE[^)]*\$\{_vst_dir\}/hosts/linux')
+        cargo=(ROOT/'rust/obs-build/src/platform/mod.rs').read_text()
+        configure=function(cargo,'pub fn configure_vst(')
+        self.assertIn('root.join("plugins/obs-vst/hosts/linux")',configure)
+
     def test_original_policy(self):
         compiler=shutil.which('c++')
         if not compiler:
