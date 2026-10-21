@@ -424,7 +424,7 @@ fn objective_groups_expand_to_individual_language_correct_sources() {
         let group = root.join(format!("fixture{suffix}"));
         fs::write(&group, format!("#include \"{member}\"\n")).unwrap();
         let sources = build
-            .separate_group_sources(root, &[group.clone()])
+            .separate_group_sources(root, std::slice::from_ref(&group))
             .unwrap();
         assert_eq!(sources.len(), 1);
         assert_ne!(
