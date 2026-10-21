@@ -20,6 +20,7 @@ if(OS_LINUX AND TARGET OBS::libobs-opengl)
     COMMAND test_deinterlace_2x_field_order
     WORKING_DIRECTORY "${OBS_OUTPUT_DIR}/$<CONFIG>"
   )
-  # The directory's parallel environment bounds software-renderer workers.
-  set_tests_properties(test_deinterlace_2x_field_order PROPERTIES TIMEOUT 300)
+  # Even with bounded renderer workers, concurrent CI dropped fields (#1643).
+  # Keep this real-time assertion isolated; the other tests can overlap.
+  set_tests_properties(test_deinterlace_2x_field_order PROPERTIES RUN_SERIAL TRUE TIMEOUT 300)
 endif()

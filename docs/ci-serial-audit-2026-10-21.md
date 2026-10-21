@@ -1,7 +1,28 @@
 # Linux Tier 2 concurrency audit — 2026-10-21
 
 Issue: [#1634](https://github.com/obs-rust/obs-studio/issues/1634).
-Native binaries built from `0b10a2f61389076e7eea82343a4d14f80b5b1723`.
+Initial experiment binaries built from `0b10a2f61389076e7eea82343a4d14f80b5b1723`.
+
+## Landing decision
+
+PR [#1643](https://github.com/obs-rust/obs-studio/pull/1643) CI run
+[39658456956](https://github.com/obs-rust/obs-studio/actions/runs/39658456956)
+failed OFF shard 1: `yadif_2x_bottom_first_50i_into_30` skipped up to three
+fields where the assertion allows one. The local capped successes below did
+not establish CI reliability. **Retain deinterlace's serial guard** and the
+renderer budget; remove the other nine broad barriers using the isolation
+described below. The two-shards-per-backend CI matrix remains unchanged.
+
+The output-delay blocker is corrected in core teardown: publish `active=false`
+before emitting `deactivate`. A new real-libobs regression observes state
+inside the synchronous callback. Both normal and forced stop fail
+deterministically against both original backends; the fix must pass 100
+iterations per stop path. Existing C tests and public headers are unchanged.
+This fixes the core notification ordering; #1391's separate frontend work is
+not claimed as completed here.
+
+The tables below retain the exploratory results, including failed trials;
+they are not timings of the final conservative scheduling policy.
 
 ## Findings
 
@@ -15,7 +36,7 @@ shared display; one is especially sensitive to CPU scheduling.
 |---|---|---|
 | `test_async_delay_audio` | Process-owned source and real-time audio assertions | Concurrent; retain assertions and timeout |
 | `test_audio_clock_drift` | Synthetic source timestamps; does not change the system clock | Concurrent |
-| `test_deinterlace_2x_field_order` | Real-time field delivery; software-renderer CPU contention | Concurrent with bounded renderer workers; eight capped full-suite trials passed this test |
+| `test_deinterlace_2x_field_order` | Real-time field delivery; software-renderer CPU contention | Retain serial guard and worker budget after CI failure |
 | `test_inhibit_sleep_dbus` | Private GTestDBus and fake service | Concurrent; preserve private bus |
 | `test_media_cover_art_seek` | Process-owned media/source; timestamp-named temporary files | Concurrent |
 | `test_pipewire_screencast_resume` | Private PipeWire daemon, bus and temporary runtime directory | Concurrent; preserve wrapper |
