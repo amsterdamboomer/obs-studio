@@ -59,6 +59,8 @@ set(OBS_OUTPUT_DIR "${CMAKE_BINARY_DIR}/output")
         cmake += f'set(OBS_TEST_XVFB_RUN "{display_wrapper}")\n'
         for name in TIMEOUTS:
             cmake += f'include("{ROOT}/test/cmocka/tests.d/{name}.cmake")\n'
+        cmake += 'set_property(TEST test_audio_clock_drift APPEND PROPERTY ENVIRONMENT "EXISTING_SETTING=preserved")\n'
+        cmake += f'include("{ROOT}/test/cmocka/parallel-environment.cmake" OPTIONAL)\n'
         (source / "CMakeLists.txt").write_text(cmake)
         build = source / "build"
         configured = subprocess.run(["cmake", "-S", directory, "-B", str(build)], capture_output=True, text=True)
@@ -78,10 +80,14 @@ set(OBS_OUTPUT_DIR "${CMAKE_BINARY_DIR}/output")
                     name = test["name"]
                     properties = {p["name"]: p["value"] for p in test["properties"]}
                     with self.subTest(test=name):
-                        exclusive = name == "test_deinterlace_2x_field_order" or (name == "test_xshm_resolution_change" and not wrapper)
+                        exclusive = name == "test_xshm_resolution_change" and not wrapper
                         self.assertEqual(bool(properties.get("RUN_SERIAL")), exclusive,
-                                         "Require exclusivity only for timing sensitivity or an unisolated display")
+                                         "Require exclusivity only for an unisolated mutable display")
                         self.assertEqual(properties["TIMEOUT"], TIMEOUTS[name])
+                        self.assertIn("LP_NUM_THREADS=1", properties.get("ENVIRONMENT", []),
+                                      "Concurrent renderers must share the CPU budget")
+                        if name == "test_audio_clock_drift":
+                            self.assertIn("EXISTING_SETTING=preserved", properties["ENVIRONMENT"])
                         if name == "test_xshm_resolution_change" and wrapper:
                             self.assertEqual(test["command"][:3], [wrapper, "-a", "--server-args=-screen 0 1280x1024x24 -noreset"])
 
