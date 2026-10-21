@@ -61,6 +61,46 @@ class ImporterFacadeTest(unittest.TestCase):
                     self.assertRegex((ROOT / f"frontend/utility/platform-{host}.hpp").read_text(),
                                      rf"\b{operation}\([^;]*?\)\s*\{{")
 
+    def test_classic_search_with_strict_native_warnings(self):
+        compiler = shutil.which("c++")
+        if not compiler:
+            self.skipTest("C++ compiler unavailable; native builds still required")
+        text = (ROOT / "frontend/importers/classic.cpp.hpp").read_text()
+        body = function(text, "OBSImporterFiles ClassicImporter::FindFiles(")
+        code = r"""
+#include <string>
+#include <vector>
+#include <cstring>
+using namespace std;
+using OBSImporterFiles = vector<string>;
+struct ClassicImporter { OBSImporterFiles FindFiles(); };
+struct os_dir_t { size_t index = 0; };
+struct os_dirent { bool directory; const char *d_name; };
+os_dirent entries[] = {{false, "scene.xconfig"}, {false, ".hidden.xconfig"},
+                      {true, "directory.xconfig"}, {false, "scene.xconfig.more"}, {false, "other"}};
+bool GetPlatformClassicImportDirectory(char *path, size_t size) {
+    if (size < 11) return false;
+    strcpy(path, "/profiles/"); return true;
+}
+os_dir_t directory;
+os_dir_t *os_opendir(const char *) { return &directory; }
+os_dirent *os_readdir(os_dir_t *dir) {
+    return dir->index < sizeof(entries) / sizeof(entries[0]) ? &entries[dir->index++] : nullptr;
+}
+void os_closedir(os_dir_t *) {}
+""" + body + r"""
+int main() {
+    return ClassicImporter().FindFiles() == OBSImporterFiles{"/profiles/scene.xconfig"} ? 0 : 1;
+}
+"""
+        with tempfile.TemporaryDirectory(prefix="obs-classic-search-") as tmp:
+            source, binary = Path(tmp) / "probe.cpp", Path(tmp) / "probe"
+            source.write_text(code)
+            result = subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror",
+                                     str(source), "-o", str(binary)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            subprocess.run([str(binary)], check=True)
+
     def test_search_directory_policy_and_error_results(self):
         compiler = shutil.which("c++")
         if not compiler:
