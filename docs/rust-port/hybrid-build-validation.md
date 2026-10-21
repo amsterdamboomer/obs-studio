@@ -54,11 +54,15 @@ profile, job count and source snapshots; record host load and all outcomes.
   **392.31 s** and **390.62 s**, respectively. These are backend runs of the
   same suite, not before/after test-speed evidence.
 - The full Rust workspace unit, differential and documentation tests pass.
-  The opt-in native integration category compiles with `libobs-integration`.
+  The opt-in native integration category also passed with `libobs-integration`:
+  **59 unchanged C executables per backend** (118 runs), selected-library
+  loader checks, matching exports, data lifecycle and plugin checks. This run
+  disabled per-target native sanitizers; the separate CMake Tier 2 run kept
+  its existing sanitizer configuration.
   An obsolete NVENC test requiring the installed C loader was updated to
   require the production Rust loader and explicit C reference instead.
-- `./lint` passed before the final test/report additions; final checks and PR
-  results are recorded on the PR.
+- `./lint` passed after the platform/packaging fixes (60.5 s); subsequent native
+  validation fixes and final PR results are recorded on the PR.
 
 Compatibility test coverage has not been reduced to create a speed claim.
 Ordinary application builds avoid the C reference; an explicit compatibility
@@ -108,3 +112,17 @@ the PR. Hardware recording performance and fourteen consecutive daily stability
 builds remain separate release requirements. The checked-in release evidence
 remains unapproved, and both publication workflows fail closed until its review
 is recorded.
+
+The native-engine compatibility run additionally exposed stale test-build
+metadata: a missing output-delay accessor stub and an old 52-test expectation
+for a manifest that now lists 59. The metadata/count are synchronized without
+changing C test bodies. Static archives precede shared dependencies, and the
+selected libobs remains a declared runtime dependency even for standalone C
+characterizations with no core imports. Explicit comparison helpers reject
+identical backend paths, preserving C-versus-Rust validation.
+
+The unrelated Windows `cm_print_error` link failure is fixed upstream by
+[#1591](https://github.com/obs-rust/obs-studio/pull/1591), tracked as
+[#1580](https://github.com/obs-rust/obs-studio/issues/1580). Final platform
+verification incorporates that upstream fix rather than rewriting the C test
+in this migration.

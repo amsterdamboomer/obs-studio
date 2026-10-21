@@ -167,7 +167,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             },
         )
         .unwrap();
-        assert_eq!(executables.len(), if options.hevc { 52 } else { 51 });
+        assert_eq!(executables.len(), if options.hevc { 59 } else { 58 });
         let mut results = Vec::new();
         for core in [&libraries.reference, &libraries.with_rust] {
             let variant = core
@@ -618,7 +618,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         native_tests::exercise(
             &build,
             &root,
-            &libraries.with_rust,
+            &libraries.reference,
             &libraries.with_rust,
             &tests,
             "graphics",
@@ -632,7 +632,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         vlc_tests::exercise(
             &build,
             &root,
-            &libraries.with_rust,
+            &libraries.reference,
             &libraries.with_rust,
             vlc,
             renderer.as_ref().unwrap(),
@@ -669,8 +669,8 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             },
             &[
                 application::Variant {
-                    core: &libraries.with_rust,
-                    nvenc: nvenc.as_ref().map(|nvenc| &nvenc.with_rust),
+                    core: &libraries.reference,
+                    nvenc: nvenc.as_ref().map(|nvenc| &nvenc.reference),
                 },
                 application::Variant {
                     core: &libraries.with_rust,
