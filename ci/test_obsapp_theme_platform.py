@@ -2,6 +2,7 @@
 """OBSApp theme policy and POSIX signal lifecycle characterization (#885)."""
 from pathlib import Path
 import re
+import os
 import shutil
 import subprocess
 import sys
@@ -132,6 +133,120 @@ int main() {{
 }}
 '''
                 compile_run(source, flags)
+
+    def test_signal_application_actions(self):
+        text = APP.read_text()
+        methods = '\n'.join(function(text, f'void OBSApp::processSig{k}(') for k in KINDS)
+        source = r'''
+#include <array>
+#include <deque>
+#include <functional>
+#include <memory>
+#include <vector>
+#include <cassert>
+''' + ENUM + r'''
+static bool saveBefore=false, haveMain=true, consumeEnabled=true;
+bool PlatformSavesBeforeSignalQuit(){return saveBefore;}
+bool ConsumePlatformAppSignal(PlatformAppSignal){return consumeEnabled;}
+struct QWidget;
+static std::deque<QWidget *> modals;
+struct QWidget {virtual ~QWidget()=default;virtual void close(){modals.pop_front();}};
+struct QDialog:QWidget {void reject(){close();}};
+template<class T> T qobject_cast(QWidget *p){return dynamic_cast<T>(p);}
+static std::function<void()> queued;
+struct QTimer {template<class R,class C>static void singleShot(int,R *r,C cb){queued=[r,cb]{(r->*cb)();};}};
+struct OBSBasic {
+ int saves=0,closes=0,noPrompts=0;
+ static OBSBasic *Get();void saveAll(){++saves;}void close(){++closes;}void closeWithoutPrompt(){++noPrompts;}
+};
+static OBSBasic mainWindow;
+OBSBasic *OBSBasic::Get(){return haveMain?&mainWindow:nullptr;}
+struct OBSApp {
+ bool quitRequested_=false;int quits=0;
+ QWidget *activeModalWidget(){return modals.empty()?nullptr:modals.front();}
+ void quit(){++quits;}
+ void processSigInt();void processSigTerm();void processSigAbrt();void processSigQuit();
+};
+''' + methods + r'''
+int main(){
+ using Fn=void(OBSApp::*)();std::array<Fn,4> methods={&OBSApp::processSigInt,&OBSApp::processSigTerm,&OBSApp::processSigAbrt,&OBSApp::processSigQuit};
+ for(bool save:{false,true})for(bool main:{false,true})for(int modalCount:{0,1,20})for(int signal=0;signal<4;++signal){
+  OBSApp app;mainWindow={};saveBefore=save;haveMain=main;queued={};modals.clear();
+  std::vector<std::unique_ptr<QWidget>> owned;
+  for(int i=0;i<modalCount;++i){if(i%2)owned.emplace_back(new QWidget);else owned.emplace_back(new QDialog);modals.push_back(owned.back().get());}
+  consumeEnabled=false;(app.*methods[signal])();assert(app.quits==0&&mainWindow.saves==0&&modals.size()==size_t(modalCount));
+  consumeEnabled=true;(app.*methods[signal])();
+  assert(mainWindow.saves==int(save&&main));
+  assert(mainWindow.closes==int(signal==0&&save&&main));
+  assert(mainWindow.noPrompts==int(signal==1&&main));
+  if(signal==1&&modalCount){assert(app.quitRequested_);assert(app.quits==0);assert(queued);assert(modals.size()==size_t(modalCount-std::min(16,modalCount)));queued();assert(app.quits==1);}
+  else {assert(!app.quitRequested_);assert(!queued);assert(app.quits==int(signal!=0||!save));assert(modals.size()==size_t(modalCount));}
+ }
+}
+'''
+        compile_run(source)
+
+    def test_windows_signal_and_dll_noops(self):
+        for host in ('windows.cpp', 'osx.mm', 'x11.cpp'):
+            text = (UTILITY / f'platform-{host}.hpp').read_text()
+            signatures = ['void InstallPlatformDllBlocklist(', 'void LogPlatformBlockedDlls(']
+            if host == 'windows.cpp':
+                signatures += ['void InstallPlatformAppSignalHandlers(', 'void ConnectPlatformAppSignals(',
+                               'bool ConsumePlatformAppSignal(', 'void DisconnectPlatformAppSignals(']
+            code = '\n'.join(function(text, sig) for sig in signatures)
+            preamble = ENUM + 'class OBSApp; int installs=0,logs=0; extern "C" void install_dll_blocklist_hook(){++installs;} extern "C" void log_blocked_dlls(){++logs;}\n'
+            calls = 'InstallPlatformAppSignalHandlers();ConnectPlatformAppSignals(nullptr);DisconnectPlatformAppSignals();for(int k=0;k<4;++k)if(ConsumePlatformAppSignal(PlatformAppSignal(k)))return 1;' if host == 'windows.cpp' else ''
+            main = 'int main(){InstallPlatformDllBlocklist();LogPlatformBlockedDlls();' + calls + f'return installs!={int(host=="windows.cpp")} || logs!={int(host=="windows.cpp")};}}'
+            compile_run(preamble + code + main)
+
+    def test_real_qt_signal_delivery(self):
+        prefix = os.environ.get('OBS_QT_TEST_PREFIX')
+        if not prefix:
+            self.skipTest('Real Qt signal test runs in Qt CI with its pinned prefix')
+        code = r'''
+#include <QCoreApplication>
+#include <QSocketNotifier>
+#include <QPointer>
+#include <QTimer>
+#include <array>
+#include <utility>
+#include <cstdio>
+#include <cstdlib>
+#include <csignal>
+#include <cassert>
+#include <pthread.h>
+#include <sys/socket.h>
+#include <unistd.h>
+''' + ENUM + r'''
+class OBSApp;bool ConsumePlatformAppSignal(PlatformAppSignal);
+class OBSApp:public QCoreApplication {
+ void consume(PlatformAppSignal signal){if(ConsumePlatformAppSignal(signal)){++calls[int(signal)];if(++total==5)quit();}}
+public:
+ std::array<int,4> calls{};int total=0;
+ OBSApp(int &argc,char **argv):QCoreApplication(argc,argv){}
+ void processSigInt(){consume(PlatformAppSignal::Interrupt);}void processSigTerm(){consume(PlatformAppSignal::Terminate);}
+ void processSigAbrt(){consume(PlatformAppSignal::Abort);}void processSigQuit(){consume(PlatformAppSignal::Quit);}
+};
+''' + bridge_code() + r'''
+int main(int argc,char **argv){
+ InstallPlatformAppSignalHandlers();OBSApp app(argc,argv);ConnectPlatformAppSignals(&app);
+ QTimer::singleShot(0,[]{raise(SIGINT);raise(SIGTERM);raise(SIGHUP);raise(SIGABRT);raise(SIGQUIT);});
+ QTimer::singleShot(3000,&app,[&]{app.exit(99);});
+ int result=app.exec();assert(result==0);assert((app.calls==std::array<int,4>{1,2,1,1}));
+ DisconnectPlatformAppSignals();
+}
+'''
+        with tempfile.TemporaryDirectory(prefix='obsapp-real-qt-signals-') as tmp:
+            Path(tmp, 'signal.cpp').write_text(code)
+            Path(tmp, 'CMakeLists.txt').write_text(
+                'cmake_minimum_required(VERSION 3.28)\nproject(signal_bridge LANGUAGES CXX)\n'
+                'find_package(Qt6 REQUIRED COMPONENTS Core)\nadd_executable(signal_test signal.cpp)\n'
+                'target_compile_features(signal_test PRIVATE cxx_std_17)\n'
+                'target_link_libraries(signal_test PRIVATE Qt6::Core)\n')
+            build = str(Path(tmp) / 'build')
+            subprocess.run(['cmake', '-S', tmp, '-B', build, '-DCMAKE_PREFIX_PATH=' + prefix], check=True)
+            subprocess.run(['cmake', '--build', build], check=True)
+            subprocess.run([str(Path(build) / 'signal_test')], check=True, timeout=10)
 
     def test_posix_signal_lifecycle(self):
         source = r'''
