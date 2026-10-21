@@ -29,7 +29,7 @@ in URLs is not proof: the review must inspect their coverage and results.
    unchanged C tests. Record the CI runs and release-candidate commit.
 2. **Running application:** a full ON app builds and launches on every
    supported release platform. The unchanged obs-websocket Tier 4 suite
-   passes against both the C++ and ON servers. A headless smoke run loads a
+   passes with the existing C++ plugin against C-reference and hybrid libobs. A headless smoke run loads a
    scene collection containing a text source, records five seconds, and
    exits cleanly. Record artifacts and logs, not just a green job summary.
 3. **Performance:** record the C and Rust results from #142 on the same

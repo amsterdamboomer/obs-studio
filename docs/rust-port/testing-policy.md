@@ -151,8 +151,8 @@ cannot prove both, so every ported unit carries the four tiers below.
 
 - Applies to obs-websocket and any other network-facing surface.
 - Written against the running server over the wire, independent of the
-  implementation language, and run unchanged against the C++ and the Rust
-  servers.
+  implementation language. Keep the existing C++ obs-websocket plugin unchanged
+  and run the same suite against the reference and hybrid libobs applications.
 
 ## Required workflow for each ported unit
 
