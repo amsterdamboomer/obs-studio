@@ -34,6 +34,6 @@ if(OS_LINUX AND _vlc_video_type STREQUAL "MODULE_LIBRARY" AND TARGET OBS::libobs
   add_test(NAME test_vlc_audio_pacing COMMAND test_vlc_audio_pacing WORKING_DIRECTORY "${OBS_OUTPUT_DIR}/$<CONFIG>")
   set_tests_properties(
     test_vlc_audio_pacing
-    PROPERTIES RUN_SERIAL TRUE SKIP_RETURN_CODE 77 TIMEOUT 120
+    PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 120
   )
 endif()

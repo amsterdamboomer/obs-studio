@@ -66,8 +66,12 @@ set(OBS_OUTPUT_DIR "${CMAKE_BINARY_DIR}/output")
         return json.loads(subprocess.check_output(["ctest", "--test-dir", str(build), "--show-only=json-v1"]))["tests"]
 
     def test_isolated_tests_can_overlap_without_losing_timeouts_or_cases(self):
-        for wrapper in ("/fixture/xvfb-run", ""):
-            with self.subTest(display_wrapper=wrapper), tempfile.TemporaryDirectory() as directory:
+        for available in (True, False):
+            with self.subTest(display_wrapper=available), tempfile.TemporaryDirectory() as directory:
+                wrapper = str(Path(directory) / "xvfb-run") if available else ""
+                if wrapper:
+                    Path(wrapper).write_text("#!/bin/sh\nexit 0\n")
+                    Path(wrapper).chmod(0o755)
                 tests = self.registry(directory, wrapper)
                 self.assertEqual({test["name"] for test in tests}, set(TIMEOUTS))
                 for test in tests:

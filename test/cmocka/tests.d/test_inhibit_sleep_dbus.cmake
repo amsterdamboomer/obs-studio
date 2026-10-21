@@ -20,7 +20,7 @@ if(OS_LINUX OR OS_FREEBSD)
     add_test(test_inhibit_sleep_dbus ${CMAKE_CURRENT_BINARY_DIR}/test_inhibit_sleep_dbus)
     set_tests_properties(
       test_inhibit_sleep_dbus
-      PROPERTIES RUN_SERIAL TRUE TIMEOUT 60 SKIP_RETURN_CODE 77
+      PROPERTIES TIMEOUT 60 SKIP_RETURN_CODE 77
     )
   endif()
 endif()

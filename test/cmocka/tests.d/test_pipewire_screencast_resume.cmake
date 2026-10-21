@@ -52,6 +52,6 @@ if(OS_LINUX AND TARGET OBS::pipewire)
   )
   set_tests_properties(
     test_pipewire_screencast_resume
-    PROPERTIES RUN_SERIAL TRUE SKIP_RETURN_CODE 77 TIMEOUT 120
+    PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 120
   )
 endif()
