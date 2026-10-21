@@ -1,6 +1,10 @@
 """Hybrid packages keep offline inputs pinned and publish only after approval."""
 
 import json
+import os
+import shutil
+import subprocess
+import tempfile
 import tomllib
 import unittest
 from pathlib import Path
@@ -36,3 +40,18 @@ class HybridPackagingTest(unittest.TestCase):
         script = (ROOT / ".github/scripts/.build.zsh").read_text()
         self.assertNotIn("libobs-with-rust", script)
         self.assertNotIn("-target libobs-c-reference", script)
+
+    def test_cold_vendor_bootstrap_output_cannot_contaminate_cargo_configuration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "build-aux").mkdir()
+            (root / "bin").mkdir()
+            script = root / "build-aux/prepare-flatpak-rust.sh"
+            shutil.copyfile(ROOT / "build-aux/prepare-flatpak-rust.sh", script)
+            stub = root / "bin/soldr"
+            stub.write_text('#!/bin/sh\ncat <<\'CONFIG\'\nRust is installed now. Great!\n[source.crates-io]\nreplace-with = "vendored-sources"\n\n[source.vendored-sources]\ndirectory = ".flatpak-rust/vendor"\nCONFIG\n')
+            stub.chmod(0o755)
+            result = subprocess.run(["bash", str(script)], env={**os.environ, "PATH": str(root / "bin") + os.pathsep + os.environ["PATH"]}, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            config = tomllib.loads((root / ".flatpak-rust/cargo/config.toml").read_text())
+            self.assertEqual(config["source"]["vendored-sources"]["directory"], "/run/build/obs/.flatpak-rust/vendor")
