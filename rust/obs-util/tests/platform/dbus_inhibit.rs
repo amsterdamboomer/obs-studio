@@ -54,10 +54,9 @@ impl Host for Fake {
 
     fn inhibit(&self, _: &(), service: Service, reason: &CStr) -> Result<u32, String> {
         let mut state = self.0.borrow_mut();
-        state.calls.push(format!(
-            "inhibit {service:?} {}",
-            reason.to_string_lossy()
-        ));
+        state
+            .calls
+            .push(format!("inhibit {service:?} {}", reason.to_string_lossy()));
         if state.fail_call {
             Err("call failed".into())
         } else {
@@ -146,7 +145,13 @@ fn no_bus_or_service_returns_none() {
     let fake = Fake::new(&[]);
     fake.0.borrow_mut().connected = false;
     assert!(DbusInfo::create(fake.clone()).is_none());
-    assert_eq!(fake.calls(), ["connect", "log 100 Could not create dbus connection: no session bus"]);
+    assert_eq!(
+        fake.calls(),
+        [
+            "connect",
+            "log 100 Could not create dbus connection: no session bus"
+        ]
+    );
 }
 
 #[test]
@@ -162,6 +167,12 @@ fn failed_calls_preserve_cookie_until_a_successful_reply() {
     fake.0.borrow_mut().fail_call = true;
     info.set_active(c"reason", false);
     assert_eq!(info.cookie(), 4242);
-    assert!(fake.calls().contains(&"log 100 Failed to call Inhibit: call failed".into()));
-    assert!(fake.calls().contains(&"log 100 Failed to call UnInhibit: call failed".into()));
+    assert!(
+        fake.calls()
+            .contains(&"log 100 Failed to call Inhibit: call failed".into())
+    );
+    assert!(
+        fake.calls()
+            .contains(&"log 100 Failed to call UnInhibit: call failed".into())
+    );
 }
