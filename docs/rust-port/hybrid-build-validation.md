@@ -73,9 +73,38 @@ attempt encountered a compiler-cache daemon outage; the successful retry
 used four compilation jobs with caching disabled and reused completed objects.
 This is functional build evidence, not a clean full-app timing comparison.
 
-Saved-profile runtime validation, the packaged websocket Tier 4 suite,
-Flatpak offline builds and supported-platform CI results are tracked on the PR.
-They must not be inferred from the libobs-only checks above. Hardware recording
-performance and fourteen consecutive daily stability builds remain separate
-release requirements. The checked-in release evidence remains unapproved,
-and both publication workflows fail closed until its review is recorded.
+The AppImage passed the saved-profile scenario on Debian 13: screen capture,
+camera and microphone reached streaming state and produced a recording. The
+recording verifier decoded 437 frames at 320x240 (14.6 seconds) in the first run,
+found no screen/camera freezes, and measured the 440 Hz microphone tone without
+silence. A second run also passed and retained `/proc` maps proving libobs loaded
+from inside the extracted package. AppImage SHA-256:
+`218f8f17afd4eb51daebb913a51983778e4f27166abe5d1b4f849995e3d6584a`.
+
+The unchanged websocket suite passed **206/206 checks**, exercising all
+**147 documented request types**, against the real executable extracted from
+that artifact. Running the suite against the AppImage wrapper initially gave
+three process/library false failures: its PID checks found the wrapper rather
+than the OBS executable. No protocol assertions were weakened. The saved-profile
+scenario separately exercised the actual AppImage entry point. SRT reconnect
+checks requiring a host ffmpeg with SRT support were skipped in that container.
+
+An explicit C rollback build also linked successfully without the libobs Rust
+archive. Substituting that library into a copy of the same AppDir and rebuilding
+the AppImage made the packaged saved-profile check fail with
+`packaged libobs does not contain the production Rust implementation`. This is
+the negative control for the shipping-library regression; the C reference tests
+remain valid independently.
+
+Verification-only CI exposed two integration problems, now fixed: the macOS
+script still explicitly requested the removed `libobs-with-rust` target, and
+Flatpak debug extraction corrupted the prebuilt Rust compiler's ELF libraries.
+The compiler module now disables stripping and debug extraction, as described by
+the [Flatpak build options reference](https://docs.flatpak.org/en/latest/flatpak-builder-command-reference.html).
+Local locked Cargo vendoring also succeeded and its generated configuration parsed.
+
+Supported-platform and final offline Flatpak verification results are tracked on
+the PR. Hardware recording performance and fourteen consecutive daily stability
+builds remain separate release requirements. The checked-in release evidence
+remains unapproved, and both publication workflows fail closed until its review
+is recorded.

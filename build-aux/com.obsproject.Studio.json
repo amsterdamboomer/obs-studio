@@ -141,7 +141,11 @@
                     "url": "https://static.rust-lang.org/dist/rust-1.98.1-x86_64-unknown-linux-gnu.tar.xz",
                     "sha256": "5326b36c53de11d148c8f8dab6553a3d1006c2cfd32123683073fad3c302605b"
                 }
-            ]
+            ],
+            "build-options": {
+                "strip": false,
+                "no-debuginfo": true
+            }
         },
         {
             "name": "obs",

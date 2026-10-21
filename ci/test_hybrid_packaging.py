@@ -15,6 +15,8 @@ class HybridPackagingTest(unittest.TestCase):
         compiler = next(module for module in manifest["modules"] if module["name"] == "obs-rust-toolchain")
         self.assertIn(f"rust-{version}-x86_64-unknown-linux-gnu.tar.xz", compiler["sources"][0]["url"])
         self.assertRegex(compiler["sources"][0]["sha256"], r"^[a-f0-9]{64}$")
+        self.assertEqual(compiler["build-options"], {"strip": False, "no-debuginfo": True},
+                         "Flatpak must preserve the prebuilt compiler's loadable ELF segments")
         obs = next(module for module in manifest["modules"] if module["name"] == "obs")
         self.assertEqual(obs["build-options"]["env"]["CARGO_NET_OFFLINE"], "true")
         self.assertIn("-DOBS_LIBOBS_BACKEND=HYBRID", obs["config-opts"])
@@ -29,3 +31,8 @@ class HybridPackagingTest(unittest.TestCase):
             with self.subTest(workflow=name):
                 self.assertIn("ci/hybrid_release_gate.py", source)
                 self.assertLess(source.index("ci/hybrid_release_gate.py"), source.index(publish))
+
+    def test_macos_application_build_does_not_request_the_removed_twin(self):
+        script = (ROOT / ".github/scripts/.build.zsh").read_text()
+        self.assertNotIn("libobs-with-rust", script)
+        self.assertNotIn("-target libobs-c-reference", script)
