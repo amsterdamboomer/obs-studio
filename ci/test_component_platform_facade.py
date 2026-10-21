@@ -104,6 +104,52 @@ class ComponentPlatformFacadeTest(unittest.TestCase):
             for host in ('windows.cpp','osx.mm','x11.cpp'):
                 self.assertIn(op,(ROOT/f'frontend/utility/platform-{host}.hpp').read_text())
 
+    def test_capture_callers_and_missing_modules(self):
+        compiler=shutil.which('c++')
+        if not compiler:
+            self.skipTest('Native compiler unavailable')
+        for host,flags,win,mac in [('windows.cpp',['-D_WIN32'],True,False),('osx.mm',['-D__APPLE__'],False,True),('x11.cpp',[],False,False)]:
+            with self.subTest(host=host):
+                code=STUBS+bodies(host)+r'''
+struct Button{};
+struct Label{std::string value;void setText(const char *v){value=v;}};
+struct UI{Button *activateButton=new Button;Label *deviceLabel=new Label;~UI(){delete activateButton;delete deviceLabel;}};
+struct ComboSelectToolbar{UI *ui=new UI;const char *prop_name=nullptr;bool is_int=false;int initialized=0;void Init(){++initialized;}~ComboSelectToolbar(){delete ui;}};
+struct AudioCaptureToolbar:ComboSelectToolbar{void Init();};
+struct DisplayCaptureToolbar:ComboSelectToolbar{void Init();};
+struct WindowCaptureToolbar:ComboSelectToolbar{void Init();};
+struct obs_module_t{};obs_module_t module;bool available=true;int moduleCalls=0,localeCalls=0;std::string moduleId;
+obs_module_t *obs_get_module(const char *id){++moduleCalls;moduleId=id;return available?&module:nullptr;}
+const char *obs_module_get_locale_text(obs_module_t *mod,const char *key){assert(mod==&module);++localeCalls;return key;}
+'''
+                for name in FILES[:3]:
+                    original=text(name)
+                    if '#define get_os_module' in original:
+                        code+=blocks(name)[0]+'\n'
+                    code+=function(original,f'void {name}::Init(')+'\n#undef get_os_module\n#undef get_os_text\n'
+                code+=r'''
+template<class T>void check(PlatformCaptureKind kind){
+ for(available=false;;available=true){
+  moduleCalls=localeCalls=0;T toolbar;toolbar.Init();
+  assert(toolbar.ui->activateButton==nullptr&&moduleCalls==1);
+  assert(moduleId==GetPlatformCaptureModuleId(kind));
+  if(available){
+   assert(localeCalls==1&&toolbar.initialized==1);
+   assert(toolbar.ui->deviceLabel->value==GetPlatformCaptureLabelKey(kind));
+   bool expected=false;const char *property=GetPlatformCaptureProperty(kind,expected);
+   assert(std::string(toolbar.prop_name)==property&&toolbar.is_int==expected);break;
+  }
+  assert(localeCalls==0&&toolbar.initialized==0&&toolbar.prop_name==nullptr&&!toolbar.is_int);
+ }
+}
+int main(){check<AudioCaptureToolbar>(PlatformCaptureKind::Audio);check<DisplayCaptureToolbar>(PlatformCaptureKind::Display);check<WindowCaptureToolbar>(PlatformCaptureKind::Window);}
+'''
+                with tempfile.TemporaryDirectory(prefix='obs-capture-callers-') as tmp:
+                    source=Path(tmp)/'capture.cpp';binary=Path(tmp)/'capture';source.write_text(code)
+                    result=subprocess.run([compiler,'-std=c++17',*flags,str(source),'-o',str(binary)],capture_output=True,text=True)
+                    self.assertEqual(result.returncode,0,result.stderr)
+                    subprocess.run([str(binary)],check=True)
+
     def test_original_host_policy(self):
         compiler=shutil.which('c++')
         if not compiler:
