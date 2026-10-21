@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parent.parent
 FRONTEND = ROOT / "frontend"
 HOST_CONDITION = re.compile(r"\b(?:if|elseif)\(([^)]*\bOS_(?:WINDOWS|MACOS|LINUX|FREEBSD|OPENBSD|FLATPAK)\b[^)]*)\)", re.S)
 OPERATIONS = ("obs_frontend_platform_sources", "obs_frontend_platform_qt",
-              "obs_frontend_platform_plugin_manager", "obs_frontend_platform_whatsnew")
+              "obs_frontend_platform_plugin_manager", "obs_frontend_platform_plugin_paths",
+              "obs_frontend_platform_whatsnew")
 
 
 class FrontendCMakeFacadeTest(unittest.TestCase):
@@ -30,6 +31,10 @@ class FrontendCMakeFacadeTest(unittest.TestCase):
         text = (FRONTEND / "CMakeLists.txt").read_text()
         self.assertEqual(text.count("if(OS_WINDOWS)"), 1)
         self.assertIn("obs_frontend_platform_sources()", text)
+        self.assertLess(text.index("include(cmake/os-windows.cmake)"),
+                        text.index("include(cmake/feature-plugin-manager.cmake)"))
+        self.assertGreater(text.index("obs_frontend_platform_sources()"),
+                           text.index("configure_file(cmake/templates/ui-config.h.in ui-config.h)"))
         for host, expected in (("windows", "windows"), ("macos", "macos"),
                                ("linux", "linux"), ("freebsd", "linux")):
             with self.subTest(host=host):
@@ -59,10 +64,9 @@ class FrontendCMakeFacadeTest(unittest.TestCase):
                         'file(APPEND "${TRACE}" "MACOS_UPDATE\\n")\n')
                     selected = "linux" if host == "flatpak" else "freebsd" if host == "openbsd" else host
                     platform_file = FRONTEND / f"cmake/os-{selected}.cmake"
-                    # RED characterizes the existing shared feature scripts;
-                    # GREEN also loads the platform macro definitions first.
-                    moved = "macro(obs_frontend_platform_qt)" in platform_file.read_text()
-                    setup = f'include("{platform_file.as_posix()}")\n' if moved else ""
+                    # Loading the selected host file must only define setup
+                    # operations; the trace must remain empty until a stage.
+                    setup = f'include("{platform_file.as_posix()}")\n'
                     script = '''cmake_minimum_required(VERSION 3.28)
 project(FrontendFacade NONE)
 set(TRACE "${CMAKE_BINARY_DIR}/trace.txt")
