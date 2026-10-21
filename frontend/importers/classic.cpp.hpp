@@ -559,7 +559,7 @@ OBSImporterFiles ClassicImporter::FindFiles()
 
 		string name = ent->d_name;
 		size_t pos = name.find(".xconfig");
-		if (pos != -1 && pos == name.length() - 8) {
+		if (pos != string::npos && pos == name.length() - 8) {
 			string path = dst + name;
 			res.push_back(path);
 		}
