@@ -68,10 +68,11 @@ class SummaryTest(unittest.TestCase):
     def test_reports_dispatch_wait_without_calling_it_dependency_wait(self):
         self.jobs[-1]["created_at"] = "2026-10-16T10:11:01Z"
         md = queue_report.summary(self.cur, self.jobs, (1, []), now="2026-10-16T10:12:30Z")
-        self.assertIn("Job dispatch delays", md)
+        self.assertIn("Job creation-to-start elapsed time", md)
         self.assertIn("| CI Gate | 59.0 |", md)
         self.assertIn("job creation to runner start", md)
-        self.assertIn("does not measure dependency wait", md)
+        self.assertIn("may include dependency waiting", md)
+        self.assertIn("cannot isolate runner dispatch latency", md)
 
     def test_setup_steps_report_elapsed_time_without_counting_post_or_incomplete_steps(self):
         self.jobs[1]["steps"] = [
