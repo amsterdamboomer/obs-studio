@@ -3,6 +3,8 @@
 use crate::common;
 
 mod export_list;
+#[cfg(all(unix, not(target_os = "macos")))]
+mod dbus_inhibit;
 mod nix_inhibit;
 mod nix_inhibit_parity;
 mod path_extension;
