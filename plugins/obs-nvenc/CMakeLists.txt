@@ -68,6 +68,7 @@ if(OBS_LIBOBS_BACKEND STREQUAL HYBRID)
         PREFIX ""
         OUTPUT_NAME obs-nvenc
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/obs-nvenc-c-reference"
+        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/obs-nvenc-c-reference"
     )
   endif()
 else()
