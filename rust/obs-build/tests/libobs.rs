@@ -1307,3 +1307,28 @@ fn captures_audio() -> bool {
     std::env::var_os("OBS_BUILD_JACK_CAPTURE").is_some()
         || std::env::var_os("OBS_BUILD_SNDIO_CAPTURE_DEVICE").is_some()
 }
+
+#[test]
+fn macos_core_builds_from_the_canonical_manifest() {
+    let Some(dependencies) = std::env::var_os("OBS_BUILD_MACOS_DEPENDENCIES") else {
+        return; // Explicit SDK-dependent integration, including cross compilation.
+    };
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let output = PathBuf::from(std::env::var_os("OBS_BUILD_MACOS_OUTPUT").expect("set OBS_BUILD_MACOS_OUTPUT"));
+    let build = NativeBuild {
+        host: obs_build::BUILD_HOST.into(),
+        target: std::env::var("OBS_BUILD_MACOS_TARGET").unwrap_or_else(|_| obs_build::BUILD_TARGET.into()),
+        output,
+    };
+    assert!(build.target.contains("apple-darwin"));
+    let options = libobs::Options {
+        native_dependencies: Some(dependencies.into()),
+        pulseaudio: false, gio: false, wayland: false,
+        unity: std::env::var_os("OBS_BUILD_MACOS_SEPARATE").is_none(),
+        pch: std::env::var_os("OBS_BUILD_MACOS_PCH").is_some(),
+        ..libobs::Options::default()
+    };
+    let library = libobs::build_c_reference_with_options(&build, &root, &options).unwrap();
+    assert!(library.is_file());
+    std::fs::write(build.output.join("macos-core-path.txt"), library.to_str().unwrap()).unwrap();
+}

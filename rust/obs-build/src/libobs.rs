@@ -17,6 +17,8 @@ pub struct Options {
     pub pulseaudio: bool,
     pub gio: bool,
     pub core_modules: Vec<String>,
+    /// Prebuilt OBS dependency bundle for targets without pkg-config metadata.
+    pub native_dependencies: Option<PathBuf>,
 }
 
 impl Default for Options {
@@ -29,6 +31,7 @@ impl Default for Options {
             pulseaudio: true,
             gio: true,
             core_modules: vec![],
+            native_dependencies: None,
         }
     }
 }
