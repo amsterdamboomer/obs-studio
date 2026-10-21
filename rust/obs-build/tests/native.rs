@@ -438,6 +438,9 @@ fn objective_groups_expand_to_individual_language_correct_sources() {
 
 #[test]
 fn mixed_objective_languages_compile_load_and_rebuild_with_unity_and_pch() {
+    if native_answer_probe() {
+        return;
+    }
     if !obs_build::BUILD_TARGET.contains("linux") && !obs_build::BUILD_TARGET.contains("apple") {
         return; // The fixture requires an Objective-C-capable Clang toolchain.
     }
@@ -513,38 +516,25 @@ fn mixed_objective_languages_compile_load_and_rebuild_with_unity_and_pch() {
                     });
             }
             let artifact = build.shared_library(&library).unwrap();
-            // SAFETY: the fixture defines this no-argument C ABI function.
-            assert_eq!(
-                unsafe { answer(&artifact, b"obs_fixture_languages", &[]) },
-                15
-            );
+            assert_native_answer_fresh(&artifact, "obs_fixture_languages", 15, &selector);
             write_header(2);
             let artifact = build.shared_library(&library).unwrap();
-            // SAFETY: changing the header macro preserves the fixture ABI.
-            assert_eq!(
-                unsafe { answer(&artifact, b"obs_fixture_languages", &[]) },
-                30
-            );
+            assert_native_answer_fresh(&artifact, "obs_fixture_languages", 30, &selector);
             library.objc_compile_options[2] = "-DOBJC_ONLY=2".into();
             let artifact = build.shared_library(&library).unwrap();
-            // SAFETY: changing a language-specific macro preserves the fixture ABI.
-            assert_eq!(
-                unsafe { answer(&artifact, b"obs_fixture_languages", &[]) },
-                38
-            );
+            assert_native_answer_fresh(&artifact, "obs_fixture_languages", 38, &selector);
             library.objcpp_compile_options[2] = "-DOBJCPP_ONLY=2".into();
             let artifact = build.shared_library(&library).unwrap();
-            // SAFETY: changing the second language's macro preserves the fixture ABI.
-            assert_eq!(
-                unsafe { answer(&artifact, b"obs_fixture_languages", &[]) },
-                54
-            );
+            assert_native_answer_fresh(&artifact, "obs_fixture_languages", 54, &selector);
         }
     }
 }
 
 #[test]
 fn arc_and_manual_groups_keep_source_flags_through_expansion_and_pch() {
+    if native_answer_probe() {
+        return;
+    }
     if !obs_build::BUILD_TARGET.contains("linux") && !obs_build::BUILD_TARGET.contains("apple") {
         return;
     }
@@ -619,18 +609,10 @@ fn arc_and_manual_groups_keep_source_flags_through_expansion_and_pch() {
                 build.separate_target_sources(root, &mut library).unwrap();
             }
             let artifact = build.shared_library(&library).unwrap();
-            // SAFETY: the fixture defines this no-argument C ABI function.
-            assert_eq!(
-                unsafe { answer(&artifact, b"obs_fixture_source_flags", &[]) },
-                42
-            );
+            assert_native_answer_fresh(&artifact, "obs_fixture_source_flags", 42, &selector);
             library.source_compile_options[0].options[1] = "-DSOURCE_VALUE=35".into();
             let artifact = build.shared_library(&library).unwrap();
-            // SAFETY: changing a compiler macro preserves the fixture ABI.
-            assert_eq!(
-                unsafe { answer(&artifact, b"obs_fixture_source_flags", &[]) },
-                60
-            );
+            assert_native_answer_fresh(&artifact, "obs_fixture_source_flags", 60, &selector);
         }
     }
 }
@@ -680,4 +662,42 @@ fn native_source_options_reject_ambiguous_or_orphan_assignments() {
         vec![source],
         "an invalid expansion must not mutate the target"
     );
+}
+
+// dyld retains Objective-C dylibs after dlclose. Probe rebuilt images in fresh
+// processes so compiler/header invalidation is observed independently of that
+// loader lifetime policy. The probe reuses its owning test in this category.
+fn native_answer_probe() -> bool {
+    let Some(library) = std::env::var_os("OBS_NATIVE_ANSWER_LIBRARY") else {
+        return false;
+    };
+    let symbol = std::env::var("OBS_NATIVE_ANSWER_SYMBOL").unwrap();
+    let expected: i32 = std::env::var("OBS_NATIVE_ANSWER_EXPECTED")
+        .unwrap()
+        .parse()
+        .unwrap();
+    // SAFETY: these self-built fixtures define a no-argument C ABI function;
+    // answer keeps the library alive throughout the call.
+    assert_eq!(
+        unsafe { answer(Path::new(&library), symbol.as_bytes(), &[]) },
+        expected
+    );
+    true
+}
+
+fn assert_native_answer_fresh(library: &Path, symbol: &str, expected: i32, selector: &str) {
+    let result = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", selector, "--nocapture"])
+        .env("OBS_NATIVE_ANSWER_LIBRARY", library)
+        .env("OBS_NATIVE_ANSWER_SYMBOL", symbol)
+        .env("OBS_NATIVE_ANSWER_EXPECTED", expected.to_string())
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(String::from_utf8_lossy(&result.stdout).contains("1 passed"));
 }
