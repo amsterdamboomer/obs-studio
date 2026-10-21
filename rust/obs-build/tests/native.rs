@@ -443,7 +443,7 @@ fn mixed_objective_languages_compile_load_and_rebuild_with_unity_and_pch() {
     }
     let selector = format!(
         "{}::mixed_objective_languages_compile_load_and_rebuild_with_unity_and_pch",
-        module_path!()
+        module_path!().split_once("::").unwrap().1
     );
     if std::env::var_os("OBS_BUILD_OBJC_CHILD").is_none() {
         let result = std::process::Command::new(std::env::current_exe().unwrap())
