@@ -39,6 +39,10 @@ pub struct SharedLibrary {
     pub compile_options: Vec<String>,
     pub c_compile_options: Vec<String>,
     pub cpp_compile_options: Vec<String>,
+    /// Extra flags for Objective-C, in addition to the C-family options.
+    pub objc_compile_options: Vec<String>,
+    /// Extra flags for Objective-C++, in addition to the C++-family options.
+    pub objcpp_compile_options: Vec<String>,
     pub link_options: Vec<String>,
     pub file_name: Option<String>,
 }

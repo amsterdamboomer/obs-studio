@@ -465,7 +465,10 @@ fn mixed_objective_languages_compile_load_and_rebuild_with_unity_and_pch() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
     let header = root.join("fixture.pch.h");
-    fs::write(&header, "#define VALUE 1\n").unwrap();
+    let write_header = |value| {
+        fs::write(&header, format!("#define VALUE {value}\n#if defined(__OBJC__)\n#if !__has_feature(objc_arc)\n#error ARC flag missing\n#endif\n#ifdef __cplusplus\n#if !defined(OBJCPP_ONLY) || defined(OBJC_ONLY)\n#error Objective-C++ flags missing or contaminated\n#endif\n#else\n#if !defined(OBJC_ONLY) || defined(OBJCPP_ONLY)\n#error Objective-C flags missing or contaminated\n#endif\n#endif\n#else\n#if defined(OBJC_ONLY) || defined(OBJCPP_ONLY)\n#error Objective-C flags leaked to C or C++\n#endif\n#endif\n")).unwrap();
+    };
+    write_header(1);
     let c = root.join("part.c");
     let cpp = root.join("part.cpp");
     let objc = root.join("part.m");
@@ -480,7 +483,7 @@ fn mixed_objective_languages_compile_load_and_rebuild_with_unity_and_pch() {
             if pch && !obs_build::BUILD_TARGET.contains("linux") {
                 continue;
             }
-            fs::write(&header, "#define VALUE 1\n").unwrap();
+            write_header(1);
             let build = NativeBuild {
                 host: obs_build::BUILD_HOST.into(),
                 target: obs_build::BUILD_TARGET.into(),
@@ -493,6 +496,18 @@ fn mixed_objective_languages_compile_load_and_rebuild_with_unity_and_pch() {
             library.include_dirs.push(root.into());
             library.unity = unity;
             library.cpp_compile_options.push("-fno-exceptions".into());
+            // Select a modern runtime for ARC parsing on Linux too. The fixture
+            // emits no Objective-C objects or runtime calls and needs no SDK.
+            library.objc_compile_options = vec![
+                "-fobjc-arc".into(),
+                "-fobjc-runtime=macosx-10.12".into(),
+                "-DOBJC_ONLY=1".into(),
+            ];
+            library.objcpp_compile_options = vec![
+                "-fobjc-arc".into(),
+                "-fobjc-runtime=macosx-10.12".into(),
+                "-DOBJCPP_ONLY=1".into(),
+            ];
             if pch {
                 library
                     .precompiled_headers
@@ -507,7 +522,7 @@ fn mixed_objective_languages_compile_load_and_rebuild_with_unity_and_pch() {
                 unsafe { answer(&artifact, b"obs_fixture_languages", &[]) },
                 15
             );
-            fs::write(&header, "#define VALUE 2\n").unwrap();
+            write_header(2);
             let artifact = build.shared_library(&library).unwrap();
             // SAFETY: changing the header macro preserves the fixture ABI.
             assert_eq!(
