@@ -170,8 +170,8 @@ const EXPORT: &str = "\n#if defined(_WIN32)\n__declspec(dllexport)\n#endif\n";
 
 #[test]
 fn pch_preserves_mixed_languages_unity_and_header_flag_invalidation() {
-    if !obs_build::BUILD_TARGET.contains("linux") {
-        eprintln!("compiled PCH integration currently covers Linux GCC and Clang");
+    if !obs_build::BUILD_TARGET.contains("linux") && !obs_build::BUILD_TARGET.contains("apple") {
+        eprintln!("compiled PCH integration covers Linux GCC/Clang and Apple Clang");
         return;
     }
     let directory = tempfile::tempdir().unwrap();
@@ -479,10 +479,6 @@ fn mixed_objective_languages_compile_load_and_rebuild_with_unity_and_pch() {
     fs::write(&cpp, "#include \"fixture.pch.h\"\n#if defined(__OBJC__) || !defined(__cplusplus)\n#error wrong C++ language\n#endif\nextern \"C\" int fixture_c(void);\nextern \"C\" int fixture_objc(void);\nextern \"C\" int fixture_objcpp(void);\nextern \"C\" int obs_fixture_languages(void) { return fixture_c() + fixture_objc() + fixture_objcpp() + 2 * VALUE; }\n").unwrap();
     for unity in [false, true] {
         for pch in [false, true] {
-            // Compiled PCH currently supports Linux; macOS still exercises both unity modes.
-            if pch && !obs_build::BUILD_TARGET.contains("linux") {
-                continue;
-            }
             write_header(1);
             let build = NativeBuild {
                 host: obs_build::BUILD_HOST.into(),
@@ -591,9 +587,6 @@ fn arc_and_manual_groups_keep_source_flags_through_expansion_and_pch() {
     .unwrap();
     for separate in [false, true] {
         for pch in [false, true] {
-            if pch && !obs_build::BUILD_TARGET.contains("linux") {
-                continue;
-            }
             let build = NativeBuild {
                 host: obs_build::BUILD_HOST.into(),
                 target: obs_build::BUILD_TARGET.into(),
@@ -640,4 +633,51 @@ fn arc_and_manual_groups_keep_source_flags_through_expansion_and_pch() {
             );
         }
     }
+}
+
+#[test]
+fn native_source_options_reject_ambiguous_or_orphan_assignments() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("source.c");
+    let other = dir.path().join("other.c");
+    fs::write(&source, "int fixture(void) { return 1; }\n").unwrap();
+    fs::write(&other, "int other(void) { return 2; }\n").unwrap();
+    let build = NativeBuild {
+        host: obs_build::BUILD_HOST.into(),
+        target: obs_build::BUILD_TARGET.into(),
+        output: dir.path().join("artifacts"),
+    };
+    let mut library = target("fixture-options", &source, vec![]);
+    let entry = obs_build::SourceCompileOptions {
+        sources: vec![source.clone()],
+        options: vec!["-DVALUE=1".into()],
+    };
+    library.source_compile_options = vec![entry.clone(), entry];
+    assert!(
+        build
+            .shared_library(&library)
+            .unwrap_err()
+            .contains("duplicate compiler options")
+    );
+    library.source_compile_options = vec![obs_build::SourceCompileOptions {
+        sources: vec![other],
+        options: vec![],
+    }];
+    assert!(
+        build
+            .shared_library(&library)
+            .unwrap_err()
+            .contains("outside this target")
+    );
+    assert!(
+        build
+            .separate_target_sources(dir.path(), &mut library)
+            .unwrap_err()
+            .contains("annotation outside target")
+    );
+    assert_eq!(
+        library.sources,
+        vec![source],
+        "an invalid expansion must not mutate the target"
+    );
 }
