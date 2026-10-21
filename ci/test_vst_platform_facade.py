@@ -19,7 +19,7 @@ OPS=('QStringList VstPlatformSearchDirs(', 'QStringList VstPlatformFileFilters('
 
 
 def bodies(host):
-    native=PLUGIN/f'hosts/{host}/vst-platform.cpp.hpp'
+    native=PLUGIN/f'hosts/{host}/vst-platform.{"mm" if host=="macos" else "cpp"}.hpp'
     if native.exists():
         return '\n'.join(function(native.read_text(),op) for op in OPS)
     source=(PLUGIN/'obs-vst.cpp.hpp').read_text()
@@ -116,10 +116,55 @@ class VstPlatformFacadeTest(unittest.TestCase):
     def test_host_wiring(self):
         self.assertTrue((PLUGIN/'headers/vst-platform.hpp').is_file())
         for host in ('windows','macos','linux'):
-            self.assertTrue((PLUGIN/f'hosts/{host}/vst-platform.cpp.hpp').is_file())
+            self.assertTrue((PLUGIN/f'hosts/{host}/vst-platform.{"mm" if host=="macos" else "cpp"}.hpp').is_file())
         cmake=(PLUGIN/'CMakeLists.txt').read_text()
         for host in ('windows','macos','linux'):
             self.assertIn('hosts/'+host,cmake)
+
+    def test_real_qt_policy(self):
+        prefix=os.environ.get('OBS_QT_TEST_PREFIX')
+        if not prefix:
+            self.skipTest('Real Qt policy test runs with the CI Qt prefix')
+        compiler=shutil.which('c++')
+        with tempfile.TemporaryDirectory(prefix='obs-vst-real-qt-') as tmp:
+            cmake='cmake_minimum_required(VERSION 3.28)\nproject(vst_policy LANGUAGES CXX)\nfind_package(Qt6 REQUIRED COMPONENTS Core)\n'
+            variants=[('windows',['-U__linux__','-DWIN32','-D_WIN32','-D_WIN64'],True,False),('windows',['-U__linux__','-DWIN32','-D_WIN32'],False,False),('macos',['-U__linux__','-D__APPLE__'],False,False),('linux',[],False,False),('linux',['-U__linux__'],False,True)]
+            for i,(host,flags,win64,bsd) in enumerate(variants):
+                selected=subprocess.run([compiler,'-E','-P','-x','c++',*flags,'-'],input=bodies(host),capture_output=True,text=True,check=True).stdout
+                Path(tmp,f'policy{i}.cpp').write_text('#include <QString>\n#include <QStringList>\n'+COMMON+selected+checks(host,win64,bsd))
+                cmake+=f'add_executable(policy{i} policy{i}.cpp)\ntarget_compile_features(policy{i} PRIVATE cxx_std_17)\ntarget_link_libraries(policy{i} PRIVATE Qt6::Core)\n'
+            Path(tmp,'CMakeLists.txt').write_text(cmake)
+            build=str(Path(tmp)/'build')
+            subprocess.run(['cmake','-S',tmp,'-B',build,'-DCMAKE_PREFIX_PATH='+prefix],check=True)
+            subprocess.run(['cmake','--build',build],check=True)
+            for i in range(len(variants)):
+                subprocess.run([str(Path(build)/f'policy{i}')],check=True,timeout=10)
+
+    def test_cmake_selects_unchanged_member_declarations(self):
+        compiler=shutil.which('c++')
+        if not compiler:
+            self.skipTest('Native compiler unavailable')
+        cmake=(PLUGIN/'CMakeLists.txt').read_text()
+        command=re.search(r'target_include_directories\(.*?\n\)',cmake,re.S)
+        self.assertIsNotNone(command)
+        for system,host,flags,editor,module in [
+            ('Windows','windows',['-U__linux__','-D_WIN32'], 'HWND windowHandle = NULL;', 'HINSTANCE dllHandle = nullptr;'),
+            ('Darwin','macos',['-U__linux__','-D__APPLE__'], 'QWidget *cocoaViewContainer = NULL;', 'CFBundleRef bundle = NULL;'),
+            ('Linux','linux',[], '', 'void *soHandle = nullptr;'),
+            ('FreeBSD','linux',['-U__linux__'], '', ''),
+        ]:
+            with self.subTest(system=system),tempfile.TemporaryDirectory(prefix='obs-vst-types-') as tmp:
+                Path(tmp,'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.28)\nproject(vst_header NONE)\nadd_library(obs-vst INTERFACE)\n'+command[0].replace('PRIVATE','INTERFACE')+'\nfile(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/selection.txt" CONTENT "$<TARGET_GENEX_EVAL:obs-vst,$<TARGET_PROPERTY:obs-vst,INTERFACE_INCLUDE_DIRECTORIES>>")\n')
+                build=Path(tmp)/'build'
+                result=subprocess.run(['cmake','-S',tmp,'-B',str(build),'-DCMAKE_SYSTEM_NAME='+system],capture_output=True,text=True)
+                self.assertEqual(result.returncode,0,result.stderr)
+                selected=(build/'selection.txt').read_text().split(';')
+                self.assertEqual(selected[-1],str(Path(tmp)/f'hosts/{host}'))
+                for name,expected in [('vst-editor-members.inc',editor),('vst-module-members.inc',module)]:
+                    file=PLUGIN/f'hosts/{host}/{name}'
+                    self.assertTrue(file.is_file())
+                    result=subprocess.run([compiler,'-E','-P','-x','c++',*flags,str(file)],capture_output=True,text=True,check=True)
+                    self.assertEqual(re.sub(r'\s+','',result.stdout),re.sub(r'\s+','',expected))
 
     def test_original_policy(self):
         compiler=shutil.which('c++')
