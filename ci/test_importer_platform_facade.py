@@ -61,12 +61,57 @@ class ImporterFacadeTest(unittest.TestCase):
                     self.assertRegex((ROOT / f"frontend/utility/platform-{host}.hpp").read_text(),
                                      rf"\b{operation}\([^;]*?\)\s*\{{")
 
+    def test_search_directory_policy_and_error_results(self):
+        compiler = shutil.which("c++")
+        if not compiler:
+            self.skipTest("C++ compiler unavailable; native builds still required")
+        for host, enabled in (("windows.cpp", (True, True, True)),
+                              ("osx.mm", (False, True, False)),
+                              ("x11.cpp", (False, False, False))):
+            with self.subTest(host=host):
+                text = (ROOT / f"frontend/utility/platform-{host}.hpp").read_text()
+                names = ("Classic", "Streamlabs", "XSplit")
+                locations = ("OBS\\sceneCollection\\", "slobs-client/SceneCollections/",
+                             "SplitMediaLabs\\XSplit\\Presentation2.0\\")
+                # Escape trailing Windows separators without changing the
+                # runtime strings expected from the original implementation.
+                preamble = """
+#include <string>
+#include <cstddef>
+int status, calls, kind; size_t suppliedSize; std::string requested;
+int record(char *directory, size_t size, const char *path, int type) {
+    ++calls; suppliedSize = size; requested = path; kind = type;
+    directory[0] = 'X'; return status;
+}
+int os_get_config_path(char *d, size_t n, const char *p) { return record(d, n, p, 1); }
+int os_get_program_data_path(char *d, size_t n, const char *p) { return record(d, n, p, 2); }
+"""
+                bodies = "\n".join(function(text, f"bool GetPlatform{name}ImportDirectory(") for name in names)
+                checks = "int main() { char directory[17];\n"
+                for name, supported, location, api in zip(names, enabled, locations, (1, 1, 2)):
+                    checks += f"""
+for (int code : {{-1, 0, 23}}) {{
+    status = code; calls = 0; directory[0] = 'U';
+    bool result = GetPlatform{name}ImportDirectory(directory, sizeof(directory));
+    if (result != ({str(supported).lower()} && code != -1)) return 1;
+    if (calls != {int(supported)}) return 2;
+    if ({str(supported).lower()} && (suppliedSize != sizeof(directory) || requested != {json.dumps(location)} || kind != {api} || directory[0] != 'X')) return 3;
+    if (!{str(supported).lower()} && directory[0] != 'U') return 4;
+}}
+"""
+                checks += "}"
+                with tempfile.TemporaryDirectory(prefix="obs-importer-directory-") as tmp:
+                    source, binary = Path(tmp) / "probe.cpp", Path(tmp) / "probe"
+                    source.write_text(preamble + bodies + checks)
+                    subprocess.run([compiler, "-std=c++17", str(source), "-o", str(binary)],
+                                   check=True, capture_output=True)
+                    subprocess.run([str(binary)], check=True)
+
     def test_legacy_paths_and_translation_matrix(self):
         compiler = shutil.which("c++")
         if not compiler:
             self.skipTest("C++ compiler unavailable; native builds still required")
         header = (ROOT / "frontend/importers/importers.hpp").read_text()
-        shared = (ROOT / "frontend/importers/studio.cpp.hpp").read_text()
         paths = ["", "file.txt", "dir/file.txt", r"dir\file.txt", r"a/b\file.txt",
                  r"a\b/file.txt", "/a.b/file", "/a/.hidden", "dir/", r"C:\a\b.ext"]
         ids = sorted(set().union(*(mapping.keys() for mapping in MAPPINGS.values())) |
@@ -76,17 +121,12 @@ class ImporterFacadeTest(unittest.TestCase):
                                   ("x11.cpp", "nix", "__linux__")):
             with self.subTest(host=host):
                 text = (ROOT / f"frontend/utility/platform-{host}.hpp").read_text()
-                # During RED, characterize the original shared code. GREEN
-                # reads the new platform function and unchanged shared helpers.
-                moved = "TranslatePlatformImportedSource(" in text
-                bodies = [function(header, "static inline std::string " + name + "(")
-                          for name in ("GetFilenameFromPath", "GetFolderFromPath")]
-                if moved:
-                    bodies.insert(0, function(text, "size_t PlatformImporterLastSeparator("))
-                    bodies.append(function(text, "void TranslatePlatformImportedSource("))
-                else:
-                    bodies.append(function(shared, "void TranslateOSStudio("))
-                    bodies.append('void TranslatePlatformImportedSource(Json &v) { Json root = Json::object{{"sources", Json::array{v}}}; TranslateOSStudio(root); v = root["sources"][0]; }')
+                # Compile the real platform function and the shared path
+                # wrappers against the same expected results recorded in RED.
+                bodies = [function(text, "size_t PlatformImporterLastSeparator(")]
+                bodies += [function(header, "static inline std::string " + name + "(")
+                           for name in ("GetFilenameFromPath", "GetFolderFromPath")]
+                bodies.append(function(text, "void TranslatePlatformImportedSource("))
                 preamble = r'''
 #include <string>
 #include <iostream>
