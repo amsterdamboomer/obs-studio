@@ -24,6 +24,13 @@ pub struct PrecompiledHeader {
     pub sources: Vec<PathBuf>,
 }
 
+#[derive(Clone, Debug)]
+pub struct SourceCompileOptions {
+    pub sources: Vec<PathBuf>,
+    /// Applied after target and language defaults, including when building PCH.
+    pub options: Vec<String>,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct SharedLibrary {
     pub name: String,
@@ -43,6 +50,7 @@ pub struct SharedLibrary {
     pub objc_compile_options: Vec<String>,
     /// Extra flags for Objective-C++, in addition to the C++-family options.
     pub objcpp_compile_options: Vec<String>,
+    pub source_compile_options: Vec<SourceCompileOptions>,
     pub link_options: Vec<String>,
     pub file_name: Option<String>,
 }
@@ -100,6 +108,15 @@ impl NativeBuild {
         sources: &[PathBuf],
     ) -> Result<Vec<PathBuf>, String> {
         groups::separate(root, &self.output.join("individual-sources"), sources)
+    }
+
+    /// Expand groups and carry per-source flags and PCH assignments to their members.
+    pub fn separate_target_sources(
+        &self,
+        _root: &std::path::Path,
+        _library: &mut SharedLibrary,
+    ) -> Result<(), String> {
+        Err("target source annotations are not implemented".into())
     }
 
     /// Compile through cc::Build, then link a native shared library.
