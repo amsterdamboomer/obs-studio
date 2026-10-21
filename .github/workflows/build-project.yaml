@@ -307,10 +307,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-26.04]
-        # ON builds the app as OBS-Studio-Rust (ENABLE_RUST_LIBOBS: name, app ID,
-        # paths). Both legs link the C libobs and build libobs-with-rust beside
-        # it without shipping it (#1065).
-        rust: ['OFF', 'ON']
+        # One production application: hybrid libobs, with OBS-Studio-Rust identity.
+        # C reference coverage remains in the explicit Tier 2 jobs.
+        rust: ['ON']
     runs-on: ${{ matrix.os }}
     needs: check-event
     # The full OBS app build is release-gating, not dev-cycle CI: it runs in
@@ -576,6 +575,15 @@ jobs:
           cache_key='flatpak-builder-${{ hashFiles('build-aux/com.obsproject.Studio.json') }}'
 
           echo "cacheKey=${cache_key}" >> $GITHUB_OUTPUT
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - name: Prepare offline Flatpak Rust dependencies
+        run: |
+          # Supply the pinned compiler in the manifest; soldr vendors Cargo inputs
+          # before flatpak-builder enters its network-isolated build sandbox.
+          cmake -P cmake/common/prepare-flatpak-soldr.cmake
+      - name: Vendor Flatpak Cargo sources
+        run: build-aux/prepare-flatpak-rust.sh
 
       - name: Validate Flatpak manifest
         uses: ./.github/actions/flatpak-builder-lint
