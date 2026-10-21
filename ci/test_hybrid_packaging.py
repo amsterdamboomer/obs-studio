@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -13,6 +14,37 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class HybridPackagingTest(unittest.TestCase):
+    def test_windows_nvenc_reference_has_separate_linker_outputs(self):
+        compiler = shutil.which("cc")
+        if not compiler or not shutil.which("ninja"):
+            self.skipTest("CMake generation fixture needs cc and Ninja")
+        source = (ROOT / "plugins/obs-nvenc/CMakeLists.txt").read_text()
+        properties = re.search(r"set_target_properties\(\s*obs-nvenc-c-reference\s+PROPERTIES.*?\n\s*\)", source, re.S)[0]
+        for generator in ("Ninja", "Ninja Multi-Config"):
+            with self.subTest(generator=generator), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                build = root / "build"
+                (root / "empty.c").write_text("void nvenc_fixture(void) {}\n")
+                (root / "CMakeLists.txt").write_text('''cmake_minimum_required(VERSION 3.28)
+project(nvenc_reference C)
+add_library(obs-nvenc MODULE empty.c)
+add_library(obs-nvenc-c-reference MODULE empty.c)
+set_target_properties(obs-nvenc PROPERTIES PREFIX "")
+''' + properties)
+                result = subprocess.run(["cmake", "-S", directory, "-B", str(build), "-G", generator,
+                                         "-DCMAKE_SYSTEM_NAME=Windows", "-DCMAKE_C_COMPILER=" + compiler,
+                                         "-DCMAKE_C_COMPILER_FORCED=TRUE", "-DCMAKE_BUILD_TYPE=RelWithDebInfo"],
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                configs = ("Debug", "Release", "RelWithDebInfo") if generator.endswith("Multi-Config") else (None,)
+                for config in configs:
+                    rules = (build / "CMakeFiles" / f"impl-{config}.ninja" if config else build / "build.ninja").read_text()
+                    imports = re.findall(r"^\s*TARGET_IMPLIB = (.+)$", rules, re.M)
+                    self.assertEqual(len(imports), 2)
+                    self.assertNotEqual(imports[0], imports[1], "production and reference import/export files collide")
+                    self.assertNotIn("obs-nvenc-c-reference/", imports[0])
+                    self.assertIn("obs-nvenc-c-reference/", imports[1])
+
     def test_flatpak_has_the_pinned_compiler_and_offline_cargo_inputs(self):
         manifest = json.loads((ROOT / "build-aux/com.obsproject.Studio.json").read_text())
         version = tomllib.loads((ROOT / "rust-toolchain.toml").read_text())["toolchain"]["channel"]
