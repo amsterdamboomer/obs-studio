@@ -13,7 +13,9 @@ exact-name regex per shard for `ctest -R`.
 from __future__ import annotations
 
 import re
+import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -98,6 +100,41 @@ class ValidateUsesPlanTest(unittest.TestCase):
         self.assertIn("shard-plan.sh", text)
         self.assertIn("tier2-shards", text)
         self.assertRegex(text, r'shard_args=\(-R "\$\(cat "\$plan"\)"\)')
+
+    def test_sharded_execution_checks_complete_plan_and_rejects_missing_plan(self):
+        text = VALIDATE.read_text(encoding="utf-8")
+        self.assertIn('uv run "$SRC/ci/tier2_plan.py"', text)
+        self.assertIn('FAIL: missing Tier 2 shard plan', text)
+
+
+class PlanCoverageTest(unittest.TestCase):
+    def check_plan(self, patterns):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            listing = root / "tests.json"
+            listing.write_text(json.dumps({"tests": [{"name": name} for name in ("test_a", "test_ab", "test_serial")]}))
+            for index, pattern in enumerate(patterns, 1):
+                (root / f"{index}-of-2.regex").write_text(pattern + "\n")
+            return subprocess.run([sys.executable, str(ROOT / "ci/tier2_plan.py"),
+                                   str(listing), str(root), "2"], capture_output=True, text=True)
+
+    def test_complete_disjoint_plan_passes(self):
+        result = self.check_plan(["^(test_a|test_serial)$", "^(test_ab)$"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("3 tests across 2 disjoint shards", result.stdout)
+
+    def test_omission_overlap_empty_and_missing_shards_fail(self):
+        for patterns, diagnostic in [
+            (["^(test_a)$", "^(test_ab)$"], "test_serial"),
+            (["^(test_a|test_ab|test_serial)$", "^(test_a)$"], "test_a"),
+            (["^(test_a|test_ab|test_serial)$", "^()$"], "empty shard"),
+            (["^(test_a|test_ab|test_serial)$"], "missing shard"),
+            (["[", "^(test_a|test_ab|test_serial)$"], "invalid regex"),
+        ]:
+            with self.subTest(patterns=patterns):
+                result = self.check_plan(patterns)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(diagnostic, result.stderr)
 
 
 if __name__ == "__main__":
