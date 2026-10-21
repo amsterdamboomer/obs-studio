@@ -1764,5 +1764,40 @@
         ]
       }
     }
-  ]
+  ],
+  "landing_policy": {
+    "revision": "6d3b3740b3cf98114f724525d767bc2312e03c71",
+    "base_revision": "f3e6260b1b6f94c884c9b95c7fbb481fddd3dd84",
+    "registered_tests": 351,
+    "run_serial": [
+      "test_deinterlace_2x_field_order"
+    ],
+    "lp_num_threads": 1,
+    "private_xshm": true,
+    "ci_shards_per_backend": 2,
+    "reason": "PR CI dropped fields despite the renderer cap; retain timing isolation. Historical candidate_registry describes the exploratory revision only.",
+    "output_notification_fix": "Publish inactive before deactivate. New synchronous callback regression failed normal and force stop on both original backends, then passed 100 cycles per path per backend (400 total).",
+    "exports_identical": 1766,
+    "ported_c_implementations_excluded": 64,
+    "local_full_suite": {
+      "command": "OBS_TIER2_STAGE=test OBS_CTEST_JOBS=8 rust/tools/linux-validate/run.sh",
+      "cpu_affinity": "unrestricted (16 logical CPUs reported); differs from exploratory four-core trials",
+      "OFF": {
+        "registered": 351,
+        "failed": 0,
+        "seconds": 169.61
+      },
+      "ON": {
+        "registered": 351,
+        "failed": 0,
+        "seconds": 169.2
+      },
+      "skipped": [
+        "test_pulse_monitor_device",
+        "test_pulse_stream_restart",
+        "test_pulse_two_sources"
+      ],
+      "purpose": "Final correctness validation, not a controlled timing comparison with the earlier source/affinity."
+    }
+  }
 }

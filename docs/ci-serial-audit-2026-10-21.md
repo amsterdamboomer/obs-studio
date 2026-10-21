@@ -16,13 +16,28 @@ described below. The two-shards-per-backend CI matrix remains unchanged.
 The output-delay blocker is corrected in core teardown: publish `active=false`
 before emitting `deactivate`. A new real-libobs regression observes state
 inside the synchronous callback. Both normal and forced stop fail
-deterministically against both original backends; the fix must pass 100
-iterations per stop path. Existing C tests and public headers are unchanged.
+deterministically against both original backends; the fix passes 100
+iterations per stop path per backend (400 stop cycles). Existing C tests and
+public headers are unchanged.
 This fixes the core notification ordering; #1391's separate frontend work is
 not claimed as completed here.
 
 The tables below retain the exploratory results, including failed trials;
 they are not timings of the final conservative scheduling policy.
+
+Final local verification, rebased onto `f3e6260b1`: the official Linux harness
+passed all 351 registered CTests in both modes (169.61 s OFF, 169.20 s ON),
+with the same three unavailable PulseAudio skips. Registry checks confirm no
+loss of the original 346 tests: four tests arrived on master and one is the
+new deactivation regression. Only deinterlace remains serial with Xvfb
+available; every Linux registration retains the renderer budget. Export
+comparison still matches all 1,766 symbols; the updated base excludes 64
+ported C implementations from hybrid libobs.
+
+This final run used the harness's unrestricted CPU affinity (16 logical CPUs
+reported), not the exploratory four-core affinity. It verifies correctness;
+its timings are not a controlled speed comparison with the initial base.
+PR CI and the merge queue remain the required merge checks.
 
 ## Findings
 
@@ -150,11 +165,11 @@ No assertion, expected frame count, test selection or retry policy was relaxed
 to hide these failures. A successful small group or single full run is not
 enough evidence for a reliability claim.
 
-The second actual hybrid run reproduced `force_stop_skips_delay` at line 484
-with the renderer cap enabled. Thus the cap does not make the full suite
-reliably green: the output lifecycle race remains a separate blocker to a
-confident rollout. Do not replace this failure with a new whole-suite serial
-guard; the signal/active-state ordering needs its own fix and regression proof.
+The second exploratory actual-source hybrid run reproduced
+`force_stop_skips_delay` at line 484 with the renderer cap enabled. The cap
+alone did not resolve the lifecycle race. The landing revision fixes this
+ordering in core and adds the deterministic regression described above,
+without adding a whole-suite serial guard for output delay.
 
 ## Sharding decision
 
@@ -162,10 +177,11 @@ The existing workflow uses two shards per backend: four test jobs. Once the
 concurrent suite is reliable, one complete invocation per backend would use
 two jobs and avoid duplicated runner setup. Keep OFF and ON coverage.
 
-Recommendation: retain the current CI shard matrix while the candidate is
-reviewed and #1391 is resolved. Then trial one shard per backend and measure
-actual gate latency and runner cost. This investigation does not change the
-workflow matrix or claim that timing flakes have been eliminated.
+Retain the current CI shard matrix: the field-order test still needs timing
+isolation, and a smaller shard count needs actual gate-latency and runner-cost
+measurements. The core signal-ordering fix removes the output-delay blocker;
+it does not eliminate real-time field-delivery sensitivity. This PR does not
+change the workflow matrix or complete #1391's separate frontend work.
 
 The unsharded capped trial is about 3.3 times faster than the original
 unsharded suite on this host. That is **not** a measured CI gate speedup or a
