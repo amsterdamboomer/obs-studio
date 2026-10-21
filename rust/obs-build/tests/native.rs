@@ -474,8 +474,8 @@ fn mixed_objective_languages_compile_load_and_rebuild_with_unity_and_pch() {
     let objc = root.join("part.m");
     let objcpp = root.join("part.mm");
     fs::write(&c, "#include \"fixture.pch.h\"\n#if defined(__OBJC__) || defined(__cplusplus)\n#error wrong C language\n#endif\nint fixture_c(void) { return VALUE; }\n").unwrap();
-    fs::write(&objc, "#include \"fixture.pch.h\"\n#if !defined(__OBJC__) || defined(__cplusplus)\n#error wrong Objective-C language\n#endif\nint fixture_objc(void) { return 4 * VALUE * (@encode(int)[0] == 'i'); }\n").unwrap();
-    fs::write(&objcpp, "#include \"fixture.pch.h\"\n#if !defined(__OBJC__) || !defined(__cplusplus)\n#error wrong Objective-C++ language\n#endif\ntemplate<int N> constexpr int value() { return N; }\nextern \"C\" int fixture_objcpp(void) { return value<8>() * VALUE * (@encode(int)[0] == 'i'); }\n").unwrap();
+    fs::write(&objc, "#include \"fixture.pch.h\"\n#if !defined(__OBJC__) || defined(__cplusplus)\n#error wrong Objective-C language\n#endif\nint fixture_objc(void) { return 4 * VALUE * OBJC_ONLY * (@encode(int)[0] == 'i'); }\n").unwrap();
+    fs::write(&objcpp, "#include \"fixture.pch.h\"\n#if !defined(__OBJC__) || !defined(__cplusplus)\n#error wrong Objective-C++ language\n#endif\ntemplate<int N> constexpr int value() { return N; }\nextern \"C\" int fixture_objcpp(void) { return value<8>() * VALUE * OBJCPP_ONLY * (@encode(int)[0] == 'i'); }\n").unwrap();
     fs::write(&cpp, "#include \"fixture.pch.h\"\n#if defined(__OBJC__) || !defined(__cplusplus)\n#error wrong C++ language\n#endif\nextern \"C\" int fixture_c(void);\nextern \"C\" int fixture_objc(void);\nextern \"C\" int fixture_objcpp(void);\nextern \"C\" int obs_fixture_languages(void) { return fixture_c() + fixture_objc() + fixture_objcpp() + 2 * VALUE; }\n").unwrap();
     for unity in [false, true] {
         for pch in [false, true] {
@@ -528,6 +528,20 @@ fn mixed_objective_languages_compile_load_and_rebuild_with_unity_and_pch() {
             assert_eq!(
                 unsafe { answer(&artifact, b"obs_fixture_languages", &[]) },
                 30
+            );
+            library.objc_compile_options[2] = "-DOBJC_ONLY=2".into();
+            let artifact = build.shared_library(&library).unwrap();
+            // SAFETY: changing a language-specific macro preserves the fixture ABI.
+            assert_eq!(
+                unsafe { answer(&artifact, b"obs_fixture_languages", &[]) },
+                38
+            );
+            library.objcpp_compile_options[2] = "-DOBJCPP_ONLY=2".into();
+            let artifact = build.shared_library(&library).unwrap();
+            // SAFETY: changing the second language's macro preserves the fixture ABI.
+            assert_eq!(
+                unsafe { answer(&artifact, b"obs_fixture_languages", &[]) },
+                54
             );
         }
     }

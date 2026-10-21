@@ -253,6 +253,11 @@ impl NativeBuild {
                 sources,
             } = batch;
             let mut compiler = self.compiler(library, &output, language.cpp());
+            compiler.flags(match language {
+                Language::ObjectiveC => library.objc_compile_options.as_slice(),
+                Language::ObjectiveCpp => library.objcpp_compile_options.as_slice(),
+                Language::C | Language::Cpp => &[],
+            });
             if let Some(header) = header {
                 pch::apply(self, &mut compiler, language, &header)?;
             }
