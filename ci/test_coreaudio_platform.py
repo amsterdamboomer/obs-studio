@@ -10,6 +10,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import platform_ifdef_ratchet as ratchet
+from ci_scope import scope
 from test_settings_platform_facade import function
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -39,6 +40,22 @@ class CoreAudioPlatformTest(unittest.TestCase):
         macos = (PLUGIN / 'hosts/macos/coreaudio-platform.cpp.hpp').read_text()
         self.assertIn('void obs_module_unload(', windows)
         self.assertNotIn('obs_module_unload(', macos)
+
+    def test_host_and_shared_paths_select_the_right_ci(self):
+        for path, windows, macos in (
+            ('build/coreaudio-encoder.windows+.hpp.cpp', True, False),
+            ('hosts/windows/coreaudio-platform.cpp.hpp', True, False),
+            ('hosts/windows/coreaudio-platform-types.hpp', True, False),
+            ('build/coreaudio-encoder.macos+.hpp.cpp', False, True),
+            ('hosts/macos/coreaudio-platform.cpp.hpp', False, True),
+            ('hosts/macos/coreaudio-platform-types.hpp', False, True),
+            ('coreaudio-platform.hpp', True, True),
+            ('build/coreaudio-encoder.pch.hpp', True, True),
+            ('encoder.cpp.hpp', True, True),
+        ):
+            with self.subTest(path=path):
+                result = scope(['plugins/coreaudio-encoder/' + path])
+                self.assertEqual((result.windows, result.macos), (windows, macos))
 
     def test_status_load_registration_and_resource_ownership(self):
         compiler = shutil.which('c++')
