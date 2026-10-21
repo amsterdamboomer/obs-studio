@@ -62,7 +62,7 @@ endif()
 
 if(TARGET gio::gio)
   target_sources(libobs-objects PRIVATE build/libobs.nix-dbus+.h.c)
-  target_sources(libobs PRIVATE ${LIBOBS_NIX_GIO_PORTED_SOURCES})
+  obs_libobs_add_c_sources(${LIBOBS_NIX_GIO_PORTED_SOURCES})
   target_link_libraries(libobs-objects PUBLIC gio::gio)
 endif()
 
