@@ -155,6 +155,16 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     .unwrap();
     assert_ne!(libraries.reference, libraries.with_rust);
     assert_eq!(exports(&libraries.reference), exports(&libraries.with_rust));
+    // Exercise the normal bundled/native entry point too: the explicit pair
+    // above must not be the only route that can produce a working hybrid.
+    let production = NativeBuild {
+        host: build.host.clone(),
+        target: build.target.clone(),
+        output: build.output.join("production"),
+    };
+    let production_core = libobs::build_with_options(&production, &root, &options).unwrap();
+    assert_eq!(exports(&production_core), exports(&libraries.with_rust));
+    assert!(!production.output.join("obs-c-reference").exists());
     if std::env::var_os("OBS_BUILD_C_TESTS").is_some() {
         let executables = obs_build::validation::build_c_tests(
             &build,

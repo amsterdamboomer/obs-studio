@@ -55,6 +55,8 @@ profile, job count and source snapshots; record host load and all outcomes.
   same suite, not before/after test-speed evidence.
 - The full Rust workspace unit, differential and documentation tests pass.
   The opt-in native integration category also passed with `libobs-integration`:
+  The normal native production entry point also built a hybrid with 1,766
+  exports and no C-reference output. The explicit pair ran
   **59 unchanged C executables per backend** (118 runs), selected-library
   loader checks, matching exports, data lifecycle and plugin checks. This run
   disabled per-target native sanitizers; the separate CMake Tier 2 run kept
