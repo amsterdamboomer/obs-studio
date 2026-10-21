@@ -62,7 +62,10 @@ class UvCacheWriterTest(unittest.TestCase):
                 block = "\n".join(lines[index:end])
                 with self.subTest(path=path.relative_to(ROOT), line=index + 1):
                     self.assertIn("save-cache: ${{ github.ref == 'refs/heads/master' }}", block)
-                    self.assertNotRegex(block, r"(?:restore-cache|enable-cache):\s*['\"]?false")
+                    # Tier 2 containers already disable uv caching entirely;
+                    # preserve that independent setting. Enabled consumers
+                    # retain setup-uv's default restore behavior.
+                    self.assertNotRegex(block, r"restore-cache:\s*['\"]?false")
         self.assertGreater(calls, 0)
 
 
