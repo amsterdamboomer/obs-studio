@@ -57,7 +57,7 @@ struct QColorDialog { enum { DontUseNativeDialog=1, ShowAlphaChannel=2 }; using 
 struct QFontDialog { enum { DontUseNativeDialog=1 }; using FontDialogOptions=int; };
 '''
 # Qt QFlags default-initializes to zero, unlike int.
-STUBS = STUBS.replace('using ColorDialogOptions=int;', 'struct ColorDialogOptions { int value=0; void operator|=(int f) { value|=f; } operator int() const { return value; } };')
+STUBS = STUBS.replace('using ColorDialogOptions=int;', 'struct ColorDialogOptions { int value=0; ColorDialogOptions()=default; ColorDialogOptions(int f):value(f){} void operator|=(int f) { value|=f; } operator int() const { return value; } };')
 STUBS = STUBS.replace('using FontDialogOptions=int;', 'struct FontDialogOptions { int value=0; FontDialogOptions()=default; FontDialogOptions(int f):value(f){} operator int() const { return value; } };')
 
 
@@ -118,10 +118,12 @@ int main() {{
                     subprocess.run([str(binary)], check=True)
 
     def test_real_qt_offscreen(self):
-        if not shutil.which('pkg-config') or subprocess.run(
-                ['pkg-config', '--exists', 'Qt6Widgets'], capture_output=True).returncode:
+        qt_prefix = os.environ.get('OBS_QT_TEST_PREFIX')
+        if not qt_prefix and (not shutil.which('pkg-config') or subprocess.run(
+                ['pkg-config', '--exists', 'Qt6Widgets'], capture_output=True).returncode):
             self.skipTest('Qt6Widgets development files unavailable; native Qt CI still required')
-        flags = shlex.split(subprocess.check_output(['pkg-config', '--cflags', '--libs', 'Qt6Widgets'], text=True))
+        flags = [] if qt_prefix else shlex.split(subprocess.check_output(
+            ['pkg-config', '--cflags', '--libs', 'Qt6Widgets'], text=True))
         source = '#include <QApplication>\n#include <QCheckBox>\n#include <QColorDialog>\n#include <QFontDialog>\n#include "libobs/obs-interaction.h"\n'
         source += bodies('posix')
         source += r'''
@@ -147,6 +149,20 @@ int main(int argc, char **argv) {
         with tempfile.TemporaryDirectory(prefix='obs-shared-qt-offscreen-') as tmp:
             p = Path(tmp) / 'offscreen.cpp'; p.write_text(source)
             binary = Path(tmp) / 'offscreen'
+            if qt_prefix:
+                Path(tmp, 'CMakeLists.txt').write_text(
+                    'cmake_minimum_required(VERSION 3.28)\nproject(qt_policy LANGUAGES CXX)\n'
+                    'find_package(Qt6 REQUIRED COMPONENTS Widgets)\n'
+                    'add_executable(offscreen offscreen.cpp)\n'
+                    'target_compile_features(offscreen PRIVATE cxx_std_17)\n'
+                    f'target_include_directories(offscreen PRIVATE "{ROOT}")\n'
+                    'target_link_libraries(offscreen PRIVATE Qt6::Widgets)\n')
+                subprocess.run(['cmake', '-S', tmp, '-B', str(Path(tmp) / 'build'),
+                                '-DCMAKE_PREFIX_PATH=' + qt_prefix], check=True)
+                subprocess.run(['cmake', '--build', str(Path(tmp) / 'build')], check=True)
+                binary = Path(tmp) / 'build/offscreen'
+                subprocess.run([str(binary)], env={**os.environ, 'QT_QPA_PLATFORM':'offscreen'}, check=True)
+                return
             result = subprocess.run(['c++', '-std=c++17', '-fPIC', '-I', str(ROOT), str(p),
                                      '-o', str(binary), *flags], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
