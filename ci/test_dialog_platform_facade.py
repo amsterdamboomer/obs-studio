@@ -2,6 +2,7 @@
 """Dialog host policy, native notifications and interaction modifiers (#879)."""
 from pathlib import Path
 import re
+import os
 import shutil
 import subprocess
 import sys
@@ -99,6 +100,53 @@ class DialogPlatformFacadeTest(unittest.TestCase):
             self.assertTrue(signature in header, 'missing declaration: ' + signature)
             for host in ('windows.cpp','osx.mm','x11.cpp'):
                 self.assertTrue(signature in (UTILITY/f'platform-{host}.hpp').read_text(), host + ': ' + signature)
+
+    def test_real_qt_display_notifications(self):
+        prefix=os.environ.get('OBS_QT_TEST_PREFIX')
+        if not prefix:
+            self.skipTest('Real Qt hierarchy check runs with the Qt CI prefix')
+        helper=function((UTILITY/'platform-windows.cpp.hpp').read_text(),
+                        'void HandlePlatformDialogNativeEvent(')
+        code=r'''
+#include <QApplication>
+#include <QDialog>
+#include <QWidget>
+#include <QByteArray>
+#include <cassert>
+class OBSQTDisplay:public QWidget {
+ Q_OBJECT
+public:
+ explicit OBSQTDisplay(QWidget *parent=nullptr):QWidget(parent){}
+ int moves=0,changes=0;void OnMove(){++moves;}void OnDisplayChange(){++changes;}
+};
+struct MSG{int message;};constexpr int WM_MOVE=1,WM_DISPLAYCHANGE=2;
+class OBSBasicFilters:public QDialog {public:bool nativeEvent(const QByteArray&,void*,qintptr*);};
+class OBSBasicInteraction:public QDialog {public:bool nativeEvent(const QByteArray&,void*,qintptr*);};
+class OBSBasicProperties:public QDialog {public:bool nativeEvent(const QByteArray&,void*,qintptr*);};
+'''+helper+native_methods()+r'''
+template<class T>void check(){
+ T dialog;QWidget container(&dialog),foreign(&dialog);OBSQTDisplay direct(&dialog),nested(&container);
+ QDialog other;OBSQTDisplay outside(&other);qintptr result=99;
+ for(int event:{WM_MOVE,WM_DISPLAYCHANGE,999}){MSG message{event};assert(!dialog.nativeEvent("mocked-message",&message,&result));assert(result==99);}
+ assert(direct.moves==1&&direct.changes==1&&nested.moves==1&&nested.changes==1);
+ assert(outside.moves==0&&outside.changes==0);
+ T empty;MSG move{WM_MOVE};assert(!empty.nativeEvent("mocked-message",&move,&result));
+}
+int main(int argc,char **argv){QApplication app(argc,argv);check<OBSBasicFilters>();check<OBSBasicInteraction>();check<OBSBasicProperties>();}
+#include "dialog.moc"
+'''
+        with tempfile.TemporaryDirectory(prefix='obs-dialog-real-qt-') as tmp:
+            Path(tmp,'dialog.cpp').write_text(code)
+            Path(tmp,'CMakeLists.txt').write_text(
+                'cmake_minimum_required(VERSION 3.28)\nproject(dialog_policy LANGUAGES CXX)\n'
+                'find_package(Qt6 REQUIRED COMPONENTS Widgets)\nset(CMAKE_AUTOMOC ON)\n'
+                'add_executable(dialog_test dialog.cpp)\ntarget_compile_features(dialog_test PRIVATE cxx_std_17)\n'
+                'target_link_libraries(dialog_test PRIVATE Qt6::Widgets)\n')
+            build=str(Path(tmp)/'build')
+            subprocess.run(['cmake','-S',tmp,'-B',build,'-DCMAKE_PREFIX_PATH='+prefix],check=True)
+            subprocess.run(['cmake','--build',build],check=True)
+            subprocess.run([str(Path(build)/'dialog_test')],check=True,
+                           env={**os.environ,'QT_QPA_PLATFORM':'offscreen'},timeout=10)
 
     def test_original_policies_and_native_notifications(self):
         compiler=shutil.which('c++')
