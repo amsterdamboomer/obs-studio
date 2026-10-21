@@ -103,6 +103,27 @@ class RetiredCacheFamilyTest(unittest.TestCase):
                 self.assertNotIn(name, families, "obsolete reservation must not consume declared capacity")
 
 
+class CacheWriterPolicyTest(unittest.TestCase):
+    def test_owned_cache_steps_restore_independently_and_publish_only_on_master(self):
+        files = sorted(WORKFLOWS.glob("*.y*ml")) + sorted(GITHUB.glob("actions/*/action.y*ml"))
+        writers = 0
+        for path in files:
+            lines = path.read_text().splitlines()
+            starts = [i for i, line in enumerate(lines) if re.match(r"\s+- ", line)] + [len(lines)]
+            for start, end in zip(starts, starts[1:]):
+                block = "\n".join(lines[start:end])
+                if re.search(r"uses: actions/cache@", block):
+                    self.fail(f"{path.relative_to(ROOT)}:{start + 1}: separate restore/save to control publication")
+                if not re.search(r"uses: actions/cache/save@", block):
+                    continue
+                writers += 1
+                with self.subTest(path=path.relative_to(ROOT), line=start + 1):
+                    condition = re.search(r"(?m)^\s+if:\s*(.+)$", block)
+                    self.assertIsNotNone(condition, "cache publication must have an explicit guard")
+                    self.assertIn("github.ref == 'refs/heads/master'", condition[1])
+        self.assertGreater(writers, 0)
+
+
 def family_prefixes(ci: dict) -> list[str]:
     out = []
     for fam in ci["cache"]["family"].values():
