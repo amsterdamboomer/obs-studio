@@ -113,8 +113,32 @@ TOML. Preparation now separates raw console output, extracts source configuratio
 and validates the rewritten TOML before entering Flatpak. A focused cold-output
 regression failed before that fix and passes afterward.
 
-Supported-platform and final offline Flatpak verification results are tracked on
-the PR. Hardware recording performance and fourteen consecutive daily stability
+## Platform CI evidence
+
+[PR CI 39531640340](https://github.com/obs-rust/obs-studio/actions/runs/39531640340)
+passed at implementation commit `4ea443714da0befcaf79418d5046e8fb6766e1e4`,
+including the Linux shards, macOS/Windows Tier 2, Rust tests and cross lint.
+The platform logs establish:
+
+| Compatibility host | Tests per backend | Matching exports | C / hybrid wall time |
+| --- | ---: | ---: | ---: |
+| Windows x64 | 165 | 1,794 | 77.40 / 77.09 s |
+| macOS arm64 | 191 | 1,877 | 124.13 / 124.10 s |
+
+[Verification-only run 39531699676](https://github.com/obs-rust/obs-studio/actions/runs/39531699676)
+built Linux, Windows x64/arm64 and macOS x64/arm64 packages, the AppImage and
+offline Flatpak. Native packaged startup passed on both Windows and both macOS
+architectures. The first attempt also passed AppImage checks on NixOS, Arch and
+Ubuntu. Two independent failures require targeted retries: the known real-time
+VLC audio timing flake [#838](https://github.com/obs-rust/obs-studio/issues/838)
+in the C-reference Linux shard, and an AlmaLinux ImageMagick mirror download
+failure before its bundle scenario. The targeted C-reference shard retry passed
+without code changes. AlmaLinux's targeted retry also passed its bundle and
+first-start scenarios. The verification workflow finished **successfully** after
+these two targeted retries; no assertions were changed to accommodate either
+failure. It ran with `verify_only=true` and published no release.
+
+Hardware recording performance and fourteen consecutive daily stability
 builds remain separate release requirements. The checked-in release evidence
 remains unapproved, and both publication workflows fail closed until its review
 is recorded.
