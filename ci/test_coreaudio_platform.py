@@ -25,6 +25,7 @@ class CoreAudioPlatformTest(unittest.TestCase):
             # The issue explicitly permits the existing compiler-only format
             # attribute and warning push/pop. It permits no shared OS branch.
             self.assertEqual([d for d in decisions if '_MSC_VER' not in d[1]], [])
+            self.assertEqual(len(decisions), 3 if p == SOURCE else 0)
 
     def test_host_groups_keep_the_import_table_with_the_encoder(self):
         cmake = (PLUGIN / 'CMakeLists.txt').read_text()
