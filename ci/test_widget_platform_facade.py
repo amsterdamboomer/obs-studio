@@ -133,7 +133,7 @@ int main(){{
  assert(settings.outline&&settings.font==&font&&settings.ints["outline_color"]=={0 if win else 17}&&settings.ints["outline_size"]=={3 if win else 9});}}
  for(auto selected:{{OBS_NIX_PLATFORM_INVALID,OBS_NIX_PLATFORM_X11_EGL,OBS_NIX_PLATFORM_WAYLAND}})for(WId handle:{{WId(0),WId(0x12345)}}){{
   backend=selected;QWindow window;window.handle=handle;gs_window gs;displayReads=0;
-  bool result=FillPlatformGraphicsWindow(&window,gs);
+  bool result=QTToGSWindow(&window,gs);
   bool supported={str(not nix).lower()}||selected==OBS_NIX_PLATFORM_X11_EGL||({str(wayland).lower()}&&selected==OBS_NIX_PLATFORM_WAYLAND);
   bool expected=supported&&(!{str(nix and wayland).lower()}||selected!=OBS_NIX_PLATFORM_WAYLAND||handle!=0);
   assert(result==expected);assert(window.reads==int(supported));
@@ -151,10 +151,100 @@ int main(){{
 }}
 '''
                 source=Path(tmp)/'policy.cpp';binary=Path(tmp)/'policy'
-                source.write_text(COMMON+'\n#undef __linux__\n#define '+macro+' 1\n'+('#define ENABLE_WAYLAND 1\n' if wayland else '')+STUBS+owner+classes+bodies(host)+extras+preview_settings()+visible_callback()+function(text('OBSQTDisplay'),'bool OBSQTDisplay::nativeEvent(')+checks)
+                source.write_text(COMMON+'\n#undef __linux__\n#define '+macro+' 1\n'+('#define ENABLE_WAYLAND 1\n' if wayland else '')+STUBS+owner+classes+bodies(host)+extras+preview_settings()+visible_callback()+function(text('OBSQTDisplay'),'bool OBSQTDisplay::nativeEvent(')+function(text('OBSQTDisplay'),'static bool QTToGSWindow(')+checks)
                 result=subprocess.run([compiler,'-std=c++17',str(source),'-o',str(binary)],capture_output=True,text=True)
                 self.assertEqual(result.returncode,0,result.stderr)
                 subprocess.run([str(binary)],check=True)
+
+    def test_live_x11_wayland_window_handles(self):
+        prefix=os.environ.get('OBS_QT_TEST_PREFIX')
+        if not prefix:
+            self.skipTest('Live Qt backend smoke runs with the CI Qt prefix')
+        import signal
+        import socket
+        with tempfile.TemporaryDirectory(prefix='obs-widget-qt-') as tmp:
+            base=Path(tmp);runtime=base/'runtime';runtime.mkdir(mode=0o700)
+            native=(UTILITY/'platform-x11.cpp.hpp').read_text()
+            mapping=function(native,OPS[3]);reset=function(native,OPS[4]);projector=function(native,OPS[2])
+            owner=function((ROOT/'libobs/obs.hpp').read_text(),'template<typename T, void destroy(T)> class OBSPtr')+';\n'
+            gs=function((ROOT/'libobs/graphics/graphics.h').read_text(),'struct gs_window {')+';\n'
+            code=r'''
+#include <QApplication>
+#include <QWindow>
+#include <QWidget>
+#include <QEventLoop>
+#include <QTimer>
+#include <QEvent>
+#include <X11/Xlib.h>
+#undef Expose
+#include <wayland-client-core.h>
+#include <obs-nix-platform.h>
+#include <cassert>
+#include <cstring>
+#include <functional>
+#include <iostream>
+static obs_nix_platform_type backend;
+static void *connection=nullptr;static int connectionReads=0;
+obs_nix_platform_type obs_get_nix_platform(){return backend;}
+void *obs_get_nix_platform_display(){++connectionReads;return connection;}
+static int destroyed=0;
+struct obs_display_t{};void obs_display_destroy(obs_display_t *display){if(display){++destroyed;delete display;}}
+void obs_display_resize(obs_display_t *display,int,int){assert(display);}
+'''+gs+owner+r'''
+using OBSDisplay=OBSPtr<obs_display_t*,obs_display_destroy>;
+class OBSQTDisplay:public QWidget{public:OBSDisplay display;void CreateDisplay(){display=new obs_display_t;}std::function<void(bool)> VisibleCallback();};
+QSize GetPixelSize(QWidget*){return QSize(96,64);}
+class SmokeWindow:public QWindow{public:std::function<void()> exposed;protected:bool event(QEvent *event)override{bool result=QWindow::event(event);if(event->type()==QEvent::Expose&&isExposed()&&exposed)exposed();return result;}};
+'''+mapping+reset+projector+visible_callback()+r'''
+int main(int argc,char **argv){
+ QApplication app(argc,argv);assert(argc==2);const bool wayland=std::strcmp(argv[1],"wayland")==0;
+ assert(QGuiApplication::platformName()==(wayland?"wayland":"xcb"));
+ backend=wayland?OBS_NIX_PLATFORM_WAYLAND:OBS_NIX_PLATFORM_X11_EGL;
+ if(!wayland){connection=XOpenDisplay(nullptr);assert(connection);}
+ SmokeWindow window;window.resize(96,64);QEventLoop loop;QTimer watchdog;watchdog.setSingleShot(true);
+ QObject::connect(&watchdog,&QTimer::timeout,&loop,&QEventLoop::quit);window.exposed=[&](){loop.quit();};
+ window.show();if(!window.isExposed()){watchdog.start(10000);loop.exec();}assert(window.isExposed());watchdog.stop();
+ gs_window mapped{};assert(FillPlatformGraphicsWindow(&window,mapped));
+ if(wayland){assert(mapped.display==(void*)window.winId());assert(mapped.display);assert(std::strcmp(wl_proxy_get_class((wl_proxy*)mapped.display),"wl_surface")==0);assert(connectionReads==0);}
+ else{assert(mapped.id==window.winId()&&mapped.display==connection&&connectionReads==1);XWindowAttributes attributes;assert(XGetWindowAttributes((Display*)connection,mapped.id,&attributes)==1);}
+ OBSQTDisplay owner;owner.setAttribute(Qt::WA_PaintOnScreen,true);ConfigurePlatformProjectorWindow(&owner);assert(!owner.testAttribute(Qt::WA_PaintOnScreen));
+ owner.CreateDisplay();QObject::connect(&window,&QWindow::visibleChanged,&owner,owner.VisibleCallback());
+ window.hide();QCoreApplication::processEvents();assert(!owner.display&&destroyed==1);
+ std::cout<<"widget-backend="<<argv[1]<<" exposed=yes valid-native-handle=yes hidden-display-destroyed="<<destroyed<<std::endl;
+ if(connection)XCloseDisplay((Display*)connection);
+}
+'''
+            (base/'smoke.cpp').write_text(code)
+            (base/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.28)\nproject(widget_smoke LANGUAGES CXX)\nfind_package(Qt6 REQUIRED COMPONENTS Widgets)\nfind_package(X11 REQUIRED)\nfind_package(PkgConfig REQUIRED)\npkg_check_modules(WAYLAND REQUIRED IMPORTED_TARGET wayland-client)\nadd_executable(widget_smoke smoke.cpp)\ntarget_compile_features(widget_smoke PRIVATE cxx_std_17)\ntarget_compile_definitions(widget_smoke PRIVATE ENABLE_WAYLAND)\ntarget_include_directories(widget_smoke PRIVATE "'+str(ROOT/'libobs')+'")\ntarget_link_libraries(widget_smoke PRIVATE Qt6::Widgets X11::X11 PkgConfig::WAYLAND)\n')
+            build=base/'build'
+            subprocess.run(['cmake','-S',tmp,'-B',str(build),'-DCMAKE_PREFIX_PATH='+prefix],check=True)
+            subprocess.run(['cmake','--build',str(build)],check=True)
+            executable=str(build/'widget_smoke')
+            env={key:value for key,value in os.environ.items() if key not in ('DISPLAY','WAYLAND_DISPLAY','XDG_RUNTIME_DIR','QT_QPA_PLATFORM','NOTIFY_SOCKET','QT_WAYLAND_SHELL_INTEGRATION')}
+            env.update(XDG_RUNTIME_DIR=str(runtime),XDG_CONFIG_HOME=str(base/'config'))
+            subprocess.run(['xvfb-run','-a',executable,'xcb'],env={**env,'QT_QPA_PLATFORM':'xcb'},check=True,timeout=30)
+            # Weston readiness is an event, not a timing assumption. Only this
+            # test's process group is terminated, including its shell clients.
+            with socket.socket(socket.AF_UNIX,socket.SOCK_DGRAM) as ready:
+                notify=str(base/'ready');ready.bind(notify);ready.settimeout(20)
+                with (base/'weston.log').open('w') as log:
+                    server=subprocess.Popen(['weston','--backend=headless','--renderer=pixman','--width=640','--height=480','--socket=widget-smoke','--idle-time=0','--no-config','--modules=systemd-notify.so'],env={**env,'NOTIFY_SOCKET':notify},stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+                    try:
+                        try:
+                            message=ready.recv(4096)
+                        except TimeoutError:
+                            self.fail('Weston did not report readiness: '+(base/'weston.log').read_text())
+                        self.assertIn(b'READY=1',message)
+                        subprocess.run([executable,'wayland'],env={**env,'QT_QPA_PLATFORM':'wayland','WAYLAND_DISPLAY':'widget-smoke','QT_WAYLAND_SHELL_INTEGRATION':'xdg-shell'},check=True,timeout=30)
+                    finally:
+                        try:
+                            os.killpg(server.pid,signal.SIGTERM)
+                        except ProcessLookupError:
+                            pass
+                        try:
+                            server.wait(timeout=10)
+                        except subprocess.TimeoutExpired:
+                            os.killpg(server.pid,signal.SIGKILL);server.wait(timeout=10)
 
     def test_objc_arc_view_is_borrowed(self):
         native=(UTILITY/'platform-osx.mm.hpp').read_text()
