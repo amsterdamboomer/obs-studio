@@ -1,4 +1,4 @@
-"""Verify compile overlap without bypassing Fast Gate for Tier 2 tests."""
+"""Verify independent Tier 2 execution while Fast Gate remains required."""
 import ast
 from pathlib import Path
 import re
@@ -48,8 +48,8 @@ class CompileOverlapTest(unittest.TestCase):
         self.assertIn("check-event", dependencies("rust-linux-tier2-build"))
         self.assertIn("ci-mode", dependencies("rust-linux-tier2-build"))
 
-    def test_tests_wait_for_build_and_fast_gate(self):
-        self.assertIn("rust-tests-linux", dependencies("rust-linux-tier2"))
+    def test_tests_wait_for_build_without_fast_gate_ancestor(self):
+        self.assertNotIn("rust-tests-linux", dependencies("rust-linux-tier2"))
         self.assertIn("rust-linux-tier2-build", dependencies("rust-linux-tier2"))
 
     def test_failure_cancellation_and_attestation_matrix(self):
@@ -59,7 +59,7 @@ class CompileOverlapTest(unittest.TestCase):
                     with self.subTest(gate=gate, build=build, cancelled=cancelled):
                         results = {"rust-tests-linux": gate, "rust-linux-tier2-build": build,
                                    "check-event": "success", "ci-mode": "success"}
-                        expected = not cancelled and build == "success" and gate in {"success", "skipped"}
+                        expected = not cancelled and build == "success"
                         self.assertEqual(tests_allowed(results, cancelled), expected)
 
     def test_both_implementations_and_final_gate_remain(self):
