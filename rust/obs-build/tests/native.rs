@@ -221,8 +221,18 @@ fn production_nvenc_defaults_and_explicit_selection_match_cmake() {
     );
     assert!(options.nvenc.as_ref().unwrap().ffmpeg_ids);
     for arguments in [
-        vec!["build", "--without-nvenc"],
-        vec!["build", "--without-nvenc-ffmpeg-ids"],
+        vec![
+            "build",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--without-nvenc",
+        ],
+        vec![
+            "build",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--without-nvenc-ffmpeg-ids",
+        ],
     ] {
         let cli::Invocation::Build(request) = cli::parse(arguments.clone()).unwrap() else {
             panic!("expected a production build request");
