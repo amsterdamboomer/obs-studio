@@ -47,6 +47,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     );
     let output = tempfile::tempdir().unwrap();
     let build = NativeBuild {
+        profile: Default::default(),
         host: obs_build::BUILD_HOST.into(),
         target: obs_build::BUILD_TARGET.into(),
         output: std::env::var_os("OBS_BUILD_TEST_OUTPUT")
@@ -164,6 +165,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
     // Exercise the normal bundled/native entry point too: the explicit pair
     // above must not be the only route that can produce a working hybrid.
     let production = NativeBuild {
+        profile: Default::default(),
         host: build.host.clone(),
         target: build.target.clone(),
         output: build.output.join("production"),
@@ -1324,6 +1326,7 @@ fn macos_core_builds_from_the_canonical_manifest() {
         std::env::var_os("OBS_BUILD_MACOS_OUTPUT").expect("set OBS_BUILD_MACOS_OUTPUT"),
     );
     let build = NativeBuild {
+        profile: Default::default(),
         host: obs_build::BUILD_HOST.into(),
         target: std::env::var("OBS_BUILD_MACOS_TARGET")
             .unwrap_or_else(|_| obs_build::BUILD_TARGET.into()),

@@ -48,6 +48,7 @@ fn native_profile_switch_rebuilds_assertion_policy() {
     )
     .unwrap();
     let build = NativeBuild {
+        profile: Default::default(),
         host: obs_build::BUILD_HOST.into(),
         target: obs_build::BUILD_TARGET.into(),
         output: directory.path().join("artifacts"),
@@ -83,6 +84,7 @@ fn swift_bridge_preserves_native_linkage_header_flags_and_source_rebuilds() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     let build = NativeBuild {
+        profile: Default::default(),
         host: obs_build::BUILD_HOST.into(),
         target: obs_build::BUILD_TARGET.into(),
         output: root.join("artifacts"),
@@ -159,6 +161,7 @@ fn native_plugin_links_shared_core_and_observes_rebuilt_dependency() {
     .unwrap();
     fs::write(&plugin_source, format!("extern int obs_fixture_answer(void); {EXPORT} int obs_fixture_plugin(void) {{ return obs_fixture_answer() + 1; }}")).unwrap();
     let build = NativeBuild {
+        profile: Default::default(),
         host: obs_build::BUILD_HOST.into(),
         target: obs_build::BUILD_TARGET.into(),
         output: dir.path().join("artifacts"),
@@ -217,6 +220,7 @@ fn unity_toggle_preserves_exports_and_explicit_generated_source_wins() {
     fs::write(&extra, "int obs_fixture_other(void) { return 23; }").unwrap();
     for unity in [false, true] {
         let build = NativeBuild {
+            profile: Default::default(),
             host: obs_build::BUILD_HOST.into(),
             target: obs_build::BUILD_TARGET.into(),
             output: dir.path().join(format!("output-{unity}")),
@@ -253,6 +257,7 @@ fn executable_runs_against_its_shared_core_dependency() {
     )
     .unwrap();
     let build = NativeBuild {
+        profile: Default::default(),
         host: obs_build::BUILD_HOST.into(),
         target: obs_build::BUILD_TARGET.into(),
         output: dir.path().join("artifacts"),
@@ -327,6 +332,7 @@ int main(void) { return obs_fixture_resource() == HEADER_VALUE + RESOURCE_VALUE 
     for unity in [false, true] {
         fs::write(&header, "#define HEADER_VALUE 2\n").unwrap();
         let build = NativeBuild {
+            profile: Default::default(),
             host: obs_build::BUILD_HOST.into(),
             target: requested.clone(),
             output: root.join(format!("resources-{unity}")),
@@ -459,6 +465,7 @@ __declspec(selectany) int fixture_c_storage = HEADER_VALUE;
     for unity in [false, true] {
         write_header(17);
         let build = NativeBuild {
+            profile: Default::default(),
             host: obs_build::BUILD_HOST.into(),
             target: requested.clone(),
             output: root.join(format!("msvc-pch-{unity}")),
@@ -559,6 +566,7 @@ fn pch_preserves_mixed_languages_unity_and_header_flag_invalidation() {
         write_header(17);
         fs::write(&transitive, "#define TRANSITIVE_VALUE 0\n").unwrap();
         let build = NativeBuild {
+            profile: Default::default(),
             host: obs_build::BUILD_HOST.into(),
             target: obs_build::BUILD_TARGET.into(),
             output: root.join(format!("output-{unity}")),
@@ -609,6 +617,7 @@ fn explicit_groups_compile_as_individual_sources_and_observe_member_edits() {
     let group = root.join("build/fixture+.h.c");
     fs::write(&group, "/* explicit group */\n#include \"build/fixture.pch.h\"\n#include \"first.c.h\"\n#include \"second.c.h\"\n").unwrap();
     let build = NativeBuild {
+        profile: Default::default(),
         host: obs_build::BUILD_HOST.into(),
         target: obs_build::BUILD_TARGET.into(),
         output: root.join("artifacts"),
@@ -651,6 +660,7 @@ fn individual_compilation_rejects_conditional_group_selection() {
     )
     .unwrap();
     let build = NativeBuild {
+        profile: Default::default(),
         host: obs_build::BUILD_HOST.into(),
         target: obs_build::BUILD_TARGET.into(),
         output: directory.path().join("artifacts"),
@@ -692,6 +702,7 @@ fn mixed_c_and_cpp_use_independent_flags_and_the_cpp_linker() {
         ..SharedLibrary::default()
     };
     let build = NativeBuild {
+        profile: Default::default(),
         host: obs_build::BUILD_HOST.into(),
         target: obs_build::BUILD_TARGET.into(),
         output: directory.path().join("out"),
@@ -733,6 +744,7 @@ fn pch_batches_preserve_constructor_order_with_interleaved_headers() {
     fs::write(&entry, "int fixture_order = 0;\nextern \"C\" int obs_fixture_order(void) { return fixture_order; }\n").unwrap();
     for unity in [false, true] {
         let build = NativeBuild {
+            profile: Default::default(),
             host: obs_build::BUILD_HOST.into(),
             target: obs_build::BUILD_TARGET.into(),
             output: root.join(format!("artifacts-{unity}")),
@@ -762,6 +774,7 @@ fn pch_batches_preserve_constructor_order_with_interleaved_headers() {
 fn production_hybrid_requires_a_real_rust_archive_before_native_compilation() {
     let directory = tempfile::tempdir().unwrap();
     let build = NativeBuild {
+        profile: Default::default(),
         host: obs_build::BUILD_HOST.into(),
         target: obs_build::BUILD_TARGET.into(),
         output: directory.path().join("build"),
@@ -782,6 +795,7 @@ fn objective_groups_expand_to_individual_language_correct_sources() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
     let build = NativeBuild {
+        profile: Default::default(),
         host: obs_build::BUILD_HOST.into(),
         target: obs_build::BUILD_TARGET.into(),
         output: root.join("artifacts"),
@@ -854,6 +868,7 @@ fn mixed_objective_languages_compile_load_and_rebuild_with_unity_and_pch() {
         for pch in [false, true] {
             write_header(1);
             let build = NativeBuild {
+                profile: Default::default(),
                 host: obs_build::BUILD_HOST.into(),
                 target: obs_build::BUILD_TARGET.into(),
                 output: root.join(format!("output-{unity}-{pch}")),
@@ -948,6 +963,7 @@ fn arc_and_manual_groups_keep_source_flags_through_expansion_and_pch() {
     for separate in [false, true] {
         for pch in [false, true] {
             let build = NativeBuild {
+                profile: Default::default(),
                 host: obs_build::BUILD_HOST.into(),
                 target: obs_build::BUILD_TARGET.into(),
                 output: root.join(format!("output-{separate}-{pch}")),
@@ -995,6 +1011,7 @@ fn native_source_options_reject_ambiguous_or_orphan_assignments() {
     fs::write(&source, "int fixture(void) { return 1; }\n").unwrap();
     fs::write(&other, "int other(void) { return 2; }\n").unwrap();
     let build = NativeBuild {
+        profile: Default::default(),
         host: obs_build::BUILD_HOST.into(),
         target: obs_build::BUILD_TARGET.into(),
         output: dir.path().join("artifacts"),
