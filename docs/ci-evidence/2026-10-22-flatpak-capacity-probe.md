@@ -114,3 +114,13 @@ differential test. Corresponding log hashes/excerpts are in the hosted record.
 The final parent gate was still queued at this follow-up; full workflow
 success remains unclaimed until that gate is observed. The earlier failed
 namespace consumer remains a separate recorded observation in #1711.
+
+
+### Terminal result
+
+Full run39722540093 subsequently completed **SUCCESS**, including its
+required final gate. Terminal API run/job metadata is appended to the hosted
+record; earlier capture-time status remains preserved. This completes the
+defined measurement trial, not production transport adoption, representative
+cost/durability evidence or the broader #1269 requirements. No workflow
+retry was used.
