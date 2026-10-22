@@ -37,6 +37,9 @@ int main(int argc, char **argv) {
     const char *value = getenv("OBS_GRAPH_VALUE");
     if (COMPILER_OPTION_REQUIRED != 23 || HEADER_ONLY_ANSWER != 17 || selected_answer() != 42 || EXPECTED != 42 || DEPENDENCY_ANSWER != 42 || DEPENDENCY_REQUIRED != 5 || argc != 2 || strcmp(argv[1], "two words") ||
         !value || strcmp(value, "first;second")) return 1;
+    FILE *module = fopen(ARTIFACT_PATH, "rb");
+    if (!module) return 4;
+    fclose(module);
     FILE *input = fopen(SOURCE_HEADER, "r");
     if (!input) return 3;
     fclose(input);
@@ -52,18 +55,20 @@ int main(int argc, char **argv) {
         "int selected_answer(void) { return 42; }\n",
     )
     .unwrap();
+    fs::write(root.join("fixture-module.c"), "int fixture_module(void) { return 7; }\n").unwrap();
     let graph = serde_json::json!({
         "schema": 1,
         "targets": {
             "answer": {"sources": ["answer.c", {"path": "selected.c", "requires": "GRAPH_FEATURE"}, {"path": "missing-disabled.c", "requires": "GRAPH_DISABLED"}], "definitions": ["EXPECTED=42", "SOURCE_HEADER=\"${source}/dependency-include/dependency.h\""],
                 "libraries": ["fixture-dependency", {"name": "disabled-library", "requires": "GRAPH_DISABLED"}],
                 "header_libraries": ["fixture-headers"],
+                "artifact_definitions": {"ARTIFACT_PATH": "fixture-module"},
                 "compile_options": [{"name": "-DCOMPILER_OPTION_REQUIRED=23", "requires": "GRAPH_FEATURE"}, {"name": "-invalid-disabled-compiler-option", "requires": "GRAPH_DISABLED"}],
                 "requires": {"all": ["GRAPH_FEATURE", {"not": "GRAPH_DISABLED"}]}},
             "disabled": {"sources": ["does-not-exist.c"], "requires": "GRAPH_DISABLED"}
         },
         "tests": {
-            "answer-case": {"target": "answer", "command": ["${target}", "two words"],
+            "answer-case": {"target": "answer", "suite": "fixture", "command": ["${target}", "two words"],
                 "environment": {"OBS_GRAPH_VALUE": "first;second"},
                 "working_directory": "${build}", "timeout_seconds": 17,
                 "skip_return_code": 77, "resource_locks": ["fixture-lock"]},
@@ -72,7 +77,7 @@ int main(int argc, char **argv) {
     });
     fs::write(root.join("graph.json"), graph.to_string()).unwrap();
     fs::write(root.join("CMakeLists.txt"), format!(
-        "cmake_minimum_required(VERSION 3.28)\nproject(graph-fixture C)\nenable_testing()\nset(GRAPH_FEATURE ON)\nset(GRAPH_DISABLED OFF)\nadd_library(fixture-dependency INTERFACE)\ntarget_include_directories(fixture-dependency INTERFACE \"${{CMAKE_CURRENT_SOURCE_DIR}}/dependency-include\")\ntarget_compile_definitions(fixture-dependency INTERFACE DEPENDENCY_REQUIRED=5)\nadd_library(fixture-headers INTERFACE)\ntarget_include_directories(fixture-headers INTERFACE \"${{CMAKE_CURRENT_SOURCE_DIR}}/header-only-include\")\ntarget_compile_definitions(fixture-headers INTERFACE HEADER_POLICY_LEAKED=1)\ntarget_compile_options(fixture-headers INTERFACE -invalid-header-policy)\ntarget_link_libraries(fixture-headers INTERFACE missing-header-link-library)\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\n",
+        "cmake_minimum_required(VERSION 3.28)\nproject(graph-fixture C)\nenable_testing()\nadd_library(fixture-module MODULE fixture-module.c)\nset_target_properties(fixture-module PROPERTIES LIBRARY_OUTPUT_DIRECTORY \"${{CMAKE_CURRENT_BINARY_DIR}}/module output\")\nset(GRAPH_FEATURE ON)\nset(GRAPH_DISABLED OFF)\nadd_library(fixture-dependency INTERFACE)\ntarget_include_directories(fixture-dependency INTERFACE \"${{CMAKE_CURRENT_SOURCE_DIR}}/dependency-include\")\ntarget_compile_definitions(fixture-dependency INTERFACE DEPENDENCY_REQUIRED=5)\nadd_library(fixture-headers INTERFACE)\ntarget_include_directories(fixture-headers INTERFACE \"${{CMAKE_CURRENT_SOURCE_DIR}}/header-only-include\")\ntarget_compile_definitions(fixture-headers INTERFACE HEADER_POLICY_LEAKED=1)\ntarget_compile_options(fixture-headers INTERFACE -invalid-header-policy)\ntarget_link_libraries(fixture-headers INTERFACE missing-header-link-library)\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\n",
         consumer.to_string_lossy().replace('\\', "/")
     )).unwrap();
     for arguments in [
@@ -157,7 +162,13 @@ int main(int argc, char **argv) {
         ("GRAPH_FEATURE".into(), true),
         ("GRAPH_DISABLED".into(), false),
     ]);
+    let module = build.shared_library(&SharedLibrary {
+        name: "fixture-module".into(),
+        sources: vec![root.join("fixture-module.c")],
+        ..Default::default()
+    }).unwrap();
     let dependencies = std::collections::BTreeMap::from([
+        ("fixture-module".into(), obs_build::validation::graph::Dependency { artifacts: vec![module], ..Default::default() }),
         (
             "fixture-dependency".into(),
             obs_build::validation::graph::Dependency {
@@ -416,6 +427,15 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         "independent Linux test inventory remains"
     );
     for name in [
+        "test_whip_rtp_timestamp",
+        "test_whip_host_os_name",
+        "test_group_hide_transition_audio",
+        "test_vlc_drain_gate",
+        "test_vlc_host_path",
+        "test_vlc_channel_order",
+        "test_vlc_audio_track",
+        "test_vlc_audio_pacing",
+        "test_vlc_playlist_gap",
         "test_amf",
         "test_amf3_classname",
         "test_amf3_terminator",
