@@ -275,20 +275,22 @@ def collect(repo: str, start: str, end: str, output: Path, per_group: int, inclu
         run_id = run["databaseId"]
         cached_path = output / f"run-{run_id}.json"
         cached = json.loads(cached_path.read_text()) if cached_path.exists() else None
-        if cached and all(cached.get(key) == run[key] for key in ("updatedAt", "headSha", "status", "conclusion")):
+        cache_valid = cached and all(cached.get(key) == run[key] for key in ("updatedAt", "headSha", "status", "conclusion"))
+        if cache_valid:
             jobs = cached["jobs"]
             detail = {"run_attempt": cached["run_attempt"], "pull_requests": []}
         else:
             detail = gh("api", f"repos/{repo}/actions/runs/{run_id}")
             pages = gh("api", f"repos/{repo}/actions/runs/{run_id}/jobs?per_page=100", "--paginate", "--slurp")
             jobs = [job for page in pages for job in page["jobs"]]
-        base = None
+        # A later PR/base update cannot change an unchanged historical sample.
+        base = cached.get("comparison_base") if cache_valid else None
         queue = re.search(r"/pr-\d+-([a-f0-9]{40})$", (run.get("headBranch") or ""))
         if queue:
             base = queue.group(1)
         elif detail.get("pull_requests"):
             base = detail["pull_requests"][0]["base"]["sha"]
-        elif run["event"] == "pull_request":
+        elif base is None and run["event"] == "pull_request":
             # GitHub often drops associations from old/merged run metadata.
             # Resolve only an unambiguous branch/lifetime match; never guess
             # docs from a missing association or the branch name itself.

@@ -212,6 +212,31 @@ class CacheMetricsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=scratch) as directory, mock.patch.object(metrics, "gh", side_effect=fake_gh):
             return metrics.collect("test/repo", "2026-01-01T00:00:00+00:00", "2026-01-02T00:00:00Z", Path(directory), 12)
 
+    def test_cached_run_preserves_its_historical_comparison_base(self):
+        import json
+        run = {'databaseId': 1, 'status': 'completed', 'conclusion': 'success',
+               'event': 'pull_request', 'headSha': 'b' * 40, 'headBranch': 'fix/one',
+               'createdAt': '2026-01-01T08:00:00Z', 'updatedAt': '2026-01-01T08:02:00Z'}
+        cached = {**run, 'jobs': [], 'run_attempt': 1, 'comparison_base': 'a' * 40,
+                  'comparison_error': None, 'changed_files': ['libobs/obs.c']}
+
+        def fake_gh(*args):
+            if args[:2] == ('run', 'list'):
+                return [run] if args[args.index('--workflow') + 1] == 'ci.yml' else []
+            if args[:2] == ('pr', 'list'):
+                return [{'headRefName': 'fix/one', 'headRefOid': 'b' * 40, 'baseRefOid': 'c' * 40,
+                         'createdAt': '2026-01-01T07:00:00Z', 'closedAt': None}]
+            if '/actions/caches?' in args[1]:
+                return [{'actions_caches': []}]
+            raise AssertionError('An unchanged cached run must not be reclassified against a later base: ' + str(args))
+
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(metrics, 'gh', side_effect=fake_gh):
+            output = Path(directory)
+            (output / 'run-1.json').write_text(json.dumps(cached))
+            report = metrics.collect('test/repo', '2026-01-01T00:00:00Z', '2026-01-02T00:00:00Z', output, 12)
+            self.assertIn('pull_request/code', report['cohorts'])
+            self.assertEqual(json.loads((output / 'run-1.json').read_text())['comparison_base'], 'a' * 40)
+
     def test_resolves_old_pr_diff_and_deduplicates_docs_candidates(self):
         report = self.collect()
         self.assertEqual(report["listed_runs"], 1)
