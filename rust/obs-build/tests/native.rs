@@ -2,6 +2,49 @@
 use obs_build::{NativeBuild, SharedLibrary};
 use std::{fs, path::Path};
 
+#[test]
+fn native_test_graph_preserves_sources_and_runtime_requirements() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let path = root.join("test/cmocka/build/test-graph.json");
+    let graph: serde_json::Value = serde_json::from_slice(
+        &fs::read(&path).expect("CMake and Cargo need a shared native test graph"),
+    )
+    .unwrap();
+    assert_eq!(graph["schema"], 1);
+    let targets = graph["targets"].as_object().unwrap();
+    let tests = graph["tests"].as_object().unwrap();
+    for name in [
+        "test_scene_group_transform",
+        "test_shader_sampler_convert",
+        "test_pulse_monitor_samples",
+    ] {
+        let sources = targets[name]["sources"].as_array().unwrap();
+        assert!(sources.contains(&serde_json::json!(format!("test/cmocka/{name}.c"))));
+        assert_eq!(tests[name]["target"], name);
+    }
+    assert!(
+        targets["test_scene_group_transform"]["sources"]
+            .as_array()
+            .unwrap()
+            .contains(&serde_json::json!("libobs/obs-scene-group-transform.c.h"))
+    );
+    let pulse = &tests["test_pulse_monitor_samples"];
+    assert_eq!(
+        pulse["command"],
+        serde_json::json!([
+            "sh",
+            "${source}/test/cmocka/test_pulse_monitor_device.sh",
+            "${target}"
+        ])
+    );
+    assert_eq!(pulse["timeout_seconds"], 60);
+    assert_eq!(pulse["skip_return_code"], 77);
+    assert_eq!(
+        targets["test_pulse_monitor_samples"]["requires"],
+        serde_json::json!({"all": ["OS_LINUX", "ENABLE_PULSEAUDIO"]})
+    );
+}
+
 fn target(name: &str, source: &Path, dependencies: Vec<std::path::PathBuf>) -> SharedLibrary {
     SharedLibrary {
         name: name.into(),
