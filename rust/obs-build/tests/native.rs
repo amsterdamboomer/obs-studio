@@ -3,6 +3,76 @@ use obs_build::{NativeBuild, SharedLibrary};
 use std::{fs, path::Path};
 
 #[test]
+fn native_test_graph_cmake_builds_and_runs_selected_contract() {
+    let fixture = tempfile::tempdir().unwrap();
+    let root = fixture.path();
+    let output = root.join("output");
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let consumer = repository.join("test/cmocka/native-test-graph.cmake");
+    fs::write(root.join("answer.c"), r#"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+int main(int argc, char **argv) {
+    const char *value = getenv("OBS_GRAPH_VALUE");
+    if (EXPECTED != 42 || argc != 2 || strcmp(argv[1], "two words") ||
+        !value || strcmp(value, "two words")) return 1;
+    FILE *file = fopen("marker.txt", "w");
+    if (!file) return 2;
+    return fclose(file);
+}
+"#).unwrap();
+    let graph = serde_json::json!({
+        "schema": 1,
+        "targets": {
+            "answer": {"sources": ["answer.c"], "definitions": ["EXPECTED=42"],
+                "requires": {"all": ["GRAPH_FEATURE", {"not": "GRAPH_DISABLED"}]}},
+            "disabled": {"sources": ["does-not-exist.c"], "requires": "GRAPH_DISABLED"}
+        },
+        "tests": {
+            "answer-case": {"target": "answer", "command": ["${target}", "two words"],
+                "environment": {"OBS_GRAPH_VALUE": "two words"},
+                "working_directory": "${build}", "timeout_seconds": 17,
+                "skip_return_code": 77, "resource_locks": ["fixture-lock"]},
+            "disabled-case": {"target": "disabled"}
+        }
+    });
+    fs::write(root.join("graph.json"), graph.to_string()).unwrap();
+    fs::write(root.join("CMakeLists.txt"), format!(
+        "cmake_minimum_required(VERSION 3.28)\nproject(graph-fixture C)\nenable_testing()\nset(GRAPH_FEATURE ON)\nset(GRAPH_DISABLED OFF)\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\n",
+        consumer.to_string_lossy().replace('\\', "/")
+    )).unwrap();
+    for arguments in [
+        vec!["-S".into(), root.to_string_lossy().into_owned(), "-B".into(), output.to_string_lossy().into_owned()],
+        vec!["--build".into(), output.to_string_lossy().into_owned(), "--config".into(), "Release".into()],
+    ] {
+        let result = std::process::Command::new("cmake").args(arguments).output().unwrap();
+        assert!(result.status.success(), "{}\n{}", String::from_utf8_lossy(&result.stdout), String::from_utf8_lossy(&result.stderr));
+    }
+    let inventory = std::process::Command::new("ctest")
+        .args(["--test-dir", output.to_str().unwrap(), "-C", "Release", "--show-only=json-v1"])
+        .output().unwrap();
+    assert!(inventory.status.success());
+    let inventory: serde_json::Value = serde_json::from_slice(&inventory.stdout).unwrap();
+    let tests = inventory["tests"].as_array().unwrap();
+    assert_eq!(tests.len(), 1);
+    assert_eq!(tests[0]["name"], "answer-case");
+    for (name, value) in [
+        ("TIMEOUT", serde_json::json!(17.0)),
+        ("SKIP_RETURN_CODE", serde_json::json!(77)),
+        ("RESOURCE_LOCK", serde_json::json!(["fixture-lock"])),
+    ] {
+        assert!(tests[0]["properties"].as_array().unwrap().iter()
+            .any(|property| property["name"] == name && property["value"] == value), "missing {name}: {tests:?}");
+    }
+    let result = std::process::Command::new("ctest")
+        .args(["--test-dir", output.to_str().unwrap(), "-C", "Release", "--output-on-failure"])
+        .output().unwrap();
+    assert!(result.status.success(), "{}\n{}", String::from_utf8_lossy(&result.stdout), String::from_utf8_lossy(&result.stderr));
+    assert!(output.join("marker.txt").is_file());
+}
+
+#[test]
 fn native_test_graph_checks_selection_references_and_commands() {
     use obs_build::validation::graph::Graph;
     use std::collections::BTreeMap;
