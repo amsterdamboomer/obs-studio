@@ -14,9 +14,11 @@ from pathlib import Path
 import re
 import subprocess
 
+# Interpreter package used by fixture scripts; project commands use uv run.
+PYTHON_RUNTIME_PACKAGE = 'python3'  # uv run supplies project execution.
 RUNTIME_TOOLS = (
     # The unchanged manifest-source CTest configures and compiles a C fixture.
-    'cmake', 'ninja-build', 'gcc', 'libc6-dev', 'python3', 'git', 'file', 'zstd', 'xvfb', 'xauth',
+    'cmake', 'ninja-build', 'gcc', 'libc6-dev', PYTHON_RUNTIME_PACKAGE, 'git', 'file', 'zstd', 'xvfb', 'xauth',
     # Tests dlopen the unversioned libvlc.so name provided by this package.
     'libvlc-dev',
     'pipewire', 'dbus-daemon', 'vlc-plugin-base', 'libgl1-mesa-dri', 'libegl-mesa0', 'libglx-mesa0',

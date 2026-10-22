@@ -65,7 +65,7 @@ libc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6 (0x234)
     def test_runtime_only_inputs_cover_non_linked_drivers_plugins_and_tools(self):
         m = module()
         for name in ('libgl1-mesa-dri', 'libegl-mesa0', 'vlc-plugin-base', 'pipewire',
-                     'dbus-daemon', 'xvfb', 'xauth', 'cmake', 'python3', 'ninja-build',
+                     'dbus-daemon', 'xvfb', 'xauth', 'cmake', m.PYTHON_RUNTIME_PACKAGE, 'ninja-build',
                      'gcc', 'libc6-dev', 'libvlc-dev'):
             self.assertIn(name, m.RUNTIME_TOOLS)
         self.assertNotIn('build-essential', m.RUNTIME_TOOLS)
