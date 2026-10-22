@@ -695,7 +695,7 @@ with source/image, commands, preparation and rebuild times, filesystem bytes,
 and literal ccache statistics/version plus machine-readable counters. The
 probe verifies the effective cache directory and rejects rebuilds with no
 cacheable C/C++ calls. The pinned ccache supports these inspection commands
-in its [manual](https://ccache.dev/manual/4.13.5.html). Artifacts expire after two days;
+in its [manual](https://ccache.dev/manual/4.14.1.html). Artifacts expire after two days;
 preserve useful results in `docs/ci-evidence/` before expiry. Filesystem bytes
 are not compressed GitHub archive sizes. Two samples per size from one runner
 do not establish representative-day latency, repository retention, or a
