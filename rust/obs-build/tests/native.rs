@@ -117,6 +117,27 @@ int main(int argc, char **argv) {
         String::from_utf8_lossy(&result.stderr)
     );
     assert!(output.join("marker.txt").is_file());
+    let rust_graph = obs_build::validation::graph::Graph::parse(&graph.to_string()).unwrap();
+    let build = NativeBuild {
+        host: obs_build::BUILD_HOST.into(),
+        target: obs_build::BUILD_TARGET.into(),
+        output: root.join("cargo-output"),
+        profile: Default::default(),
+    };
+    let facts = std::collections::BTreeMap::from([
+        ("GRAPH_FEATURE".into(), true),
+        ("GRAPH_DISABLED".into(), false),
+    ]);
+    let artifacts = rust_graph.compile(&build, root, &facts, &Default::default()).unwrap();
+    assert_eq!(artifacts.len(), 1);
+    let selected = rust_graph.select(&facts).unwrap();
+    assert_eq!(selected.tests.keys().copied().collect::<Vec<_>>(), vec![tests[0]["name"].as_str().unwrap()]);
+    let mut command = selected.tests["answer-case"]
+        .command(root, &build.output, &artifacts["answer"]).unwrap();
+    fs::create_dir_all(&build.output).unwrap();
+    let result = command.output().unwrap();
+    assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+    assert!(build.output.join("marker.txt").is_file());
     for (pointer, value, message) in [
         ("/schema", serde_json::json!(2), "schema"),
         (
