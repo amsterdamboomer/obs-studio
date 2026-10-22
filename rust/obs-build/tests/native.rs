@@ -101,6 +101,7 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/watched-inputs.txt" "${graph_inputs}")
             root.to_string_lossy().into_owned(),
             "-B".into(),
             output.to_string_lossy().into_owned(),
+            "-DCMAKE_BUILD_TYPE=Release".into(),
         ],
         vec![
             "--build".into(),
@@ -179,10 +180,7 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/watched-inputs.txt" "${graph_inputs}")
         String::from_utf8_lossy(&result.stdout),
         String::from_utf8_lossy(&result.stderr)
     );
-    assert!(
-        output.join("runtime root/marker.txt").is_file()
-            || output.join("runtime root/Release/marker.txt").is_file()
-    );
+    assert!(output.join("runtime root/Release/marker.txt").is_file());
     let rust_graph = obs_build::validation::graph::Graph::parse(&graph.to_string()).unwrap();
     let build = NativeBuild {
         host: obs_build::BUILD_HOST.into(),
