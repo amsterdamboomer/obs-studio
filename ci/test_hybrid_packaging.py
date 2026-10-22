@@ -81,7 +81,7 @@ set_target_properties(obs-nvenc PROPERTIES PREFIX "")
         self.assertIn("id: flatpak-builder-cache-lookup", job)
         lookup = job.split("id: flatpak-builder-cache-lookup", 1)[1].split("\n      - ", 1)[0]
         self.assertIn("lookup-only: true", lookup)
-        self.assertIn("key: ${{ steps.setup.outputs.cacheKey }}-x86_64", lookup)
+        self.assertIn("key: flatpak-builder-x86_64-${{ hashFiles('build-aux/com.obsproject.Studio.json') }}-x86_64", lookup)
         self.assertIn("restore-keys: flatpak-builder-x86_64", lookup)
         marker = "- name: Restore legacy Flatpak builder seed"
         self.assertIn(marker, job)
