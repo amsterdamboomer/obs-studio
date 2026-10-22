@@ -1385,9 +1385,58 @@ fn macos_core_builds_from_the_canonical_manifest() {
         std::fs::read(framework.join("Versions/A/libobs")).unwrap()
     );
     assert_eq!(bytes, std::fs::read(framework.join("libobs")).unwrap());
+    if std::env::var_os("OBS_BUILD_MACOS_GRAPHICS").is_some() {
+        for (name, renderer) in [
+            (
+                "OPENGL",
+                graphics::build_opengl(&build, &root, &library, &options).unwrap(),
+            ),
+            (
+                "METAL",
+                graphics::build_metal(&build, &root, &library, &options).unwrap(),
+            ),
+        ] {
+            let symbols = macos_graphics_exports(&renderer);
+            for required in [
+                "_device_get_name",
+                "_device_get_type",
+                "_device_create",
+                "_device_destroy",
+            ] {
+                assert!(symbols.contains(required), "{name} lacks {required}");
+            }
+            if let Some(reference) = std::env::var_os(format!("OBS_BUILD_MACOS_{name}_REFERENCE")) {
+                assert_eq!(
+                    symbols,
+                    macos_graphics_exports(std::path::Path::new(&reference)),
+                    "{name} exports differ from CMake"
+                );
+            }
+        }
+    }
     std::fs::write(
         build.output.join("macos-core-path.txt"),
         library.to_str().unwrap(),
     )
     .unwrap();
+}
+
+fn macos_graphics_exports(path: &std::path::Path) -> std::collections::BTreeSet<String> {
+    let result = std::process::Command::new(
+        std::env::var_os("OBS_BUILD_MACOS_NM").unwrap_or_else(|| "nm".into()),
+    )
+    .args(["-gUj"])
+    .arg(path)
+    .output()
+    .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    String::from_utf8(result.stdout)
+        .unwrap()
+        .lines()
+        .map(str::to_owned)
+        .collect()
 }

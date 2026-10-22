@@ -2,6 +2,18 @@
 use crate::{NativeBuild, SharedLibrary, libobs::Options};
 use std::path::{Path, PathBuf};
 
+pub fn build_metal(
+    build: &NativeBuild,
+    _root: &Path,
+    _core: &Path,
+    _options: &Options,
+) -> Result<PathBuf, String> {
+    Err(format!(
+        "native Metal graph for {} is not implemented yet",
+        build.target
+    ))
+}
+
 pub fn build_d3d11(
     build: &NativeBuild,
     root: &Path,
