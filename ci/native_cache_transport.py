@@ -173,7 +173,7 @@ def validate_archive(archive: Path, metadata: dict, identity: dict, staged: Path
         if digest(stream) != metadata['sha256']:
             raise ValueError('archive digest mismatch')
         stream.seek(0)
-        seen, expanded, aliases = set(), 0, {}
+        seen, expanded, aliases, types = set(), 0, {}, {}
         try:
             with tarfile.open(fileobj=stream, mode='r|gz') as payload:
                 for member in payload:
@@ -181,6 +181,16 @@ def validate_archive(archive: Path, metadata: dict, identity: dict, staged: Path
                     reject_case_collision(member.name, aliases)
                     if not (member.isfile() or member.isdir()) or member.name in seen:
                         raise ValueError('unsupported or duplicate archive entry')
+                    parts = member.name.split('/')
+                    for count in range(1, len(parts)):
+                        parent = '/'.join(parts[:count])
+                        if types.get(parent) == 'file':
+                            raise ValueError('archive file conflicts with parent directory')
+                        types[parent] = 'directory'
+                    kind = 'file' if member.isfile() else 'directory'
+                    if member.name in types and types[member.name] != kind:
+                        raise ValueError('archive file/directory conflict')
+                    types[member.name] = kind
                     seen.add(member.name)
                     expanded += member.size if member.isfile() else 0
                     if len(seen) > MAX_ENTRIES or expanded > MAX_EXPANDED_BYTES:
