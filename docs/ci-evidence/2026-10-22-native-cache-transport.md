@@ -143,3 +143,24 @@ foreign/product release rejection, bounded credential-free public download,
 and bounded API JSON. Upload and real GitHub behavior remain unqualified.
 The adapter has no workflow or CLI caller yet, and no real release, tag, asset,
 permissions, cache writer or consumer has changed.
+
+
+### Command orchestration
+
+The publisher/consumer command now accepts an explicit bounded identity JSON
+and writes a reserved, exclusive report. Publication validates the trusted
+master Actions context before creating a store and uses only the explicitly
+wired `NATIVE_CACHE_JOB_TOKEN`, never a `GH_TOKEN` fallback. The consumer creates
+only a read-only store. Reports include packing, validation/publication and
+total times; these local timings are not hosted performance evidence.
+
+Two additional RED tests failed against the command stub. After implementation,
+33 transport, adapter and stdlib-policy checks passed in 0.619 seconds. Review
+of this command delta was clean. No native identity capture or workflow caller
+exists yet: the identity fixture is not proof of real compiler/SDK freshness.
+
+Workflow inspection corrected an earlier assumption: current native save guards
+allow non-PR master dispatches as well as pushes. Therefore a qualification can
+restore an exact same-SHA Actions seed after a successful explicit full dispatch,
+without uploading a multi-gigabyte intermediate artifact or broadening the app
+build token. Existing macOS master-push cold behavior remains distinct.
