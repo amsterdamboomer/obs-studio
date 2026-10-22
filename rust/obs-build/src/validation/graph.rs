@@ -72,10 +72,34 @@ impl Library {
     }
 }
 
+/// Sources may be selected independently of their executable, for example a
+/// private C implementation compiled only on toolchains supporting its checks.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(untagged, deny_unknown_fields)]
+pub enum Source {
+    Path(String),
+    Conditional { path: String, requires: Requirement },
+}
+
+impl Source {
+    fn path(&self) -> &str {
+        match self {
+            Self::Path(path) | Self::Conditional { path, .. } => path,
+        }
+    }
+
+    fn selected(&self, facts: &BTreeMap<String, bool>) -> Result<bool, String> {
+        match self {
+            Self::Path(_) => Ok(true),
+            Self::Conditional { requires, .. } => requires.evaluate(facts),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Target {
-    pub sources: Vec<String>,
+    pub sources: Vec<Source>,
     #[serde(default)]
     pub requires: Requirement,
     #[serde(default)]
@@ -222,7 +246,9 @@ impl Graph {
             for definition in &target.definitions {
                 validate_compile_definition(definition)?;
             }
-            if target.sources.is_empty() || target.sources.iter().any(String::is_empty) {
+            if target.sources.is_empty()
+                || target.sources.iter().any(|source| source.path().is_empty())
+            {
                 return Err(format!("native test target {name} has no sources"));
             }
         }
@@ -290,6 +316,10 @@ impl Graph {
                 ..Default::default()
             };
             for source in &spec.sources {
+                if !source.selected(facts)? {
+                    continue;
+                }
+                let source = source.path();
                 let path = root.join(source);
                 println!("cargo:rerun-if-changed={}", path.display());
                 let extension = if source.ends_with(".c.h") {
@@ -327,6 +357,9 @@ impl Graph {
                 } else {
                     target.sources.push(path);
                 }
+            }
+            if target.sources.is_empty() {
+                return Err(format!("native test target {name} has no selected sources"));
             }
             for directory in &spec.includes {
                 target.include_dirs.push(root.join(directory));

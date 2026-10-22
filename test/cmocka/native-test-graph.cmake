@@ -117,6 +117,67 @@ function(_obs_test_graph_expand output value root target)
   set(${output} "${value}" PARENT_SCOPE)
 endfunction()
 
+function(_obs_test_graph_sources output graph target)
+  string(JSON count LENGTH "${graph}" targets "${target}" sources)
+  set(sources)
+  if(count GREATER 0)
+    math(EXPR last "${count} - 1")
+    foreach(index RANGE ${last})
+      string(JSON kind TYPE "${graph}" targets "${target}" sources ${index})
+      if(kind STREQUAL "STRING")
+        string(JSON path GET "${graph}" targets "${target}" sources ${index})
+        set(selected TRUE)
+      elseif(kind STREQUAL "OBJECT")
+        _obs_test_graph_fields("${graph}" "targets;${target};sources;${index}" "path;requires")
+        string(
+          JSON path_kind
+          TYPE "${graph}"
+          targets
+          "${target}"
+          sources
+          ${index}
+          path
+        )
+        if(NOT path_kind STREQUAL "STRING")
+          message(FATAL_ERROR "Invalid native test source path for ${target}")
+        endif()
+        string(
+          JSON path
+          GET "${graph}"
+          targets
+          "${target}"
+          sources
+          ${index}
+          path
+        )
+        # A conditional source must explicitly declare its requirement.
+        string(
+          JSON requirement_kind
+          TYPE "${graph}"
+          targets
+          "${target}"
+          sources
+          ${index}
+          requires
+        )
+        _obs_test_graph_requirement(selected "${graph}" targets "${target}" sources ${index} requires)
+      else()
+        message(FATAL_ERROR "Invalid native test source for ${target}")
+      endif()
+      if(path STREQUAL "")
+        message(FATAL_ERROR "Empty native test source path for ${target}")
+      endif()
+      if(selected)
+        list(APPEND sources "${path}")
+      endif()
+    endforeach()
+  endif()
+  if(NOT sources)
+    message(FATAL_ERROR "Native test target ${target} has no selected sources")
+  endif()
+  set(${output} "${sources}" PARENT_SCOPE)
+endfunction()
+
 function(_obs_test_graph_libraries output graph target)
   string(JSON count ERROR_VARIABLE error LENGTH "${graph}" targets "${target}" libraries)
   set(libraries)
@@ -173,7 +234,7 @@ function(obs_native_test_graph path root)
       if(NOT selected)
         continue()
       endif()
-      _obs_test_graph_array(sources "${graph}" targets "${name}" sources)
+      _obs_test_graph_sources(sources "${graph}" "${name}")
       if(NOT sources)
         message(FATAL_ERROR "Native test target ${name} has no sources")
       endif()

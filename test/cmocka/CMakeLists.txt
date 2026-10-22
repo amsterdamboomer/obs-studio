@@ -155,16 +155,7 @@ endif()
 # AVC header test. Where the toolchain supports it, obs-avc.c is compiled into
 # the test with UBSan (no recovery) so undefined behavior fails the test
 # (obs-rust/obs-studio#11); its definitions take precedence over libobs's.
-add_executable(test_avc test_avc.c)
-target_include_directories(test_avc PRIVATE ${CMOCKA_INCLUDE_DIR})
-target_link_libraries(test_avc PRIVATE OBS::libobs ${CMOCKA_LIBRARIES})
-if(NOT MSVC)
-  target_sources(test_avc PRIVATE "${CMAKE_SOURCE_DIR}/libobs/obs-avc.c.h")
-  obs_test_sanitize(test_avc undefined)
-endif()
-
-add_dependencies(cmocka-tests test_avc)
-add_test(test_avc ${CMAKE_CURRENT_BINARY_DIR}/test_avc)
+# test_avc is defined in build/test-graph.json.
 
 # AVC helpers through libobs only, so ENABLE_RUST_LIBOBS=ON tests the port
 # (test_avc above compiles its own obs-avc.c where UBSan is available).
@@ -179,34 +170,14 @@ endif()
 # compiled into the test so the test's obs_get_video_info and time fixtures
 # replace libobs's and libc's and no obs core has to be started; its definitions
 # take precedence over libobs's.
-if(NOT MSVC)
-  add_executable(
-    test_formatted_filename
-    test_formatted_filename.c
-    "${CMAKE_SOURCE_DIR}/libobs/util/platform-filename.c.h"
-  )
-  target_include_directories(test_formatted_filename PRIVATE ${CMOCKA_INCLUDE_DIR})
-  target_link_libraries(test_formatted_filename PRIVATE OBS::libobs ${CMOCKA_LIBRARIES})
-  obs_test_sanitize(test_formatted_filename address,undefined)
-
-  add_dependencies(cmocka-tests test_formatted_filename)
-  add_test(test_formatted_filename ${CMAKE_CURRENT_BINARY_DIR}/test_formatted_filename)
-endif()
+# test_formatted_filename is defined in build/test-graph.json.
 
 # CRC32 test
 # test_crc32 is defined in build/test-graph.json.
 
 # UTF-8 test. utf8.c is not exported by libobs, so it is compiled into the test
 # (non-Windows only: the Windows implementation wraps the Win32 API).
-if(NOT MSVC)
-  add_executable(test_utf8 test_utf8.c "${CMAKE_SOURCE_DIR}/libobs/util/utf8.c.h")
-  target_include_directories(test_utf8 PRIVATE ${CMOCKA_INCLUDE_DIR})
-  target_link_libraries(test_utf8 PRIVATE OBS::libobs ${CMOCKA_LIBRARIES})
-  obs_test_sanitize(test_utf8 address,undefined)
-
-  add_dependencies(cmocka-tests test_utf8)
-  add_test(test_utf8 ${CMAKE_CURRENT_BINARY_DIR}/test_utf8)
-endif()
+# test_utf8 is defined in build/test-graph.json.
 
 # dstr test
 # test_dstr is defined in build/test-graph.json.
