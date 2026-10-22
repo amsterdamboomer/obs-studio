@@ -30,6 +30,7 @@ int main(int argc, char **argv) {
         "schema": 1,
         "targets": {
             "answer": {"sources": ["answer.c"], "definitions": ["EXPECTED=42"],
+                "libraries": [{"name": "disabled-library", "requires": "GRAPH_DISABLED"}],
                 "requires": {"all": ["GRAPH_FEATURE", {"not": "GRAPH_DISABLED"}]}},
             "disabled": {"sources": ["does-not-exist.c"], "requires": "GRAPH_DISABLED"}
         },
