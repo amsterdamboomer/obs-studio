@@ -80,3 +80,20 @@ replacement. Master archive publication and subsequent reuse remain pending.
 The [rollout-day baseline](2026-10-21-rollout-day.md) separately reports code
 PR and queue timing/cost samples; it precedes this pruning publication and
 must not be used as a post-change speedup claim.
+
+## Master publication
+
+Master Qt job [119594181344](https://github.com/obs-rust/obs-studio/actions/runs/39707134569/job/119594181344)
+passed on merged source `224602f79`. It restored a 1,187,113,796-byte archive,
+then reported 310 cacheable calls (297 hits, 13 misses), five facade tests
+passed and all 19 CTest cases passed. Local bytes fell from 1,197,203,950 to
+507,500,741 after pruning, ending with 616 stored files.
+
+The job saved master cache **9314403583**, key
+`qt-ccache-linux-inputs-v2-7021a2ec3e14af5bf46e4fa736dbce3d876a44a8f2325d8cec330852ec663168`.
+The API inventory reports **507,448,340 compressed archive bytes**, created
+2026-10-22T01:59:55.925949Z: 679,665,456 fewer than the archive restored by
+this producer. This is an observed replacement size, not a causal speedup
+or proof of future retention. The parent run was still in progress when
+these completed-job logs were captured. A later real warm consumer remains
+required.
