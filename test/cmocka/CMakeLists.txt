@@ -89,20 +89,7 @@ add_dependencies(cmocka-tests test_product_name)
 add_test(test_product_name ${CMAKE_CURRENT_BINARY_DIR}/test_product_name)
 
 # Exercise hotkey loading with an isolated core and no platform input thread.
-add_executable(
-  test_hotkey_load
-  test_hotkey_load.c
-  "${CMAKE_SOURCE_DIR}/libobs/obs-hotkey.c.h"
-  "${CMAKE_SOURCE_DIR}/libobs/obs-hotkey-bindings.c.h"
-  "${CMAKE_SOURCE_DIR}/libobs/obs-hotkey-translations.c.h"
-  "${CMAKE_SOURCE_DIR}/libobs/obs-hotkey-press.c.h"
-  "${CMAKE_SOURCE_DIR}/libobs/obs-hotkey-pair.c.h"
-)
-target_compile_definitions(test_hotkey_load PRIVATE obs=hotkey_test_obs)
-target_include_directories(test_hotkey_load PRIVATE ${CMOCKA_INCLUDE_DIR})
-target_link_libraries(test_hotkey_load PRIVATE OBS::libobs OBS::caption ${CMOCKA_LIBRARIES})
-add_dependencies(cmocka-tests test_hotkey_load)
-add_test(test_hotkey_load ${CMAKE_CURRENT_BINARY_DIR}/test_hotkey_load)
+# test_hotkey_load is defined in build/test-graph.json.
 
 # A core module that cannot be loaded (its file is missing, or a library it
 # needs, like libcef.so for obs-browser, is not installed) must not stop OBS
@@ -266,30 +253,7 @@ add_test(test_volume_meter_snapshot ${CMAKE_CURRENT_BINARY_DIR}/test_volume_mete
 # Exercise AV1 encoder configuration against real FFmpeg options without a
 # running OBS video session, then encode a small synthetic sequence with SVT.
 find_package(FFmpeg 8.0 REQUIRED avcodec avformat avutil)
-add_executable(
-  test_svt_av1
-  test_svt_av1.c
-  "${CMAKE_SOURCE_DIR}/plugins/obs-ffmpeg/obs-ffmpeg-video-encoders.c.h"
-  "${CMAKE_SOURCE_DIR}/shared/opts-parser/opts-parser.c.h"
-)
-target_compile_definitions(
-  test_svt_av1
-  PRIVATE
-    obs_encoder_video=svt_test_encoder_video
-    video_output_get_info=svt_test_video_info
-    obs_encoder_get_width=svt_test_encoder_size
-    obs_encoder_get_height=svt_test_encoder_size
-    obs_encoder_get_name=svt_test_encoder_name
-    obs_encoder_set_last_error=svt_test_set_last_error
-)
-target_include_directories(test_svt_av1 PRIVATE ${CMOCKA_INCLUDE_DIR} "${CMAKE_SOURCE_DIR}/shared/opts-parser")
-target_link_libraries(
-  test_svt_av1
-  PRIVATE OBS::libobs FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil ${CMOCKA_LIBRARIES}
-)
-add_dependencies(cmocka-tests test_svt_av1)
-add_test(test_svt_av1 ${CMAKE_CURRENT_BINARY_DIR}/test_svt_av1)
-set_tests_properties(test_svt_av1 PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 60)
+# test_svt_av1 is defined in build/test-graph.json.
 
 # Exercise AMF decoding and RTMP server messages through the same
 # authentication-enabled sources as obs-outputs, without starting OBS or

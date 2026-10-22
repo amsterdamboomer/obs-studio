@@ -5,7 +5,7 @@
 use crate::{NativeBuild, SharedLibrary};
 use serde::Deserialize;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
     process::Command,
@@ -307,6 +307,7 @@ impl Graph {
         let root = dunce::canonicalize(root).map_err(|error| error.to_string())?;
         let selected = self.select(facts)?;
         let mut artifacts = BTreeMap::new();
+        let mut watched_components = BTreeSet::new();
         for (name, spec) in selected.targets {
             let mut target = SharedLibrary {
                 name: name.into(),
@@ -320,6 +321,12 @@ impl Graph {
                     continue;
                 }
                 let source = source.path();
+                // Keep component headers in Cargo's invalidation inputs when
+                // moving standalone tests out of the legacy native inventory.
+                if source.starts_with("plugins/") || source.starts_with("shared/") {
+                    let component: PathBuf = Path::new(source).components().take(2).collect();
+                    watched_components.insert(root.join(component));
+                }
                 let path = root.join(source);
                 println!("cargo:rerun-if-changed={}", path.display());
                 let extension = if source.ends_with(".c.h") {
@@ -432,6 +439,9 @@ impl Graph {
                 spec.sanitizers.as_deref(),
             )?;
             artifacts.insert(name.into(), build.executable(&target)?);
+        }
+        for directory in watched_components {
+            println!("cargo:rerun-if-changed={}", directory.display());
         }
         Ok(artifacts)
     }

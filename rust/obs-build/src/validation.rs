@@ -344,7 +344,7 @@ pub fn build_c_tests(
     let mut cmocka_interface = SharedLibrary::default();
     add_package(&mut cmocka_interface, &build.target, "cmocka")?;
     let thread_options = crate::platform::native_test_thread_options(&build.target);
-    let interfaces = BTreeMap::from([
+    let mut interfaces = BTreeMap::from([
         (
             "Threads::Threads".into(),
             graph::Dependency {
@@ -363,6 +363,23 @@ pub fn build_c_tests(
             },
         ),
     ]);
+    let caption = match archives.get("caption") {
+        Some(path) => path.clone(),
+        None => crate::libobs::build_caption(build, &root)?,
+    };
+    interfaces.insert(
+        "OBS::caption".into(),
+        graph::Dependency {
+            artifacts: vec![caption],
+            include_dirs: vec![root.join("deps/libcaption")],
+            ..Default::default()
+        },
+    );
+    for component in ["avcodec", "avformat", "avutil"] {
+        let mut dependency = SharedLibrary::default();
+        add_package(&mut dependency, &build.target, &format!("lib{component}"))?;
+        interfaces.insert(format!("FFmpeg::{component}"), dependency.into());
+    }
     let artifacts = graph.compile(build, &root, &facts, &interfaces)?;
     for (name, test) in graph.select(&facts)?.tests {
         if result.iter().any(|existing| existing.name == name) {

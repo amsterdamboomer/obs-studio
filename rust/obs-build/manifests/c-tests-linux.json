@@ -1,46 +1,5 @@
 [
   {
-    "name": "test_hotkey_load",
-    "sources": [
-      "test/cmocka/test_hotkey_load.c",
-      "libobs/obs-hotkey.c.h",
-      "libobs/obs-hotkey-bindings.c.h",
-      "libobs/obs-hotkey-translations.c.h",
-      "libobs/obs-hotkey-press.c.h",
-      "libobs/obs-hotkey-pair.c.h"
-    ],
-    "definitions": [
-      "obs=hotkey_test_obs"
-    ],
-    "archives": [
-      "caption"
-    ]
-  },
-  {
-    "name": "test_svt_av1",
-    "sources": [
-      "test/cmocka/test_svt_av1.c",
-      "plugins/obs-ffmpeg/obs-ffmpeg-video-encoders.c.h",
-      "shared/opts-parser/opts-parser.c.h"
-    ],
-    "definitions": [
-      "obs_encoder_video=svt_test_encoder_video",
-      "video_output_get_info=svt_test_video_info",
-      "obs_encoder_get_width=svt_test_encoder_size",
-      "obs_encoder_get_height=svt_test_encoder_size",
-      "obs_encoder_get_name=svt_test_encoder_name",
-      "obs_encoder_set_last_error=svt_test_set_last_error"
-    ],
-    "includes": [
-      "shared/opts-parser"
-    ],
-    "packages": [
-      "libavcodec",
-      "libavformat",
-      "libavutil"
-    ]
-  },
-  {
     "name": "test_rtmp_error",
     "sources": [
       "test/cmocka/test_rtmp_error.c",
