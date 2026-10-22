@@ -62,6 +62,18 @@ class CompileOverlapTest(unittest.TestCase):
                         expected = not cancelled and build == "success"
                         self.assertEqual(tests_allowed(results, cancelled), expected)
 
+    def test_final_gate_rejects_failed_or_cancelled_independent_workflow(self):
+        gate = (ROOT / ".github/workflows/ci.yml").read_text().split("  ci-gate:", 1)[1]
+        condition = re.search(r"if: (contains\(needs\.\*\.result[^\n]+)", gate)[1]
+        for result in ("success", "skipped", "failure", "cancelled"):
+            with self.subTest(result=result):
+                values = ["success", result]  # Successful suites cannot mask Fast Gate.
+                expression = re.sub(r"contains\(needs\.\*\.result, '([^']+)'\)",
+                                    lambda m: repr(m[1] in values), condition).replace("||", " or ")
+                self.assertEqual(eval(expression, {"__builtins__": {}}),
+                                 result in {"failure", "cancelled"})
+        self.assertNotIn("continue-on-error:", job("rust-tests-linux"))
+
     def test_both_implementations_and_final_gate_remain(self):
         tests = job("rust-linux-tier2")
         self.assertIn('mode: ["OFF", "ON"]', tests)
