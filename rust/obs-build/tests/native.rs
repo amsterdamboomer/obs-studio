@@ -102,13 +102,15 @@ fn native_test_graph_preserves_cpp_standard_without_changing_c_compilation() {
 #[test]
 fn native_test_graph_preserves_cpp_helper_build_requirements() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let raw: serde_json::Value = serde_json::from_slice(
-        &fs::read(root.join("test/cmocka/build/test-graph.json")).unwrap(),
-    )
-    .unwrap();
+    let raw: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("test/cmocka/build/test-graph.json")).unwrap())
+            .unwrap();
     for (name, implementation) in [
         ("test_disk_space_monitor", Some("disk-space-monitor")),
-        ("test_scene_collection_migration", Some("scene-collection-migration")),
+        (
+            "test_scene_collection_migration",
+            Some("scene-collection-migration"),
+        ),
         ("test_crash_sentinel_dir", Some("crash-sentinel-dir")),
         ("test_settings_migration", None),
         ("test_output_start_log", None),
@@ -123,7 +125,11 @@ fn native_test_graph_preserves_cpp_helper_build_requirements() {
         assert_eq!(target["sources"], serde_json::json!(sources));
         assert_eq!(target["cpp_standard"], "17");
         assert_eq!(target["includes"], serde_json::json!(["frontend/utility"]));
-        assert_eq!(target["watch_inputs"], serde_json::json!(["frontend/utility"]));
+        let mut watched = vec!["frontend/utility".to_owned()];
+        if let Some(implementation) = implementation {
+            watched.push(format!("frontend/build/frontend-utility-{implementation}.pch.hpp"));
+        }
+        assert_eq!(target["watch_inputs"], serde_json::json!(watched));
         let mut libraries = vec!["OBS::libobs"];
         if name == "test_disk_space_monitor" {
             libraries.push("Threads::Threads");
@@ -131,7 +137,8 @@ fn native_test_graph_preserves_cpp_helper_build_requirements() {
         libraries.push("OBS::native-test-cmocka");
         assert_eq!(target["libraries"], serde_json::json!(libraries));
         assert_eq!(raw["tests"][name]["target"], name);
-        let fragment = fs::read_to_string(root.join(format!("test/cmocka/tests.d/{name}.cmake"))).unwrap();
+        let fragment =
+            fs::read_to_string(root.join(format!("test/cmocka/tests.d/{name}.cmake"))).unwrap();
         assert!(!fragment.contains("add_executable("));
     }
 }
@@ -812,7 +819,7 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         ("HAVE_OBS_PIPEWIRE".into(), false),
         ("HAVE_OBS_PULSEAUDIO".into(), false),
     ]);
-    for (suite, count) in [("core", 132), ("graphics", 12), ("vlc", 6), ("webrtc", 2)] {
+    for (suite, count) in [("core", 138), ("graphics", 12), ("vlc", 6), ("webrtc", 2)] {
         let mut partition = obs_build::validation::graph::Graph::load(
             &root.join("test/cmocka/build/test-graph.json"),
         )
