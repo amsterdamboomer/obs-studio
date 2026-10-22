@@ -406,6 +406,11 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
     let raw: serde_json::Value =
         serde_json::from_slice(&fs::read(root.join("test/cmocka/build/test-graph.json")).unwrap())
             .unwrap();
+    assert!(
+        raw["targets"]["test_avc"]["includes"].as_array().is_some_and(|includes|
+            includes.contains(&serde_json::json!("deps/libcaption"))),
+        "AVC's private implementation needs the caption headers from its group PCH"
+    );
     for name in ["test_threading", "test_video_stats_race", "test_task"] {
         let libraries = raw["targets"][name]["libraries"].as_array().unwrap();
         assert!(libraries.contains(&serde_json::json!({
