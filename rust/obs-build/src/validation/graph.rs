@@ -55,6 +55,24 @@ impl Requirement {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+#[serde(untagged, deny_unknown_fields)]
+pub enum Library {
+    Name(String),
+    Conditional { name: String, requires: Requirement },
+}
+
+impl Library {
+    fn selected(&self, facts: &BTreeMap<String, bool>) -> Result<Option<&str>, String> {
+        match self {
+            Self::Name(name) => Ok(Some(name)),
+            Self::Conditional { name, requires } => {
+                Ok(requires.evaluate(facts)?.then_some(name.as_str()))
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Target {
     pub sources: Vec<String>,
@@ -73,7 +91,7 @@ pub struct Target {
     #[serde(default)]
     pub archives: Vec<String>,
     #[serde(default)]
-    pub libraries: Vec<String>,
+    pub libraries: Vec<Library>,
     #[serde(default)]
     pub compile_options: Vec<String>,
     #[serde(default)]
@@ -298,12 +316,17 @@ impl Graph {
             }
             // Static archives precede their dynamic dependencies under
             // --as-needed, as in the existing native compatibility builder.
-            for name in spec
+            let mut names: Vec<_> = spec
                 .archives
                 .iter()
                 .map(|name| format!("OBS::{name}"))
-                .chain(spec.libraries.iter().cloned())
-            {
+                .collect();
+            for library in &spec.libraries {
+                if let Some(name) = library.selected(facts)? {
+                    names.push(name.into());
+                }
+            }
+            for name in names {
                 target.dependencies.push(
                     libraries
                         .get(&name)
