@@ -292,6 +292,9 @@ class FlatpakPrunedBuildTest(unittest.TestCase):
             root = Path(directory)
             state, manifest = self.fixture(root)
             original = manifest.read_bytes()
+            # Transient build trees are not dependency repository inputs.
+            (state / 'build').mkdir()
+            (state / 'build/transient-link').symlink_to(state / 'cache/original')
             calls = []
 
             def execute(command, seconds):
@@ -300,6 +303,7 @@ class FlatpakPrunedBuildTest(unittest.TestCase):
                     copied = Path(command[command.index('--state-dir') + 1])
                     self.assertNotEqual(copied, state)
                     self.assertTrue((copied / 'cache/original').exists())
+                    self.assertEqual(sorted(path.name for path in copied.iterdir()), ['cache'])
                     self.assertFalse((copied / 'downloads').exists())
                     self.assertFalse((copied / 'ccache').exists())
                     recipe = Path(command[-1])
