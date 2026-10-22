@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from urllib.parse import quote
 
 MARKER = 'OBS_PRUNED_REBUILD_EXECUTED'
 EXCEPTIONS = Path(__file__).resolve().parent.parent / '.github/actions/flatpak-builder-lint/exceptions.json'
@@ -27,6 +28,13 @@ def run(command, seconds):
     print(result.stdout, end='', file=sys.stderr)
     result.check_returncode()
     return result.stdout
+
+
+def cache_branch(manifest):
+    # Match flatpak-builder1.4.9's g_uri_escape_string(..., allow_utf8=TRUE)
+    # branch under --state-dir. Keep UTF-8 characters, escape ASCII punctuation.
+    identity = 'x86_64-' + str(Path(manifest).resolve())[1:]
+    return ''.join(char if ord(char) > 127 else quote(char, safe='') for char in identity).replace('%', '_')
 
 
 def measure(state, manifest, temp_root, execute=run):
@@ -79,6 +87,16 @@ def measure(state, manifest, temp_root, execute=run):
                     shutil.copytree(source, destination, symlinks=True)
                 else:
                     shutil.copy2(source, destination)
+            # The prepared manifest changes only the final application's checksum,
+            # but its path also changes the repository's branch namespace. Alias
+            # the original stage refs in this private copy before validating it.
+            heads = isolated / 'cache/refs/heads'
+            source_branch = cache_branch(manifest)
+            probe_branch = cache_branch(prepared.name)
+            source_refs = heads / source_branch
+            if not source_refs.is_dir():
+                raise ValueError('original manifest dependency refs missing: ' + source_branch)
+            shutil.copytree(source_refs, heads / probe_branch, symlinks=True)
             ostree_version = execute(['ostree', '--version'], 30).strip()
             configuration = configparser.ConfigParser()
             configuration.read(isolated / 'cache/config')
@@ -116,6 +134,7 @@ def measure(state, manifest, temp_root, execute=run):
         'status': 'success', 'architecture': 'x86_64', 'application_rebuilt': True,
         'ostree_version': ostree_version, 'source_repository_mode': repository_mode,
         'copied_symbolic_objects': symbolic_objects, 'repository_fsck_seconds': fsck_seconds,
+        'source_cache_branch': source_branch, 'probe_cache_branch': probe_branch,
         'reused_dependency_modules': dependencies, 'isolated_build_seconds': elapsed,
         'retained_state': ['cache'], 'omitted_state': ['downloads', 'ccache', 'transient builder state'],
         'limits': 'One isolated application rebuild and output validation, not runtime/profile validation, '

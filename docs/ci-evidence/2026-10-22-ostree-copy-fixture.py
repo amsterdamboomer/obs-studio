@@ -39,6 +39,9 @@ with tempfile.TemporaryDirectory(prefix='ostree-real-fixture-', dir=TASK) as dir
     config_before = (state / 'cache/config').read_bytes()
     manifest = root / 'manifest.json'
     manifest.write_text(json.dumps({'id': 'com.obsproject.Studio', 'command': 'obs', 'modules': [{'name': 'dependency'}, {'name': 'obs'}]}))
+    source_ref = probe.cache_branch(manifest) + '/build-dependency'
+    command(['ostree', '--repo=' + str(state / 'cache'), 'refs', '--create=' + source_ref, 'dependency'])
+    original_commit = command(['ostree', '--repo=' + str(state / 'cache'), 'rev-parse', source_ref]).strip()
     recipe_before = manifest.read_bytes()
     checked = []
     def execute(args, seconds):
@@ -47,6 +50,10 @@ with tempfile.TemporaryDirectory(prefix='ostree-real-fixture-', dir=TASK) as dir
             return command(args)
         assert 'flatpak-builder' in args
         copied = Path(args[args.index('--state-dir') + 1])
+        selected_ref = probe.cache_branch(args[-1]) + '/build-dependency'
+        assert selected_ref != source_ref
+        assert command(['ostree', '--repo=' + str(copied / 'cache'), 'rev-parse', selected_ref]).strip() == original_commit
+        assert not (state / 'cache/refs/heads' / selected_ref).exists()
         for link in links:
             copied_link = copied / link.relative_to(state)
             assert copied_link.is_symlink()
@@ -66,6 +73,6 @@ with tempfile.TemporaryDirectory(prefix='ostree-real-fixture-', dir=TASK) as dir
     assert target.read_text() == 'original target sentinel'
     command(['ostree', '--repo=' + str(state / 'cache'), 'fsck'])
     binary = Path(shutil.which('ostree')).resolve(strict=True)
-    result = {'ostree_binary_path': str(binary), 'ostree_binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'status': 'success', 'scope': 'real OSTree copy/fsck boundary only; stops before application build', 'repository_mode': 'bare', 'copied_link_objects': len(links), 'original_config_and_link_target_preserved': True, 'temporary_state_and_manifest_cleaned': True, 'ostree_version': command(['ostree', '--version']).strip()}
+    result = {'ostree_binary_path': str(binary), 'ostree_binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'status': 'success', 'scope': 'real OSTree copy/fsck boundary only; stops before application build', 'repository_mode': 'bare', 'copied_link_objects': len(links), 'remapped_dependency_ref_verified': True, 'original_config_and_link_target_preserved': True, 'temporary_state_and_manifest_cleaned': True, 'ostree_version': command(['ostree', '--version']).strip()}
     (TASK / 'ostree-copy-fixture.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result, indent=2))

@@ -159,3 +159,71 @@ for the independent reasons above; macOS Tier 2 and all other selected
 non-aggregate jobs passed. The aggregate CI Gate failed. Full terminal
 run/job metadata is appended under second_trial; earlier capture-time
 metadata remains preserved. No isolated application rebuild has succeeded.
+
+## Third changed-source qualification (pending Flatpak result)
+
+Run39732161172 uses reviewed f4cbc955df8da30a29238f3b5d267a29e22e4564.
+Both previous full trials were terminal before this dispatch. Normal Flatpak
+build/output validation completed and the pruned rebuild probe started at
+2026-10-22T06:22:47Z. This observation does not yet prove the isolated
+build or any of its validation checks completed.
+
+Completed Linux OFF/ON jobs119670535142/119670535097 each report358
+registered tests,355 executed and three expected PulseAudio skips, zero
+failures. macOS job119672176825 passed four202-registered CTest runs,
+each with one SVT skip. Windows job119672176937 failed before CTest with
+cm_print_error from test_video_output_plan, retaining the failure from the
+previous trial. The immediate fix remains under #1713 ownership; #1739
+records why the narrowly scoped earlier guard and Linux-only PR selection
+missed the recurrence. #1739 requests proportionate temporary prevention,
+not broad additional Windows CI or permanent infrastructure for cmocka.
+
+The [third-trial record](2026-10-22-flatpak-pruned-build-third-trial.json)
+contains capture-time metadata and hashes/excerpts for the completed jobs.
+Parent and Flatpak outcome remain pending in this capture. A green PR Gate
+does not substitute for the actual manual probe, and a later successful
+Flatpak job cannot erase the full trial's independent Windows failure.
+
+
+### Terminal third-trial failure
+
+Run39732161172 completed FAILURE. Isolated OSTree fsck succeeded for10
+commits/19,104 objects and the forced application marker appeared. However,
+all six dependencies rebuilt instead of producing cache hits. The probe
+correctly failed with `dependency module reuse missing: obs-deps-buildstream-base`.
+Output validation after that guard never ran. This proves the object-copy
+barrier is resolved, but does not qualify the pruned dependency projection.
+The Windows link failure remains independent. Full terminal metadata and
+Flatpak artifact/log hash/excerpts are appended in the third-trial record.
+No fourth trial or production change is authorized by this result alone;
+first determine why the dependency repository was not reused.
+
+
+### Identified cache branch mismatch
+
+Pinned action79327416609af08178ad73b352877e51450790b3 passes
+`--state-dir` and its prepared manifest path. flatpak-builder1.4.9
+`builder-main.c:975-992` derives the branch from architecture plus the
+manifest's absolute path whenever that option is present, then URI-escapes
+it with percent replaced by underscore. The probe's random temporary
+manifest therefore selects a different branch from the original prepared
+manifest in the copied repository. Removing transient scaffolding alone
+cannot preserve this identity. Source URLs, hashes and excerpts are in
+the third-trial record. A correction must preserve the original stage
+identity on the isolated copy without writing the original manifest/state,
+and still force the final application module and require all six hits.
+No new hosted dispatch has occurred.
+
+
+### Ref identity RED and local correction
+
+RED28a6b1efc makes the existing isolated-build fixture select dependency
+refs using the prepared manifest's absolute-path namespace; old helper fails.
+The correction aliases the original stage refs into that namespace only
+inside the independent copy, then runs fsck. Final module changes still
+force OBS to rebuild; the six dependency-hit checks remain mandatory.
+The real OSTree fixture now verifies the selected remapped ref resolves
+to the original commit and that no matching ref was created in the source.
+It passed with local OSTree2026.1; previous copy-only execution is retained
+in the result wrapper. This still stops before any real application build.
+31 focused tests pass. No fourth hosted dispatch yet.
