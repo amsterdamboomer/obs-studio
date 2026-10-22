@@ -1403,7 +1403,7 @@ fn macos_core_builds_from_the_canonical_manifest() {
                 "_obs_module_load",
                 "_obs_module_ver",
                 "_obs_module_set_pointer",
-                "_obs_module_name",
+                "_obs_module_description",
             ] {
                 assert!(
                     symbols.contains(required),

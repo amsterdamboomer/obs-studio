@@ -11,6 +11,7 @@ mod graphics_windows;
 mod libobs_linux;
 mod libobs_macos;
 mod libobs_windows;
+mod plugins_macos;
 pub(crate) mod resources;
 mod swift_macos;
 
@@ -247,16 +248,19 @@ pub fn configure_module(target: &str, library: &mut crate::SharedLibrary) -> Res
 
 pub fn build_macos_capture(
     build: &crate::NativeBuild,
-    _root: &Path,
-    _core: &Path,
-    _options: &crate::libobs::Options,
+    root: &Path,
+    core: &Path,
+    options: &crate::libobs::Options,
     module: crate::plugins::MacosCaptureModule,
 ) -> Result<crate::plugins::Module, String> {
-    Err(format!(
-        "native {} graph for {} is not implemented yet",
-        module.name(),
-        build.target
-    ))
+    if build.target.contains("apple-darwin") {
+        plugins_macos::capture(build, root, core, options, module)
+    } else {
+        Err(format!(
+            "macOS capture requires an Apple target, got {}",
+            build.target
+        ))
+    }
 }
 
 pub fn configure_d3d11(
