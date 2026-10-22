@@ -77,41 +77,74 @@ pub fn exercise(inputs: Inputs<'_>, variants: &[Variant<'_>]) -> Result<(), Stri
             )
             .map_err(|e| e.to_string())?;
         }
-        // D-Bus activated services can inherit standard streams after the
-        // launcher exits. Files let us wait for the owned launcher without
-        // waiting indefinitely for every inherited pipe writer to disappear.
-        let probe_log = runtime.join("application-probe.log");
-        let log = std::fs::File::create(&probe_log).map_err(|e| e.to_string())?;
-        let errors = log.try_clone().map_err(|e| e.to_string())?;
-        let result = std::process::Command::new("dbus-run-session")
-            .args(["--", "uv", "run", "--no-project", "python"])
-            .arg(
-                inputs
-                    .root
-                    .join("rust/obs-build/tests/libobs/application_probe.py"),
-            )
-            .arg("--runtime")
-            .arg(&runtime)
-            .arg("--inspector")
-            .arg(&inspector)
-            .stdout(log)
-            .stderr(errors)
-            .status()
-            .map_err(|e| e.to_string())?;
-        if !result.success() {
-            return Err(format!(
-                "{} GUI runtime {} failed: {}\n{}",
-                core.display(),
-                runtime.display(),
-                result,
-                std::fs::read_to_string(&probe_log).map_err(|e| e.to_string())?
-            ));
-        }
+        run_probe(inputs.root, &runtime, &inspector)?;
         println!(
             "OBS GUI runtime passed for {}: {}",
             core.display(),
             runtime.display()
         );
+    }
+    Ok(())
+}
+
+// Validate the exact runtime produced by the user command without rebuilding
+// its core, modules or frontend through the compatibility-test graph.
+#[test]
+fn production_command_runtime_runs_saved_scene_and_recording() {
+    let Some(runtime) = std::env::var_os("OBS_BUILD_APPLICATION_RUNTIME") else {
+        return;
+    };
+    let runtime = PathBuf::from(runtime);
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(runtime.join("application-build.json")).unwrap())
+            .unwrap();
+    assert_eq!(manifest["target"], obs_build::BUILD_TARGET);
+    std::fs::write(
+        runtime.join("expected-modules.json"),
+        serde_json::to_vec(&manifest["modules"]).unwrap(),
+    )
+    .unwrap();
+    if !manifest["scripting"].is_null() {
+        std::fs::write(
+            runtime.join("expected-scripting.json"),
+            serde_json::to_vec(&manifest["scripting"]).unwrap(),
+        )
+        .unwrap();
+    }
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let build = NativeBuild {
+        profile: Default::default(),
+        host: obs_build::BUILD_HOST.into(),
+        target: obs_build::BUILD_TARGET.into(),
+        output: runtime.join("test-tools"),
+    };
+    std::fs::create_dir_all(&build.output).unwrap();
+    let inspector = inspector(&build).unwrap();
+    run_probe(&root, &runtime, &inspector).unwrap();
+}
+
+fn run_probe(root: &Path, runtime: &Path, inspector: &Path) -> Result<(), String> {
+    let probe_log = runtime.join("application-probe.log");
+    let log = std::fs::File::create(&probe_log).map_err(|e| e.to_string())?;
+    let errors = log.try_clone().map_err(|e| e.to_string())?;
+    let result = std::process::Command::new("dbus-run-session")
+        .args(["--", "uv", "run", "--no-project", "python"])
+        .arg(root.join("rust/obs-build/tests/libobs/application_probe.py"))
+        .arg("--runtime")
+        .arg(&runtime)
+        .arg("--inspector")
+        .arg(&inspector)
+        .stdout(log)
+        .stderr(errors)
+        .status()
+        .map_err(|e| e.to_string())?;
+    if !result.success() {
+        return Err(format!(
+            "GUI runtime {} failed: {}\n{}",
+            runtime.display(),
+            result,
+            std::fs::read_to_string(&probe_log).map_err(|e| e.to_string())?
+        ));
     }
     Ok(())
 }

@@ -458,7 +458,11 @@ fn staged_executable_prefers_runtime_core_over_build_outputs() {
     let directory = tempfile::tempdir().unwrap();
     let source = directory.path().join("core.c");
     let main = directory.path().join("main.c");
-    fs::write(&main, "extern int fixture_value(void); int main(void) { return fixture_value() == 42 ? 0 : 7; }").unwrap();
+    fs::write(
+        &main,
+        "extern int fixture_value(void); int main(void) { return fixture_value() == 42 ? 0 : 7; }",
+    )
+    .unwrap();
     let build = NativeBuild {
         profile: Default::default(),
         host: obs_build::BUILD_HOST.into(),
@@ -466,19 +470,69 @@ fn staged_executable_prefers_runtime_core_over_build_outputs() {
         output: directory.path().join("original"),
     };
     fs::write(&source, "int fixture_value(void) { return 1; }").unwrap();
-    let original = build.shared_library(&target("fixture-core", &source, vec![])).unwrap();
-    let executable = build.executable(&target("fixture-app", &main, vec![original])).unwrap();
+    let original = build
+        .shared_library(&target("fixture-core", &source, vec![]))
+        .unwrap();
+    let executable = build
+        .executable(&target("fixture-app", &main, vec![original.clone()]))
+        .unwrap();
     fs::write(&source, "int fixture_value(void) { return 42; }").unwrap();
-    let runtime_build = NativeBuild { output: directory.path().join("replacement"), ..build };
-    let replacement = runtime_build.shared_library(&target("fixture-core", &source, vec![])).unwrap();
+    let runtime_build = NativeBuild {
+        output: directory.path().join("replacement"),
+        ..build.clone()
+    };
+    let replacement = runtime_build
+        .shared_library(&target("fixture-core", &source, vec![]))
+        .unwrap();
     let runtime = directory.path().join("runtime");
     fs::create_dir_all(runtime.join("bin")).unwrap();
     fs::create_dir_all(runtime.join("lib64")).unwrap();
     let staged = runtime.join("bin/fixture-app");
     fs::copy(&executable, &staged).unwrap();
-    fs::copy(&replacement, runtime.join("lib64").join(replacement.file_name().unwrap())).unwrap();
-    let status = std::process::Command::new(&staged).env_remove("LD_LIBRARY_PATH").status().unwrap();
-    assert!(status.success(), "staged executable loaded the original core: {status}");
+    fs::copy(
+        &replacement,
+        runtime.join("lib64").join(replacement.file_name().unwrap()),
+    )
+    .unwrap();
+    let status = std::process::Command::new(&staged)
+        .env_remove("LD_LIBRARY_PATH")
+        .status()
+        .unwrap();
+    assert!(
+        status.success(),
+        "staged executable loaded the original core: {status}"
+    );
+    // A separately loaded module must resolve its own dependency from the
+    // staged lib64 directory, without the executable preloading that core.
+    let plugin_source = directory.path().join("plugin.c");
+    fs::write(
+        &plugin_source,
+        "extern int fixture_value(void); int plugin_value(void) { return fixture_value(); }",
+    )
+    .unwrap();
+    let plugin = build
+        .shared_library(&target("fixture-plugin", &plugin_source, vec![original]))
+        .unwrap();
+    let modules = runtime.join("lib64/obs-modules/core");
+    fs::create_dir_all(&modules).unwrap();
+    let staged_plugin = modules.join(plugin.file_name().unwrap());
+    fs::copy(plugin, &staged_plugin).unwrap();
+    let loader_source = directory.path().join("loader.c");
+    fs::write(&loader_source, "#include <dlfcn.h>\nint main(int argc, char **argv) { if (argc != 2) return 2; void *lib = dlopen(argv[1], RTLD_NOW); if (!lib) return 3; int (*value)(void) = dlsym(lib, \"plugin_value\"); return value && value() == 42 ? 0 : 7; }").unwrap();
+    let mut loader = target("fixture-loader", &loader_source, vec![]);
+    loader.link_options.push("-ldl".into());
+    let loader = build.executable(&loader).unwrap();
+    let output = std::process::Command::new(loader)
+        .arg(staged_plugin)
+        .env_remove("LD_LIBRARY_PATH")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "staged module loaded the original core: {}\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 const EXPORT: &str = "\n#if defined(_WIN32)\n__declspec(dllexport)\n#endif\n";

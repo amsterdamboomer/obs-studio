@@ -272,6 +272,11 @@ pub fn configure_shared_link(
             }
             command.arg("-Wl,--no-undefined");
             command.arg("-Wl,-rpath,$ORIGIN");
+            if target.contains("linux") {
+                // Installed modules live in lib64/obs-modules/core. Resolve their
+                // core and frontend dependencies from this runtime first.
+                command.arg("-Wl,-rpath,$ORIGIN/../..");
+            }
         }
         for dependency in dependencies {
             let parent = dependency
@@ -520,6 +525,11 @@ pub fn configure_executable_link(
         } else {
             "-Wl,-rpath,$ORIGIN"
         });
+        if target.contains("linux") {
+            // Development and installed application layouts use bin/ + lib64/.
+            // This must precede the fallback paths to build artifacts.
+            command.arg("-Wl,-rpath,$ORIGIN/../lib64");
+        }
         for dependency in dependencies {
             let parent = dependency
                 .parent()
