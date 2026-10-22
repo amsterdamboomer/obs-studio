@@ -139,6 +139,11 @@ def build(tag: str, assets: Path, mac_info: dict, key_pem: bytes, out: Path) -> 
         (out / name).write_bytes(data)
 
 
+def check_certifiable(facts: dict, now: str, min_age_days: float) -> list[str]:
+    """Raise FeedError unless facts describe a certifiable release; return warnings."""
+    raise NotImplementedError
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
