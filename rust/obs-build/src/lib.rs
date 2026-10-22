@@ -76,6 +76,16 @@ pub struct NativeBuild {
     pub output: PathBuf,
 }
 
+/// Native configurations corresponding to the supported CMake build profiles.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum NativeProfile {
+    Debug,
+    Release,
+    #[default]
+    RelWithDebInfo,
+    MinSizeRel,
+}
+
 /// Swift module inputs; C-family sources continue to compile through cc::Build.
 #[derive(Clone, Debug)]
 pub struct SwiftLibrary {
@@ -135,6 +145,12 @@ struct CompilationBatch {
 }
 
 impl NativeBuild {
+    /// Select the native configuration explicitly for an application build.
+    pub fn with_profile(&self, _profile: NativeProfile) -> Self {
+        // RED: native compiler configuration is still hardcoded below.
+        self.clone()
+    }
+
     /// Compile and link a complete Swift module with an explicit native bridge.
     pub fn swift_shared_library(&self, library: &SwiftLibrary) -> Result<PathBuf, String> {
         platform::build_swift_library(self, library)

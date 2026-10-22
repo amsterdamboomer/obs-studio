@@ -30,6 +30,45 @@ unsafe fn answer(library: &Path, symbol: &[u8], dependencies: &[&Path]) -> i32 {
 }
 
 #[test]
+fn native_profile_switch_rebuilds_assertion_policy() {
+    if native_answer_probe() {
+        return;
+    }
+    let selector = format!(
+        "{}::native_profile_switch_rebuilds_assertion_policy",
+        module_path!().split_once("::").unwrap().1
+    );
+    let directory = tempfile::tempdir().unwrap();
+    let source = directory.path().join("profile.c");
+    fs::write(
+        &source,
+        format!(
+            "{EXPORT} int obs_fixture_profile(void) {{\n#ifdef NDEBUG\nreturn 1;\n#else\nreturn 0;\n#endif\n}}\n"
+        ),
+    )
+    .unwrap();
+    let build = NativeBuild {
+        host: obs_build::BUILD_HOST.into(),
+        target: obs_build::BUILD_TARGET.into(),
+        output: directory.path().join("artifacts"),
+    };
+    use obs_build::NativeProfile::{Debug, MinSizeRel, RelWithDebInfo, Release};
+    for (profile, expected) in [
+        (Debug, 0),
+        (Release, 1),
+        (RelWithDebInfo, 1),
+        (MinSizeRel, 1),
+        (Debug, 0),
+    ] {
+        let artifact = build
+            .with_profile(profile)
+            .shared_library(&target("fixture-profile", &source, vec![]))
+            .unwrap();
+        assert_native_answer_fresh(&artifact, "obs_fixture_profile", expected, &selector);
+    }
+}
+
+#[test]
 fn swift_bridge_preserves_native_linkage_header_flags_and_source_rebuilds() {
     if native_answer_probe() {
         return;
