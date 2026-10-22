@@ -109,6 +109,40 @@ class NativeCacheTransportTest(unittest.TestCase):
             TRANSPORT.restore(archive, metadata, root / 'restored', IDENTITY)
             self.assertEqual((root / 'restored/one').read_bytes(), (root / 'restored/two').read_bytes())
 
+    def test_destination_created_at_publication_is_preserved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _, archive, metadata = self.fixture(root)
+            destination = root / 'restored'
+            original = Path.mkdir
+            def racing_mkdir(path, *args, **kwargs):
+                if path == destination and not destination.exists():
+                    original(destination)
+                    (destination / 'sentinel').write_text('other owner')
+                return original(path, *args, **kwargs)
+            # Publication must acquire an exclusive destination rather than
+            # rename over a directory that appeared after its existence check.
+            with mock.patch.object(Path, 'mkdir', racing_mkdir):
+                with self.assertRaisesRegex(ValueError, 'destination'):
+                    TRANSPORT.restore(archive, metadata, destination, IDENTITY)
+            self.assertEqual((destination / 'sentinel').read_text(), 'other owner')
+
+    def test_case_insensitive_archive_path_collisions_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _, archive, metadata = self.fixture(root)
+            for names in (('objects/AB', 'objects/ab'), ('Objects/one', 'objects/two')):
+                with tarfile.open(archive, 'w:gz') as stream:
+                    for name in names:
+                        member = tarfile.TarInfo(name)
+                        member.size = 1
+                        stream.addfile(member, io.BytesIO(b'x'))
+                changed = dict(metadata, entries=2, expanded_bytes=2, bytes=archive.stat().st_size,
+                               sha256=hashlib.sha256(archive.read_bytes()).hexdigest())
+                with self.subTest(names=names), self.assertRaisesRegex(ValueError, 'collision'):
+                    TRANSPORT.restore(archive, changed, root / 'restored', IDENTITY)
+                self.assertFalse((root / 'restored').exists())
+
     def test_resource_limits_reject_pack_and_restore_without_partial_output(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
