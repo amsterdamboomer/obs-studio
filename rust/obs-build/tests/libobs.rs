@@ -65,25 +65,9 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         unity: std::env::var_os("OBS_BUILD_DISABLE_CORE_UNITY").is_none(),
         hevc: std::env::var_os("OBS_BUILD_DISABLE_HEVC").is_none(),
         core_modules: if enabled("OBS_BUILD_APP_GUI") {
-            [
-                "obs-transitions",
-                "obs-filters",
-                "image-source",
-                "text-freetype2",
-                "linux-pulseaudio",
-                "linux-alsa",
-                "linux-v4l2",
-                "linux-capture",
-                "rtmp-services",
-                "linux-pipewire",
-                "obs-vst",
-                "obs-x264",
-                "obs-outputs",
-                "obs-ffmpeg",
-            ]
-            .into_iter()
-            .map(String::from)
-            .collect()
+            obs_build::application::BuildOptions::for_target(&build.target)
+                .unwrap()
+                .core_module_names()
         } else {
             vec![]
         },
@@ -418,18 +402,15 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         modules.push(vlc);
     }
     if enabled("OBS_BUILD_SOURCES") {
-        for source in [
-            plugins::SourceModule::Image,
-            plugins::SourceModule::Text,
-            plugins::SourceModule::PulseAudio,
-            plugins::SourceModule::Alsa,
-            plugins::SourceModule::V4l2 {
-                udev: std::env::var_os("OBS_BUILD_DISABLE_UDEV").is_none(),
-            },
-            plugins::SourceModule::X11Capture,
-            // Offline smoke tests must not start the update service.
-            plugins::SourceModule::RtmpServices { updates: false },
-        ] {
+        for source in obs_build::application::source_modules(
+            &build.target,
+            std::env::var_os("OBS_BUILD_DISABLE_UDEV").is_none(),
+            false, // Offline smoke tests must not start the update service.
+        )
+        .unwrap()
+        .into_iter()
+        .filter(|source| !matches!(source, plugins::SourceModule::PipeWire))
+        {
             modules
                 .push(plugins::build_source(&build, &root, &libraries.with_rust, source).unwrap());
         }

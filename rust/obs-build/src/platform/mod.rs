@@ -39,6 +39,25 @@ pub fn application_sources(
     ])
 }
 
+pub fn validate_application_build(build: &crate::NativeBuild) -> Result<(), String> {
+    application_sources(&build.target, true, true)?;
+    if build.host != build.target {
+        return Err("application cross-build dependency discovery is not implemented".into());
+    }
+    Ok(())
+}
+
+pub fn application_rust_archives(
+    target: &str,
+    directory: &Path,
+) -> Result<crate::application::RustArchives, String> {
+    application_sources(target, true, true)?;
+    Ok(crate::application::RustArchives {
+        core: directory.join("liblibobs_rust.a"),
+        gpu_status: directory.join("libobs_gpu_status_frontend.a"),
+    })
+}
+
 pub fn stage_application_runtime(
     build: &crate::NativeBuild,
     inputs: &crate::application::RuntimeInputs<'_>,
