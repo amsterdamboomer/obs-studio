@@ -3,6 +3,60 @@ use obs_build::{NativeBuild, SharedLibrary};
 use std::{fs, path::Path};
 
 #[test]
+fn native_test_graph_checks_selection_references_and_commands() {
+    use obs_build::validation::graph::Graph;
+    use std::collections::BTreeMap;
+    let fixture = serde_json::json!({
+        "schema": 1,
+        "targets": {
+            "portable": {"sources": ["test/cmocka/portable.c"]},
+            "pulse": {"sources": ["test/cmocka/pulse.c"],
+                "requires": {"all": ["OS_LINUX", "ENABLE_PULSEAUDIO"]}}
+        },
+        "tests": {
+            "portable-case": {"target": "portable"},
+            "pulse-case": {"target": "pulse", "command": [
+                "sh", "${source}/test/cmocka/pulse.sh", "${target}"],
+                "timeout_seconds": 60, "skip_return_code": 77,
+                "environment": {"LP_NUM_THREADS": "1"}}
+        }
+    });
+    let graph = Graph::parse(&fixture.to_string()).unwrap();
+    let mut flags = BTreeMap::from([
+        ("OS_LINUX".into(), true),
+        ("ENABLE_PULSEAUDIO".into(), false),
+    ]);
+    let selected = graph.select(&flags).unwrap();
+    assert_eq!(selected.targets.len(), 1);
+    assert_eq!(selected.tests.len(), 1);
+    assert!(selected.tests.contains_key("portable-case"));
+    flags.insert("ENABLE_PULSEAUDIO".into(), true);
+    let selected = graph.select(&flags).unwrap();
+    assert_eq!(selected.targets.len(), 2);
+    let pulse = &selected.tests["pulse-case"];
+    assert_eq!(pulse.skip_return_code, Some(77));
+    assert_eq!(pulse.environment["LP_NUM_THREADS"], "1");
+    assert_eq!(pulse.command[2], "${target}");
+    flags.remove("ENABLE_PULSEAUDIO");
+    assert!(graph.select(&flags).unwrap_err().contains("ENABLE_PULSEAUDIO"));
+    for (pointer, value, message) in [
+        ("/schema", serde_json::json!(2), "schema"),
+        ("/tests/portable-case/target", serde_json::json!("absent"), "absent"),
+        ("/tests/pulse-case/timeout_seconds", serde_json::json!(0), "timeout"),
+        ("/tests/pulse-case/command", serde_json::json!([]), "command"),
+        ("/tests/pulse-case/command", serde_json::json!(["${unknown}"]), "unknown"),
+        ("/targets/pulse/sources", serde_json::json!([]), "sources"),
+    ] {
+        let mut invalid = fixture.clone();
+        *invalid.pointer_mut(pointer).unwrap() = value;
+        assert!(Graph::parse(&invalid.to_string()).unwrap_err().contains(message));
+    }
+    let mut invalid = fixture;
+    invalid["targets"]["pulse"]["sorces"] = serde_json::json!(["typo.c"]);
+    assert!(Graph::parse(&invalid.to_string()).unwrap_err().contains("sorces"));
+}
+
+#[test]
 fn native_test_graph_preserves_sources_and_runtime_requirements() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let path = root.join("test/cmocka/build/test-graph.json");
