@@ -7,6 +7,17 @@ on:
     branches:
       - master
       - 'release/**'
+  workflow_run:
+    workflows:
+      - Release OBS-Studio-Rust
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: obs-studio-rust-v* release to offer in the update feed (default the latest)
+        required: false
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -257,78 +268,127 @@ jobs:
           gcsAccessKeyId: ${{ secrets.GCS_ACCESS_KEY_ID }}
           gcsAccessKeySecret: ${{ secrets.GCS_ACCESS_KEY_SECRET }}
 
-  create-appcast:
-    name: Create Sparkle Appcast 🎙️
-    if: github.repository_owner == 'obsproject' && fromJSON(needs.check-tag.outputs.validTag)
+  # obs-rust's update feed (#1730). release-rust.yaml publishes releases with
+  # GITHUB_TOKEN, which never fires `release: published`, so this job runs when
+  # that workflow finishes. It writes the Sparkle appcasts (one per macOS arch)
+  # and an RSA-signed branches.json as assets of the fixed `update-feed`
+  # release: the stable URLs that CMakePresets.json (SPARKLE_APPCAST_URL),
+  # OBSSparkle.mm.hpp and MacUpdateThread.cpp.hpp name. Each enclosure points
+  # at the DMG on the tagged release itself. The Windows updater stays off
+  # (ENABLE_WIN_UPDATER) until its manifest and patches are published too.
+  update-feed:
+    name: Publish obs-rust Update Feed 🎙️
+    if: >-
+      github.repository == 'obs-rust/obs-studio'
+      && (github.event_name == 'workflow_dispatch'
+        || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.head_branch == 'master'))
     runs-on: macos-26
-    needs: check-tag
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [arm64, x86_64]
+    timeout-minutes: 60
+    permissions:
+      contents: write
     defaults:
       run:
         shell: zsh --no-rcs --errexit --pipefail {0}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FEED_TAG: update-feed
+      FEED_URL: https://github.com/obs-rust/obs-studio/releases/download/update-feed
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          submodules: recursive
-          fetch-depth: 0
-          ref: ${{ github.ref }}
+          persist-credentials: false
 
-      - name: Set Up Environment 🔧
-        id: setup
+      - name: Find Release 🔎
+        id: release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          : Set Up Environment 🔧
-          if (( ${+RUNNER_DEBUG} )) setopt XTRACE
+          : Find Release 🔎
+          local tag="${INPUT_TAG}"
+          if [[ -z ${tag} ]] {
+            tag="$(gh release list --repo "${GITHUB_REPOSITORY}" --exclude-drafts --exclude-pre-releases --limit 30 \
+              --json tagName --jq '[.[] | select(.tagName | startswith("obs-studio-rust-v"))] | first | .tagName // ""')"
+          }
+          if [[ ${tag} != obs-studio-rust-v* ]] {
+            print '::notice::No obs-studio-rust release to publish'
+            print 'skip=true' >> $GITHUB_OUTPUT
+            exit 0
+          }
+          local current="$(curl -fsSL "${FEED_URL}/updates_arm64_v2.xml" || true)"
+          if [[ ${GITHUB_EVENT_NAME} != workflow_dispatch && ${current} == *"/download/${tag}/"* ]] {
+            print "::notice::The update feed already offers ${tag}"
+            print 'skip=true' >> $GITHUB_OUTPUT
+            exit 0
+          }
+          print "tag=${tag}" >> $GITHUB_OUTPUT
+          print 'skip=false' >> $GITHUB_OUTPUT
 
-          local channel='stable'
-          if [[ ${GITHUB_REF_NAME} == *(beta|rc)* ]] {
-            channel='beta'
+      - name: Set Up Sparkle ✨
+        if: steps.release.outputs.skip == 'false'
+        run: |
+          : Set Up Sparkle ✨
+          local version base_url hash
+          IFS=';' read -r version base_url hash <<< \
+            "$(jq -r '.configurePresets[] | select(.name=="dependencies")
+              | .vendor["obsproject.com/obs-studio"].tools.sparkle | [.version, .baseUrl, .hash] | join(";")' CMakePresets.json)"
+          mkdir -p "${RUNNER_TEMP}/Sparkle"
+          curl -fsSL -o "${RUNNER_TEMP}/Sparkle.tar.xz" "${base_url}/${version}/Sparkle-${version}.tar.xz"
+          local checksum="$(shasum -a 256 "${RUNNER_TEMP}/Sparkle.tar.xz" | cut -d ' ' -f 1)"
+          if [[ ${checksum} != ${hash} ]] {
+            print "::error::Sparkle-${version}.tar.xz checksum mismatch: ${checksum} (expected: ${hash})"
+            exit 2
+          }
+          tar -xJf "${RUNNER_TEMP}/Sparkle.tar.xz" -C "${RUNNER_TEMP}/Sparkle"
+
+      - name: Generate Appcasts 🎙️
+        if: steps.release.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          SPARKLE_KEY: ${{ secrets.OBS_RUST_SPARKLE_PRIVATE_KEY }}
+          RSA_KEY: ${{ secrets.OBS_RUST_UPDATE_RSA_PRIVATE_KEY }}
+        run: |
+          : Generate Appcasts 🎙️
+          if [[ -z ${SPARKLE_KEY} || -z ${RSA_KEY} ]] {
+            print '::error::OBS_RUST_SPARKLE_PRIVATE_KEY and OBS_RUST_UPDATE_RSA_PRIVATE_KEY must be set'
+            exit 2
+          }
+          local keys="${RUNNER_TEMP}/keys"
+          mkdir -m 700 -p "${keys}"
+          trap 'rm -rf "${keys}"' EXIT
+          print -rn -- "${SPARKLE_KEY}" > "${keys}/sparkle.key"
+          print -r -- "${RSA_KEY}" > "${keys}/rsa.pem"
+
+          mkdir -p feed
+          local arch
+          for arch (arm64 x86_64) {
+            mkdir -p "builds/${arch}"
+            gh release download "${TAG}" --repo "${GITHUB_REPOSITORY}" --pattern "*-macos-${arch}.dmg" --dir "builds/${arch}"
+            "${RUNNER_TEMP}/Sparkle/bin/generate_appcast" \
+              --ed-key-file "${keys}/sparkle.key" \
+              --download-url-prefix "https://github.com/obs-rust/obs-studio/releases/download/${TAG}/" \
+              --full-release-notes-url "https://github.com/obs-rust/obs-studio/releases/tag/${TAG}" \
+              --link 'https://github.com/obs-rust/obs-studio' \
+              --maximum-deltas 0 \
+              -o "feed/updates_${arch}_v2.xml" \
+              "builds/${arch}"
+            grep -q "/download/${TAG}/" "feed/updates_${arch}_v2.xml"
+            grep -q 'sparkle:edSignature=' "feed/updates_${arch}_v2.xml"
           }
 
-          local -A arch_names=(x86_64 intel arm64 apple)
-          print "cpuName=${arch_names[${{ matrix.target }}]}" >> $GITHUB_OUTPUT
-          print "commitHash=${GITHUB_SHA:0:9}" >> $GITHUB_OUTPUT
-          print "channel=${channel}" >> $GITHUB_OUTPUT
+          # Only the default "stable" branch exists; OBSApp always adds it.
+          print '[]' > feed/branches.json
+          openssl dgst -sha512 -sign "${keys}/rsa.pem" -out feed/branches.json.bin feed/branches.json
+          xxd -p feed/branches.json.bin | tr -d '\n' > feed/branches.json.sig
+          rm feed/branches.json.bin
 
-          local workflowRunId="$(gh run list --branch "${GITHUB_REF_NAME}" --event push --limit 1 --json "databaseId" --jq ".[].databaseId")"
-          print "workflowRunId=${workflowRunId}" >> $GITHUB_OUTPUT
-
-      - name: Download Artifact 📥
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: obs-studio-macos-${{ matrix.target }}-${{ steps.setup.outputs.commitHash }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ steps.setup.outputs.workflowRunId }}
-
-      - name: Generate Appcast 🎙️
-        id: generate-appcast
-        uses: ./.github/actions/sparkle-appcast
-        with:
-          sparklePrivateKey: ${{ secrets.SPARKLE_PRIVATE_KEY }}
-          baseImage: ${{ github.workspace }}/obs-studio-*-macos-${{ steps.setup.outputs.cpuName }}.dmg
-          channel: ${{ steps.setup.outputs.channel }}
-          count: 5
-          urlPrefix: 'https://cdn-fastly.obsproject.com/downloads'
-          customTitle: 'OBS Studio'
-          customLink: 'https://obsproject.com/'
-
-      - name: Upload Artifacts 📡
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: macos-sparkle-update-${{ matrix.target }}
-          path: ${{ github.workspace }}/output
-
-  merge-appcasts:
-    runs-on: ubuntu-26.04
-    needs: create-appcast
-    steps:
-      - name: Merge Appcasts
-        uses: actions/upload-artifact/merge@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: macos-sparkle-update
-          pattern: macos-sparkle-update-*
-          delete-merged: true
+      - name: Publish Feed 📡
+        if: steps.release.outputs.skip == 'false'
+        run: |
+          : Publish Feed 📡
+          if ! gh release view "${FEED_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release create "${FEED_TAG}" --repo "${GITHUB_REPOSITORY}" --target master --prerelease --latest=false \
+              --title 'OBS-Studio-Rust update feed' \
+              --notes 'Update feed for the in-app updater (#1730). Updated by publish.yaml after each release; not a release itself.'
+          fi
+          gh release upload update-feed --repo "${GITHUB_REPOSITORY}" --clobber feed/*
