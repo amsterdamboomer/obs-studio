@@ -342,6 +342,15 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         "test_hevc",
         "test_deque",
         "test_platform_time",
+        "test_dstr_regressions",
+        "test_threading",
+        "test_video_stats_race",
+        "test_task",
+        "test_quat",
+        "test_axisang",
+        "test_vec2",
+        "test_vec3",
+        "test_vec4",
     ] {
         assert!(graph.targets.contains_key(name), "missing canonical {name}");
         assert!(
@@ -356,6 +365,18 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         ("ENABLE_HEVC".into(), false),
     ]);
     let selected = graph.select(&facts).unwrap();
+    assert_eq!(graph.tests["test_dstr_regressions"].timeout_seconds, Some(60));
+    let raw: serde_json::Value = serde_json::from_slice(
+        &fs::read(root.join("test/cmocka/build/test-graph.json")).unwrap(),
+    )
+    .unwrap();
+    for name in ["test_threading", "test_video_stats_race", "test_task"] {
+        let libraries = raw["targets"][name]["libraries"].as_array().unwrap();
+        assert!(libraries.contains(&serde_json::json!({
+            "name": "Threads::Threads", "requires": {"not": "MSVC"}
+        })));
+    }
+    assert_eq!(raw["targets"]["test_video_stats_race"]["libraries"].as_array().unwrap().len(), 2);
     assert!(selected.tests.contains_key("test_serializer"));
     assert!(!selected.tests.contains_key("test_hevc"));
     assert!(!selected.tests.contains_key("test_config_save"));
