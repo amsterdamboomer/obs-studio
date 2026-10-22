@@ -310,6 +310,8 @@ class FlatpakPrunedBuildTest(unittest.TestCase):
             def execute(command, seconds):
                 calls.append(command)
                 if 'flatpak-builder' in command:
+                    self.assertIn('--mirror-screenshots-url=https://dl.flathub.org/media', command)
+                    self.assertIn('--compose-url-policy=full', command)
                     copied = Path(command[command.index('--state-dir') + 1])
                     self.assertNotEqual(copied, state)
                     self.assertTrue((copied / 'cache/original').exists())
