@@ -67,6 +67,7 @@ int main(int argc, char **argv) {
                 "libraries": ["fixture-dependency", {"name": "disabled-library", "requires": "GRAPH_DISABLED"}],
                 "header_libraries": ["fixture-headers"],
                 "artifact_definitions": {"ARTIFACT_PATH": "fixture-module"},
+                "watch_inputs": ["dependency-include", "fixture-module.c"],
                 "compile_options": [{"name": "-DCOMPILER_OPTION_REQUIRED=23", "requires": "GRAPH_FEATURE"}, {"name": "-invalid-disabled-compiler-option", "requires": "GRAPH_DISABLED"}],
                 "requires": {"all": ["GRAPH_FEATURE", {"not": "GRAPH_DISABLED"}]}},
             "disabled": {"sources": ["does-not-exist.c"], "requires": "GRAPH_DISABLED"}
