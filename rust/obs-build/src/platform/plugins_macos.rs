@@ -1,10 +1,94 @@
 //! Native macOS capture language settings and framework dependencies.
 use crate::{
-    NativeBuild, SharedLibrary, SourceCompileOptions,
+    LibraryKind, NativeBuild, SharedLibrary, SourceCompileOptions,
     libobs::Options,
     plugins::{MacosCaptureModule, Module},
 };
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::BTreeMap,
+    hash::{Hash, Hasher},
+    path::{Path, PathBuf},
+};
+
+fn resource_files(
+    root: &Path,
+    directory: &Path,
+    files: &mut Vec<(PathBuf, Vec<u8>)>,
+) -> Result<(), String> {
+    println!("cargo:rerun-if-changed={}", directory.display());
+    for entry in std::fs::read_dir(directory).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        if entry.file_name() == ".DS_Store" {
+            continue;
+        }
+        let path = entry.path();
+        if entry.file_type().map_err(|e| e.to_string())?.is_dir() {
+            resource_files(root, &path, files)?;
+        } else {
+            println!("cargo:rerun-if-changed={}", path.display());
+            files.push((
+                path.strip_prefix(root).map_err(|e| e.to_string())?.into(),
+                std::fs::read(path).map_err(|e| e.to_string())?,
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn stage_bundle(binary: &Path, data: &Path, name: &str) -> Result<Module, String> {
+    let image = std::fs::read(binary).map_err(|e| e.to_string())?;
+    let mut files = Vec::new();
+    resource_files(data, data, &mut files)?;
+    files.sort_by(|left, right| left.0.cmp(&right.0));
+    // This development bundle supplies runtime discovery metadata only. Release
+    // versioning, signing and distribution packaging remain separate inputs.
+    let plist = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>{name}</string>
+<key>CFBundleIdentifier</key><string>com.obsproject.{name}</string>
+<key>CFBundleName</key><string>{name}</string>
+<key>CFBundlePackageType</key><string>BNDL</string>
+<key>LSMinimumSystemVersion</key><string>13.0</string>
+</dict></plist>
+"#
+    );
+    // Select a snapshot of all runtime inputs, so removed resources cannot be
+    // picked up from a previously staged same-named module.
+    let mut signature = std::collections::hash_map::DefaultHasher::new();
+    (&image, &files, &plist).hash(&mut signature);
+    let contents = binary
+        .parent()
+        .ok_or("capture binary has no parent")?
+        .join("bundles")
+        .join(format!("{:016x}", signature.finish()))
+        .join(format!("{name}.plugin/Contents"));
+    let library = contents.join("MacOS").join(name);
+    let resources = contents.join("Resources");
+    std::fs::create_dir_all(library.parent().ok_or("bundle binary has no parent")?)
+        .map_err(|e| e.to_string())?;
+    std::fs::write(&library, image).map_err(|e| e.to_string())?;
+    std::fs::set_permissions(
+        &library,
+        std::fs::metadata(binary)
+            .map_err(|e| e.to_string())?
+            .permissions(),
+    )
+    .map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&resources).map_err(|e| e.to_string())?;
+    for (relative, bytes) in files {
+        let destination = resources.join(relative);
+        std::fs::create_dir_all(destination.parent().ok_or("resource has no parent")?)
+            .map_err(|e| e.to_string())?;
+        std::fs::write(destination, bytes).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(contents.join("Info.plist"), plist).map_err(|e| e.to_string())?;
+    Ok(Module {
+        library,
+        data: resources,
+    })
+}
 
 pub fn capture(
     build: &NativeBuild,
@@ -40,6 +124,7 @@ pub fn capture(
     }
     let mut library = SharedLibrary {
         name: module.name().into(),
+        kind: LibraryKind::Module,
         file_name: Some(module.name().into()),
         sources: sources.iter().map(|path| root.join(path)).collect(),
         include_dirs: vec![
@@ -122,8 +207,9 @@ pub fn capture(
     if options.pch {
         library.precompiled_headers = crate::groups::headers(&root, &library.sources)?;
     }
-    Ok(Module {
-        library: build.shared_library(&library)?,
-        data: root.join("plugins").join(directory).join("data"),
-    })
+    stage_bundle(
+        &build.shared_library(&library)?,
+        &root.join("plugins").join(directory).join("data"),
+        module.name(),
+    )
 }

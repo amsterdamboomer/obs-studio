@@ -13,7 +13,9 @@ pub(super) fn build_probe(
         &source,
         r#"
 #include <obs.h>
+#include <CoreFoundation/CoreFoundation.h>
 #include <dlfcn.h>
+#include <limits.h>
 #include <sys/stat.h>
 #include <string.h>
 #include <stdio.h>
@@ -58,6 +60,27 @@ int main(int argc, char **argv) {
         module_version() != LIBOBS_API_VER) return 14;
     Dl_info owner;
     if (!dladdr(description_export, &owner) || !same_file(owner.dli_fname, argv[1])) return 16;
+    CFURLRef data_url = CFURLCreateFromFileSystemRepresentation(NULL, (const UInt8 *)argv[3], strlen(argv[3]), true);
+    CFURLRef contents_url = data_url ? CFURLCreateCopyDeletingLastPathComponent(NULL, data_url) : NULL;
+    CFURLRef bundle_url = contents_url ? CFURLCreateCopyDeletingLastPathComponent(NULL, contents_url) : NULL;
+    CFBundleRef bundle = bundle_url ? CFBundleCreate(NULL, bundle_url) : NULL;
+    CFURLRef executable_url = bundle ? CFBundleCopyExecutableURL(bundle) : NULL;
+    UInt8 executable_path[PATH_MAX];
+    char identifier[128];
+    snprintf(identifier, sizeof(identifier), "com.obsproject.%s", argv[2]);
+    CFStringRef expected_identifier = CFStringCreateWithCString(NULL, identifier, kCFStringEncodingUTF8);
+    if (!executable_url || !CFURLGetFileSystemRepresentation(executable_url, true, executable_path, sizeof(executable_path)) ||
+        !same_file((const char *)executable_path, argv[1]) || !CFBundleGetIdentifier(bundle) ||
+        !CFEqual(CFBundleGetIdentifier(bundle), expected_identifier)) {
+        fprintf(stderr, "bundle executable/identifier mismatch for %s\n", argv[1]);
+        return 23;
+    }
+    CFRelease(expected_identifier);
+    CFRelease(executable_url);
+    CFRelease(bundle);
+    CFRelease(bundle_url);
+    CFRelease(contents_url);
+    CFRelease(data_url);
     if (!obs_startup("en-US", NULL, NULL)) return 17;
     size_t baseline = 0;
     const char *id;
@@ -106,6 +129,7 @@ int main(int argc, char **argv) {
             dependencies: vec![core.into()],
             c_compile_options: vec!["-std=gnu17".into()],
             compile_options: vec!["-mmacosx-version-min=13.0".into()],
+            link_options: vec!["-framework".into(), "CoreFoundation".into()],
             ..SharedLibrary::default()
         })
         .unwrap()

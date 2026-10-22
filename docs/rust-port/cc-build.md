@@ -95,14 +95,24 @@ device, verify rendered pixels, record media or prove the full application.
 
 ## macOS capture module graphs
 
+`LibraryKind::Module` selects a loadable module: Apple linking uses `-bundle`
+and omits the dylib install name, while shared libraries retain `-dynamiclib`.
+The capture contract verifies `MH_BUNDLE` headers in both Cargo and CMake
+artifacts. The existing shared-core/plugin fixture exercises module loading
+and observes a rebuilt dependency without relinking the module.
+
 `plugins::build_macos_capture` builds the original `mac-capture`,
 `mac-avcapture` and `mac-avcapture-legacy` modules. CMake, its cross checks
 and Cargo consume `plugins/mac-capture/source-sets.json`. The screen/audio
 Objective-C group keeps manual reference counting; the modern camera uses
 ARC and Clang modules, and the legacy camera keeps Objective-C++ with ARC.
 Framework dependencies, weak ScreenCaptureKit linking, macOS 13 minimum,
-locale data paths and independent unity/PCH choices are retained. The output
-is a development module binary, not a signed release plugin bundle.
+locale data and independent unity/PCH choices are retained. Each development
+artifact has the native `.plugin/Contents/MacOS/<name>` layout, staged resources
+and an `Info.plist` with its executable and bundle identifier. A snapshot of
+binary, resource paths/contents and metadata selects the output directory so
+removed resources cannot survive from an older same-named bundle. Release
+version metadata, signing and distribution packaging remain incomplete.
 
 `OBS_BUILD_MACOS_CAPTURE=1` extends the existing core integration contract.
 The three `OBS_BUILD_MACOS_MAC_CAPTURE_REFERENCE`,
@@ -111,7 +121,8 @@ The three `OBS_BUILD_MACOS_MAC_CAPTURE_REFERENCE`,
 agreement with actual CMake binaries. The native macOS Tier 2 script builds
 those references and runs each Cargo/CMake module with both Cargo cores in
 fresh processes. Checks cover module/core file identity, API version,
-description, locale resources, initialization and all registered source IDs.
+description, byte-for-byte resource agreement, CoreFoundation bundle/executable identity,
+initialization and all registered source IDs.
 Wrong-module and wrong-core controls must return 14 and 12 respectively.
 The unchanged CTest suites still run against both cores.
 

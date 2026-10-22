@@ -250,6 +250,7 @@ for native_variant in obs-c-reference obs; do
     [ -f "$capture_data/locale/en-US.ini" ] && [ -f "$reference_data/locale/en-US.ini" ] || {
       echo "FAIL: $capture locale data missing" >&2; exit 1;
     }
+    diff -r "$capture_data" "$reference_data"
     echo "== Cargo [$native_variant] $capture module/core identity and source registration"
     "${native_dyld[@]}" "$capture_probe" "$capture_path" "$capture" "$capture_data" "$native_framework/Versions/A/libobs"
     "${native_dyld[@]}" "$capture_probe" "$reference_module" "$capture" "$reference_data" "$native_framework/Versions/A/libobs"
