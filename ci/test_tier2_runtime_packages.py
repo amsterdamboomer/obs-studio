@@ -62,6 +62,29 @@ libc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6 (0x234)
             (root / 'cargo' / 'build-script').write_bytes(b'\x7fELFbuildscript')
             self.assertEqual(list(m.elf_files(root)), [root / 'test'])
 
+    def test_batch_ownership_retains_per_path_fallback_for_loader_diversion(self):
+        import subprocess
+        from unittest.mock import patch
+        m = module()
+        response = subprocess.CompletedProcess([], 1,
+            'libc6:amd64: /usr/lib/libc.so.6\n'
+            'diversion by libc6 from: /lib64/ld-linux-x86-64.so.2\n', '')
+        with patch.object(m, 'query', return_value=response) as query, \
+             patch.object(m, 'owners', return_value={'libc6:amd64'}) as fallback:
+            self.assertEqual(m.ownership_packages(['/usr/lib/libc.so.6', '/lib64/ld-linux-x86-64.so.2']), {'libc6:amd64'})
+            self.assertEqual(query.call_count, 1)
+            fallback.assert_called_once_with('/lib64/ld-linux-x86-64.so.2')
+
+    def test_batch_ownership_cannot_hide_an_unowned_library(self):
+        import subprocess
+        from unittest.mock import patch
+        m = module()
+        response = subprocess.CompletedProcess([], 1, 'libc6:amd64: /usr/lib/libc.so.6\n', 'no match')
+        with patch.object(m, 'query', return_value=response), \
+             patch.object(m, 'owners', side_effect=ValueError('No installed package')):
+            with self.assertRaisesRegex(ValueError, 'No installed package'):
+                m.ownership_packages(['/usr/lib/libc.so.6', '/missing.so'])
+
     def test_runtime_only_inputs_cover_non_linked_drivers_plugins_and_tools(self):
         m = module()
         for name in ('libgl1-mesa-dri', 'libegl-mesa0', 'vlc-plugin-base', 'pipewire',
