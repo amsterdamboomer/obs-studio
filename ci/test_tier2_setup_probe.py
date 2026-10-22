@@ -28,6 +28,19 @@ class ProbeTest(unittest.TestCase):
                     probe.verify_bundle(root)
                 command.assert_not_called()
 
+    def test_measure_rejects_corruption_before_any_docker_command(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'image.tar.zst').write_bytes(b'corrupt')
+            (root / 'bundle.json').write_text(json.dumps({
+                'archive_sha256': hashlib.sha256(b'original').hexdigest(),
+            }))
+            with patch.object(probe, 'command') as command, patch.object(probe.subprocess, 'run') as run:
+                with self.assertRaisesRegex(ValueError, 'checksum'):
+                    probe.measure(root, 'prepared', root)
+                command.assert_not_called()
+                run.assert_not_called()
+
     def test_image_identity_is_not_an_arbitrary_docker_argument(self):
         with self.assertRaises(ValueError):
             probe.image_id('--privileged')
@@ -45,6 +58,28 @@ class ProbeTest(unittest.TestCase):
         for text in ('--allow-unauthenticated\n', 'libc6\n', 'a=1; touch x\n', ''):
             with self.subTest(text=text), self.assertRaises(ValueError):
                 probe.package_specs(text)
+
+
+class ProbeWorkflowTest(unittest.TestCase):
+    def test_manual_probe_is_master_only_and_does_not_replace_normal_build(self):
+        text = (ROOT / '.github/workflows/ci.yml').read_text()
+        producer = text.split('  tier2-setup-producer:', 1)[1].split('  tier2-setup-consumer:', 1)[0]
+        self.assertIn("github.event_name == 'workflow_dispatch'", producer)
+        self.assertIn("github.ref == 'refs/heads/master'", producer)
+        self.assertIn('inputs.tier2-setup-probe', producer)
+        self.assertIn('needs: build-project', producer)
+        normal = text.split('  build-project:', 1)[1].split('  tier2-setup-producer:', 1)[0]
+        self.assertNotIn('tier2-setup-probe', normal)
+        self.assertNotIn('actions/cache/save@', producer)
+
+    def test_stock_does_not_pay_for_prepared_image_transfer(self):
+        text = (ROOT / '.github/workflows/ci.yml').read_text()
+        consumers = text.split('  tier2-setup-consumer:', 1)[1].split('  validate-data:', 1)[0]
+        image_step = consumers.split('- name: Download Prepared Image', 1)[1].split('- name: Measure', 1)[0]
+        self.assertIn("matrix.variant == 'prepared'", image_step)
+        self.assertIn('variant: [stock, prepared]', consumers)
+        self.assertIn('trial: [1, 2, 3]', consumers)
+        self.assertIn('fail-fast: false', consumers)
 
 
 if __name__ == '__main__':
