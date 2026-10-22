@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tier2-setup-probe:
-        description: Measure cold prepared-environment transfer against locked stock setup (six extra runners)
+        description: Measure cold prepared-environment transfer against locked stock setup (one producer and six fresh consumers)
         type: boolean
         default: false
       native-cache-probe:

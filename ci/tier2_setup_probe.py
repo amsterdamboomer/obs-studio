@@ -26,7 +26,10 @@ def command(*args: str, output: Path | None = None) -> str:
         with output.open('wb') as stream:
             subprocess.run(args, stdout=stream, check=True)
         return ''
-    return subprocess.run(args, capture_output=True, text=True, check=True).stdout.strip()
+    result = subprocess.run(args, capture_output=True, text=True)
+    if result.returncode:
+        raise RuntimeError(f'Command failed ({result.returncode}): {args[0]}\n{result.stdout[-8192:]}\n{result.stderr[-8192:]}')
+    return result.stdout.strip()
 
 
 def image_id(value: str) -> str:
