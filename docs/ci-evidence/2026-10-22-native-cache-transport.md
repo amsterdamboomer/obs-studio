@@ -93,3 +93,24 @@ API references for the adapter design:
 Publication must use the explicit repository job token, never an inherited PAT
 or custom token that could trigger product tag/release workflows. The actual
 trusted job wiring and cache-only release namespace still require verification.
+
+## Retry and abandoned-upload recovery
+
+REDe7fc556c4 demonstrates non-reproducible gzip retry bytes, failed retries,
+old orphan uploads exhausting admission, and starter-state manifests hiding a
+usable prior seed. Gzip now fixes header timestamp/name while preserving
+snapshot file metadata, so an unchanged snapshot produces identical bytes.
+A retry verifies/reuses existing immutable assets without clobbering them.
+
+Only uploaded, nonempty, digest-bearing archive/manifest pairs are complete.
+A serialized publisher can reclaim incomplete generations after a ten-minute
+creation grace period; valid complete pairs and reusable current-generation
+assets remain protected. Recent orphans still count against admission limits:
+publication refuses when necessary rather than exceeding the bound or
+removing a retained usable seed. No background deletion job was added.
+
+Twenty archive/protocol cases plus two stdlib checks pass in0.501s. Coverage
+includes reproducibility across different wall times, a no-upload retry,
+expired orphan recovery, recent orphan protection/budget refusal, and ignoring
+starter manifests while retaining a real usable generation. The fixture is
+local; GitHub adapter, actual publication and native qualification remain open.

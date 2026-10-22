@@ -8,6 +8,8 @@ ordinary files/directories; unsupported entries fail rather than disappearing.
 from __future__ import annotations
 
 import hashlib
+import gzip
+from datetime import datetime
 import json
 import os
 from pathlib import Path
@@ -118,7 +120,11 @@ def pack(source: Path, output: Path, identity: dict, source_sha: str) -> dict:
     # Hard-link publication is atomic, same-filesystem, and never clobbers output.
     with tempfile.TemporaryDirectory(prefix='native-cache-pack-', dir=output.parent) as directory:
         staged = Path(directory) / 'seed.tar.gz'
-        with tarfile.open(staged, 'w:gz', compresslevel=1, dereference=True) as archive:
+        with (
+            staged.open('wb') as raw,
+            gzip.GzipFile(fileobj=raw, filename='', mode='wb', mtime=0, compresslevel=1) as compressed,
+            tarfile.open(fileobj=compressed, mode='w|', dereference=True) as archive,
+        ):
             for path, relative, status in entries:
                 info = archive.gettarinfo(str(path), arcname=relative)
                 if not (info.isdir() or info.isfile()):
@@ -217,11 +223,35 @@ def checked_assets(store) -> list:
     return assets
 
 
+def uploaded_asset(asset: dict) -> bool:
+    return (asset.get('state') == 'uploaded' and asset['size'] > 0
+            and re.fullmatch(r'sha256:[0-9a-f]{64}', str(asset.get('digest', ''))) is not None)
+
+
 def complete_generations(assets: list) -> list:
-    names = {asset['name'] for asset in assets}
-    return sorted((asset for asset in assets if asset['name'].endswith('.json')
-                   and asset['name'][:-5] + '.tar.gz' in names),
+    ready = {asset['name']: asset for asset in assets if uploaded_asset(asset)}
+    return sorted((asset for asset in ready.values() if asset['name'].endswith('.json')
+                   and asset['size'] <= MAX_MANIFEST_BYTES
+                   and asset['name'][:-5] + '.tar.gz' in ready
+                   and ready[asset['name'][:-5] + '.tar.gz']['size'] <= MAX_ARCHIVE_BYTES),
                   key=lambda asset: (asset['created_at'], asset['id']), reverse=True)
+
+
+def trim_orphans(store, assets: list, current_stem: str) -> None:
+    # A serialized publisher may reclaim abandoned uploads only after a
+    # ten-minute grace period. Never classify a valid complete pair as orphaned.
+    committed = {asset['name'][:-5] for asset in complete_generations(assets)}
+    now = time.time()
+    for asset in assets:
+        match = ASSET_NAME.fullmatch(asset['name'])
+        stem = 'native-' + match.group(1) + '-' + match.group(2)
+        if stem in committed or (stem == current_stem and uploaded_asset(asset)):
+            continue
+        created = datetime.fromisoformat(asset['created_at'].replace('Z', '+00:00'))
+        if created.tzinfo is None:
+            raise ValueError('orphan creation time must include timezone')
+        if now - created.timestamp() >= 600:
+            store.delete(asset['name'])
 
 
 def trim_generations(store, assets: list) -> None:
@@ -260,6 +290,7 @@ def publish(archive: Path, metadata: dict, store, context: dict) -> dict:
     # Recover a prior interrupted cleanup without discarding either retained
     # complete generation. Incomplete uploads still count against admission.
     trim_generations(store, assets)
+    trim_orphans(store, checked_assets(store), stem)
     assets = checked_assets(store)
     names = {asset['name']: asset for asset in assets}
     additions = [(stem + '.tar.gz', archive.stat().st_size), (stem + '.json', len(encoded))]
