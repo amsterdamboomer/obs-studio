@@ -173,7 +173,8 @@ fn production_runtime_stages_selected_artifacts_and_rejects_stale_outputs() {
 
 #[test]
 fn bundled_frontend_plugins_follow_application_feature_selection() {
-    let mut options = obs_build::application::BuildOptions::for_target("x86_64-unknown-linux-gnu").unwrap();
+    let mut options =
+        obs_build::application::BuildOptions::for_target("x86_64-unknown-linux-gnu").unwrap();
     for (tools, websocket) in [(true, true), (true, false), (false, true), (false, false)] {
         options.frontend_tools = tools;
         options.websocket = websocket.then(Default::default);

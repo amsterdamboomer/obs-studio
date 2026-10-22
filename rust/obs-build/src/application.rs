@@ -47,6 +47,8 @@ impl BuildOptions {
         .collect();
         names.extend(self.sources.iter().map(|source| source.name().into()));
         for (enabled, name) in [
+            (self.frontend_tools, "frontend-tools"),
+            (self.websocket.is_some(), "obs-websocket"),
             (self.fdk, "obs-libfdk"),
             (self.qsv.is_some(), "obs-qsv11"),
             (self.webrtc.is_some(), "obs-webrtc"),

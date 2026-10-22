@@ -65,9 +65,13 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
         unity: std::env::var_os("OBS_BUILD_DISABLE_CORE_UNITY").is_none(),
         hevc: std::env::var_os("OBS_BUILD_DISABLE_HEVC").is_none(),
         core_modules: if enabled("OBS_BUILD_APP_GUI") {
-            obs_build::application::BuildOptions::for_target(&build.target)
-                .unwrap()
-                .core_module_names()
+            let mut application =
+                obs_build::application::BuildOptions::for_target(&build.target).unwrap();
+            // This driver enables frontend plugins explicitly below; its
+            // baseline must not request modules absent from that variant.
+            application.frontend_tools = false;
+            application.websocket = None;
+            application.core_module_names()
         } else {
             vec![]
         },
