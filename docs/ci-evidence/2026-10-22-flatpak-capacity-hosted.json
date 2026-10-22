@@ -1,0 +1,311 @@
+{
+  "run_id": 39722540093,
+  "source": "3531d3d6796c90f29bc68f29e86ce6183cf935a4",
+  "job": {
+    "id": 119639155538,
+    "run_id": 39722540093,
+    "workflow_name": "infra/1269-flatpak-download-probe pull request run \ud83d\ude80",
+    "head_branch": "infra/1269-flatpak-download-probe",
+    "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39722540093",
+    "run_attempt": 1,
+    "node_id": "CR_kwDOVAc9yc8AAAAb2wyjUg",
+    "head_sha": "3531d3d6796c90f29bc68f29e86ce6183cf935a4",
+    "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119639155538",
+    "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39722540093/job/119639155538",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-10-22T04:28:28Z",
+    "started_at": "2026-10-22T04:28:31Z",
+    "completed_at": "2026-10-22T04:46:26Z",
+    "name": "Build \ud83e\uddf1 / Flatpak \ud83d\udce6",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-10-22T04:28:32Z",
+        "completed_at": "2026-10-22T04:28:34Z"
+      },
+      {
+        "name": "Initialize containers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-10-22T04:28:34Z",
+        "completed_at": "2026-10-22T04:29:39Z"
+      },
+      {
+        "name": "Prepare build space",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-10-22T04:29:39Z",
+        "completed_at": "2026-10-22T04:29:39Z"
+      },
+      {
+        "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-10-22T04:29:39Z",
+        "completed_at": "2026-10-22T04:29:50Z"
+      },
+      {
+        "name": "Set Up Environment \ud83d\udd27",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-10-22T04:29:50Z",
+        "completed_at": "2026-10-22T04:29:50Z"
+      },
+      {
+        "name": "Run astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-10-22T04:29:50Z",
+        "completed_at": "2026-10-22T04:29:52Z"
+      },
+      {
+        "name": "Prepare offline Flatpak Rust dependencies",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-10-22T04:29:52Z",
+        "completed_at": "2026-10-22T04:29:52Z"
+      },
+      {
+        "name": "Vendor Flatpak Cargo sources",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-10-22T04:29:52Z",
+        "completed_at": "2026-10-22T04:30:09Z"
+      },
+      {
+        "name": "Validate Flatpak manifest",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-10-22T04:30:09Z",
+        "completed_at": "2026-10-22T04:30:16Z"
+      },
+      {
+        "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-10-22T04:30:16Z",
+        "completed_at": "2026-10-22T04:30:17Z"
+      },
+      {
+        "name": "Restore legacy Flatpak builder seed",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 11,
+        "started_at": "2026-10-22T04:30:17Z",
+        "completed_at": "2026-10-22T04:30:17Z"
+      },
+      {
+        "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12,
+        "started_at": "2026-10-22T04:30:17Z",
+        "completed_at": "2026-10-22T04:30:19Z"
+      },
+      {
+        "name": "Record Start Time \u23f1\ufe0f",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13,
+        "started_at": "2026-10-22T04:30:19Z",
+        "completed_at": "2026-10-22T04:30:19Z"
+      },
+      {
+        "name": "Build Flatpak Manifest \ud83e\uddfe",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14,
+        "started_at": "2026-10-22T04:30:19Z",
+        "completed_at": "2026-10-22T04:44:19Z"
+      },
+      {
+        "name": "Report Flatpak Cache Contents",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15,
+        "started_at": "2026-10-22T04:44:19Z",
+        "completed_at": "2026-10-22T04:44:19Z"
+      },
+      {
+        "name": "Ccache Stats \ud83d\udcca",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 16,
+        "started_at": "2026-10-22T04:44:19Z",
+        "completed_at": "2026-10-22T04:44:20Z"
+      },
+      {
+        "name": "Run actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 17,
+        "started_at": "2026-10-22T04:44:20Z",
+        "completed_at": "2026-10-22T04:44:20Z"
+      },
+      {
+        "name": "Validate AppStream",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 18,
+        "started_at": "2026-10-22T04:44:20Z",
+        "completed_at": "2026-10-22T04:44:24Z"
+      },
+      {
+        "name": "Verify Icon and Metadata in app-info",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 19,
+        "started_at": "2026-10-22T04:44:24Z",
+        "completed_at": "2026-10-22T04:44:24Z"
+      },
+      {
+        "name": "Validate build directory",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 20,
+        "started_at": "2026-10-22T04:44:24Z",
+        "completed_at": "2026-10-22T04:44:30Z"
+      },
+      {
+        "name": "Validate repository",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 21,
+        "started_at": "2026-10-22T04:44:30Z",
+        "completed_at": "2026-10-22T04:44:36Z"
+      },
+      {
+        "name": "Measure Flatpak Cache Capacity",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 22,
+        "started_at": "2026-10-22T04:44:36Z",
+        "completed_at": "2026-10-22T04:46:14Z"
+      },
+      {
+        "name": "Upload Flatpak Cache Measurement",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 23,
+        "started_at": "2026-10-22T04:46:14Z",
+        "completed_at": "2026-10-22T04:46:15Z"
+      },
+      {
+        "name": "Post Run astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 44,
+        "started_at": "2026-10-22T04:46:15Z",
+        "completed_at": "2026-10-22T04:46:15Z"
+      },
+      {
+        "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 45,
+        "started_at": "2026-10-22T04:46:15Z",
+        "completed_at": "2026-10-22T04:46:16Z"
+      },
+      {
+        "name": "Stop containers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 46,
+        "started_at": "2026-10-22T04:46:16Z",
+        "completed_at": "2026-10-22T04:46:23Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 47,
+        "started_at": "2026-10-22T04:46:23Z",
+        "completed_at": "2026-10-22T04:46:23Z"
+      }
+    ],
+    "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119639155538",
+    "labels": [
+      "ubuntu-26.04"
+    ],
+    "runner_id": 1000056072,
+    "runner_name": "GitHub Actions 1000056072",
+    "runner_group_id": 0,
+    "runner_group_name": "GitHub Actions"
+  },
+  "measurement": {
+    "status": "success",
+    "architecture": "x86_64",
+    "manifest": "/__w/obs-studio/obs-studio/build-aux/flatpak-github-action-modified-com.obsproject.Studio.json",
+    "builder_version": "flatpak-builder-1.4.9",
+    "zstd_version": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***",
+    "downloads_apparent_bytes": 1026740380,
+    "compression": {
+      "full": {
+        "bytes": 2703989420,
+        "seconds": 42.675362508000035
+      },
+      "without_downloads": {
+        "bytes": 1684447411,
+        "seconds": 12.605927070000007
+      },
+      "without_downloads_or_compiler": {
+        "bytes": 1624465624,
+        "seconds": 11.701207222999983
+      }
+    },
+    "limits": "Canonical tar+zstd proxy sizes, not Actions-cache archive/transport measurements. One paired source-fetch observation, not a build, safe-pruning decision or representative speedup. Download commands use isolated states; original state is read for copying/compression only.",
+    "warm_download_seconds": 0.04552783500002988,
+    "fresh_download_seconds": 26.691295268000204
+  },
+  "raw_log_sha256": "00fb6328eccd6fcddf88f4d5ba7ee77a6eca82d5a0885be647039e8d7f316872",
+  "literal_excerpts": [
+    "2026-10-22T04:29:50.8124937Z Downloading uv from \"https://releases.astral.sh/github/uv/releases/download/0.13.4/uv-x86_64-unknown-linux-gnu.tar.gz\" ...",
+    "2026-10-22T04:30:07.1103799Z     0.88  Downloading crates ...",
+    "2026-10-22T04:30:17.4960924Z Cache hit for: flatpak-builder-x86_64-7bb71f0a48a885ca4bfe218d34814d0c108cb0ee80df664119c10c6a24945d77-x86_64",
+    "2026-10-22T04:30:17.9278036Z Cache hit for restore-key: flatpak-ccache-x86_64-9c56136dd87b903a7a1ebd64166647d066d29f26",
+    "2026-10-22T04:30:19.9928208Z Cache hit for: flatpak-builder-x86_64-7bb71f0a48a885ca4bfe218d34814d0c108cb0ee80df664119c10c6a24945d77-x86_64",
+    "2026-10-22T04:31:06.8945441Z Restored cache with key: flatpak-builder-x86_64-7bb71f0a48a885ca4bfe218d34814d0c108cb0ee80df664119c10c6a24945d77-x86_64",
+    "2026-10-22T04:33:06.7141009Z Downloading sources",
+    "2026-10-22T04:33:06.7147312Z Cache hit for obs-deps-buildstream-base, skipping build",
+    "2026-10-22T04:33:06.7187113Z Cache hit for obs-deps-buildstream-devel, skipping build",
+    "2026-10-22T04:33:06.7221612Z Cache hit for obs-deps-buildstream-devtools, skipping build",
+    "2026-10-22T04:33:06.7225970Z Cache hit for obs-deps-buildstream-qt, skipping build",
+    "2026-10-22T04:33:06.7261391Z Cache hit for cef, skipping build",
+    "2026-10-22T04:33:06.7264215Z Cache hit for obs-rust-toolchain, skipping build",
+    "2026-10-22T04:44:36.6185621Z + timeout --kill-after=10s 30s flatpak-builder --version",
+    "2026-10-22T04:44:36.6282187Z + timeout --kill-after=10s 30s zstd --version",
+    "2026-10-22T04:44:36.6299503Z + timeout --kill-after=10s 180s du --apparent-size --block-size=1 --summarize -- /__w/obs-studio/obs-studio/.flatpak-builder/downloads",
+    "2026-10-22T04:44:40.3011034Z + timeout --kill-after=10s 180s flatpak-builder --download-only --disable-rofiles-fuse --force-clean --arch=x86_64 --state-dir /__w/_temp/flatpak-cache-probe-pd45oxp2/warm /__w/_temp/flatpak-cache-probe-pd45oxp2/warm-build /__w/obs-studio/obs-studio/build-aux/flatpak-github-action-modified-com.obsproject.Studio.json",
+    "2026-10-22T04:44:40.3464810Z Downloading sources",
+    "2026-10-22T04:44:40.3466265Z + timeout --kill-after=10s 180s flatpak-builder --download-only --disable-rofiles-fuse --force-clean --arch=x86_64 --state-dir /__w/_temp/flatpak-cache-probe-pd45oxp2/fresh /__w/_temp/flatpak-cache-probe-pd45oxp2/fresh-build /__w/obs-studio/obs-studio/build-aux/flatpak-github-action-modified-com.obsproject.Studio.json",
+    "2026-10-22T04:45:07.0380851Z Downloading sources",
+    "2026-10-22T04:45:07.0381697Z Downloading https://github.com/obs-rust/obs-deps-buildstream/releases/download/2026-09-24/flatpak-base-x86_64-2026-09-24.tar.xz",
+    "2026-10-22T04:45:07.0382439Z Downloading https://github.com/obs-rust/obs-deps-buildstream/releases/download/2026-09-24/flatpak-devel-x86_64-2026-09-24.tar.xz",
+    "2026-10-22T04:45:07.0383126Z Downloading https://github.com/obs-rust/obs-deps-buildstream/releases/download/2026-09-24/flatpak-devtools-x86_64-2026-09-24.tar.xz",
+    "2026-10-22T04:45:07.0384130Z Downloading https://github.com/obs-rust/obs-deps-buildstream/releases/download/2026-09-24/flatpak-qt-x86_64-2026-09-24.tar.xz",
+    "2026-10-22T04:45:07.0384782Z Downloading https://github.com/obs-rust/cef/releases/download/7871/cef_binary_7871_linux_x86_64.tar.xz",
+    "2026-10-22T04:45:07.0385306Z Downloading https://static.rust-lang.org/dist/rust-1.98.1-x86_64-unknown-linux-gnu.tar.xz",
+    "2026-10-22T04:45:07.0385788Z Downloading https://github.com/corrosion-rs/corrosion/archive/refs/tags/v0.5.2.tar.gz",
+    "2026-10-22T04:45:07.0407192Z + timeout --kill-after=10s 120s bash -o pipefail -c 'root=$1",
+    "2026-10-22T04:45:49.7135933Z + timeout --kill-after=10s 120s bash -o pipefail -c 'root=$1",
+    "2026-10-22T04:46:02.3196559Z + timeout --kill-after=10s 120s bash -o pipefail -c 'root=$1"
+  ],
+  "parent_status_at_capture": "in_progress",
+  "limits": [
+    "One paired observation; proxy compression is not actual Actions cache transport.",
+    "Full parent result not yet established. No production exclusion adopted."
+  ]
+}

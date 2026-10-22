@@ -60,10 +60,44 @@ flatpak-cache-probe=true and native-cache-probe=false. Preserve the resolved
 source, job IDs, command logs, versions and JSON. Do not rerun a full workflow
 for an unrelated failure. Keep watcher cancellation disabled for the trial.
 
-No hosted result is observed yet. One paired source-fetch observation does
+The hosted result below is one paired observation. One source-fetch pair does
 not establish representative network cost or an end-to-end speedup. It also
 does not prove a pruned state can rebuild the application: any adoption needs
 actual changed-cache producer/consumer build/output validation, required
 coverage and an honest global allocation. Native architecture retention and
 repository headroom remain unresolved under #1269; no smaller native limit
 or production exclusion is adopted by this unit.
+
+
+## Observed single hosted experiment
+
+Run [39722540093](https://github.com/obs-rust/obs-studio/actions/runs/39722540093)
+on `3531d3d6796c90f29bc68f29e86ce6183cf935a4` completed Flatpak
+job119639155538 successfully, including existing output validation followed
+by the optional measurement. Full parent status was still in progress at
+this capture. The [hosted record](2026-10-22-flatpak-capacity-hosted.json)
+retains job metadata, actual JSON, log hash and command/source excerpts.
+
+Installed tools: flatpak-builder 1.4.9, zstd 1.5.7. Downloads apparent bytes:
+1,026,740,380. Isolated warm source acquisition took 0.046 seconds; fresh
+acquisition took 26.691 seconds. Copy/setup is excluded from those timers.
+
+| Canonical compression proxy | Bytes | Compression seconds |
+| --- | ---: | ---: |
+| Full state | 2,703,989,420 | 42.675 |
+| Without downloads | 1,684,447,411 | 12.606 |
+| Without downloads or compiler state | 1,624,465,624 | 11.701 |
+
+The full-to-no-downloads proxy difference is 1,019,542,009 bytes; excluding
+compiler state too differs by 1,079,523,796 bytes. These are matched proxy
+differences on this state, not measured Actions upload/restore savings.
+One fresh network observation does not establish representative acquisition
+cost, and download-only success does not prove an application rebuild from
+a pruned cache. Existing full build/output validation happened before the
+probe with the original state.
+
+Decision: retain the measurement helper, but do not adopt a production
+exclusion from this observation alone. Next validate an actual isolated
+pruned-state build and cache producer/consumer behavior before changing
+production transport. Global allocation and architecture retention remain
+unresolved; no end-to-end speedup or completed #1269 claim.
