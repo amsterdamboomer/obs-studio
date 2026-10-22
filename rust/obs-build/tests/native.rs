@@ -144,6 +144,15 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/watched-inputs.txt" "${graph_inputs}")
         ("SKIP_RETURN_CODE", serde_json::json!(77)),
         ("RESOURCE_LOCK", serde_json::json!(["fixture-lock"])),
         ("LABELS", serde_json::json!(["native-fixture"])),
+        (
+            "WORKING_DIRECTORY",
+            serde_json::json!(
+                output
+                    .join("runtime root/Release")
+                    .to_string_lossy()
+                    .replace('\\', "/")
+            ),
+        ),
     ] {
         assert!(
             tests[0]["properties"]
