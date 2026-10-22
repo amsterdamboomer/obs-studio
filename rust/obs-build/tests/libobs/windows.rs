@@ -111,9 +111,12 @@ static int same_file(const wchar_t *left, const wchar_t *right) {
 int wmain(int argc, wchar_t **argv) {
     if (argc != 2) return 10;
     if (obs_get_version() != LIBOBS_API_VER) return 11;
+    HMODULE core = GetModuleHandleW(L"obs.dll");
+    FARPROC version = core ? GetProcAddress(core, "obs_get_version") : NULL;
+    if (!version) return 12;
     HMODULE owner = NULL;
     if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-        GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR)&obs_get_version, &owner)) return 12;
+        GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCWSTR)version, &owner)) return 12;
     wchar_t loaded[32768];
     DWORD size = GetModuleFileNameW(owner, loaded, 32768);
     if (!size || size >= 32768) return 13;
