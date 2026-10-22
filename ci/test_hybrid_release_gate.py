@@ -50,3 +50,10 @@ class ReleaseChannelGateTest(unittest.TestCase):
     def test_unknown_channel_fails_closed(self):
         with self.assertRaises(ValueError):
             module.check("stable-ish", {"approved": False})
+
+    def test_workflow_publishes_nightly_and_gates_certify(self):
+        source = (Path(__file__).resolve().parent.parent / ".github/workflows/release-rust.yaml").read_text()
+        release, certify = source.split("\n  release:", 1)[1], source.split("\n  certify:", 1)[1]
+        self.assertIn("hybrid_release_gate.py --channel nightly", release.split("\n  certify:", 1)[0])
+        gate = certify.index("hybrid_release_gate.py --channel blessed")
+        self.assertLess(gate, certify.index("--prerelease=false --latest"))
