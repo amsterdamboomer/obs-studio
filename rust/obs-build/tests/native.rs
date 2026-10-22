@@ -10,7 +10,11 @@ fn native_test_graph_cmake_builds_and_runs_selected_contract() {
     let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let consumer = repository.join("test/cmocka/native-test-graph.cmake");
     fs::create_dir_all(root.join("dependency-include")).unwrap();
-    fs::write(root.join("dependency-include/dependency.h"), "#define DEPENDENCY_ANSWER 42\n").unwrap();
+    fs::write(
+        root.join("dependency-include/dependency.h"),
+        "#define DEPENDENCY_ANSWER 42\n",
+    )
+    .unwrap();
     fs::write(
         root.join("answer.c"),
         r#"
@@ -132,12 +136,14 @@ int main(int argc, char **argv) {
         ("GRAPH_FEATURE".into(), true),
         ("GRAPH_DISABLED".into(), false),
     ]);
-    let dependencies = std::collections::BTreeMap::from([("fixture-dependency".into(),
+    let dependencies = std::collections::BTreeMap::from([(
+        "fixture-dependency".into(),
         obs_build::validation::graph::Dependency {
             include_dirs: vec![root.join("dependency-include")],
             definitions: vec![("DEPENDENCY_REQUIRED".into(), Some("5".into()))],
             ..Default::default()
-        })]);
+        },
+    )]);
     let artifacts = rust_graph
         .compile(&build, root, &facts, &dependencies)
         .unwrap();
@@ -147,8 +153,13 @@ int main(int argc, char **argv) {
         selected.tests.keys().copied().collect::<Vec<_>>(),
         vec![tests[0]["name"].as_str().unwrap()]
     );
-    let mut command = selected.tests["answer-case"]
-        .command(root, &build.output, &artifacts["answer"])
+    let executable = obs_build::validation::Executable {
+        name: "answer-case".into(),
+        path: artifacts["answer"].clone(),
+        runtime: Some(selected.tests["answer-case"].clone()),
+    };
+    let mut command = executable
+        .command(root, &build.output)
         .unwrap();
     fs::create_dir_all(&build.output).unwrap();
     let result = command.output().unwrap();
