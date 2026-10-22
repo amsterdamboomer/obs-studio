@@ -78,7 +78,7 @@ class RuntimeWorkflowTest(unittest.TestCase):
         tests = text.split('  rust-linux-tier2:', 1)[1].split('  rust-linux-tier2-done:', 1)[0]
         self.assertIn('runtime-packages.py', build)
         self.assertLess(build.index('runtime-packages.py'), build.index('Upload Tier 2 Tree'))
-        self.assertIn('${{ runner.temp }}/tier2-pack/runtime-packages.txt', build)
+        self.assertIn('path: ${{ runner.temp }}/tier2-pack/', build)
         self.assertLess(tests.index('actions/download-artifact@'), tests.index('Install Tier 2 Packages'))
         install = tests.split('Install Tier 2 Packages', 1)[1].split('- name: Unpack', 1)[0]
         self.assertIn('test -s "$RUNNER_TEMP/tier2-pack/runtime-packages.txt"', install)
