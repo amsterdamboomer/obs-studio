@@ -532,6 +532,34 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         "independent Linux test inventory remains"
     );
     for name in [
+        "test_output_deactivate_state",
+        "test_cf_preprocessor",
+        "test_output_null_id",
+        "test_output_failed_start_encoders",
+        "test_output_rescale",
+        "test_output_start_twice",
+        "test_texture_encoder_raw_format",
+        "test_audio_restart_resampler_tail",
+        "test_obs_enum_outputs_removal",
+        "test_output_caption_queue",
+        "test_output_caption_text",
+        "test_scene_bounds_fit",
+        "test_scene_coords",
+        "test_encoder_fallback",
+        "test_scene_list_remove",
+        "test_output_filename_format",
+        "test_output_delay_e2e",
+        "test_encoder_video_reset",
+        "test_scene_private_canvas",
+        "test_scene_rotated_scale_filter",
+        "test_scene_duplicate_scale_ref",
+        "test_scene_dup_group_children",
+        "test_output_caption_codec",
+        "test_output_delay_restart",
+        "test_output_interleave_e2e",
+        "test_output_interleave_restart",
+        "test_audio_sync_offset_change",
+        "test_audio_capture_mix_race",
         "test_audio_io_inlines",
         "test_audio_math",
         "test_bounds",
@@ -638,7 +666,7 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         ("HAVE_OBS_PIPEWIRE".into(), false),
         ("HAVE_OBS_PULSEAUDIO".into(), false),
     ]);
-    for (suite, count) in [("core", 107), ("graphics", 1), ("vlc", 6), ("webrtc", 2)] {
+    for (suite, count) in [("core", 124), ("graphics", 12), ("vlc", 6), ("webrtc", 2)] {
         let mut partition = obs_build::validation::graph::Graph::load(
             &root.join("test/cmocka/build/test-graph.json"),
         )
