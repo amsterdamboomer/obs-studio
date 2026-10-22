@@ -26,9 +26,9 @@ pub struct StagedRuntime {
 /// Stage into an empty destination, retaining only explicitly selected inputs.
 /// This is a development runtime, not a portable signed release package.
 pub fn stage_runtime(
-    _build: &NativeBuild,
-    _inputs: &RuntimeInputs<'_>,
-    _destination: &Path,
+    build: &NativeBuild,
+    inputs: &RuntimeInputs<'_>,
+    destination: &Path,
 ) -> Result<StagedRuntime, String> {
-    Err("production application runtime staging is not implemented".into())
+    crate::platform::stage_application_runtime(build, inputs, destination)
 }

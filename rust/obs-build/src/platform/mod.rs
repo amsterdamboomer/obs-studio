@@ -6,6 +6,7 @@ use std::{
     process::Command,
 };
 
+mod application_linux;
 mod graphics_macos;
 mod graphics_windows;
 mod libobs_linux;
@@ -14,6 +15,20 @@ mod libobs_windows;
 mod plugins_macos;
 pub(crate) mod resources;
 mod swift_macos;
+
+pub fn stage_application_runtime(
+    build: &crate::NativeBuild,
+    inputs: &crate::application::RuntimeInputs<'_>,
+    destination: &Path,
+) -> Result<crate::application::StagedRuntime, String> {
+    if !build.target.contains("linux") {
+        return Err(format!(
+            "application runtime graph is not implemented for {}",
+            build.target
+        ));
+    }
+    application_linux::stage(inputs, destination)
+}
 
 pub fn stage_core_identity(target: &str, artifact: &Path) -> Result<(), String> {
     if target.contains("apple-darwin") {
