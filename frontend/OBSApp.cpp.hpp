@@ -1283,8 +1283,11 @@ bool OBSApp::OBSInit()
 			emit this->logUploadFailed(OBS::LogFileType::CrashLog, errorMessage);
 		});
 
-	connect(crashHandler_.get(), &OBS::CrashHandler::crashLogUploadFinished, this,
-		[this](const QString &fileUrl) { emit this->logUploadFinished(OBS::LogFileType::CrashLog, fileUrl); });
+	connect(crashHandler_.get(), &OBS::CrashHandler::crashLogUploadFinished, this, [this](const QString &filePath) {
+		/* The crash log stays local (#1731): show its folder. */
+		openCrashLogDirectory();
+		emit this->logUploadFinished(OBS::LogFileType::CrashLog, filePath);
+	});
 
 	return true;
 }

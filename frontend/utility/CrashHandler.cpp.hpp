@@ -213,7 +213,7 @@ void CrashHandler::saveCrashLogToConfig()
 }
 
 /* obs-rust runs no log upload service (#1731): the crash log stays on the
- * user's computer. Open its folder and hand its path to the dialog. */
+ * user's computer. Hand its path to the dialog; OBSApp opens its folder. */
 void CrashHandler::uploadCrashLogToServer()
 {
 	if (lastCrashLogFile_.empty() || !std::filesystem::exists(lastCrashLogFile_)) {
@@ -221,8 +221,6 @@ void CrashHandler::uploadCrashLogToServer()
 		emit crashLogUploadFailed(QTStr("LogUploadDialog.Errors.NoLogFile"));
 		return;
 	}
-
-	App()->openCrashLogDirectory();
 
 	emit crashLogUploadFinished(QString::fromStdString(lastCrashLogFile_.u8string()));
 }
