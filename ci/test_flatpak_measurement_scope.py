@@ -19,7 +19,8 @@ def job(name, workflow=WORKFLOW):
     return match.group()
 
 
-def selected(expression, measurement, full, targets='', native=False):
+def selected(expression, measurement, full, targets='', native=False, input_values=None,
+             event='workflow_dispatch', build_result='success'):
     expression = expression.strip().removeprefix('${{').removesuffix('}}').strip()
     for before, after in [
         ('fromJSON(needs.check-event.outputs.full)', 'full'),
@@ -35,12 +36,25 @@ def selected(expression, measurement, full, targets='', native=False):
         ('needs.check-event.outputs.windows', 'windows'),
         ('needs.ci-mode.outputs.skip_rust-cross-lint', 'skip_cross'),
         ('needs.ci-mode.outputs.cross_hit', 'cross_hit'),
+        ('github.event_name', 'event_name'),
+        ('github.ref', 'ref'),
+        ('needs.build-project.result', 'build_result'),
     ]:
         expression = expression.replace(before, after)
     expression = re.sub(r'!(?!=)', ' not ', expression.replace('&&', ' and ').replace('||', ' or '))
     values = dict(measurement=measurement, native=native, full=full, full_text=str(full).lower(), targets=targets,
                   always=True, cancelled=False, fast_result='success', deferred='false',
-                  macos='false', windows='false', skip_cross='false', cross_hit='false')
+                  macos='false', windows='false', skip_cross='false', cross_hit='false',
+                  event_name=event, ref='refs/heads/master', build_result=build_result)
+    inputs = input_values or {}
+    values['measurement'] = inputs.get('flatpak-measurement-only', measurement)
+
+    def replace_input(match):
+        name = 'input_' + match[1].replace('-', '_')
+        values[name] = inputs.get(match[1], '' if match[1].endswith('reuse-run') else False)
+        return name
+
+    expression = re.sub(r'inputs\.([\w-]+)', replace_input, expression)
 
     def evaluate(node):
         if isinstance(node, ast.Expression):
@@ -203,6 +217,45 @@ class NativeMeasurementScopeTest(unittest.TestCase):
                          'inputs.flatpak-runtime-test', 'inputs.flatpak-cache-probe']:
             self.assertIn(conflict, build)
         self.assertNotIn('native-cache-measurement-only', (ROOT / '.github/workflows/release-rust.yaml').read_text())
+
+    def test_each_conflict_is_computed_from_the_actual_workflow_expression(self):
+        caller = (ROOT / '.github/workflows/ci.yml').read_text()
+        expressions = [
+            (re.search(r'^      native-cache-measurement-conflict: (.*)$',
+                       job('build-project', caller), re.MULTILINE).group(1),
+             ['flatpak-runtime-reuse-run', 'tier2-setup-probe']),
+            (re.search(r'^          NATIVE_MEASUREMENT_CONFLICT: (.*)$',
+                       job('check-event'), re.MULTILINE).group(1),
+             ['native-cache-measurement-conflict', 'flatpak-measurement-only',
+              'flatpak-compiler-diagnostics', 'flatpak-runtime-test', 'flatpak-cold-build',
+              'flatpak-dependency-transfer-probe', 'flatpak-compiler-transfer-probe',
+              'flatpak-cache-probe', 'flatpak-pruned-build-probe']),
+        ]
+        for expression, flags in expressions:
+            self.assertFalse(selected(expression, False, True))
+            for flag in flags:
+                with self.subTest(flag=flag):
+                    value = '123' if flag.endswith('reuse-run') else True
+                    self.assertTrue(selected(expression, False, True, input_values={flag: value}))
+        self.assertFalse(selected(expressions[0][0], False, True, event='pull_request',
+                                  input_values={'tier2-setup-probe': True}))
+
+    def test_conflicting_caller_modes_cannot_skip_validation_or_start_setup(self):
+        caller = (ROOT / '.github/workflows/ci.yml').read_text()
+        inputs = {'flatpak-runtime-reuse-run': '123', 'tier2-setup-probe': True}
+        for name in ['build-project', 'flatpak-runtime-reuse', 'tier2-setup-producer',
+                     'tier2-setup-consumer']:
+            expression = re.search(r'^    if: (.*)$', job(name, caller), re.MULTILINE).group(1)
+            self.assertEqual(selected(expression, False, True, native=True, input_values=inputs),
+                             name == 'build-project', name)
+        expression = re.search(r'^    if: (.*)$', job('native-cache-consumer', caller),
+                               re.MULTILINE).group(1)
+        inputs = {'native-cache-transport-probe': True}
+        self.assertTrue(selected(expression, False, True, native=True, input_values=inputs))
+        self.assertFalse(selected(expression, False, True, native=True, input_values=inputs,
+                                  build_result='failure'))
+        self.assertTrue(selected(expression, False, True, native=False, input_values=inputs,
+                                 build_result='failure'))
 
 
 if __name__ == '__main__':
