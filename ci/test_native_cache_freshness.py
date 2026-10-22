@@ -4,8 +4,10 @@
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
+import subprocess
 import tempfile
 import unittest
 
@@ -99,8 +101,48 @@ class NativeCacheFreshnessTest(unittest.TestCase):
             freshness.prepare(self.root, self.state, CONTEXT)
         self.assertFalse(self.state.exists())
 
+    def test_source_and_binary_symlinks_are_rejected(self):
+        original = self.root / 'original'
+        self.source.rename(original)
+        self.source.symlink_to(original)
+        with self.assertRaises(ValueError):
+            freshness.prepare(self.root, self.state, CONTEXT)
+        self.assertTrue(self.source.is_symlink())
+        # A separate fixture avoids deleting or replacing the rejected link.
+        other = self.root / 'other'
+        (other / 'frontend').mkdir(parents=True)
+        (other / 'frontend/OBSApp.cpp.hpp').write_bytes(SOURCE)
+        state = other / 'state.json'
+        prepared = freshness.prepare(other, state, CONTEXT)
+        target = other / 'binary'
+        target.write_bytes(b'MZ' + prepared['marker'].encode())
+        link = other / 'build_x64/install/bin/64bit/obs64.exe'
+        link.parent.mkdir(parents=True)
+        link.symlink_to(target)
+        with self.assertRaises(ValueError):
+            freshness.verify(other, state, 'windows', 'x64')
+        freshness.restore(other, state)
+
 
 class NativeReuseWorkflowTest(unittest.TestCase):
+    def test_manual_source_guard_rejects_unsafe_or_confounded_requests(self):
+        text = (Path(__file__).resolve().parent.parent / '.github/workflows/build-project.yaml').read_text()
+        guard = text.split('          if [[ -n "$NATIVE_REUSE_SOURCE" ]]; then\n', 1)[1].split('          fi', 1)[0]
+        script = 'if [[ -n "$NATIVE_REUSE_SOURCE" ]]; then\n' + guard + '\nfi'
+        env = {**os.environ, **CONTEXT, 'NATIVE_REUSE_SOURCE': 'b' * 40,
+               'NATIVE_TRANSPORT_PROBE': 'false', 'NATIVE_BUDGET_PROBE': 'false'}
+        for overrides, expected in [({}, 0), ({'NATIVE_REUSE_SOURCE': ''}, 0),
+                                    ({'NATIVE_REUSE_SOURCE': 'bad\nidentity'}, 1),
+                                    ({'GITHUB_REF': 'refs/heads/other'}, 1),
+                                    ({'GITHUB_REPOSITORY': 'another/repo'}, 1),
+                                    ({'GITHUB_EVENT_NAME': 'pull_request'}, 1),
+                                    ({'NATIVE_TRANSPORT_PROBE': 'true'}, 1),
+                                    ({'NATIVE_BUDGET_PROBE': 'true'}, 1)]:
+            with self.subTest(overrides=overrides):
+                result = subprocess.run(['bash', '-e', '-c', script], env=env | overrides,
+                                        capture_output=True, timeout=5, check=False)
+                self.assertEqual(result.returncode, expected)
+
     def test_input_is_default_empty_and_forwarded_only_on_dispatch(self):
         root = Path(__file__).resolve().parent.parent
         for name in ('ci.yml', 'build-project.yaml'):
