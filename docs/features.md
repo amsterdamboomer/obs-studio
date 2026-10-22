@@ -366,6 +366,13 @@ not get a line.
   has its own feed. *macOS*, 2026-10-22. PR
   [#1727](https://github.com/obs-rust/obs-studio/pull/1727).
 
+- **No updates from upstream OBS Studio on Windows.** The Windows app no
+  longer builds the updater that fetched upstream's update manifests, so it
+  can't download and install upstream OBS Studio over itself. Help > Check
+  for Updates and the update settings are gone until OBS-Studio-Rust has its
+  own signed feed. *Windows*, 2026-10-21. PR
+  [#1733](https://github.com/obs-rust/obs-studio/pull/1733).
+
 ## Fixed upstream bugs
 
 Bugs inherited from OBS Studio (and obs-websocket) that are fixed here, by
