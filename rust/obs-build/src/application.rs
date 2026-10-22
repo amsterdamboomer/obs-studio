@@ -1,6 +1,37 @@
 //! Production application assembly and development runtime artifacts.
-use crate::{NativeBuild, plugins, scripting};
+use crate::{NativeBuild, libobs, plugins, scripting};
 use std::path::{Path, PathBuf};
+
+/// Features of the application graph, independent of test-driver environment.
+pub struct BuildOptions {
+    pub core: libobs::Options,
+    pub filters: plugins::FiltersOptions,
+    pub sources: Vec<plugins::SourceModule>,
+    pub scripting: Option<scripting::Options>,
+    pub frontend_tools: bool,
+    pub websocket: Option<plugins::WebsocketOptions>,
+    pub browser: Option<plugins::BrowserOptions>,
+    pub fdk: bool,
+    pub qsv: Option<plugins::QsvOptions>,
+    pub webrtc: Option<(plugins::DataChannelSdk, plugins::WebRtcOptions)>,
+}
+
+impl BuildOptions {
+    pub fn for_target(target: &str) -> Result<Self, String> {
+        Ok(Self {
+            core: libobs::Options::default(),
+            filters: plugins::FiltersOptions::default(),
+            sources: crate::platform::application_sources(target, true, true)?,
+            scripting: Some(scripting::Options::default()),
+            frontend_tools: true,
+            websocket: Some(plugins::WebsocketOptions::default()),
+            browser: None,
+            fdk: false,
+            qsv: None,
+            webrtc: None,
+        })
+    }
+}
 
 /// Explicit artifacts to stage; no discovery of same-named source-tree outputs.
 pub struct RuntimeInputs<'a> {

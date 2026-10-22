@@ -7,6 +7,7 @@
 use std::{fs, path::PathBuf};
 
 pub mod application;
+pub mod cli;
 mod deps;
 pub mod frontend;
 pub mod graphics;

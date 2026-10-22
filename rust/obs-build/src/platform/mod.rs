@@ -16,6 +16,29 @@ mod plugins_macos;
 pub(crate) mod resources;
 mod swift_macos;
 
+pub fn application_sources(
+    target: &str,
+    udev: bool,
+    service_updates: bool,
+) -> Result<Vec<crate::plugins::SourceModule>, String> {
+    if !target.contains("linux") {
+        return Err(format!("application graph is not implemented for {target}"));
+    }
+    use crate::plugins::SourceModule;
+    Ok(vec![
+        SourceModule::Image,
+        SourceModule::Text,
+        SourceModule::PulseAudio,
+        SourceModule::Alsa,
+        SourceModule::V4l2 { udev },
+        SourceModule::X11Capture,
+        SourceModule::RtmpServices {
+            updates: service_updates,
+        },
+        SourceModule::PipeWire,
+    ])
+}
+
 pub fn stage_application_runtime(
     build: &crate::NativeBuild,
     inputs: &crate::application::RuntimeInputs<'_>,

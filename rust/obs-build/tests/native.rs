@@ -172,6 +172,64 @@ fn production_runtime_stages_selected_artifacts_and_rejects_stale_outputs() {
 }
 
 #[test]
+fn production_command_selects_explicit_profile_target_and_features() {
+    use obs_build::{NativeProfile, cli};
+    let invocation = cli::parse([
+        "build",
+        "--root",
+        "source tree",
+        "--output",
+        "build output",
+        "--target",
+        "x86_64-unknown-linux-gnu",
+        "--profile",
+        "release",
+        "--separate-core",
+        "--core-pch",
+        "--disable-service-updates",
+        "--without-websocket",
+        "--without-scripting",
+        "--with-vlc",
+    ])
+    .unwrap();
+    let cli::Invocation::Build(request) = invocation else {
+        panic!("build request was lost")
+    };
+    assert_eq!(request.root, std::path::PathBuf::from("source tree"));
+    assert_eq!(request.output, std::path::PathBuf::from("build output"));
+    assert_eq!(request.target, "x86_64-unknown-linux-gnu");
+    assert_eq!(request.profile, NativeProfile::Release);
+    assert!(!request.options.core.unity);
+    assert!(request.options.core.pch);
+    assert!(request.options.websocket.is_none());
+    assert!(request.options.scripting.is_none());
+    assert!(
+        request
+            .options
+            .sources
+            .iter()
+            .any(|source| matches!(source, obs_build::plugins::SourceModule::Vlc))
+    );
+    assert!(request.options.sources.iter().any(|source| matches!(
+        source,
+        obs_build::plugins::SourceModule::RtmpServices { updates: false }
+    )));
+    for arguments in [
+        vec!["build", "--profile", "fast"],
+        vec!["build", "--target", "x86_64-pc-windows-msvc"],
+        vec!["build", "--unrecognized"],
+        vec!["build", "--output"],
+        vec!["build", "--profile", "debug", "--profile", "release"],
+    ] {
+        assert!(cli::parse(arguments).is_err());
+    }
+    assert!(matches!(
+        cli::parse(["--help"]).unwrap(),
+        cli::Invocation::Help
+    ));
+}
+
+#[test]
 fn swift_bridge_preserves_native_linkage_header_flags_and_source_rebuilds() {
     if native_answer_probe() {
         return;
