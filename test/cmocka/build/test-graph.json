@@ -2394,6 +2394,112 @@
         "libobs/data"
       ]
     },
+    "test_menu_text": {
+      "sources": [
+        "test/cmocka/test_menu_text.c",
+        "frontend/utility/menu-text.c.h"
+      ],
+      "libraries": [
+        "OBS::native-test-cmocka"
+      ],
+      "includes": [
+        "frontend/utility"
+      ],
+      "watch_inputs": [
+        "frontend/utility"
+      ]
+    },
+    "test_profile_remove": {
+      "sources": [
+        "test/cmocka/test_profile_remove.c",
+        "frontend/utility/profile-remove.c.h"
+      ],
+      "libraries": [
+        "OBS::native-test-cmocka"
+      ],
+      "includes": [
+        "frontend/utility"
+      ],
+      "watch_inputs": [
+        "frontend/utility"
+      ]
+    },
+    "test_tbar_position": {
+      "sources": [
+        "test/cmocka/test_tbar_position.c",
+        "frontend/utility/tbar-position.c.h"
+      ],
+      "libraries": [
+        "OBS::native-test-cmocka"
+      ],
+      "includes": [
+        "frontend/utility"
+      ],
+      "watch_inputs": [
+        "frontend/utility"
+      ]
+    },
+    "test_media_time": {
+      "sources": [
+        "test/cmocka/test_media_time.c",
+        "frontend/utility/media-time.c.h"
+      ],
+      "libraries": [
+        "OBS::native-test-cmocka"
+      ],
+      "includes": [
+        "frontend/utility"
+      ],
+      "watch_inputs": [
+        "frontend/utility"
+      ]
+    },
+    "test_studio_mode_exit": {
+      "sources": [
+        "test/cmocka/test_studio_mode_exit.c",
+        "frontend/utility/studio-mode-exit.c.h"
+      ],
+      "libraries": [
+        "OBS::native-test-cmocka"
+      ],
+      "includes": [
+        "frontend/utility"
+      ],
+      "watch_inputs": [
+        "frontend/utility"
+      ]
+    },
+    "test_studio_mode_swap": {
+      "sources": [
+        "test/cmocka/test_studio_mode_swap.c",
+        "frontend/utility/studio-mode-swap.c.h"
+      ],
+      "libraries": [
+        "OBS::native-test-cmocka"
+      ],
+      "includes": [
+        "frontend/utility"
+      ],
+      "watch_inputs": [
+        "frontend/utility"
+      ]
+    },
+    "test_profile_activate": {
+      "sources": [
+        "test/cmocka/test_profile_activate.c",
+        "frontend/utility/profile-activate.c.h"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "includes": [
+        "frontend/utility"
+      ],
+      "watch_inputs": [
+        "frontend/utility"
+      ]
+    },
     "test_output_protocol_list_steps": {
       "sources": [
         "test/cmocka/test_output_protocol_list_steps.c",
@@ -3201,6 +3307,48 @@
           "-s",
           "-screen 0 1280x1024x24 -noreset"
         ]
+      ]
+    },
+    "test_menu_text": {
+      "target": "test_menu_text",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_profile_remove": {
+      "target": "test_profile_remove",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_tbar_position": {
+      "target": "test_tbar_position",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_media_time": {
+      "target": "test_media_time",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_studio_mode_exit": {
+      "target": "test_studio_mode_exit",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_studio_mode_swap": {
+      "target": "test_studio_mode_swap",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_profile_activate": {
+      "target": "test_profile_activate",
+      "command": [
+        "${target}"
       ]
     },
     "test_output_protocol_list_steps": {
