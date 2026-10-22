@@ -754,3 +754,15 @@ See the [experiment and limits](ci-speed-2026-10-22.md#rust-execution-schedule-a
 for exact coverage and local timings. Native Windows/macOS workflow commands,
 C tests, OFF/ON execution, source assertions and Rust compiler/cache settings
 are unchanged.
+
+### Rust timing observations in CI reports
+
+`ci/cache_metrics.py --include-logs` records nextest and Cargo doctests as
+separate command observations. It retains Cargo build/link summaries, time to
+the first execution marker, the observed output span and nextest's explicitly
+reported execution duration. These are distinct from full setup or process
+runtime; missing markers remain unknown. Nextest passed/failed/skipped/not-run
+counts are kept as reported, without inventing absent zeros or adding skipped
+tests to `tests_run`. Separate Cargo result summaries retain doctest coverage.
+The regression evidence includes a parsed real hosted run in
+`docs/ci-evidence/2026-10-22-nextest-log-observations.json`.
