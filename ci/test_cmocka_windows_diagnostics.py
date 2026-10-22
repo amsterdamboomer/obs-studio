@@ -13,7 +13,9 @@ The scan covers every test source named by add_executable() in
 test/cmocka/CMakeLists.txt and test/cmocka/tests.d/*.cmake, unless an
 enclosing if() keeps it off Windows (OS_LINUX, UNIX, NOT WIN32, a plugin
 target that plugins/CMakeLists.txt only adds on other platforms, ...). An
-else() or a condition it cannot read counts as built on Windows. Comments
+else() or a condition it cannot read counts as built on Windows. The shared
+build/test-graph.json contributes its target and conditional sources too;
+unknown feature facts conservatively count as possibly enabled. Comments
 that mention fail_msg() do not count. The second test compiles the actual
 test_video_output_plan diagnostic helpers without a cm_print_error
 definition, which reproduces the Windows unresolved-symbol link failure.
@@ -103,6 +105,46 @@ def windows_sources(cmake: Path, plugins: set[str]) -> set[Path]:
     return found
 
 
+def windows_requirement(requirement: bool | str | dict) -> bool | None:
+    """Evaluate known platform facts; None means a feature can have either value."""
+    if isinstance(requirement, bool):
+        return requirement
+    if isinstance(requirement, str):
+        if requirement in NOT_WINDOWS:
+            return False
+        if requirement in {"MSVC", "WIN32", "OS_WINDOWS", "WINDOWS"}:
+            return True
+        return None
+    if "not" in requirement:
+        value = windows_requirement(requirement["not"])
+        return None if value is None else not value
+    for operator in ("all", "any"):
+        if operator in requirement:
+            values = [windows_requirement(child) for child in requirement[operator]]
+            if operator == "all":
+                return False if False in values else None if None in values else True
+            return True if True in values else None if None in values else False
+    raise ValueError(f"invalid shared test requirement: {requirement!r}")
+
+
+def windows_graph_sources(path: Path) -> set[Path]:
+    """Conservatively include each shared source that may compile on Windows."""
+    graph = json.loads(path.read_text())
+    found = set()
+    for target in graph["targets"].values():
+        if windows_requirement(target.get("requires", True)) is False:
+            continue
+        for source in target["sources"]:
+            if isinstance(source, str):
+                name = source
+            else:
+                if windows_requirement(source["requires"]) is False:
+                    continue
+                name = source["path"]
+            found.add((ROOT / name).resolve())
+    return found
+
+
 def fail_msg_calls(path: Path) -> int:
     return len(FAIL_MSG.findall(COMMENT.sub("", path.read_text(errors="replace"))))
 
@@ -146,6 +188,7 @@ class CmockaWindowsDiagnosticsTest(unittest.TestCase):
         sources = set()
         for cmake in [CMOCKA / "CMakeLists.txt", *sorted((CMOCKA / "tests.d").glob("*.cmake"))]:
             sources |= windows_sources(cmake, plugins)
+        sources |= windows_graph_sources(CMOCKA / "build/test-graph.json")
         names = {path.name for path in sources}
         # The scan sees the tests the Windows Tier 2 log builds and links ...
         for name in ("test_base.c", "test_output_delay_e2e.c", "test_video_output_plan.c",
