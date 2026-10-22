@@ -75,7 +75,7 @@ Both removed 689,078,793 local bytes (57.59%), ending with 615 stored files.
 These related source observations are not independent randomized trials.
 The hit counts were measured during builds before pruning; they do not
 establish the next consumer's hit rate. Neither event publishes a remote
-replacement. Master archive publication and subsequent reuse remain pending.
+replacement. Master archive publication is recorded below; subsequent reuse remains pending.
 
 The [rollout-day baseline](2026-10-21-rollout-day.md) separately reports code
 PR and queue timing/cost samples; it precedes this pruning publication and
