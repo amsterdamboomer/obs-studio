@@ -678,7 +678,7 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         ("HAVE_OBS_PIPEWIRE".into(), false),
         ("HAVE_OBS_PULSEAUDIO".into(), false),
     ]);
-    for (suite, count) in [("core", 131), ("graphics", 12), ("vlc", 6), ("webrtc", 2)] {
+    for (suite, count) in [("core", 132), ("graphics", 12), ("vlc", 6), ("webrtc", 2)] {
         let mut partition = obs_build::validation::graph::Graph::load(
             &root.join("test/cmocka/build/test-graph.json"),
         )
@@ -849,6 +849,23 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
     );
     assert_eq!(
         graph.targets["test_scene_audio_action_steps"]
+            .sanitizers
+            .as_deref(),
+        Some("address,undefined")
+    );
+    assert_eq!(
+        raw["targets"]["test_output_protocol_list_steps"]["sources"],
+        serde_json::json!([
+            "test/cmocka/test_output_protocol_list_steps.c",
+            "libobs/obs-output-protocols.c.h"
+        ])
+    );
+    assert_eq!(
+        raw["targets"]["test_output_protocol_list_steps"]["libraries"],
+        raw["targets"]["test_scene_audio_action_steps"]["libraries"]
+    );
+    assert_eq!(
+        graph.targets["test_output_protocol_list_steps"]
             .sanitizers
             .as_deref(),
         Some("address,undefined")
