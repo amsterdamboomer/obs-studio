@@ -396,17 +396,17 @@ def consume(identity: dict, destination: Path, store) -> dict:
 
 def main(argv=None, store_factory=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=('publish', 'consume'))
+    parser.add_argument('mode', choices=('publish', 'consume', 'verify-local'))
     parser.add_argument('--identity', type=Path, required=True)
     parser.add_argument('--source', type=Path)
     parser.add_argument('--destination', type=Path)
     parser.add_argument('--report', type=Path, required=True)
     parser.add_argument('--require-hit', action='store_true')
     args = parser.parse_args(argv)
-    if args.mode == 'publish' and args.require_hit:
+    if args.mode != 'consume' and args.require_hit:
         parser.error('--require-hit applies only to consume')
-    if args.mode == 'publish' and (args.source is None or args.destination is not None):
-        parser.error('publish requires --source and no --destination')
+    if args.mode != 'consume' and (args.source is None or args.destination is not None):
+        parser.error('archive modes require --source and no --destination')
     if args.mode == 'consume' and (args.destination is None or args.source is not None):
         parser.error('consume requires --destination and no --source')
     # Reserve the report before any operation: a preexisting report cannot cause
@@ -428,19 +428,24 @@ def main(argv=None, store_factory=None):
                     or context['event_name'] not in ('push', 'schedule', 'workflow_dispatch')
                     or context['actions'] != 'true' or not re.fullmatch('[0-9a-f]{40}', context['sha'])):
                 raise ValueError('publication requires trusted master Actions context')
-            if store_factory is None:
-                from native_cache_release_store import ReleaseStore
-                store_factory = ReleaseStore
-            store = store_factory(identity, token=os.environ.get('NATIVE_CACHE_JOB_TOKEN', ''),
-                                  writable=args.mode == 'publish')
-            if args.mode == 'publish':
+            if args.mode != 'verify-local':
+                if store_factory is None:
+                    from native_cache_release_store import ReleaseStore
+                    store_factory = ReleaseStore
+                store = store_factory(identity, token=os.environ.get('NATIVE_CACHE_JOB_TOKEN', ''),
+                                      writable=args.mode == 'publish')
+            if args.mode != 'consume':
                 with tempfile.TemporaryDirectory(prefix='native-cache-pack-', dir=args.report.parent) as directory:
                     archive = Path(directory) / 'cache.tar.gz'
                     packed_at = time.monotonic()
                     metadata = pack(args.source, archive, identity, context['sha'])
                     packing_seconds = time.monotonic() - packed_at
                     published_at = time.monotonic()
-                    report = publish(archive, metadata, store, context)
+                    if args.mode == 'publish':
+                        report = publish(archive, metadata, store, context)
+                    else:
+                        restore(archive, metadata, Path(directory) / 'restored', identity)
+                        report = {'status': 'verified-local', 'source_sha': context['sha'], 'profile': profile(identity)}
                     report.update(packing_seconds=packing_seconds,
                                   validation_and_publication_seconds=time.monotonic() - published_at,
                                   archive_bytes=metadata['bytes'], expanded_bytes=metadata['expanded_bytes'])

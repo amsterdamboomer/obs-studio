@@ -334,6 +334,24 @@ jobs:
           --architecture '${{ matrix.target }}' --configuration '${{ needs.check-event.outputs.config }}'
           --output '${{ runner.temp }}/native-cache-identity.json'
 
+      - name: Qualify Local Native Cache Archive
+        if: inputs.native-cache-transport-probe
+        env:
+          CACHE_SOURCE: ${{ steps.setup.outputs.xcodeCasPath }}
+        run: >-
+          uv run ci/native_cache_transport.py verify-local
+          --identity '${{ runner.temp }}/native-cache-identity.json' --source "$CACHE_SOURCE"
+          --report '${{ runner.temp }}/native-cache-local.json'
+
+      - name: Upload Local Native Cache Evidence
+        if: always() && inputs.native-cache-transport-probe
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-cache-local-macos-${{ matrix.target }}
+          path: ${{ runner.temp }}/native-cache-local.json
+          retention-days: 1
+          if-no-files-found: warn
+
       - name: Upload Native Transport Identity
         if: inputs.native-cache-transport-probe
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -952,6 +970,24 @@ jobs:
           uv run ci/native_cache_identity.py --platform windows
           --architecture '${{ matrix.architecture }}' --configuration '${{ needs.check-event.outputs.config }}'
           --output '${{ runner.temp }}/native-cache-identity.json'
+
+      - name: Qualify Local Native Cache Archive
+        if: inputs.native-cache-transport-probe
+        env:
+          CACHE_SOURCE: ${{ github.workspace }}/.ccache
+        run: >-
+          uv run ci/native_cache_transport.py verify-local
+          --identity '${{ runner.temp }}/native-cache-identity.json' --source "$CACHE_SOURCE"
+          --report '${{ runner.temp }}/native-cache-local.json'
+
+      - name: Upload Local Native Cache Evidence
+        if: always() && inputs.native-cache-transport-probe
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-cache-local-windows-${{ matrix.architecture }}
+          path: ${{ runner.temp }}/native-cache-local.json
+          retention-days: 1
+          if-no-files-found: warn
 
       - name: Upload Native Transport Identity
         if: inputs.native-cache-transport-probe
