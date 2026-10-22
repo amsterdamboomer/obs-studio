@@ -35,3 +35,18 @@ class HybridReleaseGateTest(unittest.TestCase):
         broken["stability_days"][-1] = "2026-10-15"
         with self.assertRaisesRegex(ValueError, "consecutive"):
             validate(broken)
+
+
+class ReleaseChannelGateTest(unittest.TestCase):
+    """Nightlies publish while approval is pending; blessing stays gated."""
+
+    def test_nightly_prerelease_publishes_while_approval_is_pending(self):
+        self.assertIn("pending", module.check("nightly", {"approved": False}))
+
+    def test_blessed_promotion_still_requires_approval(self):
+        with self.assertRaisesRegex(ValueError, "approval is pending"):
+            module.check("blessed", {"approved": False})
+
+    def test_unknown_channel_fails_closed(self):
+        with self.assertRaises(ValueError):
+            module.check("stable-ish", {"approved": False})
