@@ -80,6 +80,7 @@ pub fn application_rust_archives(
     Ok(crate::application::RustArchives {
         core: directory.join("liblibobs_rust.a"),
         gpu_status: directory.join("libobs_gpu_status_frontend.a"),
+        nvenc: directory.join("libobs_nvenc_plugin.a"),
     })
 }
 
