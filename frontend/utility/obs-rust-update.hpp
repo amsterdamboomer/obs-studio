@@ -19,11 +19,14 @@ struct Version {
 
 inline bool IsDigits(const std::string &s)
 {
-	if (s.empty() || s.size() > 18)
+	if (s.empty() || s.size() > 18) {
 		return false;
-	for (char c : s)
-		if (c < '0' || c > '9')
+	}
+	for (char c : s) {
+		if (c < '0' || c > '9') {
 			return false;
+		}
+	}
 	return true;
 }
 
@@ -34,8 +37,9 @@ inline std::vector<std::string> Split(const std::string &s, char sep)
 	for (;;) {
 		size_t end = s.find(sep, start);
 		parts.push_back(s.substr(start, end == std::string::npos ? std::string::npos : end - start));
-		if (end == std::string::npos)
+		if (end == std::string::npos) {
 			return parts;
+		}
 		start = end + 1;
 	}
 }
@@ -44,22 +48,27 @@ inline bool Parse(const std::string &text, Version &out)
 {
 	size_t dash = text.find('-');
 	std::vector<std::string> core = Split(text.substr(0, dash), '.');
-	if (core.size() != 3)
+	if (core.size() != 3) {
 		return false;
+	}
 	for (size_t i = 0; i < 3; i++) {
-		if (!IsDigits(core[i]))
+		if (!IsDigits(core[i])) {
 			return false;
+		}
 		out.core[i] = std::stoull(core[i]);
 	}
 	out.pre.clear();
 	if (dash != std::string::npos) {
 		out.pre = Split(text.substr(dash + 1), '.');
 		for (const std::string &id : out.pre) {
-			if (id.empty())
+			if (id.empty()) {
 				return false;
-			for (char c : id)
-				if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')))
+			}
+			for (char c : id) {
+				if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))) {
 					return false;
+				}
+			}
 		}
 	}
 	return true;
@@ -72,8 +81,9 @@ inline int CompareIdentifiers(const std::string &a, const std::string &b)
 		unsigned long long x = std::stoull(a), y = std::stoull(b);
 		return x < y ? -1 : (x > y ? 1 : 0);
 	}
-	if (an != bn)
+	if (an != bn) {
 		return an ? -1 : 1;
+	}
 	int c = a.compare(b);
 	return c < 0 ? -1 : (c > 0 ? 1 : 0);
 }
@@ -93,17 +103,22 @@ inline int CompareObsRustVersions(const std::string &a, const std::string &b)
 	using namespace obs_rust_update;
 	Version va, vb;
 	bool oka = Parse(a, va), okb = Parse(b, vb);
-	if (!oka || !okb)
+	if (!oka || !okb) {
 		return (int)oka - (int)okb;
-	for (size_t i = 0; i < 3; i++)
-		if (va.core[i] != vb.core[i])
+	}
+	for (size_t i = 0; i < 3; i++) {
+		if (va.core[i] != vb.core[i]) {
 			return va.core[i] < vb.core[i] ? -1 : 1;
-	if (va.pre.empty() || vb.pre.empty())
+		}
+	}
+	if (va.pre.empty() || vb.pre.empty()) {
 		return (int)va.pre.empty() - (int)vb.pre.empty();
+	}
 	for (size_t i = 0; i < va.pre.size() && i < vb.pre.size(); i++) {
 		int c = CompareIdentifiers(va.pre[i], vb.pre[i]);
-		if (c)
+		if (c) {
 			return c;
+		}
 	}
 	return va.pre.size() < vb.pre.size() ? -1 : (va.pre.size() > vb.pre.size() ? 1 : 0);
 }
