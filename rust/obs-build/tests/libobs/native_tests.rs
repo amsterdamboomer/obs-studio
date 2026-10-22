@@ -80,7 +80,7 @@ pub fn exercise(
                 .as_ref()
                 .and_then(|test| test.timeout_seconds)
                 .unwrap_or(inherited_timeout);
-            let prepared = test.command(root, &build.output).unwrap();
+            let prepared = test.command_in(root, &build.output, &directory).unwrap();
             let mut command = if seconds == 0 {
                 prepared
             } else {

@@ -55,7 +55,11 @@ int main(int argc, char **argv) {
         "int selected_answer(void) { return 42; }\n",
     )
     .unwrap();
-    fs::write(root.join("fixture-module.c"), "int fixture_module(void) { return 7; }\n").unwrap();
+    fs::write(
+        root.join("fixture-module.c"),
+        "int fixture_module(void) { return 7; }\n",
+    )
+    .unwrap();
     let graph = serde_json::json!({
         "schema": 1,
         "targets": {
@@ -70,14 +74,14 @@ int main(int argc, char **argv) {
         "tests": {
             "answer-case": {"target": "answer", "suite": "fixture", "command": ["${target}", "two words"],
                 "environment": {"OBS_GRAPH_VALUE": "first;second"},
-                "working_directory": "${build}", "timeout_seconds": 17,
+                "working_directory": "${runtime}", "timeout_seconds": 17,
                 "skip_return_code": 77, "resource_locks": ["fixture-lock"]},
             "disabled-case": {"target": "disabled"}
         }
     });
     fs::write(root.join("graph.json"), graph.to_string()).unwrap();
     fs::write(root.join("CMakeLists.txt"), format!(
-        "cmake_minimum_required(VERSION 3.28)\nproject(graph-fixture C)\nenable_testing()\nadd_library(fixture-module MODULE fixture-module.c)\nset_target_properties(fixture-module PROPERTIES LIBRARY_OUTPUT_DIRECTORY \"${{CMAKE_CURRENT_BINARY_DIR}}/module output\")\nset(GRAPH_FEATURE ON)\nset(GRAPH_DISABLED OFF)\nadd_library(fixture-dependency INTERFACE)\ntarget_include_directories(fixture-dependency INTERFACE \"${{CMAKE_CURRENT_SOURCE_DIR}}/dependency-include\")\ntarget_compile_definitions(fixture-dependency INTERFACE DEPENDENCY_REQUIRED=5)\nadd_library(fixture-headers INTERFACE)\ntarget_include_directories(fixture-headers INTERFACE \"${{CMAKE_CURRENT_SOURCE_DIR}}/header-only-include\")\ntarget_compile_definitions(fixture-headers INTERFACE HEADER_POLICY_LEAKED=1)\ntarget_compile_options(fixture-headers INTERFACE -invalid-header-policy)\ntarget_link_libraries(fixture-headers INTERFACE missing-header-link-library)\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\n",
+        "cmake_minimum_required(VERSION 3.28)\nproject(graph-fixture C)\nenable_testing()\nset(OBS_OUTPUT_DIR \"${{CMAKE_CURRENT_BINARY_DIR}}/runtime root\")\nfile(MAKE_DIRECTORY \"${{OBS_OUTPUT_DIR}}\" \"${{OBS_OUTPUT_DIR}}/Release\")\nadd_library(fixture-module MODULE fixture-module.c)\nset_target_properties(fixture-module PROPERTIES LIBRARY_OUTPUT_DIRECTORY \"${{CMAKE_CURRENT_BINARY_DIR}}/module output\")\nset(GRAPH_FEATURE ON)\nset(GRAPH_DISABLED OFF)\nadd_library(fixture-dependency INTERFACE)\ntarget_include_directories(fixture-dependency INTERFACE \"${{CMAKE_CURRENT_SOURCE_DIR}}/dependency-include\")\ntarget_compile_definitions(fixture-dependency INTERFACE DEPENDENCY_REQUIRED=5)\nadd_library(fixture-headers INTERFACE)\ntarget_include_directories(fixture-headers INTERFACE \"${{CMAKE_CURRENT_SOURCE_DIR}}/header-only-include\")\ntarget_compile_definitions(fixture-headers INTERFACE HEADER_POLICY_LEAKED=1)\ntarget_compile_options(fixture-headers INTERFACE -invalid-header-policy)\ntarget_link_libraries(fixture-headers INTERFACE missing-header-link-library)\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\n",
         consumer.to_string_lossy().replace('\\', "/")
     )).unwrap();
     for arguments in [
@@ -124,6 +128,7 @@ int main(int argc, char **argv) {
         ("TIMEOUT", serde_json::json!(17.0)),
         ("SKIP_RETURN_CODE", serde_json::json!(77)),
         ("RESOURCE_LOCK", serde_json::json!(["fixture-lock"])),
+        ("LABELS", serde_json::json!(["native-fixture"])),
     ] {
         assert!(
             tests[0]["properties"]
@@ -150,7 +155,10 @@ int main(int argc, char **argv) {
         String::from_utf8_lossy(&result.stdout),
         String::from_utf8_lossy(&result.stderr)
     );
-    assert!(output.join("marker.txt").is_file());
+    assert!(
+        output.join("runtime root/marker.txt").is_file()
+            || output.join("runtime root/Release/marker.txt").is_file()
+    );
     let rust_graph = obs_build::validation::graph::Graph::parse(&graph.to_string()).unwrap();
     let build = NativeBuild {
         host: obs_build::BUILD_HOST.into(),
@@ -162,13 +170,25 @@ int main(int argc, char **argv) {
         ("GRAPH_FEATURE".into(), true),
         ("GRAPH_DISABLED".into(), false),
     ]);
-    let module = build.shared_library(&SharedLibrary {
-        name: "fixture-module".into(),
-        sources: vec![root.join("fixture-module.c")],
-        ..Default::default()
-    }).unwrap();
+    let module_build = NativeBuild {
+        output: build.output.join("module output"),
+        ..build.clone()
+    };
+    let module = module_build
+        .shared_library(&SharedLibrary {
+            name: "fixture-module".into(),
+            sources: vec![root.join("fixture-module.c")],
+            ..Default::default()
+        })
+        .unwrap();
     let dependencies = std::collections::BTreeMap::from([
-        ("fixture-module".into(), obs_build::validation::graph::Dependency { artifacts: vec![module], ..Default::default() }),
+        (
+            "fixture-module".into(),
+            obs_build::validation::graph::Dependency {
+                artifacts: vec![module],
+                ..Default::default()
+            },
+        ),
         (
             "fixture-dependency".into(),
             obs_build::validation::graph::Dependency {
@@ -223,17 +243,42 @@ int main(int argc, char **argv) {
             .unwrap(),
         vec![imported]
     );
-    let mut command = executable.command(root, &build.output).unwrap();
-    fs::create_dir_all(&build.output).unwrap();
+    let runtime = build.output.join("runtime root");
+    fs::create_dir_all(&runtime).unwrap();
+    let mut command = executable
+        .command_in(root, &build.output, &runtime)
+        .unwrap();
+    assert_eq!(command.get_current_dir(), Some(runtime.as_path()));
     let result = command.output().unwrap();
     assert!(
         result.status.success(),
         "{}",
         String::from_utf8_lossy(&result.stderr)
     );
-    assert!(build.output.join("marker.txt").is_file());
+    assert!(runtime.join("marker.txt").is_file());
     for (pointer, value, message) in [
         ("/schema", serde_json::json!(2), "schema"),
+        (
+            "/targets/answer/artifact_definitions",
+            serde_json::json!({"ARTIFACT_PATH":"absent-artifact"}),
+            "absent-artifact",
+        ),
+        (
+            "/targets/answer/artifact_definitions",
+            serde_json::json!({"BAD-NAME":"fixture-module"}),
+            "artifact",
+        ),
+        (
+            "/targets/answer/artifact_definitions",
+            serde_json::json!({"ARTIFACT_PATH":"fixture-headers"}),
+            "artifact",
+        ),
+        (
+            "/targets/answer/definitions",
+            serde_json::json!(["BAD=${runtime}"]),
+            "compile definition",
+        ),
+        ("/tests/answer-case/suite", serde_json::json!(42), "suite"),
         (
             "/targets/answer/compile_options",
             serde_json::json!([{ "name": "-DUNKNOWN", "requires": "UNKNOWN_COMPILER_FEATURE" }]),
@@ -495,11 +540,24 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         ("ENABLE_HEVC".into(), false),
         ("OS_FREEBSD".into(), false),
         ("OS_WINDOWS".into(), true),
+        ("OS_MACOS".into(), false),
+        ("HAVE_OBS_OPENGL".into(), false),
+        ("HAVE_VLC_MODULE".into(), false),
         ("HAVE_OBS_OUTPUTS".into(), false),
         ("HAVE_OBS_FILTERS".into(), false),
         ("HAVE_OBS_PIPEWIRE".into(), false),
         ("HAVE_OBS_PULSEAUDIO".into(), false),
     ]);
+    for (suite, count) in [("core", 77), ("graphics", 1), ("vlc", 6), ("webrtc", 2)] {
+        let mut partition = obs_build::validation::graph::Graph::load(
+            &root.join("test/cmocka/build/test-graph.json"),
+        )
+        .unwrap();
+        partition.retain_suite(suite);
+        assert_eq!(partition.tests.len(), count);
+        assert!(partition.tests.values().all(|test| test.suite == suite));
+        assert_eq!(partition.targets.len(), count);
+    }
     let selected = graph.select(&facts).unwrap();
     assert_eq!(graph.tests["test_svt_av1"].timeout_seconds, Some(60));
     assert_eq!(graph.tests["test_svt_av1"].skip_return_code, Some(77));

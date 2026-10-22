@@ -109,6 +109,9 @@ pub struct Target {
     pub includes: Vec<String>,
     #[serde(default)]
     pub definitions: Vec<String>,
+    /// Quoted C string definitions referring to separately built artifacts.
+    #[serde(default)]
+    pub artifact_definitions: BTreeMap<String, String>,
     #[serde(default)]
     pub packages: Vec<String>,
     #[serde(default)]
@@ -169,6 +172,8 @@ impl Target {
 #[serde(deny_unknown_fields)]
 pub struct Test {
     pub target: String,
+    #[serde(default = "default_suite")]
+    pub suite: String,
     #[serde(default)]
     pub requires: Requirement,
     #[serde(default = "default_command")]
@@ -194,10 +199,20 @@ impl Test {
     /// owns timeout, skip and scheduling policy; preparing a command is not a
     /// test result and does not apply those execution policies.
     pub fn command(&self, root: &Path, output: &Path, target: &Path) -> Result<Command, String> {
+        self.command_in(root, output, target, output)
+    }
+
+    pub fn command_in(
+        &self,
+        root: &Path,
+        output: &Path,
+        target: &Path,
+        runtime: &Path,
+    ) -> Result<Command, String> {
         let arguments = self
             .command
             .iter()
-            .map(|value| expand(value, root, output, target))
+            .map(|value| expand(value, root, output, target, runtime))
             .collect::<Result<Vec<_>, _>>()?;
         let (program, arguments) = arguments
             .split_first()
@@ -205,15 +220,19 @@ impl Test {
         let mut command = Command::new(program);
         command.args(arguments);
         for (key, value) in &self.environment {
-            command.env(key, expand(value, root, output, target)?);
+            command.env(key, expand(value, root, output, target, runtime)?);
         }
         let directory = match &self.working_directory {
-            Some(value) => PathBuf::from(expand(value, root, output, target)?),
+            Some(value) => PathBuf::from(expand(value, root, output, target, runtime)?),
             None => output.to_owned(),
         };
         command.current_dir(directory);
         Ok(command)
     }
+}
+
+fn default_suite() -> String {
+    "core".into()
 }
 
 fn default_command() -> Vec<String> {
@@ -282,6 +301,18 @@ impl Graph {
         }
         for (name, target) in &graph.targets {
             validate_name(name)?;
+            for (definition, artifact) in &target.artifact_definitions {
+                if definition.is_empty()
+                    || !definition.bytes().enumerate().all(|(i, b)| {
+                        b == b'_' || b.is_ascii_alphabetic() || (i > 0 && b.is_ascii_digit())
+                    })
+                    || artifact.is_empty()
+                {
+                    return Err(format!(
+                        "invalid native test artifact definition {definition:?}"
+                    ));
+                }
+            }
             for definition in &target.definitions {
                 validate_compile_definition(definition)?;
             }
@@ -293,6 +324,7 @@ impl Graph {
         }
         for (name, test) in &graph.tests {
             validate_name(name)?;
+            validate_name(&test.suite)?;
             if !graph.targets.contains_key(&test.target) {
                 return Err(format!(
                     "native test {name} references absent target {}",
@@ -312,6 +344,17 @@ impl Graph {
             }
         }
         Ok(graph)
+    }
+
+    pub fn retain_suite(&mut self, suite: &str) {
+        self.tests.retain(|_, test| test.suite == suite);
+        let targets: BTreeSet<_> = self
+            .tests
+            .values()
+            .map(|test| test.target.as_str())
+            .collect();
+        self.targets
+            .retain(|name, _| targets.contains(name.as_str()));
     }
 
     pub fn select(&self, facts: &BTreeMap<String, bool>) -> Result<Selection<'_>, String> {
@@ -413,6 +456,31 @@ impl Graph {
             if target.sources.is_empty() {
                 return Err(format!("native test target {name} has no selected sources"));
             }
+            for (definition, artifact_name) in &spec.artifact_definitions {
+                let dependency = libraries
+                    .get(artifact_name)
+                    .ok_or_else(|| format!("unresolved native test artifact {artifact_name}"))?;
+                if dependency.artifacts.len() != 1 {
+                    return Err(format!(
+                        "native test artifact {artifact_name} requires exactly one file artifact"
+                    ));
+                }
+                let artifact = dunce::canonicalize(&dependency.artifacts[0])
+                    .map_err(|error| format!("native test artifact {artifact_name}: {error}"))?;
+                if !artifact.is_file() {
+                    return Err(format!(
+                        "native test artifact {artifact_name} is not a file"
+                    ));
+                }
+                let path = artifact
+                    .to_str()
+                    .ok_or("non-UTF8 native test artifact")?
+                    .replace('\\', "/");
+                target.definitions.push((
+                    definition.clone(),
+                    Some(serde_json::to_string(&path).map_err(|error| error.to_string())?),
+                ));
+            }
             for directory in &spec.includes {
                 target.include_dirs.push(root.join(directory));
             }
@@ -507,18 +575,24 @@ pub(crate) fn expand_compile_definition(
             .ok_or("non-UTF8 native test build path")?
             .replace('\\', "/"),
     );
-    expand(value, &root, &output, Path::new(""))
+    expand(value, &root, &output, Path::new(""), Path::new(""))
 }
 
 fn validate_compile_definition(value: &str) -> Result<(), String> {
     validate_template(value)?;
-    if value.contains("${target}") {
-        return Err("native test compile definition cannot reference its target executable".into());
+    if value.contains("${target}") || value.contains("${runtime}") {
+        return Err("native test compile definition cannot reference its target executable or runtime directory".into());
     }
     Ok(())
 }
 
-fn expand(value: &str, root: &Path, output: &Path, target: &Path) -> Result<String, String> {
+fn expand(
+    value: &str,
+    root: &Path,
+    output: &Path,
+    target: &Path,
+    runtime: &Path,
+) -> Result<String, String> {
     let mut expanded = String::new();
     let mut rest = value;
     while let Some((prefix, suffix)) = rest.split_once("${") {
@@ -530,6 +604,7 @@ fn expand(value: &str, root: &Path, output: &Path, target: &Path) -> Result<Stri
             "source" => root,
             "build" => output,
             "target" => target,
+            "runtime" => runtime,
             _ => return Err(format!("unknown native test template {token}")),
         };
         expanded.push_str(path.to_str().ok_or("non-UTF8 native test runtime path")?);
@@ -555,7 +630,7 @@ fn validate_template(mut value: &str) -> Result<(), String> {
         let (token, rest) = suffix
             .split_once('}')
             .ok_or_else(|| format!("unterminated native test template {value:?}"))?;
-        if !["source", "build", "target"].contains(&token) {
+        if !["source", "build", "target", "runtime"].contains(&token) {
             return Err(format!("unknown native test template {token}"));
         }
         value = rest;

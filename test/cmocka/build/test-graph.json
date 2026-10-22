@@ -1327,6 +1327,214 @@
         }
       ]
     },
+    "test_whip_rtp_timestamp": {
+      "sources": [
+        "test/cmocka/test_whip_rtp_timestamp.c"
+      ],
+      "libraries": [
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "OS_WINDOWS"
+          }
+        }
+      ],
+      "includes": [
+        "plugins/obs-webrtc"
+      ]
+    },
+    "test_whip_host_os_name": {
+      "sources": [
+        "test/cmocka/test_whip_host_os_name.cpp"
+      ],
+      "libraries": [
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "all": [
+          {
+            "not": "OS_WINDOWS"
+          },
+          {
+            "not": "OS_MACOS"
+          }
+        ]
+      }
+    },
+    "test_group_hide_transition_audio": {
+      "sources": [
+        "test/cmocka/test_group_hide_transition_audio.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "OBS::native-test-cmocka",
+        "m"
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_OBS_OPENGL"
+        ]
+      },
+      "artifact_definitions": {
+        "GRAPHICS_MODULE_PATH": "OBS::libobs-opengl"
+      }
+    },
+    "test_vlc_drain_gate": {
+      "sources": [
+        "test/cmocka/test_vlc_drain_gate.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "includes": [
+        "plugins/vlc-video"
+      ]
+    },
+    "test_vlc_host_path": {
+      "sources": [
+        "test/cmocka/test_vlc_host_path.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "all": [
+          {
+            "not": "OS_WINDOWS"
+          },
+          {
+            "not": "OS_MACOS"
+          }
+        ]
+      }
+    },
+    "test_vlc_channel_order": {
+      "sources": [
+        "test/cmocka/test_vlc_channel_order.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "OS_WINDOWS"
+          }
+        }
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_VLC_MODULE",
+          "HAVE_OBS_OPENGL"
+        ]
+      },
+      "artifact_definitions": {
+        "VLC_MODULE_PATH": "vlc-video",
+        "GRAPHICS_MODULE_PATH": "OBS::libobs-opengl"
+      },
+      "definitions": [
+        "VLC_DATA_PATH=\"${source}/plugins/vlc-video/data\""
+      ],
+      "includes": [
+        "plugins/vlc-video"
+      ]
+    },
+    "test_vlc_audio_track": {
+      "sources": [
+        "test/cmocka/test_vlc_audio_track.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "OS_WINDOWS"
+          }
+        }
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_VLC_MODULE",
+          "HAVE_OBS_OPENGL"
+        ]
+      },
+      "artifact_definitions": {
+        "VLC_MODULE_PATH": "vlc-video",
+        "GRAPHICS_MODULE_PATH": "OBS::libobs-opengl"
+      },
+      "definitions": [
+        "VLC_DATA_PATH=\"${source}/plugins/vlc-video/data\""
+      ]
+    },
+    "test_vlc_audio_pacing": {
+      "sources": [
+        "test/cmocka/test_vlc_audio_pacing.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "FFmpeg::avcodec",
+        "FFmpeg::avformat",
+        "FFmpeg::avutil",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "OS_WINDOWS"
+          }
+        }
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_VLC_MODULE",
+          "HAVE_OBS_OPENGL"
+        ]
+      },
+      "artifact_definitions": {
+        "VLC_MODULE_PATH": "vlc-video",
+        "GRAPHICS_MODULE_PATH": "OBS::libobs-opengl"
+      },
+      "definitions": [
+        "VLC_DATA_PATH=\"${source}/plugins/vlc-video/data\""
+      ]
+    },
+    "test_vlc_playlist_gap": {
+      "sources": [
+        "test/cmocka/test_vlc_playlist_gap.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "OS_WINDOWS"
+          }
+        }
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_VLC_MODULE",
+          "HAVE_OBS_OPENGL"
+        ]
+      },
+      "artifact_definitions": {
+        "VLC_MODULE_PATH": "vlc-video",
+        "GRAPHICS_MODULE_PATH": "OBS::libobs-opengl"
+      },
+      "definitions": [
+        "VLC_DATA_PATH=\"${source}/plugins/vlc-video/data\""
+      ]
+    },
     "test_output_protocol_list_steps": {
       "sources": [
         "test/cmocka/test_output_protocol_list_steps.c",
@@ -1629,6 +1837,83 @@
         "${target}"
       ],
       "timeout_seconds": 30
+    },
+    "test_whip_rtp_timestamp": {
+      "target": "test_whip_rtp_timestamp",
+      "command": [
+        "${target}"
+      ],
+      "suite": "webrtc"
+    },
+    "test_whip_host_os_name": {
+      "target": "test_whip_host_os_name",
+      "command": [
+        "${target}"
+      ],
+      "suite": "webrtc"
+    },
+    "test_group_hide_transition_audio": {
+      "target": "test_group_hide_transition_audio",
+      "command": [
+        "${target}"
+      ],
+      "suite": "graphics",
+      "working_directory": "${runtime}",
+      "timeout_seconds": 120
+    },
+    "test_vlc_drain_gate": {
+      "target": "test_vlc_drain_gate",
+      "command": [
+        "${target}"
+      ],
+      "suite": "vlc"
+    },
+    "test_vlc_host_path": {
+      "target": "test_vlc_host_path",
+      "command": [
+        "${target}"
+      ],
+      "suite": "vlc"
+    },
+    "test_vlc_channel_order": {
+      "target": "test_vlc_channel_order",
+      "command": [
+        "${target}"
+      ],
+      "suite": "vlc",
+      "working_directory": "${runtime}",
+      "timeout_seconds": 60,
+      "skip_return_code": 77
+    },
+    "test_vlc_audio_track": {
+      "target": "test_vlc_audio_track",
+      "command": [
+        "${target}"
+      ],
+      "suite": "vlc",
+      "working_directory": "${runtime}",
+      "timeout_seconds": 120,
+      "skip_return_code": 77
+    },
+    "test_vlc_audio_pacing": {
+      "target": "test_vlc_audio_pacing",
+      "command": [
+        "${target}"
+      ],
+      "suite": "vlc",
+      "working_directory": "${runtime}",
+      "timeout_seconds": 120,
+      "skip_return_code": 77
+    },
+    "test_vlc_playlist_gap": {
+      "target": "test_vlc_playlist_gap",
+      "command": [
+        "${target}"
+      ],
+      "suite": "vlc",
+      "working_directory": "${runtime}",
+      "timeout_seconds": 120,
+      "skip_return_code": 77
     },
     "test_output_protocol_list_steps": {
       "target": "test_output_protocol_list_steps",

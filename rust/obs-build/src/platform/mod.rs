@@ -661,7 +661,6 @@ pub fn configure_webrtc_tests(
     }
     library.c_compile_options.push("-std=gnu17".into());
     library.cpp_compile_options.push("-std=gnu++17".into());
-    library.link_options.push("-lm".into());
     Ok(())
 }
 
