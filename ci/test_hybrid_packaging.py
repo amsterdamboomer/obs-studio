@@ -64,7 +64,7 @@ set_target_properties(obs-nvenc PROPERTIES PREFIX "")
         workflow = (ROOT / ".github/workflows/build-project.yaml").read_text()
         job = workflow.split("  flatpak-build:\n", 1)[1].split("\n  windows-build:", 1)[0]
         marker = "- name: Report Flatpak Cache Contents"
-        self.assertIn(marker, job, "measure the actual builder state before proposing pruning")
+        self.assertTrue(marker in job, "measure the actual builder state before proposing pruning")
         self.assertLess(job.index("- name: Build Flatpak Manifest"), job.index(marker))
         self.assertLess(job.index(marker), job.index("- name: Ccache Stats"))
         step = job.split(marker, 1)[1].split("\n      - ", 1)[0]
