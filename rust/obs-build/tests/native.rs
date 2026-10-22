@@ -35,7 +35,7 @@ fn native_test_graph_cmake_builds_and_runs_selected_contract() {
 int selected_answer(void);
 int main(int argc, char **argv) {
     const char *value = getenv("OBS_GRAPH_VALUE");
-    if (HEADER_ONLY_ANSWER != 17 || selected_answer() != 42 || EXPECTED != 42 || DEPENDENCY_ANSWER != 42 || DEPENDENCY_REQUIRED != 5 || argc != 2 || strcmp(argv[1], "two words") ||
+    if (COMPILER_OPTION_REQUIRED != 23 || HEADER_ONLY_ANSWER != 17 || selected_answer() != 42 || EXPECTED != 42 || DEPENDENCY_ANSWER != 42 || DEPENDENCY_REQUIRED != 5 || argc != 2 || strcmp(argv[1], "two words") ||
         !value || strcmp(value, "first;second")) return 1;
     FILE *input = fopen(SOURCE_HEADER, "r");
     if (!input) return 3;
@@ -58,6 +58,7 @@ int main(int argc, char **argv) {
             "answer": {"sources": ["answer.c", {"path": "selected.c", "requires": "GRAPH_FEATURE"}, {"path": "missing-disabled.c", "requires": "GRAPH_DISABLED"}], "definitions": ["EXPECTED=42", "SOURCE_HEADER=\"${source}/dependency-include/dependency.h\""],
                 "libraries": ["fixture-dependency", {"name": "disabled-library", "requires": "GRAPH_DISABLED"}],
                 "header_libraries": ["fixture-headers"],
+                "compile_options": [{"name": "-DCOMPILER_OPTION_REQUIRED=23", "requires": "GRAPH_FEATURE"}, {"name": "-invalid-disabled-compiler-option", "requires": "GRAPH_DISABLED"}],
                 "requires": {"all": ["GRAPH_FEATURE", {"not": "GRAPH_DISABLED"}]}},
             "disabled": {"sources": ["does-not-exist.c"], "requires": "GRAPH_DISABLED"}
         },
@@ -202,6 +203,7 @@ int main(int argc, char **argv) {
     assert!(build.output.join("marker.txt").is_file());
     for (pointer, value, message) in [
         ("/schema", serde_json::json!(2), "schema"),
+        ("/targets/answer/compile_options", serde_json::json!([{ "name": "-DUNKNOWN", "requires": "UNKNOWN_COMPILER_FEATURE" }]), "UNKNOWN_COMPILER_FEATURE"),
         (
             "/targets/answer/header_libraries",
             serde_json::json!(["absent-header-library"]),
