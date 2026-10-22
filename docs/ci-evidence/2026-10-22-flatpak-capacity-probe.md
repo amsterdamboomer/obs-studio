@@ -101,3 +101,16 @@ exclusion from this observation alone. Next validate an actual isolated
 pruned-state build and cache producer/consumer behavior before changing
 production transport. Global allocation and architecture retention remain
 unresolved; no end-to-end speedup or completed #1269 claim.
+
+
+### Later selected-test coverage
+
+The same full experiment completed all selected build/test jobs successfully.
+Linux OFF/ON each registered 354 tests, executed 351, skipped three Pulse
+cases and failed zero (168.21/168.65 seconds). Windows completed four
+174-test CTest passes plus its Rust differential test. macOS completed four
+199-registered/198-executed passes with one SVT-AV1 skip each, plus its Rust
+differential test. Corresponding log hashes/excerpts are in the hosted record.
+The final parent gate was still queued at this follow-up; full workflow
+success remains unclaimed until that gate is observed. The earlier failed
+namespace consumer remains a separate recorded observation in #1711.

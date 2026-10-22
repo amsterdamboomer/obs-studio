@@ -357,5 +357,37 @@
       "2026-10-22T04:38:42.1213997Z \t247 - test_pulse_stream_restart (Skipped)",
       "2026-10-22T04:38:42.1214309Z \t249 - test_pulse_two_sources (Skipped)"
     ]
+  },
+  "macos_tier2": {
+    "job_id": 119641498710,
+    "raw_log_sha256": "2dc26ee17fb47ad3d043965199fe9db808d7bf5b769c6899effe008ad11c5112",
+    "ctest_passes": 4,
+    "registered_per_pass": 199,
+    "executed_per_pass": 198,
+    "skipped_per_pass": 1,
+    "differential_test_passed": true,
+    "literal_excerpts": [
+      "2026-10-22T04:43:58.3066280Z == [OFF] tests load /Users/runner/work/obs-studio/obs-studio/build_rust/libobs-c-reference/RelWithDebInfo/libobs.framework",
+      "2026-10-22T04:43:58.3171500Z == [OFF] ctest",
+      "2026-10-22T04:44:00.7276210Z  41/199 Test  #41: test_svt_av1 ........................***Skipped   0.04 sec",
+      "2026-10-22T04:46:08.2236800Z 100% tests passed out of 199",
+      "2026-10-22T04:46:08.2237780Z Total Test time (real) = 129.81 sec",
+      "2026-10-22T04:46:08.2239440Z \t 41 - test_svt_av1 (Skipped)",
+      "2026-10-22T04:46:08.2979760Z == [ON] tests load /Users/runner/work/obs-studio/obs-studio/build_rust/libobs/RelWithDebInfo/libobs.framework",
+      "2026-10-22T04:46:08.2986530Z == [ON] ctest",
+      "2026-10-22T04:46:10.0809520Z  41/199 Test  #41: test_svt_av1 ........................***Skipped   0.03 sec",
+      "2026-10-22T04:48:10.7002120Z 100% tests passed out of 199",
+      "2026-10-22T04:48:10.7002450Z Total Test time (real) = 122.18 sec",
+      "2026-10-22T04:48:10.7003250Z \t 41 - test_svt_av1 (Skipped)",
+      "2026-10-22T04:49:39.4527910Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 42 filtered out; finished in 46.45s",
+      "2026-10-22T04:49:58.7188730Z  41/199 Test  #41: test_svt_av1 ........................***Skipped   0.03 sec",
+      "2026-10-22T04:52:01.7850460Z 100% tests passed out of 199",
+      "2026-10-22T04:52:01.7851240Z Total Test time (real) = 125.00 sec",
+      "2026-10-22T04:52:01.7852410Z \t 41 - test_svt_av1 (Skipped)",
+      "2026-10-22T04:52:03.4552750Z  41/199 Test  #41: test_svt_av1 ........................***Skipped   0.02 sec",
+      "2026-10-22T04:54:00.4333900Z 100% tests passed out of 199",
+      "2026-10-22T04:54:00.4334330Z Total Test time (real) = 118.30 sec",
+      "2026-10-22T04:54:00.4335230Z \t 41 - test_svt_av1 (Skipped)"
+    ]
   }
 }
