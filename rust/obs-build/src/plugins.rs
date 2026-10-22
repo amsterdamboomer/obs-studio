@@ -68,6 +68,20 @@ pub struct NvencProductionArtifacts {
     pub helper: PathBuf,
 }
 
+pub(crate) fn nvenc_sources(root: &Path, key: &str) -> Result<Vec<PathBuf>, String> {
+    let manifest = root.join("plugins/obs-nvenc/build/source-sets.json");
+    println!("cargo:rerun-if-changed={}", manifest.display());
+    let sets: std::collections::BTreeMap<String, Vec<String>> =
+        serde_json::from_slice(&std::fs::read(&manifest).map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())?;
+    Ok(sets
+        .get(key)
+        .ok_or_else(|| format!("NVENC source set missing: {key}"))?
+        .iter()
+        .map(|source| root.join("plugins/obs-nvenc").join(source))
+        .collect())
+}
+
 fn nvenc_library(
     build: &NativeBuild,
     root: &Path,
@@ -104,9 +118,7 @@ fn nvenc_rust_module(
     rust_archive: &Path,
     mut library: SharedLibrary,
 ) -> Result<Module, String> {
-    library
-        .sources
-        .push(root.join("plugins/obs-nvenc/build/obs-nvenc.cuda-load-rust+.h.c"));
+    library.sources.extend(nvenc_sources(root, "rust")?);
     library
         .dependencies
         .push(rust_archive.canonicalize().map_err(|e| e.to_string())?);
@@ -120,9 +132,7 @@ fn nvenc_rust_module(
 fn nvenc_helper(build: &NativeBuild, root: &Path) -> Result<PathBuf, String> {
     let mut helper = SharedLibrary {
         name: "obs-nvenc-test".into(),
-        sources: vec![
-            root.join("plugins/obs-nvenc/obs-nvenc-test/build/obs-nvenc-test.core+.hpp.cpp"),
-        ],
+        sources: nvenc_sources(root, "helper")?,
         include_dirs: vec![root.into()],
         ..SharedLibrary::default()
     };
@@ -166,7 +176,7 @@ pub fn build_nvenc_pair(
     let mut common = library.clone();
     common.name = "obs-nvenc-common".into();
     library.precompiled_objects = build.objects(&common)?.2;
-    library.sources = vec![root.join("plugins/obs-nvenc/build/obs-nvenc.cuda-load+.h.c")];
+    library.sources = nvenc_sources(&root, "reference")?;
     let reference = Module {
         library: build.shared_library(&library)?,
         data: root.join("plugins/obs-nvenc/data"),
