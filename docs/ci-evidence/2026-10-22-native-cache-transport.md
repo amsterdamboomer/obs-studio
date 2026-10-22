@@ -127,3 +127,19 @@ Non-object JSON manifests now fall back to the previous complete generation.
 The focused transport and stdlib-policy suites passed 24 tests in 0.404 seconds.
 These are local protocol fixtures, not evidence of real GitHub transport or
 native build performance. No publication route has been enabled.
+
+
+### Offline GitHub adapter boundary
+
+A subsequent structural regression showed that a regular file `a` and child
+`a/b` could pass publication scanning but fail restoration. Both entry orders
+now fail before any store operation; implicit directory types are tracked.
+
+The release-store adapter has six offline HTTP-boundary tests. The initial stub
+failed all six; implementation plus the transport and stdlib-policy suites pass
+31 tests in 0.396 seconds. These cover read-only missing inventory, permission
+failure without creation, cache-only prerelease creation with `make_latest=false`,
+foreign/product release rejection, bounded credential-free public download,
+and bounded API JSON. Upload and real GitHub behavior remain unqualified.
+The adapter has no workflow or CLI caller yet, and no real release, tag, asset,
+permissions, cache writer or consumer has changed.
