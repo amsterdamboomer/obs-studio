@@ -272,6 +272,31 @@ class NativeCacheReleaseProtocolTest(unittest.TestCase):
                 self.assertEqual(store.objects, original)
                 self.assertEqual(store.calls, [])
 
+    def test_structurally_conflicting_publication_never_touches_store(self):
+        for paths in (('a', 'a/b'), ('a/b', 'a')):
+            with self.subTest(paths=paths), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                store = MemoryReleaseStore()
+                self.produce(root, store)
+                original = dict(store.objects)
+                archive = root / 'conflict.tar.gz'
+                with tarfile.open(archive, 'w:gz') as payload:
+                    for name in paths:
+                        entry = tarfile.TarInfo(name)
+                        entry.size = 1
+                        payload.addfile(entry, io.BytesIO(b'x'))
+                metadata = {'schema': 1, 'format': 'tar.gz', 'identity': IDENTITY,
+                            'source_sha': 'b' * 40, 'bytes': archive.stat().st_size,
+                            'expanded_bytes': 2, 'entries': 2,
+                            'sha256': hashlib.sha256(archive.read_bytes()).hexdigest()}
+                context = {'repository': 'obs-rust/obs-studio', 'ref': 'refs/heads/master',
+                           'event_name': 'workflow_dispatch', 'sha': 'b' * 40, 'actions': 'true'}
+                store.calls.clear()
+                with self.assertRaises(ValueError):
+                    TRANSPORT.publish(archive, metadata, store, context)
+                self.assertEqual(store.calls, [])
+                self.assertEqual(store.objects, original)
+
     def test_nonobject_newest_manifest_falls_back_to_previous_seed(self):
         for value in ([], None, 'invalid', 42):
             with self.subTest(value=value), tempfile.TemporaryDirectory() as directory:
