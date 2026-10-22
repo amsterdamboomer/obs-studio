@@ -8,6 +8,8 @@ if [ -z "$build_host" ]; then
   exit 1
 fi
 tool_output="${OBS_NATIVE_TOOL_OUTPUT:-$repository/build_cargo/tool}"
+# Match the native Rust consumer safeguard in docs/ci-tooling.md.
+export SOLDR_RUSTC_WRAPPER=none
 soldr cargo build --locked --manifest-path "$repository/Cargo.toml" \
   -p obs-build --bin obs-build --target "$build_host" --target-dir "$tool_output"
 tool="$tool_output/$build_host/debug/obs-build"

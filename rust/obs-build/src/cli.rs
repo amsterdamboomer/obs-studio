@@ -237,6 +237,8 @@ where
     let cargo_profile = if debug { "DEV" } else { "RELEASE" };
     let mut cargo = std::process::Command::new("soldr");
     cargo
+        // Match the native Rust consumers in CI; keep standalone C/C++ caching.
+        .env("SOLDR_RUSTC_WRAPPER", "none")
         .current_dir(&root)
         .args([
             "cargo",

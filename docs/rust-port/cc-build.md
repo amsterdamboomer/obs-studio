@@ -29,7 +29,9 @@ From a native Linux checkout with the existing native build dependencies install
 ```
 
 The launcher builds the `obs-build` tool through `soldr cargo`, then runs it
-outside Soldr's build process. The tool builds the production hybrid core,
+outside Soldr's build process. Both Rust build invocations use the existing
+native-consumer `SOLDR_RUSTC_WRAPPER=none` safeguard; standalone C/C++ compiler
+caching remains available. The tool builds the production hybrid core,
 frontend API, OpenGL renderer, Qt application, enabled modules and scripting
 bindings through the Rust build graph. It does not build a C reference or ship
 compatibility probes. CMake remains the authoritative build while the full

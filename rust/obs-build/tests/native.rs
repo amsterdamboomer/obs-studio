@@ -186,12 +186,17 @@ fn bundled_frontend_plugins_follow_application_feature_selection() {
 
 #[test]
 fn production_archive_command_uses_the_native_rust_cache_safeguard() {
-    if !obs_build::BUILD_TARGET.contains("linux") { return; }
+    if !obs_build::BUILD_TARGET.contains("linux") {
+        return;
+    }
     if let Some(output) = std::env::var_os("OBS_NATIVE_CACHE_PROBE_OUTPUT") {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let result = obs_build::cli::run([
-            std::ffi::OsString::from("build"), "--root".into(), root.into_os_string(),
-            "--output".into(), output,
+            std::ffi::OsString::from("build"),
+            "--root".into(),
+            root.into_os_string(),
+            "--output".into(),
+            output,
         ]);
         assert!(result.unwrap_err().contains("Rust archive build failed"));
         return;
@@ -199,16 +204,35 @@ fn production_archive_command_uses_the_native_rust_cache_safeguard() {
     let directory = tempfile::tempdir().unwrap();
     let soldr = directory.path().join("soldr");
     fs::write(&soldr, "#!/bin/sh\nprintf '%s' \"${SOLDR_RUSTC_WRAPPER:-unset}\" > \"$OBS_NATIVE_CACHE_LOG\"\nexit 19\n").unwrap();
-    assert!(std::process::Command::new("chmod").arg("+x").arg(&soldr).status().unwrap().success());
+    assert!(
+        std::process::Command::new("chmod")
+            .arg("+x")
+            .arg(&soldr)
+            .status()
+            .unwrap()
+            .success()
+    );
     let marker = directory.path().join("wrapper");
-    let path = std::env::join_paths(std::iter::once(directory.path().to_path_buf()).chain(std::env::split_paths(&std::env::var_os("PATH").unwrap()))).unwrap();
-    let selector = format!("{}::production_archive_command_uses_the_native_rust_cache_safeguard", module_path!().split_once("::").unwrap().1);
+    let path = std::env::join_paths(
+        std::iter::once(directory.path().to_path_buf())
+            .chain(std::env::split_paths(&std::env::var_os("PATH").unwrap())),
+    )
+    .unwrap();
+    let selector = format!(
+        "{}::production_archive_command_uses_the_native_rust_cache_safeguard",
+        module_path!().split_once("::").unwrap().1
+    );
     let status = std::process::Command::new(std::env::current_exe().unwrap())
         .args(["--exact", &selector, "--nocapture"])
-        .env("PATH", path).env_remove("SOLDR_RUSTC_WRAPPER")
+        .env("PATH", path)
+        .env_remove("SOLDR_RUSTC_WRAPPER")
         .env("OBS_NATIVE_CACHE_LOG", &marker)
-        .env("OBS_NATIVE_CACHE_PROBE_OUTPUT", directory.path().join("output"))
-        .status().unwrap();
+        .env(
+            "OBS_NATIVE_CACHE_PROBE_OUTPUT",
+            directory.path().join("output"),
+        )
+        .status()
+        .unwrap();
     assert!(status.success());
     assert_eq!(fs::read_to_string(marker).unwrap(), "none");
 }
