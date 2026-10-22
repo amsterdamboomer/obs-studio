@@ -26,7 +26,9 @@ or overwritten attempts, and are elapsed hosted job time rather than a bill.
 
 No logs were collected in this pass. Compiler hits, cold/warm conditions and
 literal executed/skipped test counts are unverified. Workflow job statuses
-must not be substituted for test coverage. Creation-to-start intervals can
+must not be substituted for test coverage. The capture labels counts as
+non-skipped/skipped job records: non-skipped records may include canceled
+or never-started jobs and do not establish job execution. Creation-to-start intervals can
 include dependency waiting and do not isolate runner capacity delays.
 
 The adjacent `2026-10-21-rollout-day.json.gz` preserves the full window listing,
