@@ -44,12 +44,16 @@ def measure(state, manifest, temp_root, execute=run):
         'test -x ' + shlex.quote('/app/bin/' + binary),
         "printf '%s\\n' " + MARKER,
     ])
-    retained = [path for path in state.iterdir() if path.name not in ('downloads', 'ccache')]
+    # Only the dependency OSTree repository is a transport input. Build/checksum
+    # scaffolding is regenerated and may contain transient checkout links.
+    retained = [state / 'cache']
     if not (state / 'cache').is_dir():
         raise ValueError('expected populated dependency cache')
     for path in retained:
         if path.is_symlink() or (path.is_dir() and any(child.is_symlink() for child in path.rglob('*'))):
-            raise ValueError('retained state cannot contain symbolic links')
+            links = [path] if path.is_symlink() else [child for child in path.rglob('*') if child.is_symlink()]
+            relative = links[0].relative_to(state).as_posix()
+            raise ValueError('retained dependency cache contains symbolic link: ' + relative[:250])
     # Keeping the temporary manifest beside its source preserves relative paths.
     # Both contexts clean up even when a build or validation fails.
     with tempfile.TemporaryDirectory(prefix='flatpak-pruned-build-', dir=scratch) as directory:
@@ -94,7 +98,7 @@ def measure(state, manifest, temp_root, execute=run):
     return {
         'status': 'success', 'architecture': 'x86_64', 'application_rebuilt': True,
         'reused_dependency_modules': dependencies, 'isolated_build_seconds': elapsed,
-        'omitted_state': ['downloads', 'ccache'],
+        'retained_state': ['cache'], 'omitted_state': ['downloads', 'ccache', 'transient builder state'],
         'limits': 'One isolated application rebuild and output validation, not runtime/profile validation, '
                   'Actions cache transport savings, representative cost or production adoption. '
                   'Copy/setup and validation excluded from build timer; original state only read (may affect atime).',

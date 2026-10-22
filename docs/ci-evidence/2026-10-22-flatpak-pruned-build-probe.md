@@ -7,7 +7,8 @@ source acquisition took 26.691 seconds. These observations do not establish
 actual transport savings or a successful application rebuild from that state.
 
 This default-off manual probe copies retained builder state into an isolated
-temporary directory, omitting top-level downloads and ccache. It never
+temporary directory. The revised candidate retains only the cache dependency
+repository, omitting downloads, ccache and transient builder scaffolding. It never
 builds in, moves, deletes or prunes original state. Retained symlinks and
 scratch inside original state are rejected. Copying may affect original atime.
 
@@ -43,7 +44,7 @@ flatpak-pruned-build-probe=true and native-cache-probe=false. Keep complete
 normal selection and validation. This is a distinct changed-state rebuild
 experiment, not a retry of the completed capacity measurement. Record source,
 commands, actual module reuse/rebuild output, versions, output validation,
-JSON, hashes and terminal selected-platform results. No hosted result yet.
+JSON, hashes and terminal selected-platform results. The initial hosted result and revised candidate are recorded below.
 
 No production cache writer, key, path or limit changes are adopted. A later
 production transport migration needs matching restore/save identities and
@@ -51,3 +52,33 @@ actual trusted producer/consumer evidence. Global allocation, writer headroom,
 independent native architecture retention and representative durability remain
 unresolved under #1269. This does not run a packaged bundle or saved user
 profile and does not claim runtime validation or end-to-end speedup.
+
+
+## Initial hosted failure and revised dependency projection
+
+Run39725882580 on659756295 completed Flatpak job119650969777 with
+FAILURE. Its normal Flatpak build and output validation passed, but the
+optional probe rejected symbolic links before starting the isolated rebuild.
+The [failed record](2026-10-22-flatpak-pruned-build-failed.json) preserves
+job metadata, capture-time parent status, failed JSON and log hash/excerpts.
+The original generic error did not identify the link location; do not infer
+which subtree contained it or claim any pruned rebuild succeeded.
+
+[Upstream flatpak-builder 1.4.9 builder-cache.c](https://github.com/flatpak/flatpak-builder/blob/1.4.9/src/builder-cache.c)
+locates the dependency OSTree repository in the cache directory and creates
+it in bare-user-only mode. That source matches the installed version label;
+it is not a byte identity attestation of the distributed binary.
+
+The revised projection copies only that repository. Transient state is
+regenerated, and no transient checkout tree can supply compiler outputs to
+the rebuild. Symbolic links in retained dependency state remain rejected;
+the error now identifies a bounded relative path. No general permission to
+follow links into original state or external paths is introduced. Regression
+RED9e503de5e reproduces rejection of a transient-tree link by the original
+helper; the revised projection passes while preserving original state.
+
+The revised candidate still requires an actual forced application rebuild,
+dependency hits and output validation. After the initial full run is terminal,
+one explicitly defined new-source experiment may qualify the changed
+projection. Never retry the unchanged workflow or treat the original failure
+as successful validation. Production transport/allocation remains unchanged.
