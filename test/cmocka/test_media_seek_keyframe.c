@@ -62,6 +62,9 @@
 /* one frame at 30 fps, and some slack for the media time */
 #define FRAME_MS (1000 / FPS)
 #define TIME_SLACK_MS (2 * FRAME_MS)
+/* the decoder runs several frames ahead of the shown frame, and the media
+ * time reports the latest decoded frame, so it can lead the wall clock */
+#define DECODER_LEAD_MS 250
 
 static bool files_ok;
 static char video_path[512];
@@ -626,8 +629,9 @@ static void playing_seek_between_keyframes(void **state)
 	expect_frame("playing seek", target_ms, shown);
 	/* it plays on from the target, so allow the real time that passed
 	 * between the seek and reading the media time (a slow runner can take
-	 * longer than any fixed bound to show the first frame) */
-	if (t < target_ms - TIME_SLACK_MS || t > target_ms + elapsed_ms + TIME_SLACK_MS) {
+	 * longer than any fixed bound to show the first frame), plus the decoder
+	 * lead */
+	if (t < target_ms - TIME_SLACK_MS || t > target_ms + elapsed_ms + DECODER_LEAD_MS + TIME_SLACK_MS) {
 		fprintf(stderr, "playing seek: seek to %lld ms reports a media time of %lld ms\n", (long long)target_ms,
 			(long long)t);
 		fail();
