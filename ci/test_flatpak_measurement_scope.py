@@ -13,19 +13,20 @@ ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = (ROOT / '.github/workflows/build-project.yaml').read_text()
 
 
-def job(name):
-    match = re.search(rf'(?ms)^  {re.escape(name)}:\n.*?(?=^  [a-z][\w-]*:|\Z)', WORKFLOW)
+def job(name, workflow=WORKFLOW):
+    match = re.search(rf'(?ms)^  {re.escape(name)}:\n.*?(?=^  [a-z][\w-]*:|\Z)', workflow)
     assert match, name
     return match.group()
 
 
-def selected(expression, measurement, full, targets=''):
+def selected(expression, measurement, full, targets='', native=False):
     expression = expression.strip().removeprefix('${{').removesuffix('}}').strip()
     for before, after in [
         ('fromJSON(needs.check-event.outputs.full)', 'full'),
         ('needs.check-event.outputs.full', 'full_text'),
         ('needs.check-event.outputs.linux_targets', 'targets'),
         ('inputs.flatpak-measurement-only', 'measurement'),
+        ('inputs.native-cache-measurement-only', 'native'),
         ('always()', 'always'),
         ('cancelled()', 'cancelled'),
         ('needs.rust-tests-linux.result', 'fast_result'),
@@ -37,7 +38,7 @@ def selected(expression, measurement, full, targets=''):
     ]:
         expression = expression.replace(before, after)
     expression = re.sub(r'!(?!=)', ' not ', expression.replace('&&', ' and ').replace('||', ' or '))
-    values = dict(measurement=measurement, full=full, full_text=str(full).lower(), targets=targets,
+    values = dict(measurement=measurement, native=native, full=full, full_text=str(full).lower(), targets=targets,
                   always=True, cancelled=False, fast_result='success', deferred='false',
                   macos='false', windows='false', skip_cross='false', cross_hit='false')
 
@@ -65,7 +66,9 @@ def selected(expression, measurement, full, targets=''):
 
 
 class FlatpakMeasurementScopeTest(unittest.TestCase):
-    def scope(self, event, measurement, full_input=False):
+    def scope(self, event, measurement, full_input=False, native=False,
+              transport=False, source='', conflict=False, budget=False,
+              repository='obs-rust/obs-studio', ref='refs/heads/master'):
         step = job('check-event').split('      - name: Check Change Scope 🧭\n', 1)[1]
         body = step.split('        run: |\n', 1)[1]
         lines = []
@@ -80,7 +83,12 @@ class FlatpakMeasurementScopeTest(unittest.TestCase):
             output = Path(directory) / 'output'
             env = dict(os.environ, GITHUB_EVENT_NAME=event, GITHUB_REF_TYPE='branch',
                        GITHUB_REF_NAME='master', GITHUB_BASE_REF='master', GITHUB_OUTPUT=str(output),
-                       FLATPAK_MEASUREMENT_ONLY=str(measurement).lower())
+                       GITHUB_REPOSITORY=repository, GITHUB_REF=ref,
+                       FLATPAK_MEASUREMENT_ONLY=str(measurement).lower(),
+                       NATIVE_MEASUREMENT_ONLY=str(native).lower(),
+                       NATIVE_MEASUREMENT_CONFLICT=str(conflict).lower(),
+                       NATIVE_TRANSPORT_PROBE=str(transport).lower(),
+                       NATIVE_REUSE_SOURCE=source, NATIVE_BUDGET_PROBE=str(budget).lower())
             result = subprocess.run(['bash', '-euo', 'pipefail', '-c', script], cwd=ROOT,
                                     env=env, text=True, capture_output=True, timeout=15)
             values = dict(line.split('=', 1) for line in output.read_text().splitlines()) if output.exists() else {}
@@ -138,6 +146,63 @@ class FlatpakMeasurementScopeTest(unittest.TestCase):
             with self.subTest(full=full):
                 self.assertTrue(selected(expression, False, full))
                 self.assertFalse(selected(expression, True, full))
+
+
+class NativeMeasurementScopeTest(unittest.TestCase):
+    scope = FlatpakMeasurementScopeTest.scope
+
+    def test_native_modes_keep_native_apps_without_unrelated_scope(self):
+        for protocol in [dict(transport=True), dict(source='a' * 40)]:
+            with self.subTest(protocol=protocol):
+                result, values = self.scope('workflow_dispatch', False, native=True, **protocol)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(values['full'], 'true')
+                for key in ['core', 'macos', 'windows', 'qt', 'tier2']:
+                    self.assertEqual(values[key], 'false', (key, values))
+                self.assertEqual(values['platform_os'], '[]')
+                self.assertEqual(values['linux_targets'], '')
+
+    def test_native_modes_reject_untrusted_or_ambiguous_requests(self):
+        cases = [
+            dict(event=event) for event in ['pull_request', 'merge_group', 'push', 'schedule']
+        ] + [
+            dict(repository='someone/obs-studio'), dict(ref='refs/heads/feature'),
+            dict(full_input=True), dict(measurement=True), dict(conflict=True),
+            dict(budget=True), dict(transport=False), dict(source='a' * 40),
+            dict(transport=False, source='not-a-sha'),
+        ]
+        for overrides in cases:
+            parameters = dict(event='workflow_dispatch', measurement=False, native=True, transport=True)
+            parameters.update(overrides)
+            with self.subTest(parameters=parameters):
+                result, _ = self.scope(**parameters)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+
+    def test_real_native_and_unrelated_app_selectors(self):
+        for name in ['macos-build', 'windows-build', 'ubuntu-build', 'flatpak-build',
+                     'rust-cross-lint', 'rust-cross-lint-release']:
+            expression = re.search(r'^    if: (.*)$', job(name), re.MULTILINE).group(1)
+            with self.subTest(job=name):
+                self.assertTrue(selected(expression, False, True))
+                self.assertEqual(selected(expression, False, True, native=True),
+                                 name in ['macos-build', 'windows-build'])
+
+    def test_native_input_is_default_off_and_forwarded_only_on_manual(self):
+        caller = (ROOT / '.github/workflows/ci.yml').read_text()
+        for workflow in [caller, WORKFLOW]:
+            self.assertIsNotNone(re.search(
+                r'native-cache-measurement-only:\n\s+description: [^\n]+\n\s+type: boolean\n\s+default: false',
+                workflow))
+        self.assertIn("native-cache-measurement-only: ${{ github.event_name == 'workflow_dispatch' && inputs.native-cache-measurement-only }}", caller)
+        self.assertIn('native-cache-measurement-conflict:', job('build-project', caller))
+        for name in ['flatpak-runtime-reuse', 'tier2-setup-producer', 'tier2-setup-consumer']:
+            expression = re.search(r'^    if: (.*)$', job(name, caller), re.MULTILINE).group(1)
+            self.assertIn('!inputs.native-cache-measurement-only', expression, name)
+        build = job('build-project', caller)
+        for conflict in ['inputs.flatpak-runtime-reuse-run', 'inputs.tier2-setup-probe',
+                         'inputs.flatpak-runtime-test', 'inputs.flatpak-cache-probe']:
+            self.assertIn(conflict, build)
+        self.assertNotIn('native-cache-measurement-only', (ROOT / '.github/workflows/release-rust.yaml').read_text())
 
 
 if __name__ == '__main__':
