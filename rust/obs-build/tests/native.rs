@@ -389,11 +389,13 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
     let graph =
         obs_build::validation::graph::Graph::load(&root.join("test/cmocka/build/test-graph.json"))
             .unwrap();
-    let legacy: Vec<serde_json::Value> = serde_json::from_slice(
-        &fs::read(root.join("rust/obs-build/manifests/c-tests-linux.json")).unwrap(),
-    )
-    .unwrap();
+    assert!(!root.join("rust/obs-build/manifests/c-tests-linux.json").exists(), "independent Linux test inventory remains");
     for name in [
+        "test_rtmp_error",
+        "test_rtmp_chunk_size",
+        "test_amf_decode",
+        "test_flv_mux",
+        "test_scene_audio_action_steps",
         "test_serializer",
         "test_darray",
         "test_bitstream",
@@ -432,10 +434,7 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         "test_vec4",
     ] {
         assert!(graph.targets.contains_key(name), "missing canonical {name}");
-        assert!(
-            !legacy.iter().any(|test| test["name"] == name),
-            "duplicate legacy {name}"
-        );
+
     }
     let facts = std::collections::BTreeMap::from([
         ("OS_LINUX".into(), false),
@@ -444,6 +443,7 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         ("ENABLE_HEVC".into(), false),
         ("OS_FREEBSD".into(), false),
         ("OS_WINDOWS".into(), true),
+        ("HAVE_OBS_OUTPUTS".into(), false),
         ("HAVE_OBS_FILTERS".into(), false),
         ("HAVE_OBS_PIPEWIRE".into(), false),
         ("HAVE_OBS_PULSEAUDIO".into(), false),
