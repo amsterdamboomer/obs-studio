@@ -467,6 +467,26 @@ class NativeCacheCommandTest(unittest.TestCase):
             report = json.loads((root / 'consume.json').read_text())
             self.assertEqual(report['status'], 'hit')
 
+    def test_qualification_rejects_older_fallback_after_new_generation_breaks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = MemoryReleaseStore()
+            producer = NativeCacheReleaseProtocolTest()
+            producer.produce(root, store)
+            producer.produce(root, store, 'b' * 40)
+            name = next(name for name in store.objects if 'b' * 40 in name and name.endswith('.tar.gz'))
+            data, asset = store.objects[name]
+            store.objects[name] = (b'corrupt', asset)
+            identity = root / 'identity.json'
+            identity.write_text(json.dumps(IDENTITY))
+            code = TRANSPORT.main(['consume', '--identity', str(identity), '--destination', str(root / 'restored'),
+                                   '--require-hit', '--expected-source', 'b' * 40,
+                                   '--report', str(root / 'report.json')], store_factory=lambda *a, **kw: store)
+            self.assertEqual(code, 1)
+            report = json.loads((root / 'report.json').read_text())
+            self.assertEqual(report['status'], 'hit')
+            self.assertEqual(report['source_sha'], SHA)
+
     def test_local_verification_never_creates_network_store(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
