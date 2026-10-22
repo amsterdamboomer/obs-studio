@@ -3,17 +3,30 @@ pub mod graph;
 
 use crate::{NativeBuild, SharedLibrary, libobs::add_package};
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     path::{Path, PathBuf},
 };
 
 pub struct Executable {
     pub name: String,
     pub path: PathBuf,
+    pub runtime: Option<graph::Test>,
+}
+
+impl Executable {
+    pub fn command(&self, root: &Path, output: &Path) -> Result<std::process::Command, String> {
+        let path = dunce::canonicalize(&self.path)
+            .map_err(|error| format!("native test executable {}: {error}", self.path.display()))?;
+        match &self.runtime {
+            Some(runtime) => runtime.command(root, output, &path),
+            None => Ok(std::process::Command::new(path)),
+        }
+    }
 }
 
 pub struct Options {
     pub hevc: bool,
+    pub pulseaudio: bool,
     pub per_target_sanitizers: bool,
 }
 
@@ -21,6 +34,7 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             hevc: true,
+            pulseaudio: true,
             per_target_sanitizers: true,
         }
     }
@@ -48,6 +62,7 @@ pub fn build_webrtc_tests(build: &NativeBuild, root: &Path) -> Result<Vec<Execut
         result.push(Executable {
             name: name.into(),
             path: build.executable(&library)?,
+            runtime: None,
         });
     }
     for directory in ["test/cmocka", "plugins/obs-webrtc"] {
@@ -92,6 +107,7 @@ pub fn build_graphics_tests(
     Ok(vec![Executable {
         name: name.into(),
         path: build.executable(&library)?,
+        runtime: None,
     }])
 }
 
@@ -151,6 +167,7 @@ pub fn build_vlc_tests(
         result.push(Executable {
             name: name.into(),
             path: build.executable(&library)?,
+            runtime: None,
         });
     }
     for directory in ["test/cmocka", "plugins/vlc-video", "libobs/data"] {
@@ -245,9 +262,10 @@ pub fn build_c_tests(
             library.include_dirs.push(root.join(include));
         }
         for define in strings(&spec, "definitions")? {
+            let define = graph::expand_compile_definition(define, &root, &build.output)?;
             let (name, value) = define
                 .split_once('=')
-                .map_or((define, None), |(name, value)| {
+                .map_or((define.as_str(), None), |(name, value)| {
                     (name, Some(value.to_string()))
                 });
             library.definitions.push((name.into(), value));
@@ -297,6 +315,62 @@ pub fn build_c_tests(
         result.push(Executable {
             name: name.into(),
             path: build.executable(&library)?,
+            runtime: None,
+        });
+    }
+    let graph_path = root.join("test/cmocka/build/test-graph.json");
+    println!("cargo:rerun-if-changed={}", graph_path.display());
+    let mut graph = graph::Graph::load(&graph_path)?;
+    if !options.per_target_sanitizers {
+        for target in graph.targets.values_mut() {
+            target.sanitizers = None;
+        }
+    }
+    let facts = crate::platform::native_test_facts(&build.target, options.pulseaudio);
+    let mut core_interface = SharedLibrary {
+        include_dirs: vec![
+            root.join("libobs"),
+            root.join("deps/libcaption"),
+            build.output.join("config"),
+        ],
+        dependencies: vec![core.into()],
+        ..Default::default()
+    };
+    if options.hevc {
+        core_interface
+            .definitions
+            .push(("ENABLE_HEVC".into(), None));
+    }
+    add_package(&mut core_interface, &build.target, "simde")?;
+    headers_only(&mut core_interface, "jansson")?;
+    crate::platform::configure_c_tests(build, &mut core_interface, None, core)?;
+    let mut cmocka_interface = SharedLibrary::default();
+    add_package(&mut cmocka_interface, &build.target, "cmocka")?;
+    let interfaces = BTreeMap::from([
+        ("OBS::libobs".into(), core_interface.into()),
+        ("OBS::native-test-cmocka".into(), cmocka_interface.into()),
+        (
+            "m".into(),
+            graph::Dependency {
+                link_options: crate::platform::native_test_math_options(&build.target),
+                ..Default::default()
+            },
+        ),
+    ]);
+    let artifacts = graph.compile(build, &root, &facts, &interfaces)?;
+    for (name, test) in graph.select(&facts)?.tests {
+        if result.iter().any(|existing| existing.name == name) {
+            return Err(format!(
+                "native test {name} appears in both legacy and canonical inventories"
+            ));
+        }
+        result.push(Executable {
+            name: name.into(),
+            path: artifacts
+                .get(&test.target)
+                .ok_or("selected native test artifact missing")?
+                .clone(),
+            runtime: Some(test.clone()),
         });
     }
     for directory in watched {

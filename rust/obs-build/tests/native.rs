@@ -26,6 +26,9 @@ int main(int argc, char **argv) {
     const char *value = getenv("OBS_GRAPH_VALUE");
     if (EXPECTED != 42 || DEPENDENCY_ANSWER != 42 || DEPENDENCY_REQUIRED != 5 || argc != 2 || strcmp(argv[1], "two words") ||
         !value || strcmp(value, "first;second")) return 1;
+    FILE *input = fopen(SOURCE_HEADER, "r");
+    if (!input) return 3;
+    fclose(input);
     FILE *file = fopen("marker.txt", "w");
     if (!file) return 2;
     return fclose(file);
@@ -36,7 +39,7 @@ int main(int argc, char **argv) {
     let graph = serde_json::json!({
         "schema": 1,
         "targets": {
-            "answer": {"sources": ["answer.c"], "definitions": ["EXPECTED=42"],
+            "answer": {"sources": ["answer.c"], "definitions": ["EXPECTED=42", "SOURCE_HEADER=\"${source}/dependency-include/dependency.h\""],
                 "libraries": ["fixture-dependency", {"name": "disabled-library", "requires": "GRAPH_DISABLED"}],
                 "requires": {"all": ["GRAPH_FEATURE", {"not": "GRAPH_DISABLED"}]}},
             "disabled": {"sources": ["does-not-exist.c"], "requires": "GRAPH_DISABLED"}
@@ -158,9 +161,7 @@ int main(int argc, char **argv) {
         path: artifacts["answer"].clone(),
         runtime: Some(selected.tests["answer-case"].clone()),
     };
-    let mut command = executable
-        .command(root, &build.output)
-        .unwrap();
+    let mut command = executable.command(root, &build.output).unwrap();
     fs::create_dir_all(&build.output).unwrap();
     let result = command.output().unwrap();
     assert!(
@@ -171,6 +172,11 @@ int main(int argc, char **argv) {
     assert!(build.output.join("marker.txt").is_file());
     for (pointer, value, message) in [
         ("/schema", serde_json::json!(2), "schema"),
+        (
+            "/targets/answer/definitions",
+            serde_json::json!(["SELF=${target}"]),
+            "compile definition",
+        ),
         (
             "/targets/answer/requires",
             serde_json::json!("UNKNOWN_FEATURE"),
@@ -300,6 +306,13 @@ fn native_test_graph_checks_selection_references_and_commands() {
         Some(0)
     );
     let mut invalid = fixture;
+    invalid["targets"]["portable"]["definitions"] = serde_json::json!(["SELF=${target}"]);
+    assert!(
+        Graph::parse(&invalid.to_string())
+            .unwrap_err()
+            .contains("compile definition")
+    );
+    invalid["targets"]["portable"]["definitions"] = serde_json::json!([]);
     invalid["targets"]["pulse"]["sorces"] = serde_json::json!(["typo.c"]);
     assert!(
         Graph::parse(&invalid.to_string())

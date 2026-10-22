@@ -569,6 +569,9 @@
     "name": "test_video_output_plan",
     "sources": [
       "test/cmocka/test_video_output_plan.c"
+    ],
+    "definitions": [
+      "FORMAT_CONVERSION_EFFECT=\"${source}/libobs/data/format_conversion.effect\""
     ]
   }
 ]

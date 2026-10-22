@@ -40,7 +40,7 @@ pub fn exercise(
             std::fs::create_dir_all(directory.join("tmp")).unwrap();
             let directory = dunce::canonicalize(directory).unwrap();
             let executable = dunce::canonicalize(&test.path).unwrap();
-            for name in ["config", "data", "cache"] {
+            for name in ["config", "data", "cache", "home"] {
                 std::fs::create_dir_all(directory.join(name)).unwrap();
             }
             super::application::copy_tree(
@@ -60,19 +60,50 @@ pub fn exercise(
                 test.name
             );
             std::fs::write(directory.join("dependencies.log"), &resolution.stdout).unwrap();
-            let deadline = match test.name.as_str() {
+            let inherited_timeout = match test.name.as_str() {
                 "test_vlc_audio_track"
                 | "test_vlc_audio_pacing"
                 | "test_vlc_playlist_gap"
-                | "test_group_hide_transition_audio" => "120s",
-                _ => "60s",
+                | "test_group_hide_transition_audio" => 120,
+                _ => 60,
             };
+            let seconds = test
+                .runtime
+                .as_ref()
+                .and_then(|test| test.timeout_seconds)
+                .unwrap_or(inherited_timeout);
+            let prepared = test.command(root, &build.output).unwrap();
+            let mut command = if seconds == 0 {
+                prepared
+            } else {
+                let mut bounded = std::process::Command::new("timeout");
+                bounded
+                    .args(["--kill-after=5s", &format!("{seconds}s")])
+                    .arg(prepared.get_program())
+                    .args(prepared.get_args());
+                for (name, value) in prepared.get_envs() {
+                    if let Some(value) = value {
+                        bounded.env(name, value);
+                    } else {
+                        bounded.env_remove(name);
+                    }
+                }
+                if let Some(directory) = prepared.get_current_dir() {
+                    bounded.current_dir(directory);
+                }
+                bounded
+            };
+            if test
+                .runtime
+                .as_ref()
+                .is_none_or(|test| test.working_directory.is_none())
+            {
+                command.current_dir(&directory);
+            }
             let started = std::time::Instant::now();
-            let status = std::process::Command::new("timeout")
-                .args(["--kill-after=5s", deadline])
-                .arg(&executable)
-                .current_dir(&directory)
+            let status = command
                 .env("LD_LIBRARY_PATH", &search)
+                .env("HOME", directory.join("home"))
                 .env("TMPDIR", directory.join("tmp"))
                 .env("XDG_CONFIG_HOME", directory.join("config"))
                 .env("XDG_DATA_HOME", directory.join("data"))
@@ -86,7 +117,12 @@ pub fn exercise(
                 .unwrap();
             let stdout = std::fs::read_to_string(directory.join("stdout.log")).unwrap();
             let stderr = std::fs::read_to_string(directory.join("stderr.log")).unwrap();
-            let skipped = status.code() == Some(77)
+            let skip_code = test
+                .runtime
+                .as_ref()
+                .and_then(|test| test.skip_return_code)
+                .unwrap_or(77);
+            let skipped = status.code() == Some(skip_code)
                 || stdout.contains("SKIPPED")
                 || stderr.contains("SKIPPED");
             let passed = status.success() && !skipped;

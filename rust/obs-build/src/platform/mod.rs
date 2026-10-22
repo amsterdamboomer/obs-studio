@@ -867,6 +867,25 @@ pub fn configure_c_tests(
     configure_test_sanitizers(build, library, sanitizer)
 }
 
+pub fn native_test_facts(
+    target: &str,
+    pulseaudio: bool,
+) -> std::collections::BTreeMap<String, bool> {
+    std::collections::BTreeMap::from([
+        ("OS_LINUX".into(), target.contains("linux")),
+        ("ENABLE_PULSEAUDIO".into(), pulseaudio),
+        ("MSVC".into(), target.contains("msvc")),
+    ])
+}
+
+pub fn native_test_math_options(target: &str) -> Vec<String> {
+    if target.contains("msvc") {
+        vec![]
+    } else {
+        vec!["-lm".into()]
+    }
+}
+
 pub fn configure_test_sanitizers(
     build: &crate::NativeBuild,
     library: &mut crate::SharedLibrary,

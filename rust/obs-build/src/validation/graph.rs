@@ -171,6 +171,34 @@ pub struct Selection<'a> {
     pub tests: BTreeMap<&'a str, &'a Test>,
 }
 
+/// The selected native artifact and its public compile/link interface, matching
+/// the information inherited from a CMake library target. Header-only interfaces
+/// have no artifacts; they still carry required headers and definitions.
+#[derive(Clone, Debug, Default)]
+pub struct Dependency {
+    pub artifacts: Vec<PathBuf>,
+    pub include_dirs: Vec<PathBuf>,
+    pub definitions: Vec<(String, Option<String>)>,
+    pub compile_options: Vec<String>,
+    pub c_compile_options: Vec<String>,
+    pub cpp_compile_options: Vec<String>,
+    pub link_options: Vec<String>,
+}
+
+impl From<SharedLibrary> for Dependency {
+    fn from(library: SharedLibrary) -> Self {
+        Self {
+            artifacts: library.dependencies,
+            include_dirs: library.include_dirs,
+            definitions: library.definitions,
+            compile_options: library.compile_options,
+            c_compile_options: library.c_compile_options,
+            cpp_compile_options: library.cpp_compile_options,
+            link_options: library.link_options,
+        }
+    }
+}
+
 impl Graph {
     pub fn load(path: &Path) -> Result<Self, String> {
         let text = fs::read_to_string(path)
@@ -191,6 +219,9 @@ impl Graph {
         }
         for (name, target) in &graph.targets {
             validate_name(name)?;
+            for definition in &target.definitions {
+                validate_compile_definition(definition)?;
+            }
             if target.sources.is_empty() || target.sources.iter().any(String::is_empty) {
                 return Err(format!("native test target {name} has no sources"));
             }
@@ -245,7 +276,7 @@ impl Graph {
         build: &NativeBuild,
         root: &Path,
         facts: &BTreeMap<String, bool>,
-        libraries: &BTreeMap<String, PathBuf>,
+        libraries: &BTreeMap<String, Dependency>,
     ) -> Result<BTreeMap<String, PathBuf>, String> {
         let root = dunce::canonicalize(root).map_err(|error| error.to_string())?;
         let selected = self.select(facts)?;
@@ -301,6 +332,7 @@ impl Graph {
                 target.include_dirs.push(root.join(directory));
             }
             for definition in &spec.definitions {
+                let definition = expand_compile_definition(definition, &root, &build.output)?;
                 let (key, value) = definition
                     .split_once('=')
                     .map_or((definition.as_str(), None), |(key, value)| {
@@ -327,12 +359,30 @@ impl Graph {
                 }
             }
             for name in names {
-                target.dependencies.push(
-                    libraries
-                        .get(&name)
-                        .ok_or_else(|| format!("unresolved native test library {name}"))?
-                        .clone(),
-                );
+                let dependency = libraries
+                    .get(&name)
+                    .ok_or_else(|| format!("unresolved native test library {name}"))?;
+                target
+                    .dependencies
+                    .extend(dependency.artifacts.iter().cloned());
+                target
+                    .include_dirs
+                    .extend(dependency.include_dirs.iter().cloned());
+                target
+                    .definitions
+                    .extend(dependency.definitions.iter().cloned());
+                target
+                    .compile_options
+                    .extend(dependency.compile_options.iter().cloned());
+                target
+                    .c_compile_options
+                    .extend(dependency.c_compile_options.iter().cloned());
+                target
+                    .cpp_compile_options
+                    .extend(dependency.cpp_compile_options.iter().cloned());
+                target
+                    .link_options
+                    .extend(dependency.link_options.iter().cloned());
             }
             for flag in &spec.compile_options_if_supported {
                 if build
@@ -352,6 +402,37 @@ impl Graph {
         }
         Ok(artifacts)
     }
+}
+
+pub(crate) fn expand_compile_definition(
+    value: &str,
+    root: &Path,
+    output: &Path,
+) -> Result<String, String> {
+    validate_compile_definition(value)?;
+    // CMake represents paths in compile definitions with forward slashes.
+    // Native Windows separators would become C string escapes (for example
+    // C:\Users contains a universal-character escape), unlike runtime argv.
+    let root = PathBuf::from(
+        root.to_str()
+            .ok_or("non-UTF8 native test source path")?
+            .replace('\\', "/"),
+    );
+    let output = PathBuf::from(
+        output
+            .to_str()
+            .ok_or("non-UTF8 native test build path")?
+            .replace('\\', "/"),
+    );
+    expand(value, &root, &output, Path::new(""))
+}
+
+fn validate_compile_definition(value: &str) -> Result<(), String> {
+    validate_template(value)?;
+    if value.contains("${target}") {
+        return Err("native test compile definition cannot reference its target executable".into());
+    }
+    Ok(())
 }
 
 fn expand(value: &str, root: &Path, output: &Path, target: &Path) -> Result<String, String> {
