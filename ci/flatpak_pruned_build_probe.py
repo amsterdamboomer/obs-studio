@@ -110,6 +110,7 @@ def measure(state, manifest, temp_root, execute=run):
                 'xvfb-run', '--auto-servernum', 'flatpak-builder',
                 '--disable-rofiles-fuse', '--install-deps-from=flathub', '--force-clean',
                 '--default-branch=master', '--arch=x86_64', '--ccache',
+                '--mirror-screenshots-url=https://dl.flathub.org/media', '--compose-url-policy=full',
                 '--repo=' + str(repo), '--state-dir', str(isolated), str(build), prepared.name,
             ], 1800)
             elapsed = time.monotonic() - start
@@ -125,6 +126,9 @@ def measure(state, manifest, temp_root, execute=run):
             ):
                 if not (build / 'files' / relative).is_file():
                     raise ValueError('isolated output missing: ' + relative)
+            # Match the pinned action's screenshot publication inside this repo.
+            execute(['ostree', 'commit', '--repo=' + str(repo), '--canonical-permissions',
+                     '--branch=screenshots/x86_64', str(build / 'files/share/app-info/media')], 120)
             for kind, path in (
                 ('appstream', build / 'files/share/metainfo' / (recipe['id'] + '.metainfo.xml')),
                 ('builddir', build), ('repo', repo),

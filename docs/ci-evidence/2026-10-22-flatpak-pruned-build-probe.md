@@ -227,3 +227,24 @@ to the original commit and that no matching ref was created in the source.
 It passed with local OSTree2026.1; previous copy-only execution is retained
 in the result wrapper. This still stops before any real application build.
 31 focused tests pass. No fourth hosted dispatch yet.
+
+## Fourth trial: dependency reuse established, output lint failed
+
+Run39735957434 on218c48278 completed FAILURE. The private repository
+passed fsck; all six unchanged dependency modules reported cache hits;
+OBS rebuilt and emitted the marker. Binary/icon/XML checks and AppStream
+lint passed. Build-directory lint then rejected
+`appstream-external-screenshot-url`: screenshots were not mirrored to
+https://dl.flathub.org/media. Repository lint after that failure did not run.
+The [fourth-trial record](2026-10-22-flatpak-pruned-build-fourth-trial.json)
+retains terminal metadata, artifact, hashes/excerpts, Linux OFF/ON and macOS
+coverage, and the independent Windows cm_print_error link failure.
+
+The pinned action supplies `--mirror-screenshots-url` and
+`--compose-url-policy=full` (index.js250-253), then commits media with
+`ostree commit --canonical-permissions --branch=screenshots/x86_64`
+(index.js318-337). The probe omitted this production behavior. REDf1d53548f
+requires the builder options; RED7fdff3615 requires the screenshot commit
+before lint. The correction matches both on the isolated output, preserving
+all validation and exceptions.31 focused checks pass. No fifth dispatch yet;
+actual builddir/repository validation remains unproven.
