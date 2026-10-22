@@ -396,6 +396,14 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         "independent Linux test inventory remains"
     );
     for name in [
+        "test_amf",
+        "test_amf3_classname",
+        "test_amf3_terminator",
+        "test_mp4_mux_multichannel",
+        "test_mp4_split_time",
+        "test_null_output_stop_thread",
+        "test_rtmp_dbr_user_bitrate",
+        "test_rtmp_send_thread_leak",
         "test_rtmp_error",
         "test_rtmp_chunk_size",
         "test_amf_decode",
