@@ -13,6 +13,7 @@ file
 libglib2.0-dev
 libcurl4-openssl-dev
 libffmpeg-nvenc-dev
+ffmpeg
 libavcodec-dev
 libavdevice-dev
 libavfilter-dev
