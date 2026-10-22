@@ -4488,5 +4488,21 @@
       "registered": 353,
       "ctest_seconds": 166.96
     }
+  },
+  "deinterlace_attribution": {
+    "source": "test/cmocka/test_deinterlace_2x_field_order.c",
+    "cases": 40,
+    "source_30fps_cases": 16,
+    "source_25fps_cases": 24,
+    "frames": 36,
+    "warmup_frames": 6,
+    "play_drain_seconds": 0.3,
+    "case_drain_seconds": 0.25,
+    "pacing_floor_seconds": 81.73333333333335,
+    "observed_seconds": {
+      "OFF": 82.6,
+      "ON": 82.88
+    },
+    "decision": "Retain unchanged assertions, frame pacing and RUN_SERIAL. No algorithm/resource isolation change justified by these samples. Timing floor excludes startup, reset and extra warmup polling; this is source-derived attribution, not CPU sampling."
   }
 }
