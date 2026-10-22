@@ -11,6 +11,8 @@ pub struct Executable {
     pub name: String,
     pub path: PathBuf,
     pub runtime: Option<graph::Test>,
+    /// Resolved link artifacts; used to verify core selection only when applicable.
+    pub dependencies: Vec<PathBuf>,
 }
 
 impl Executable {
@@ -72,6 +74,7 @@ pub fn build_webrtc_tests(build: &NativeBuild, root: &Path) -> Result<Vec<Execut
             name: name.into(),
             path: build.executable(&library)?,
             runtime: None,
+            dependencies: vec![],
         });
     }
     for directory in ["test/cmocka", "plugins/obs-webrtc"] {
@@ -117,6 +120,7 @@ pub fn build_graphics_tests(
         name: name.into(),
         path: build.executable(&library)?,
         runtime: None,
+        dependencies: vec![core.into()],
     }])
 }
 
@@ -177,6 +181,7 @@ pub fn build_vlc_tests(
             name: name.into(),
             path: build.executable(&library)?,
             runtime: None,
+            dependencies: vec![core.into()],
         });
     }
     for directory in ["test/cmocka", "plugins/vlc-video", "libobs/data"] {
@@ -256,7 +261,7 @@ pub fn build_c_tests(
     interfaces.insert(
         "OBS::caption".into(),
         graph::Dependency {
-            artifacts: vec![caption],
+            artifacts: vec![caption.clone()],
             include_dirs: vec![root.join("deps/libcaption")],
             ..Default::default()
         },
@@ -296,6 +301,26 @@ pub fn build_c_tests(
             add_package(&mut tls, &build.target, package)?;
         }
         interfaces.insert("MbedTLS::mbedtls".into(), tls.into());
+        for name in ["opts-parser", "bpm"] {
+            let mut artifacts = vec![
+                crate::deps::shared_archive(build, &root, name)?,
+                core.into(),
+            ];
+            if name == "bpm" {
+                artifacts.push(caption.clone());
+            }
+            interfaces.insert(
+                format!("OBS::{name}"),
+                graph::Dependency {
+                    artifacts,
+                    include_dirs: vec![root.join("shared").join(name)],
+                    ..Default::default()
+                },
+            );
+        }
+        let mut jansson = SharedLibrary::default();
+        add_package(&mut jansson, &build.target, "jansson")?;
+        interfaces.insert("jansson::jansson".into(), jansson.into());
         for name in ["crypt32", "iphlpapi", "winmm", "ws2_32"] {
             interfaces.insert(
                 name.into(),
@@ -327,6 +352,7 @@ pub fn build_c_tests(
                 .ok_or("selected native test artifact missing")?
                 .clone(),
             runtime: Some(test.clone()),
+            dependencies: graph.targets[&test.target].dependency_artifacts(&facts, &interfaces)?,
         });
     }
     for directory in ["libobs", "test/cmocka", "deps/libcaption"] {

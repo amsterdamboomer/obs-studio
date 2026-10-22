@@ -54,11 +54,19 @@ pub fn exercise(
                 .output()
                 .unwrap();
             assert!(resolution.status.success());
-            assert!(
-                String::from_utf8_lossy(&resolution.stdout).contains(selected.to_str().unwrap()),
-                "{} did not resolve the selected core",
-                test.name
-            );
+            let core_required = test
+                .dependencies
+                .iter()
+                .any(|path| path == core || path == rust_core);
+            let resolved = String::from_utf8_lossy(&resolution.stdout);
+            let core_linked = resolved.contains("libobs.so");
+            if core_required || core_linked {
+                assert!(
+                    resolved.contains(selected.to_str().unwrap()),
+                    "{} did not resolve the selected core",
+                    test.name
+                );
+            }
             std::fs::write(directory.join("dependencies.log"), &resolution.stdout).unwrap();
             let inherited_timeout = match test.name.as_str() {
                 "test_vlc_audio_track"
@@ -132,6 +140,7 @@ pub fn exercise(
             );
             results.push(serde_json::json!({"variant":variant,"name":test.name,
                 "status":status.code(),"skipped":skipped,"passed":passed,
+                "core_required":core_required,"core_linked":core_linked,
                 "seconds":started.elapsed().as_secs_f64(),"directory":directory}));
             std::fs::write(
                 build.output.join(format!("{suite}-c-tests.json")),

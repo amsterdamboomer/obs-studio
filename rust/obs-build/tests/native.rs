@@ -191,7 +191,27 @@ int main(int argc, char **argv) {
         name: "answer-case".into(),
         path: artifacts["answer"].clone(),
         runtime: Some(selected.tests["answer-case"].clone()),
+        dependencies: rust_graph.targets["answer"]
+            .dependency_artifacts(&facts, &dependencies)
+            .unwrap(),
     };
+    assert!(
+        executable.dependencies.is_empty(),
+        "header-only imports must not create runtime dependencies"
+    );
+    let mut with_artifact = dependencies.clone();
+    let imported = root.join("selected-imported-library.so");
+    with_artifact
+        .get_mut("fixture-dependency")
+        .unwrap()
+        .artifacts
+        .push(imported.clone());
+    assert_eq!(
+        rust_graph.targets["answer"]
+            .dependency_artifacts(&facts, &with_artifact)
+            .unwrap(),
+        vec![imported]
+    );
     let mut command = executable.command(root, &build.output).unwrap();
     fs::create_dir_all(&build.output).unwrap();
     let result = command.output().unwrap();
@@ -553,6 +573,40 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
     let output_selection = graph.select(&with_outputs).unwrap();
     for name in output_tests {
         assert!(output_selection.tests.contains_key(name));
+    }
+    for name in [
+        "test_amf",
+        "test_amf3_classname",
+        "test_amf3_terminator",
+        "test_mp4_mux_multichannel",
+        "test_mp4_split_time",
+    ] {
+        assert!(output_selection.tests.contains_key(name));
+        assert!(!selected.tests.contains_key(name));
+    }
+    for name in [
+        "test_null_output_stop_thread",
+        "test_rtmp_dbr_user_bitrate",
+        "test_rtmp_send_thread_leak",
+    ] {
+        assert!(!output_selection.tests.contains_key(name));
+        let mut linux_outputs = with_outputs.clone();
+        linux_outputs.insert("OS_LINUX".into(), true);
+        linux_outputs.insert("OS_WINDOWS".into(), false);
+        assert!(
+            graph
+                .select(&linux_outputs)
+                .unwrap()
+                .tests
+                .contains_key(name)
+        );
+    }
+    assert_eq!(
+        raw["targets"]["test_amf"]["libraries"],
+        serde_json::json!(["OBS::native-test-cmocka", {"name":"ws2_32", "requires":"OS_WINDOWS"}])
+    );
+    for name in ["test_amf3_classname", "test_amf3_terminator"] {
+        assert_eq!(graph.targets[name].sanitizers.as_deref(), Some("address"));
     }
     assert_eq!(
         raw["targets"]["test_amf_decode"]["compile_options"][2],

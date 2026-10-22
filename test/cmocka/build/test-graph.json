@@ -1066,6 +1066,267 @@
       ],
       "sanitizers": "address,undefined"
     },
+    "test_amf": {
+      "sources": [
+        "test/cmocka/test_amf.c",
+        "plugins/obs-outputs/librtmp/amf.c",
+        "plugins/obs-outputs/librtmp/log.c"
+      ],
+      "requires": "HAVE_OBS_OUTPUTS",
+      "includes": [
+        "plugins/obs-outputs"
+      ],
+      "libraries": [
+        "OBS::native-test-cmocka",
+        {
+          "name": "ws2_32",
+          "requires": "OS_WINDOWS"
+        }
+      ],
+      "definitions": [
+        "NO_CRYPTO"
+      ]
+    },
+    "test_amf3_classname": {
+      "sources": [
+        "test/cmocka/test_amf3_classname.c",
+        "plugins/obs-outputs/librtmp/amf.c",
+        "plugins/obs-outputs/librtmp/log.c"
+      ],
+      "requires": "HAVE_OBS_OUTPUTS",
+      "includes": [
+        "plugins/obs-outputs"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "ws2_32",
+          "requires": "OS_WINDOWS"
+        }
+      ],
+      "definitions": [
+        "NO_CRYPTO"
+      ],
+      "sanitizers": "address"
+    },
+    "test_amf3_terminator": {
+      "sources": [
+        "test/cmocka/test_amf3_terminator.c",
+        "plugins/obs-outputs/librtmp/amf.c",
+        "plugins/obs-outputs/librtmp/log.c"
+      ],
+      "requires": "HAVE_OBS_OUTPUTS",
+      "includes": [
+        "plugins/obs-outputs"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "ws2_32",
+          "requires": "OS_WINDOWS"
+        }
+      ],
+      "definitions": [
+        "NO_CRYPTO"
+      ],
+      "sanitizers": "address"
+    },
+    "test_mp4_mux_multichannel": {
+      "sources": [
+        "test/cmocka/test_mp4_mux_multichannel.c",
+        "plugins/obs-outputs/mp4-mux.c.h",
+        "plugins/obs-outputs/rtmp-av1.c.h",
+        {
+          "path": "plugins/obs-outputs/rtmp-hevc.c.h",
+          "requires": "ENABLE_HEVC"
+        }
+      ],
+      "requires": "HAVE_OBS_OUTPUTS",
+      "includes": [
+        "plugins/obs-outputs",
+        "shared/opts-parser",
+        "shared/bpm"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_mp4_split_time": {
+      "sources": [
+        "test/cmocka/test_mp4_split_time.c",
+        "plugins/obs-outputs/mp4-mux.c.h",
+        "plugins/obs-outputs/rtmp-av1.c.h",
+        {
+          "path": "plugins/obs-outputs/rtmp-hevc.c.h",
+          "requires": "ENABLE_HEVC"
+        }
+      ],
+      "requires": "HAVE_OBS_OUTPUTS",
+      "includes": [
+        "plugins/obs-outputs",
+        "shared/opts-parser",
+        "shared/bpm"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::opts-parser",
+        "OBS::bpm",
+        "OBS::native-test-cmocka"
+      ],
+      "definitions": [
+        "USE_MBEDTLS",
+        "CRYPTO"
+      ]
+    },
+    "test_null_output_stop_thread": {
+      "sources": [
+        "test/cmocka/test_null_output_stop_thread.c"
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_OBS_OUTPUTS"
+        ]
+      },
+      "includes": [
+        "plugins/obs-outputs",
+        "shared/opts-parser",
+        "shared/bpm"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "Threads::Threads",
+        "OBS::native-test-cmocka"
+      ],
+      "definitions": [
+        "NO_CRYPTO"
+      ],
+      "compile_options": [
+        "-Wno-unused-function"
+      ],
+      "link_options": [
+        "-Wl,--wrap=obs_output_can_begin_data_capture,--wrap=obs_output_initialize_encoders,--wrap=obs_output_begin_data_capture,--wrap=obs_output_end_data_capture,--wrap=pthread_create,--wrap=pthread_join"
+      ]
+    },
+    "test_rtmp_dbr_user_bitrate": {
+      "sources": [
+        "test/cmocka/test_rtmp_dbr_user_bitrate.c",
+        {
+          "path": "plugins/obs-outputs/rtmp-hevc.c.h",
+          "requires": "ENABLE_HEVC"
+        },
+        "plugins/obs-outputs/flv-mux.c.h",
+        "plugins/obs-outputs/net-if.c.h",
+        "plugins/obs-outputs/rtmp-av1.c.h",
+        "plugins/obs-outputs/librtmp/amf.c",
+        "plugins/obs-outputs/librtmp/cencode.c",
+        "plugins/obs-outputs/librtmp/hashswf.c",
+        "plugins/obs-outputs/librtmp/log.c",
+        "plugins/obs-outputs/librtmp/md5.c",
+        "plugins/obs-outputs/librtmp/parseurl.c",
+        "plugins/obs-outputs/librtmp/rtmp.c"
+      ],
+      "requires": {
+        "all": [
+          "HAVE_OBS_OUTPUTS",
+          {
+            "not": "OS_WINDOWS"
+          }
+        ]
+      },
+      "includes": [
+        "plugins/obs-outputs",
+        "shared/opts-parser",
+        "shared/bpm"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::happy-eyeballs",
+        "MbedTLS::mbedtls",
+        "ZLIB::ZLIB",
+        "jansson::jansson",
+        "OBS::native-test-cmocka",
+        {
+          "name": "OBS::native-test-foundation",
+          "requires": "OS_MACOS"
+        },
+        {
+          "name": "OBS::native-test-security",
+          "requires": "OS_MACOS"
+        }
+      ],
+      "definitions": [
+        "USE_MBEDTLS",
+        "CRYPTO"
+      ],
+      "compile_options": [
+        {
+          "name": "-Wno-comma",
+          "requires": "C_COMPILER_CLANG"
+        }
+      ]
+    },
+    "test_rtmp_send_thread_leak": {
+      "sources": [
+        "test/cmocka/test_rtmp_send_thread_leak.c",
+        {
+          "path": "plugins/obs-outputs/rtmp-hevc.c.h",
+          "requires": "ENABLE_HEVC"
+        },
+        "plugins/obs-outputs/flv-mux.c.h",
+        "plugins/obs-outputs/net-if.c.h",
+        "plugins/obs-outputs/rtmp-av1.c.h",
+        "plugins/obs-outputs/librtmp/amf.c",
+        "plugins/obs-outputs/librtmp/cencode.c",
+        "plugins/obs-outputs/librtmp/hashswf.c",
+        "plugins/obs-outputs/librtmp/log.c",
+        "plugins/obs-outputs/librtmp/md5.c",
+        "plugins/obs-outputs/librtmp/parseurl.c",
+        "plugins/obs-outputs/librtmp/rtmp.c"
+      ],
+      "requires": {
+        "all": [
+          "HAVE_OBS_OUTPUTS",
+          {
+            "not": "OS_WINDOWS"
+          }
+        ]
+      },
+      "includes": [
+        "plugins/obs-outputs",
+        "shared/opts-parser",
+        "shared/bpm"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::happy-eyeballs",
+        "MbedTLS::mbedtls",
+        "ZLIB::ZLIB",
+        "jansson::jansson",
+        "OBS::native-test-cmocka",
+        {
+          "name": "OBS::native-test-foundation",
+          "requires": "OS_MACOS"
+        },
+        {
+          "name": "OBS::native-test-security",
+          "requires": "OS_MACOS"
+        }
+      ],
+      "definitions": [
+        "USE_MBEDTLS",
+        "CRYPTO"
+      ],
+      "compile_options": [
+        {
+          "name": "-Wno-comma",
+          "requires": "C_COMPILER_CLANG"
+        }
+      ]
+    },
     "test_output_protocol_list_steps": {
       "sources": [
         "test/cmocka/test_output_protocol_list_steps.c",
@@ -1316,6 +1577,58 @@
       "command": [
         "${target}"
       ]
+    },
+    "test_amf": {
+      "target": "test_amf",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_amf3_classname": {
+      "target": "test_amf3_classname",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_amf3_terminator": {
+      "target": "test_amf3_terminator",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_mp4_mux_multichannel": {
+      "target": "test_mp4_mux_multichannel",
+      "command": [
+        "${target}"
+      ],
+      "timeout_seconds": 60
+    },
+    "test_mp4_split_time": {
+      "target": "test_mp4_split_time",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_null_output_stop_thread": {
+      "target": "test_null_output_stop_thread",
+      "command": [
+        "${target}"
+      ],
+      "timeout_seconds": 60
+    },
+    "test_rtmp_dbr_user_bitrate": {
+      "target": "test_rtmp_dbr_user_bitrate",
+      "command": [
+        "${target}"
+      ],
+      "timeout_seconds": 30
+    },
+    "test_rtmp_send_thread_leak": {
+      "target": "test_rtmp_send_thread_leak",
+      "command": [
+        "${target}"
+      ],
+      "timeout_seconds": 30
     },
     "test_output_protocol_list_steps": {
       "target": "test_output_protocol_list_steps",

@@ -132,6 +132,39 @@ pub struct Target {
     pub sanitizers: Option<String>,
 }
 
+impl Target {
+    fn library_names(&self, facts: &BTreeMap<String, bool>) -> Result<Vec<String>, String> {
+        let mut names: Vec<_> = self
+            .archives
+            .iter()
+            .map(|name| format!("OBS::{name}"))
+            .collect();
+        for library in &self.libraries {
+            if let Some(name) = library.selected(facts)? {
+                names.push(name.into());
+            }
+        }
+        Ok(names)
+    }
+
+    /// Actual link artifacts after conditional and imported dependency resolution.
+    /// Header-only imports contribute no artifacts.
+    pub fn dependency_artifacts(
+        &self,
+        facts: &BTreeMap<String, bool>,
+        libraries: &BTreeMap<String, Dependency>,
+    ) -> Result<Vec<PathBuf>, String> {
+        let mut artifacts = Vec::new();
+        for name in self.library_names(facts)? {
+            let dependency = libraries
+                .get(&name)
+                .ok_or_else(|| format!("unresolved native test library {name}"))?;
+            artifacts.extend(dependency.artifacts.iter().cloned());
+        }
+        Ok(artifacts)
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Test {
@@ -318,6 +351,7 @@ impl Graph {
             let mut target = SharedLibrary {
                 name: name.into(),
                 include_dirs: vec![root.clone()],
+                dependencies: spec.dependency_artifacts(facts, libraries)?,
                 compile_options: spec
                     .compile_options
                     .iter()
@@ -407,23 +441,10 @@ impl Graph {
             }
             // Static archives precede their dynamic dependencies under
             // --as-needed, as in the existing native compatibility builder.
-            let mut names: Vec<_> = spec
-                .archives
-                .iter()
-                .map(|name| format!("OBS::{name}"))
-                .collect();
-            for library in &spec.libraries {
-                if let Some(name) = library.selected(facts)? {
-                    names.push(name.into());
-                }
-            }
-            for name in names {
+            for name in spec.library_names(facts)? {
                 let dependency = libraries
                     .get(&name)
                     .ok_or_else(|| format!("unresolved native test library {name}"))?;
-                target
-                    .dependencies
-                    .extend(dependency.artifacts.iter().cloned());
                 target
                     .include_dirs
                     .extend(dependency.include_dirs.iter().cloned());
