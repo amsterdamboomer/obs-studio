@@ -28,7 +28,7 @@ def command(arguments):
         value = output.read((64 << 10) + 1)
     if len(value) > 64 << 10:
         raise ValueError('native tool version output budget exceeded')
-    return value.decode('utf-8').strip()
+    return value.decode('utf-8-sig').strip()
 
 
 def tool_versions(platform, architecture):
@@ -43,7 +43,7 @@ def tool_versions(platform, architecture):
         raise ValueError('Windows identity requires a Windows runner')
     vswhere = Path(os.environ['ProgramFiles(x86)']) / 'Microsoft Visual Studio/Installer/vswhere.exe'
     installations = json.loads(command([str(vswhere), '-latest', '-products', '*', '-requires',
-                                        'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', '-format', 'json']))
+                                        'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', '-format', 'json', '-utf8']))
     if not isinstance(installations, list) or len(installations) != 1:
         raise ValueError('expected one selected Visual Studio installation')
     installation = installations[0]
