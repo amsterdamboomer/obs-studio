@@ -537,6 +537,3754 @@
   "limits": [
     "Normal build/output validation passed; isolated rebuild never started.",
     "Initial generic guard did not report the link location. No claim that the offending link was in any specific subtree.",
-    "Parent active at capture; do not infer terminal result. Revised candidate not yet hosted."
-  ]
+    "Parent was active at capture; later terminal FAILURE and coverage are separately preserved. Revised candidate not yet hosted at original capture."
+  ],
+  "terminal_observation": {
+    "run": {
+      "id": 39725882580,
+      "name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+      "node_id": "WFR_kwLOVAc9yc8AAAAJP9jc1A",
+      "head_branch": "infra/1269-flatpak-pruned-build",
+      "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+      "path": ".github/workflows/ci.yml",
+      "display_title": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+      "run_number": 1283,
+      "event": "workflow_dispatch",
+      "status": "completed",
+      "conclusion": "failure",
+      "workflow_id": 386287070,
+      "check_suite_id": 107661593619,
+      "check_suite_node_id": "CS_kwDOVAc9yc8AAAAZESGMEw",
+      "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+      "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580",
+      "pull_requests": [
+        {
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/pulls/1715",
+          "id": 4962387433,
+          "number": 1715,
+          "head": {
+            "ref": "infra/1269-flatpak-pruned-build",
+            "sha": "446a12945b44a3c647995d5e86c2f96502638cad",
+            "repo": {
+              "id": 1409760713,
+              "url": "https://api.github.com/repos/obs-rust/obs-studio",
+              "name": "obs-studio"
+            }
+          },
+          "base": {
+            "ref": "master",
+            "sha": "9f2253334beffb2ceacc40b68ba797c732c915bd",
+            "repo": {
+              "id": 1409760713,
+              "url": "https://api.github.com/repos/obs-rust/obs-studio",
+              "name": "obs-studio"
+            }
+          }
+        }
+      ],
+      "created_at": "2026-10-22T05:03:57Z",
+      "updated_at": "2026-10-22T05:42:20Z",
+      "actor": {
+        "login": "zackees",
+        "id": 6856673,
+        "node_id": "MDQ6VXNlcjY4NTY2NzM=",
+        "avatar_url": "https://avatars.githubusercontent.com/u/6856673?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/zackees",
+        "html_url": "https://github.com/zackees",
+        "followers_url": "https://api.github.com/users/zackees/followers",
+        "following_url": "https://api.github.com/users/zackees/following{/other_user}",
+        "gists_url": "https://api.github.com/users/zackees/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/zackees/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/zackees/subscriptions",
+        "organizations_url": "https://api.github.com/users/zackees/orgs",
+        "repos_url": "https://api.github.com/users/zackees/repos",
+        "events_url": "https://api.github.com/users/zackees/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/zackees/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "run_attempt": 1,
+      "referenced_workflows": [
+        {
+          "path": "obs-rust/obs-studio/.github/workflows/ci-pre.yml@659756295b0edd68ea2513687156afc3e294f9f1",
+          "sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "ref": "refs/heads/infra/1269-flatpak-pruned-build"
+        },
+        {
+          "path": "obs-rust/obs-studio/.github/workflows/check-format.yaml@659756295b0edd68ea2513687156afc3e294f9f1",
+          "sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "ref": "refs/heads/infra/1269-flatpak-pruned-build"
+        },
+        {
+          "path": "obs-rust/obs-studio/.github/workflows/build-project.yaml@659756295b0edd68ea2513687156afc3e294f9f1",
+          "sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "ref": "refs/heads/infra/1269-flatpak-pruned-build"
+        }
+      ],
+      "run_started_at": "2026-10-22T05:03:57Z",
+      "triggering_actor": {
+        "login": "zackees",
+        "id": 6856673,
+        "node_id": "MDQ6VXNlcjY4NTY2NzM=",
+        "avatar_url": "https://avatars.githubusercontent.com/u/6856673?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/zackees",
+        "html_url": "https://github.com/zackees",
+        "followers_url": "https://api.github.com/users/zackees/followers",
+        "following_url": "https://api.github.com/users/zackees/following{/other_user}",
+        "gists_url": "https://api.github.com/users/zackees/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/zackees/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/zackees/subscriptions",
+        "organizations_url": "https://api.github.com/users/zackees/orgs",
+        "repos_url": "https://api.github.com/users/zackees/repos",
+        "events_url": "https://api.github.com/users/zackees/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/zackees/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "jobs_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580/jobs",
+      "logs_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580/logs",
+      "check_suite_url": "https://api.github.com/repos/obs-rust/obs-studio/check-suites/107661593619",
+      "artifacts_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580/artifacts",
+      "cancel_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580/cancel",
+      "rerun_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580/rerun",
+      "previous_attempt_url": null,
+      "workflow_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/workflows/386287070",
+      "head_commit": {
+        "id": "659756295b0edd68ea2513687156afc3e294f9f1",
+        "tree_id": "ab8108780cc4a5934714289ad2c0e3a10e7a5dd6",
+        "message": "ci: probe isolated Flatpak application rebuild from pruned state",
+        "timestamp": "2026-10-22T05:03:35Z",
+        "author": {
+          "name": "Zach Vorhies",
+          "email": "zachvorhies@protonmail.com"
+        },
+        "committer": {
+          "name": "Zach Vorhies",
+          "email": "zachvorhies@protonmail.com"
+        }
+      },
+      "repository": {
+        "id": 1409760713,
+        "node_id": "R_kgDOVAc9yQ",
+        "name": "obs-studio",
+        "full_name": "obs-rust/obs-studio",
+        "private": false,
+        "owner": {
+          "login": "obs-rust",
+          "id": 339444210,
+          "node_id": "O_kgDOFDuB8g",
+          "avatar_url": "https://avatars.githubusercontent.com/u/339444210?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/obs-rust",
+          "html_url": "https://github.com/obs-rust",
+          "followers_url": "https://api.github.com/users/obs-rust/followers",
+          "following_url": "https://api.github.com/users/obs-rust/following{/other_user}",
+          "gists_url": "https://api.github.com/users/obs-rust/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/obs-rust/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/obs-rust/subscriptions",
+          "organizations_url": "https://api.github.com/users/obs-rust/orgs",
+          "repos_url": "https://api.github.com/users/obs-rust/repos",
+          "events_url": "https://api.github.com/users/obs-rust/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/obs-rust/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "html_url": "https://github.com/obs-rust/obs-studio",
+        "description": "OBS-STUDIO-RUST is an independent fork of obsproject/obs-studio with all the problems fixed. want to have maintainer privledges? File an issue and tag @zackees",
+        "fork": false,
+        "url": "https://api.github.com/repos/obs-rust/obs-studio",
+        "forks_url": "https://api.github.com/repos/obs-rust/obs-studio/forks",
+        "keys_url": "https://api.github.com/repos/obs-rust/obs-studio/keys{/key_id}",
+        "collaborators_url": "https://api.github.com/repos/obs-rust/obs-studio/collaborators{/collaborator}",
+        "teams_url": "https://api.github.com/repos/obs-rust/obs-studio/teams",
+        "hooks_url": "https://api.github.com/repos/obs-rust/obs-studio/hooks",
+        "issue_events_url": "https://api.github.com/repos/obs-rust/obs-studio/issues/events{/number}",
+        "events_url": "https://api.github.com/repos/obs-rust/obs-studio/events",
+        "assignees_url": "https://api.github.com/repos/obs-rust/obs-studio/assignees{/user}",
+        "branches_url": "https://api.github.com/repos/obs-rust/obs-studio/branches{/branch}",
+        "tags_url": "https://api.github.com/repos/obs-rust/obs-studio/tags",
+        "blobs_url": "https://api.github.com/repos/obs-rust/obs-studio/git/blobs{/sha}",
+        "git_tags_url": "https://api.github.com/repos/obs-rust/obs-studio/git/tags{/sha}",
+        "git_refs_url": "https://api.github.com/repos/obs-rust/obs-studio/git/refs{/sha}",
+        "trees_url": "https://api.github.com/repos/obs-rust/obs-studio/git/trees{/sha}",
+        "statuses_url": "https://api.github.com/repos/obs-rust/obs-studio/statuses/{sha}",
+        "languages_url": "https://api.github.com/repos/obs-rust/obs-studio/languages",
+        "stargazers_url": "https://api.github.com/repos/obs-rust/obs-studio/stargazers",
+        "contributors_url": "https://api.github.com/repos/obs-rust/obs-studio/contributors",
+        "subscribers_url": "https://api.github.com/repos/obs-rust/obs-studio/subscribers",
+        "subscription_url": "https://api.github.com/repos/obs-rust/obs-studio/subscription",
+        "commits_url": "https://api.github.com/repos/obs-rust/obs-studio/commits{/sha}",
+        "git_commits_url": "https://api.github.com/repos/obs-rust/obs-studio/git/commits{/sha}",
+        "comments_url": "https://api.github.com/repos/obs-rust/obs-studio/comments{/number}",
+        "issue_comment_url": "https://api.github.com/repos/obs-rust/obs-studio/issues/comments{/number}",
+        "contents_url": "https://api.github.com/repos/obs-rust/obs-studio/contents/{+path}",
+        "compare_url": "https://api.github.com/repos/obs-rust/obs-studio/compare/{base}...{head}",
+        "merges_url": "https://api.github.com/repos/obs-rust/obs-studio/merges",
+        "archive_url": "https://api.github.com/repos/obs-rust/obs-studio/{archive_format}{/ref}",
+        "downloads_url": "https://api.github.com/repos/obs-rust/obs-studio/downloads",
+        "issues_url": "https://api.github.com/repos/obs-rust/obs-studio/issues{/number}",
+        "pulls_url": "https://api.github.com/repos/obs-rust/obs-studio/pulls{/number}",
+        "milestones_url": "https://api.github.com/repos/obs-rust/obs-studio/milestones{/number}",
+        "notifications_url": "https://api.github.com/repos/obs-rust/obs-studio/notifications{?since,all,participating}",
+        "labels_url": "https://api.github.com/repos/obs-rust/obs-studio/labels{/name}",
+        "releases_url": "https://api.github.com/repos/obs-rust/obs-studio/releases{/id}",
+        "deployments_url": "https://api.github.com/repos/obs-rust/obs-studio/deployments"
+      },
+      "head_repository": {
+        "id": 1409760713,
+        "node_id": "R_kgDOVAc9yQ",
+        "name": "obs-studio",
+        "full_name": "obs-rust/obs-studio",
+        "private": false,
+        "owner": {
+          "login": "obs-rust",
+          "id": 339444210,
+          "node_id": "O_kgDOFDuB8g",
+          "avatar_url": "https://avatars.githubusercontent.com/u/339444210?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/obs-rust",
+          "html_url": "https://github.com/obs-rust",
+          "followers_url": "https://api.github.com/users/obs-rust/followers",
+          "following_url": "https://api.github.com/users/obs-rust/following{/other_user}",
+          "gists_url": "https://api.github.com/users/obs-rust/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/obs-rust/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/obs-rust/subscriptions",
+          "organizations_url": "https://api.github.com/users/obs-rust/orgs",
+          "repos_url": "https://api.github.com/users/obs-rust/repos",
+          "events_url": "https://api.github.com/users/obs-rust/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/obs-rust/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "html_url": "https://github.com/obs-rust/obs-studio",
+        "description": "OBS-STUDIO-RUST is an independent fork of obsproject/obs-studio with all the problems fixed. want to have maintainer privledges? File an issue and tag @zackees",
+        "fork": false,
+        "url": "https://api.github.com/repos/obs-rust/obs-studio",
+        "forks_url": "https://api.github.com/repos/obs-rust/obs-studio/forks",
+        "keys_url": "https://api.github.com/repos/obs-rust/obs-studio/keys{/key_id}",
+        "collaborators_url": "https://api.github.com/repos/obs-rust/obs-studio/collaborators{/collaborator}",
+        "teams_url": "https://api.github.com/repos/obs-rust/obs-studio/teams",
+        "hooks_url": "https://api.github.com/repos/obs-rust/obs-studio/hooks",
+        "issue_events_url": "https://api.github.com/repos/obs-rust/obs-studio/issues/events{/number}",
+        "events_url": "https://api.github.com/repos/obs-rust/obs-studio/events",
+        "assignees_url": "https://api.github.com/repos/obs-rust/obs-studio/assignees{/user}",
+        "branches_url": "https://api.github.com/repos/obs-rust/obs-studio/branches{/branch}",
+        "tags_url": "https://api.github.com/repos/obs-rust/obs-studio/tags",
+        "blobs_url": "https://api.github.com/repos/obs-rust/obs-studio/git/blobs{/sha}",
+        "git_tags_url": "https://api.github.com/repos/obs-rust/obs-studio/git/tags{/sha}",
+        "git_refs_url": "https://api.github.com/repos/obs-rust/obs-studio/git/refs{/sha}",
+        "trees_url": "https://api.github.com/repos/obs-rust/obs-studio/git/trees{/sha}",
+        "statuses_url": "https://api.github.com/repos/obs-rust/obs-studio/statuses/{sha}",
+        "languages_url": "https://api.github.com/repos/obs-rust/obs-studio/languages",
+        "stargazers_url": "https://api.github.com/repos/obs-rust/obs-studio/stargazers",
+        "contributors_url": "https://api.github.com/repos/obs-rust/obs-studio/contributors",
+        "subscribers_url": "https://api.github.com/repos/obs-rust/obs-studio/subscribers",
+        "subscription_url": "https://api.github.com/repos/obs-rust/obs-studio/subscription",
+        "commits_url": "https://api.github.com/repos/obs-rust/obs-studio/commits{/sha}",
+        "git_commits_url": "https://api.github.com/repos/obs-rust/obs-studio/git/commits{/sha}",
+        "comments_url": "https://api.github.com/repos/obs-rust/obs-studio/comments{/number}",
+        "issue_comment_url": "https://api.github.com/repos/obs-rust/obs-studio/issues/comments{/number}",
+        "contents_url": "https://api.github.com/repos/obs-rust/obs-studio/contents/{+path}",
+        "compare_url": "https://api.github.com/repos/obs-rust/obs-studio/compare/{base}...{head}",
+        "merges_url": "https://api.github.com/repos/obs-rust/obs-studio/merges",
+        "archive_url": "https://api.github.com/repos/obs-rust/obs-studio/{archive_format}{/ref}",
+        "downloads_url": "https://api.github.com/repos/obs-rust/obs-studio/downloads",
+        "issues_url": "https://api.github.com/repos/obs-rust/obs-studio/issues{/number}",
+        "pulls_url": "https://api.github.com/repos/obs-rust/obs-studio/pulls{/number}",
+        "milestones_url": "https://api.github.com/repos/obs-rust/obs-studio/milestones{/number}",
+        "notifications_url": "https://api.github.com/repos/obs-rust/obs-studio/notifications{?since,all,participating}",
+        "labels_url": "https://api.github.com/repos/obs-rust/obs-studio/labels{/name}",
+        "releases_url": "https://api.github.com/repos/obs-rust/obs-studio/releases{/id}",
+        "deployments_url": "https://api.github.com/repos/obs-rust/obs-studio/deployments"
+      }
+    },
+    "jobs": {
+      "total_count": 29,
+      "jobs": [
+        {
+          "id": 119649548377,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb26s4WQ",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119649548377",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119649548377",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:03:59Z",
+          "started_at": "2026-10-22T05:10:09Z",
+          "completed_at": "2026-10-22T05:11:22Z",
+          "name": "Format \ud83d\udd0d / checks",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:10:10Z",
+              "completed_at": "2026-10-22T05:10:11Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:10:11Z",
+              "completed_at": "2026-10-22T05:10:16Z"
+            },
+            {
+              "name": "Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:10:16Z",
+              "completed_at": "2026-10-22T05:10:19Z"
+            },
+            {
+              "name": "Check for Swift Changes \ud83d\udd0e",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:10:19Z",
+              "completed_at": "2026-10-22T05:10:19Z"
+            },
+            {
+              "name": "clang-format Check \ud83d\udc09",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:10:19Z",
+              "completed_at": "2026-10-22T05:10:24Z"
+            },
+            {
+              "name": "gersemi Check \ud83c\udf9b\ufe0f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-22T05:10:24Z",
+              "completed_at": "2026-10-22T05:10:25Z"
+            },
+            {
+              "name": "Flatpak Manifest Check \ud83d\udce6",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-22T05:10:25Z",
+              "completed_at": "2026-10-22T05:10:27Z"
+            },
+            {
+              "name": "Qt XML Check \ud83d\uddbc\ufe0f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-22T05:10:27Z",
+              "completed_at": "2026-10-22T05:10:36Z"
+            },
+            {
+              "name": "ci/ Self-Tests \ud83e\uddea",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-22T05:10:36Z",
+              "completed_at": "2026-10-22T05:11:20Z"
+            },
+            {
+              "name": "Post Qt XML Check \ud83d\uddbc\ufe0f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-22T05:11:20Z",
+              "completed_at": "2026-10-22T05:11:20Z"
+            },
+            {
+              "name": "Post Flatpak Manifest Check \ud83d\udce6",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-10-22T05:11:20Z",
+              "completed_at": "2026-10-22T05:11:20Z"
+            },
+            {
+              "name": "Post Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-10-22T05:11:20Z",
+              "completed_at": "2026-10-22T05:11:20Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-10-22T05:11:20Z",
+              "completed_at": "2026-10-22T05:11:20Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-10-22T05:11:20Z",
+              "completed_at": "2026-10-22T05:11:20Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119649548377",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "runner_id": 1000056254,
+          "runner_name": "GitHub Actions 1000056254",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119649548493,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb26s4zQ",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119649548493",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119649548493",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:03:59Z",
+          "started_at": "2026-10-22T05:06:26Z",
+          "completed_at": "2026-10-22T05:06:43Z",
+          "name": "Build \ud83e\uddf1 / CI Mode \ud83d\udec2",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:06:27Z",
+              "completed_at": "2026-10-22T05:06:28Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:06:28Z",
+              "completed_at": "2026-10-22T05:06:36Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:06:36Z",
+              "completed_at": "2026-10-22T05:06:37Z"
+            },
+            {
+              "name": "Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:06:37Z",
+              "completed_at": "2026-10-22T05:06:39Z"
+            },
+            {
+              "name": "Local Gate Attestation \ud83d\udec2",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:06:39Z",
+              "completed_at": "2026-10-22T05:06:40Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-10-22T05:06:40Z",
+              "completed_at": "2026-10-22T05:06:40Z"
+            },
+            {
+              "name": "Fetch Base",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-10-22T05:06:40Z",
+              "completed_at": "2026-10-22T05:06:40Z"
+            },
+            {
+              "name": "rust-test",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-10-22T05:06:40Z",
+              "completed_at": "2026-10-22T05:06:40Z"
+            },
+            {
+              "name": "cross",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-10-22T05:06:40Z",
+              "completed_at": "2026-10-22T05:06:40Z"
+            },
+            {
+              "name": "tier2-linux",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-10-22T05:06:40Z",
+              "completed_at": "2026-10-22T05:06:40Z"
+            },
+            {
+              "name": "Post Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-10-22T05:06:40Z",
+              "completed_at": "2026-10-22T05:06:40Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-10-22T05:06:40Z",
+              "completed_at": "2026-10-22T05:06:40Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-10-22T05:06:40Z",
+              "completed_at": "2026-10-22T05:06:40Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-10-22T05:06:40Z",
+              "completed_at": "2026-10-22T05:06:40Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119649548493",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000056242,
+          "runner_name": "GitHub Actions 1000056242",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119649548621,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb26s5TQ",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119649548621",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119649548621",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:03:59Z",
+          "started_at": "2026-10-22T05:08:25Z",
+          "completed_at": "2026-10-22T05:08:41Z",
+          "name": "Build \ud83e\uddf1 / Event Data \ud83d\udd0e",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:08:26Z",
+              "completed_at": "2026-10-22T05:08:27Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:08:27Z",
+              "completed_at": "2026-10-22T05:08:34Z"
+            },
+            {
+              "name": "Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:08:34Z",
+              "completed_at": "2026-10-22T05:08:37Z"
+            },
+            {
+              "name": "Check Event Data \u2611\ufe0f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:08:37Z",
+              "completed_at": "2026-10-22T05:08:37Z"
+            },
+            {
+              "name": "Check Submodule Pointers \ud83e\udded",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5,
+              "started_at": "2026-10-22T05:08:37Z",
+              "completed_at": "2026-10-22T05:08:37Z"
+            },
+            {
+              "name": "Check Change Scope \ud83e\udded",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-22T05:08:37Z",
+              "completed_at": "2026-10-22T05:08:37Z"
+            },
+            {
+              "name": "Post Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-22T05:08:37Z",
+              "completed_at": "2026-10-22T05:08:37Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-22T05:08:37Z",
+              "completed_at": "2026-10-22T05:08:38Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-10-22T05:08:38Z",
+              "completed_at": "2026-10-22T05:08:38Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119649548621",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000056248,
+          "runner_name": "GitHub Actions 1000056248",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119649549267,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb26s70w",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119649549267",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119649549267",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-22T05:04:00Z",
+          "started_at": "2026-10-22T05:04:00Z",
+          "completed_at": "2026-10-22T05:03:59Z",
+          "name": "Cancel Superseded Queue Runs \ud83e\uddf9",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119649549267",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "runner_id": null,
+          "runner_name": null,
+          "runner_group_id": null,
+          "runner_group_name": null
+        },
+        {
+          "id": 119649549395,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb26s8Uw",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119649549395",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119649549395",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-22T05:04:00Z",
+          "started_at": "2026-10-22T05:04:00Z",
+          "completed_at": "2026-10-22T05:03:59Z",
+          "name": "Update Documentation \ud83d\udcd6",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119649549395",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": null,
+          "runner_name": null,
+          "runner_group_id": null,
+          "runner_group_name": null
+        },
+        {
+          "id": 119649549458,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb26s8kg",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119649549458",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119649549458",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-22T05:04:00Z",
+          "started_at": "2026-10-22T05:04:00Z",
+          "completed_at": "2026-10-22T05:03:59Z",
+          "name": "CI Pre \ud83e\uddf9 / Cache Janitor \ud83e\uddf9",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119649549458",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": null,
+          "runner_name": null,
+          "runner_group_id": null,
+          "runner_group_name": null
+        },
+        {
+          "id": 119649549517,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb26s8zQ",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119649549517",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119649549517",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-22T05:04:00Z",
+          "started_at": "2026-10-22T05:04:00Z",
+          "completed_at": "2026-10-22T05:03:59Z",
+          "name": "Validate Data \ud83d\udd75\ufe0f",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119649549517",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "runner_id": null,
+          "runner_name": null,
+          "runner_group_id": null,
+          "runner_group_name": null
+        },
+        {
+          "id": 119650969774,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb28Dorg",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119650969774",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119650969774",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:08:41Z",
+          "started_at": "2026-10-22T05:11:00Z",
+          "completed_at": "2026-10-22T05:16:49Z",
+          "name": "Build \ud83e\uddf1 / Windows \ud83e\ude9f (x64)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:11:01Z",
+              "completed_at": "2026-10-22T05:11:02Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:11:02Z",
+              "completed_at": "2026-10-22T05:11:23Z"
+            },
+            {
+              "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:11:23Z",
+              "completed_at": "2026-10-22T05:11:34Z"
+            },
+            {
+              "name": "Set Up ccache \ud83d\uddc4\ufe0f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:11:34Z",
+              "completed_at": "2026-10-22T05:11:36Z"
+            },
+            {
+              "name": "Install the Rust toolchain \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:11:36Z",
+              "completed_at": "2026-10-22T05:11:48Z"
+            },
+            {
+              "name": "Build OBS Studio \ud83e\uddf1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-22T05:11:48Z",
+              "completed_at": "2026-10-22T05:16:39Z"
+            },
+            {
+              "name": "Set Up uv for Cache Probe \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-10-22T05:16:39Z",
+              "completed_at": "2026-10-22T05:16:39Z"
+            },
+            {
+              "name": "Measure Windows Cache Budgets",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-10-22T05:16:39Z",
+              "completed_at": "2026-10-22T05:16:39Z"
+            },
+            {
+              "name": "Upload Windows Cache Probe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-10-22T05:16:39Z",
+              "completed_at": "2026-10-22T05:16:39Z"
+            },
+            {
+              "name": "Prune ccache \ud83e\uddf9",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-10-22T05:16:39Z",
+              "completed_at": "2026-10-22T05:16:39Z"
+            },
+            {
+              "name": "Run actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-10-22T05:16:39Z",
+              "completed_at": "2026-10-22T05:16:39Z"
+            },
+            {
+              "name": "Package OBS Studio \ud83d\udcc0",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 12,
+              "started_at": "2026-10-22T05:16:39Z",
+              "completed_at": "2026-10-22T05:16:39Z"
+            },
+            {
+              "name": "Upload Artifacts \ud83d\udce1",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 13,
+              "started_at": "2026-10-22T05:16:39Z",
+              "completed_at": "2026-10-22T05:16:39Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-10-22T05:16:39Z",
+              "completed_at": "2026-10-22T05:16:44Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-10-22T05:16:44Z",
+              "completed_at": "2026-10-22T05:16:46Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119650969774",
+          "labels": [
+            "windows-2025-vs2026"
+          ],
+          "runner_id": 1000056260,
+          "runner_name": "GitHub Actions 1000056260",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119650969777,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb28DosQ",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119650969777",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119650969777",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-10-22T05:08:41Z",
+          "started_at": "2026-10-22T05:15:43Z",
+          "completed_at": "2026-10-22T05:30:30Z",
+          "name": "Build \ud83e\uddf1 / Flatpak \ud83d\udce6",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:15:44Z",
+              "completed_at": "2026-10-22T05:15:46Z"
+            },
+            {
+              "name": "Initialize containers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:15:46Z",
+              "completed_at": "2026-10-22T05:16:52Z"
+            },
+            {
+              "name": "Prepare build space",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:16:52Z",
+              "completed_at": "2026-10-22T05:16:52Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:16:52Z",
+              "completed_at": "2026-10-22T05:17:01Z"
+            },
+            {
+              "name": "Set Up Environment \ud83d\udd27",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:17:01Z",
+              "completed_at": "2026-10-22T05:17:01Z"
+            },
+            {
+              "name": "Run astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-22T05:17:01Z",
+              "completed_at": "2026-10-22T05:17:03Z"
+            },
+            {
+              "name": "Prepare offline Flatpak Rust dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-22T05:17:03Z",
+              "completed_at": "2026-10-22T05:17:04Z"
+            },
+            {
+              "name": "Vendor Flatpak Cargo sources",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-22T05:17:04Z",
+              "completed_at": "2026-10-22T05:17:19Z"
+            },
+            {
+              "name": "Validate Flatpak manifest",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-22T05:17:19Z",
+              "completed_at": "2026-10-22T05:17:27Z"
+            },
+            {
+              "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-22T05:17:27Z",
+              "completed_at": "2026-10-22T05:17:28Z"
+            },
+            {
+              "name": "Restore legacy Flatpak builder seed",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-10-22T05:17:28Z",
+              "completed_at": "2026-10-22T05:17:28Z"
+            },
+            {
+              "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-22T05:17:28Z",
+              "completed_at": "2026-10-22T05:17:30Z"
+            },
+            {
+              "name": "Record Start Time \u23f1\ufe0f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-10-22T05:17:30Z",
+              "completed_at": "2026-10-22T05:17:30Z"
+            },
+            {
+              "name": "Build Flatpak Manifest \ud83e\uddfe",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-10-22T05:17:30Z",
+              "completed_at": "2026-10-22T05:30:01Z"
+            },
+            {
+              "name": "Report Flatpak Cache Contents",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-22T05:30:01Z",
+              "completed_at": "2026-10-22T05:30:01Z"
+            },
+            {
+              "name": "Ccache Stats \ud83d\udcca",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-10-22T05:30:01Z",
+              "completed_at": "2026-10-22T05:30:01Z"
+            },
+            {
+              "name": "Run actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 17,
+              "started_at": "2026-10-22T05:30:01Z",
+              "completed_at": "2026-10-22T05:30:01Z"
+            },
+            {
+              "name": "Validate AppStream",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-10-22T05:30:01Z",
+              "completed_at": "2026-10-22T05:30:04Z"
+            },
+            {
+              "name": "Verify Icon and Metadata in app-info",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-10-22T05:30:04Z",
+              "completed_at": "2026-10-22T05:30:04Z"
+            },
+            {
+              "name": "Validate build directory",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-10-22T05:30:04Z",
+              "completed_at": "2026-10-22T05:30:13Z"
+            },
+            {
+              "name": "Validate repository",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-10-22T05:30:13Z",
+              "completed_at": "2026-10-22T05:30:21Z"
+            },
+            {
+              "name": "Probe Pruned Flatpak Rebuild",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 22,
+              "started_at": "2026-10-22T05:30:21Z",
+              "completed_at": "2026-10-22T05:30:21Z"
+            },
+            {
+              "name": "Upload Pruned Flatpak Evidence",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-10-22T05:30:21Z",
+              "completed_at": "2026-10-22T05:30:23Z"
+            },
+            {
+              "name": "Post Run astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 44,
+              "started_at": "2026-10-22T05:30:23Z",
+              "completed_at": "2026-10-22T05:30:23Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 45,
+              "started_at": "2026-10-22T05:30:23Z",
+              "completed_at": "2026-10-22T05:30:23Z"
+            },
+            {
+              "name": "Stop containers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 46,
+              "started_at": "2026-10-22T05:30:23Z",
+              "completed_at": "2026-10-22T05:30:28Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 47,
+              "started_at": "2026-10-22T05:30:28Z",
+              "completed_at": "2026-10-22T05:30:28Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119650969777",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000056278,
+          "runner_name": "GitHub Actions 1000056278",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119650969791,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb28Dovw",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119650969791",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119650969791",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:08:41Z",
+          "started_at": "2026-10-22T05:16:56Z",
+          "completed_at": "2026-10-22T05:20:06Z",
+          "name": "Build \ud83e\uddf1 / Rust Cross Lint \ud83e\udd80 (release targets)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:16:57Z",
+              "completed_at": "2026-10-22T05:17:00Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:17:00Z",
+              "completed_at": "2026-10-22T05:17:03Z"
+            },
+            {
+              "name": "Set Up soldr \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:17:03Z",
+              "completed_at": "2026-10-22T05:17:57Z"
+            },
+            {
+              "name": "Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:17:57Z",
+              "completed_at": "2026-10-22T05:18:00Z"
+            },
+            {
+              "name": "Local Gate (cross-release) \ud83e\uddea",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:18:00Z",
+              "completed_at": "2026-10-22T05:20:00Z"
+            },
+            {
+              "name": "Post Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-22T05:20:00Z",
+              "completed_at": "2026-10-22T05:20:00Z"
+            },
+            {
+              "name": "Post Set Up soldr \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-22T05:20:00Z",
+              "completed_at": "2026-10-22T05:20:00Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-22T05:20:00Z",
+              "completed_at": "2026-10-22T05:20:01Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-22T05:20:01Z",
+              "completed_at": "2026-10-22T05:20:01Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119650969791",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000056284,
+          "runner_name": "GitHub Actions 1000056284",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119650969793,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb28DowQ",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119650969793",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119650969793",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:08:41Z",
+          "started_at": "2026-10-22T05:16:56Z",
+          "completed_at": "2026-10-22T05:23:35Z",
+          "name": "Build \ud83e\uddf1 / Ubuntu \ud83d\udc27 (OBS-Studio-Rust)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:16:57Z",
+              "completed_at": "2026-10-22T05:16:58Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:16:58Z",
+              "completed_at": "2026-10-22T05:17:06Z"
+            },
+            {
+              "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:17:06Z",
+              "completed_at": "2026-10-22T05:17:24Z"
+            },
+            {
+              "name": "Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:17:24Z",
+              "completed_at": "2026-10-22T05:17:28Z"
+            },
+            {
+              "name": "Start Native Cache Journal",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:17:28Z",
+              "completed_at": "2026-10-22T05:17:28Z"
+            },
+            {
+              "name": "Build OBS Studio \ud83e\uddf1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-22T05:17:28Z",
+              "completed_at": "2026-10-22T05:22:15Z"
+            },
+            {
+              "name": "Summarize Native Cache Journal",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-22T05:22:15Z",
+              "completed_at": "2026-10-22T05:22:15Z"
+            },
+            {
+              "name": "Upload Native Cache Diagnostics",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-22T05:22:15Z",
+              "completed_at": "2026-10-22T05:22:17Z"
+            },
+            {
+              "name": "Smoke Test OBS-Studio-Rust \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-22T05:22:17Z",
+              "completed_at": "2026-10-22T05:22:17Z"
+            },
+            {
+              "name": "Package OBS Studio \ud83d\udcc0",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-10-22T05:22:17Z",
+              "completed_at": "2026-10-22T05:22:17Z"
+            },
+            {
+              "name": "Upload Source Tarball \ud83d\udddc\ufe0f",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-10-22T05:22:17Z",
+              "completed_at": "2026-10-22T05:22:17Z"
+            },
+            {
+              "name": "Upload Artifacts \ud83d\udce1",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 12,
+              "started_at": "2026-10-22T05:22:17Z",
+              "completed_at": "2026-10-22T05:22:17Z"
+            },
+            {
+              "name": "Upload Debug Symbol Artifacts \ud83e\udeb2",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 13,
+              "started_at": "2026-10-22T05:22:17Z",
+              "completed_at": "2026-10-22T05:22:17Z"
+            },
+            {
+              "name": "Tier 4 GPU Acceleration Check \ud83c\udfae",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-10-22T05:22:17Z",
+              "completed_at": "2026-10-22T05:22:33Z"
+            },
+            {
+              "name": "Tier 4 Suite (Rust libobs app) \ud83d\udd0c",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-22T05:22:33Z",
+              "completed_at": "2026-10-22T05:23:33Z"
+            },
+            {
+              "name": "Check Ubuntu Compiler Snapshot Size",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 16,
+              "started_at": "2026-10-22T05:23:33Z",
+              "completed_at": "2026-10-22T05:23:33Z"
+            },
+            {
+              "name": "Run actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 17,
+              "started_at": "2026-10-22T05:23:33Z",
+              "completed_at": "2026-10-22T05:23:33Z"
+            },
+            {
+              "name": "Post Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 33,
+              "started_at": "2026-10-22T05:23:33Z",
+              "completed_at": "2026-10-22T05:23:33Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 34,
+              "started_at": "2026-10-22T05:23:33Z",
+              "completed_at": "2026-10-22T05:23:34Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 35,
+              "started_at": "2026-10-22T05:23:34Z",
+              "completed_at": "2026-10-22T05:23:34Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119650969793",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000056285,
+          "runner_name": "GitHub Actions 1000056285",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119650969853,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb28Do_Q",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119650969853",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119650969853",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:08:41Z",
+          "started_at": "2026-10-22T05:25:33Z",
+          "completed_at": "2026-10-22T05:29:22Z",
+          "name": "Build \ud83e\uddf1 / macOS \ud83c\udf4f (x86_64)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:25:34Z",
+              "completed_at": "2026-10-22T05:25:34Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:25:35Z",
+              "completed_at": "2026-10-22T05:25:47Z"
+            },
+            {
+              "name": "Set Up Environment \ud83d\udd27",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:25:47Z",
+              "completed_at": "2026-10-22T05:25:47Z"
+            },
+            {
+              "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:25:47Z",
+              "completed_at": "2026-10-22T05:26:05Z"
+            },
+            {
+              "name": "Set Up Code Signing \ud83d\udd11",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:26:05Z",
+              "completed_at": "2026-10-22T05:26:05Z"
+            },
+            {
+              "name": "Install the Rust toolchain \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-22T05:26:05Z",
+              "completed_at": "2026-10-22T05:26:14Z"
+            },
+            {
+              "name": "Build OBS Studio \ud83e\uddf1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-22T05:26:14Z",
+              "completed_at": "2026-10-22T05:29:17Z"
+            },
+            {
+              "name": "Package OBS Studio \ud83d\udcc0",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-10-22T05:29:17Z",
+              "completed_at": "2026-10-22T05:29:17Z"
+            },
+            {
+              "name": "Upload Artifacts \ud83d\udce1",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-10-22T05:29:17Z",
+              "completed_at": "2026-10-22T05:29:17Z"
+            },
+            {
+              "name": "Upload Debug Symbol Artifacts \ud83e\udeb2",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-10-22T05:29:17Z",
+              "completed_at": "2026-10-22T05:29:17Z"
+            },
+            {
+              "name": "Run actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-10-22T05:29:17Z",
+              "completed_at": "2026-10-22T05:29:17Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 22,
+              "started_at": "2026-10-22T05:29:17Z",
+              "completed_at": "2026-10-22T05:29:18Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-10-22T05:29:18Z",
+              "completed_at": "2026-10-22T05:29:20Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119650969853",
+          "labels": [
+            "macos-26"
+          ],
+          "runner_id": 1000056331,
+          "runner_name": "GitHub Actions 1000056331",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119650969896,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb28DpKA",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119650969896",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119650969896",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:08:41Z",
+          "started_at": "2026-10-22T05:27:10Z",
+          "completed_at": "2026-10-22T05:30:48Z",
+          "name": "Build \ud83e\uddf1 / macOS \ud83c\udf4f (arm64)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:27:10Z",
+              "completed_at": "2026-10-22T05:27:11Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:27:11Z",
+              "completed_at": "2026-10-22T05:27:21Z"
+            },
+            {
+              "name": "Set Up Environment \ud83d\udd27",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:27:21Z",
+              "completed_at": "2026-10-22T05:27:22Z"
+            },
+            {
+              "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:27:22Z",
+              "completed_at": "2026-10-22T05:27:35Z"
+            },
+            {
+              "name": "Set Up Code Signing \ud83d\udd11",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:27:35Z",
+              "completed_at": "2026-10-22T05:27:35Z"
+            },
+            {
+              "name": "Install the Rust toolchain \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-22T05:27:35Z",
+              "completed_at": "2026-10-22T05:27:41Z"
+            },
+            {
+              "name": "Build OBS Studio \ud83e\uddf1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-22T05:27:41Z",
+              "completed_at": "2026-10-22T05:30:42Z"
+            },
+            {
+              "name": "Package OBS Studio \ud83d\udcc0",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-10-22T05:30:42Z",
+              "completed_at": "2026-10-22T05:30:42Z"
+            },
+            {
+              "name": "Upload Artifacts \ud83d\udce1",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-10-22T05:30:42Z",
+              "completed_at": "2026-10-22T05:30:42Z"
+            },
+            {
+              "name": "Upload Debug Symbol Artifacts \ud83e\udeb2",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-10-22T05:30:42Z",
+              "completed_at": "2026-10-22T05:30:42Z"
+            },
+            {
+              "name": "Run actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-10-22T05:30:42Z",
+              "completed_at": "2026-10-22T05:30:42Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 22,
+              "started_at": "2026-10-22T05:30:42Z",
+              "completed_at": "2026-10-22T05:30:44Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-10-22T05:30:44Z",
+              "completed_at": "2026-10-22T05:30:46Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119650969896",
+          "labels": [
+            "macos-26"
+          ],
+          "runner_id": 1000056339,
+          "runner_name": "GitHub Actions 1000056339",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119650969918,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb28DpPg",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119650969918",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119650969918",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:08:41Z",
+          "started_at": "2026-10-22T05:18:02Z",
+          "completed_at": "2026-10-22T05:20:57Z",
+          "name": "Build \ud83e\uddf1 / Rust Tier 2 Linux \ud83d\udc27 (build)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:18:03Z",
+              "completed_at": "2026-10-22T05:18:05Z"
+            },
+            {
+              "name": "Initialize containers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:18:05Z",
+              "completed_at": "2026-10-22T05:18:10Z"
+            },
+            {
+              "name": "Install Git \ud83d\udce6",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:18:10Z",
+              "completed_at": "2026-10-22T05:18:23Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:18:23Z",
+              "completed_at": "2026-10-22T05:18:34Z"
+            },
+            {
+              "name": "Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:18:34Z",
+              "completed_at": "2026-10-22T05:18:35Z"
+            },
+            {
+              "name": "Keep apt Downloads \ud83d\udce6",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-22T05:18:35Z",
+              "completed_at": "2026-10-22T05:18:35Z"
+            },
+            {
+              "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-22T05:18:35Z",
+              "completed_at": "2026-10-22T05:18:39Z"
+            },
+            {
+              "name": "Install Tier 2 Packages \ud83d\udce6",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-22T05:18:39Z",
+              "completed_at": "2026-10-22T05:19:07Z"
+            },
+            {
+              "name": "Save apt Downloads \ud83d\udcbe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-10-22T05:19:07Z",
+              "completed_at": "2026-10-22T05:19:07Z"
+            },
+            {
+              "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-22T05:19:07Z",
+              "completed_at": "2026-10-22T05:19:16Z"
+            },
+            {
+              "name": "Bound zccache \ud83e\uddf9",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-10-22T05:19:16Z",
+              "completed_at": "2026-10-22T05:19:16Z"
+            },
+            {
+              "name": "Set Up soldr \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-22T05:19:16Z",
+              "completed_at": "2026-10-22T05:19:30Z"
+            },
+            {
+              "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-10-22T05:19:30Z",
+              "completed_at": "2026-10-22T05:19:31Z"
+            },
+            {
+              "name": "Seed Tier 2 Test Timings \u23f1\ufe0f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-10-22T05:19:31Z",
+              "completed_at": "2026-10-22T05:19:31Z"
+            },
+            {
+              "name": "Install zccache \ud83d\udce6",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-22T05:19:31Z",
+              "completed_at": "2026-10-22T05:19:32Z"
+            },
+            {
+              "name": "Build Tier 2 (libobs and libobs-c-reference) \ud83e\uddf1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-10-22T05:19:32Z",
+              "completed_at": "2026-10-22T05:20:43Z"
+            },
+            {
+              "name": "Record Tier 2 Runtime Packages \ud83d\udce6",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-10-22T05:20:43Z",
+              "completed_at": "2026-10-22T05:20:49Z"
+            },
+            {
+              "name": "Upload Tier 2 Tree \ud83e\uddfe",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-10-22T05:20:49Z",
+              "completed_at": "2026-10-22T05:20:52Z"
+            },
+            {
+              "name": "Save Tier 2 zccache \ud83d\udcbe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 19,
+              "started_at": "2026-10-22T05:20:52Z",
+              "completed_at": "2026-10-22T05:20:52Z"
+            },
+            {
+              "name": "Post Set Up soldr \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 35,
+              "started_at": "2026-10-22T05:20:52Z",
+              "completed_at": "2026-10-22T05:20:52Z"
+            },
+            {
+              "name": "Post Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 36,
+              "started_at": "2026-10-22T05:20:52Z",
+              "completed_at": "2026-10-22T05:20:53Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 37,
+              "started_at": "2026-10-22T05:20:53Z",
+              "completed_at": "2026-10-22T05:20:53Z"
+            },
+            {
+              "name": "Stop containers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 38,
+              "started_at": "2026-10-22T05:20:53Z",
+              "completed_at": "2026-10-22T05:20:55Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 39,
+              "started_at": "2026-10-22T05:20:55Z",
+              "completed_at": "2026-10-22T05:20:55Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119650969918",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000056292,
+          "runner_name": "GitHub Actions 1000056292",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119650969950,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb28DpXg",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119650969950",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119650969950",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:08:41Z",
+          "started_at": "2026-10-22T05:20:27Z",
+          "completed_at": "2026-10-22T05:24:45Z",
+          "name": "Build \ud83e\uddf1 / Fast Gate \u26a1",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:20:28Z",
+              "completed_at": "2026-10-22T05:20:30Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:20:30Z",
+              "completed_at": "2026-10-22T05:20:33Z"
+            },
+            {
+              "name": "Install libuuid and GIO",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:20:33Z",
+              "completed_at": "2026-10-22T05:20:40Z"
+            },
+            {
+              "name": "Set Up soldr \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:20:40Z",
+              "completed_at": "2026-10-22T05:21:15Z"
+            },
+            {
+              "name": "Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:21:15Z",
+              "completed_at": "2026-10-22T05:21:17Z"
+            },
+            {
+              "name": "Local Gate (lint) \ud83e\uddea",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-22T05:21:17Z",
+              "completed_at": "2026-10-22T05:22:25Z"
+            },
+            {
+              "name": "Unit Tests (changed crates) \ud83e\uddea",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-10-22T05:22:25Z",
+              "completed_at": "2026-10-22T05:22:25Z"
+            },
+            {
+              "name": "Restore ccache \ud83d\udcbe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-10-22T05:22:25Z",
+              "completed_at": "2026-10-22T05:22:25Z"
+            },
+            {
+              "name": "Prepare Touched Target apt Directory",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-10-22T05:22:25Z",
+              "completed_at": "2026-10-22T05:22:25Z"
+            },
+            {
+              "name": "Restore Touched Target apt Downloads",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-10-22T05:22:25Z",
+              "completed_at": "2026-10-22T05:22:25Z"
+            },
+            {
+              "name": "Build Touched Linux Targets \ud83e\uddf1",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-10-22T05:22:25Z",
+              "completed_at": "2026-10-22T05:22:25Z"
+            },
+            {
+              "name": "Save Touched Target ccache \ud83d\udcbe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 12,
+              "started_at": "2026-10-22T05:22:25Z",
+              "completed_at": "2026-10-22T05:22:25Z"
+            },
+            {
+              "name": "Check Touched Target apt Snapshot",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 13,
+              "started_at": "2026-10-22T05:22:25Z",
+              "completed_at": "2026-10-22T05:22:25Z"
+            },
+            {
+              "name": "Save Touched Target apt Downloads",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 14,
+              "started_at": "2026-10-22T05:22:25Z",
+              "completed_at": "2026-10-22T05:22:25Z"
+            },
+            {
+              "name": "Local Gate (rust-test) \ud83e\uddea",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-22T05:22:25Z",
+              "completed_at": "2026-10-22T05:24:40Z"
+            },
+            {
+              "name": "Mark Lane Proof \ud83e\uddfe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 16,
+              "started_at": "2026-10-22T05:24:40Z",
+              "completed_at": "2026-10-22T05:24:40Z"
+            },
+            {
+              "name": "Upload Lane Proof \ud83e\uddfe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 17,
+              "started_at": "2026-10-22T05:24:40Z",
+              "completed_at": "2026-10-22T05:24:40Z"
+            },
+            {
+              "name": "Post Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 32,
+              "started_at": "2026-10-22T05:24:40Z",
+              "completed_at": "2026-10-22T05:24:40Z"
+            },
+            {
+              "name": "Post Set Up soldr \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 33,
+              "started_at": "2026-10-22T05:24:40Z",
+              "completed_at": "2026-10-22T05:24:41Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 34,
+              "started_at": "2026-10-22T05:24:41Z",
+              "completed_at": "2026-10-22T05:24:41Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 35,
+              "started_at": "2026-10-22T05:24:41Z",
+              "completed_at": "2026-10-22T05:24:41Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119650969950",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000056308,
+          "runner_name": "GitHub Actions 1000056308",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119650969954,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb28DpYg",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119650969954",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119650969954",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:08:41Z",
+          "started_at": "2026-10-22T05:17:35Z",
+          "completed_at": "2026-10-22T05:26:25Z",
+          "name": "Build \ud83e\uddf1 / Qt Frontend Linux \ud83d\udc27",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:17:36Z",
+              "completed_at": "2026-10-22T05:17:37Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:17:37Z",
+              "completed_at": "2026-10-22T05:17:46Z"
+            },
+            {
+              "name": "Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:17:46Z",
+              "completed_at": "2026-10-22T05:17:49Z"
+            },
+            {
+              "name": "Cache Prebuilt Qt \ud83d\udcbe",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:17:49Z",
+              "completed_at": "2026-10-22T05:17:49Z"
+            },
+            {
+              "name": "Cache Prebuilt FFmpeg \ud83d\udcbe",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:17:49Z",
+              "completed_at": "2026-10-22T05:17:49Z"
+            },
+            {
+              "name": "Fetch Prebuilt Libs \ud83d\udce6",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-22T05:17:49Z",
+              "completed_at": "2026-10-22T05:17:53Z"
+            },
+            {
+              "name": "Install Build Dependencies \ud83d\udce6",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-22T05:17:53Z",
+              "completed_at": "2026-10-22T05:18:56Z"
+            },
+            {
+              "name": "Qt Compiler Snapshot Identity",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-22T05:18:56Z",
+              "completed_at": "2026-10-22T05:18:56Z"
+            },
+            {
+              "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-22T05:18:56Z",
+              "completed_at": "2026-10-22T05:18:56Z"
+            },
+            {
+              "name": "Set Qt Cache Limit \ud83d\uddc4\ufe0f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-22T05:18:56Z",
+              "completed_at": "2026-10-22T05:18:56Z"
+            },
+            {
+              "name": "Build Frontend and Run Qt Tests \ud83c\udfd7\ufe0f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-22T05:18:56Z",
+              "completed_at": "2026-10-22T05:26:20Z"
+            },
+            {
+              "name": "Report Qt Cache \ud83d\uddc4\ufe0f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-22T05:26:20Z",
+              "completed_at": "2026-10-22T05:26:20Z"
+            },
+            {
+              "name": "Save Qt ccache \ud83d\udcbe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 13,
+              "started_at": "2026-10-22T05:26:20Z",
+              "completed_at": "2026-10-22T05:26:20Z"
+            },
+            {
+              "name": "Save Prebuilt Qt \ud83d\udcbe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 14,
+              "started_at": "2026-10-22T05:26:20Z",
+              "completed_at": "2026-10-22T05:26:20Z"
+            },
+            {
+              "name": "Save Prebuilt FFmpeg \ud83d\udcbe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 15,
+              "started_at": "2026-10-22T05:26:20Z",
+              "completed_at": "2026-10-22T05:26:20Z"
+            },
+            {
+              "name": "Post Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 29,
+              "started_at": "2026-10-22T05:26:20Z",
+              "completed_at": "2026-10-22T05:26:21Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 30,
+              "started_at": "2026-10-22T05:26:21Z",
+              "completed_at": "2026-10-22T05:26:21Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 31,
+              "started_at": "2026-10-22T05:26:21Z",
+              "completed_at": "2026-10-22T05:26:21Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119650969954",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000056291,
+          "runner_name": "GitHub Actions 1000056291",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119650969962,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb28Dpag",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119650969962",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119650969962",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:08:41Z",
+          "started_at": "2026-10-22T05:11:05Z",
+          "completed_at": "2026-10-22T05:17:00Z",
+          "name": "Build \ud83e\uddf1 / Windows \ud83e\ude9f (arm64)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:11:05Z",
+              "completed_at": "2026-10-22T05:11:06Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:11:06Z",
+              "completed_at": "2026-10-22T05:11:25Z"
+            },
+            {
+              "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:11:25Z",
+              "completed_at": "2026-10-22T05:11:33Z"
+            },
+            {
+              "name": "Set Up ccache \ud83d\uddc4\ufe0f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:11:33Z",
+              "completed_at": "2026-10-22T05:11:35Z"
+            },
+            {
+              "name": "Install the Rust toolchain \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:11:35Z",
+              "completed_at": "2026-10-22T05:11:48Z"
+            },
+            {
+              "name": "Build OBS Studio \ud83e\uddf1",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-22T05:11:48Z",
+              "completed_at": "2026-10-22T05:16:54Z"
+            },
+            {
+              "name": "Set Up uv for Cache Probe \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-10-22T05:16:54Z",
+              "completed_at": "2026-10-22T05:16:54Z"
+            },
+            {
+              "name": "Measure Windows Cache Budgets",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-10-22T05:16:54Z",
+              "completed_at": "2026-10-22T05:16:54Z"
+            },
+            {
+              "name": "Upload Windows Cache Probe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-10-22T05:16:54Z",
+              "completed_at": "2026-10-22T05:16:54Z"
+            },
+            {
+              "name": "Prune ccache \ud83e\uddf9",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-10-22T05:16:54Z",
+              "completed_at": "2026-10-22T05:16:54Z"
+            },
+            {
+              "name": "Run actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-10-22T05:16:54Z",
+              "completed_at": "2026-10-22T05:16:54Z"
+            },
+            {
+              "name": "Package OBS Studio \ud83d\udcc0",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 12,
+              "started_at": "2026-10-22T05:16:54Z",
+              "completed_at": "2026-10-22T05:16:54Z"
+            },
+            {
+              "name": "Upload Artifacts \ud83d\udce1",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 13,
+              "started_at": "2026-10-22T05:16:54Z",
+              "completed_at": "2026-10-22T05:16:54Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-10-22T05:16:54Z",
+              "completed_at": "2026-10-22T05:16:58Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-10-22T05:16:58Z",
+              "completed_at": "2026-10-22T05:16:58Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119650969962",
+          "labels": [
+            "windows-2025-vs2026"
+          ],
+          "runner_id": 1000056262,
+          "runner_name": "GitHub Actions 1000056262",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119651785964,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb281c7A",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119651785964",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119651785964",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:11:23Z",
+          "started_at": "2026-10-22T05:27:32Z",
+          "completed_at": "2026-10-22T05:27:46Z",
+          "name": "Format \ud83d\udd0d / swift-format",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:27:32Z",
+              "completed_at": "2026-10-22T05:27:32Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:27:32Z",
+              "completed_at": "2026-10-22T05:27:43Z"
+            },
+            {
+              "name": "swift-format Check \ud83d\udd25",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:27:43Z",
+              "completed_at": "2026-10-22T05:27:43Z"
+            },
+            {
+              "name": "Post swift-format Check \ud83d\udd25",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:27:43Z",
+              "completed_at": "2026-10-22T05:27:43Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-22T05:27:43Z",
+              "completed_at": "2026-10-22T05:27:44Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-22T05:27:44Z",
+              "completed_at": "2026-10-22T05:27:44Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119651785964",
+          "labels": [
+            "macos-26"
+          ],
+          "runner_id": 1000056342,
+          "runner_name": "GitHub Actions 1000056342",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119654700007,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb2_nT5w",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119654700007",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119654700007",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:20:57Z",
+          "started_at": "2026-10-22T05:21:49Z",
+          "completed_at": "2026-10-22T05:25:43Z",
+          "name": "Build \ud83e\uddf1 / Rust Tier 2 Linux \ud83d\udc27 (tests OFF)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:21:50Z",
+              "completed_at": "2026-10-22T05:21:52Z"
+            },
+            {
+              "name": "Initialize containers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:21:52Z",
+              "completed_at": "2026-10-22T05:21:56Z"
+            },
+            {
+              "name": "Install Git \ud83d\udce6",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:21:56Z",
+              "completed_at": "2026-10-22T05:22:08Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:22:08Z",
+              "completed_at": "2026-10-22T05:22:10Z"
+            },
+            {
+              "name": "Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:22:10Z",
+              "completed_at": "2026-10-22T05:22:11Z"
+            },
+            {
+              "name": "Keep apt Downloads \ud83d\udce6",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-22T05:22:11Z",
+              "completed_at": "2026-10-22T05:22:11Z"
+            },
+            {
+              "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-22T05:22:11Z",
+              "completed_at": "2026-10-22T05:22:15Z"
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-22T05:22:15Z",
+              "completed_at": "2026-10-22T05:22:25Z"
+            },
+            {
+              "name": "Install Tier 2 Packages \ud83d\udce6",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-22T05:22:25Z",
+              "completed_at": "2026-10-22T05:22:50Z"
+            },
+            {
+              "name": "Unpack Tier 2 Tree \ud83d\udcc2",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-22T05:22:50Z",
+              "completed_at": "2026-10-22T05:22:51Z"
+            },
+            {
+              "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-22T05:22:51Z",
+              "completed_at": "2026-10-22T05:22:53Z"
+            },
+            {
+              "name": "Test Tier 2 (OFF) \u2705",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-22T05:22:53Z",
+              "completed_at": "2026-10-22T05:25:38Z"
+            },
+            {
+              "name": "Upload Test Timings \u23f1\ufe0f",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 13,
+              "started_at": "2026-10-22T05:25:38Z",
+              "completed_at": "2026-10-22T05:25:38Z"
+            },
+            {
+              "name": "Post Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-10-22T05:25:38Z",
+              "completed_at": "2026-10-22T05:25:39Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 25,
+              "started_at": "2026-10-22T05:25:39Z",
+              "completed_at": "2026-10-22T05:25:39Z"
+            },
+            {
+              "name": "Stop containers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-10-22T05:25:39Z",
+              "completed_at": "2026-10-22T05:25:42Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-10-22T05:25:42Z",
+              "completed_at": "2026-10-22T05:25:42Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119654700007",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000056312,
+          "runner_name": "GitHub Actions 1000056312",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119654700074,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb2_nUKg",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119654700074",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119654700074",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:20:57Z",
+          "started_at": "2026-10-22T05:22:19Z",
+          "completed_at": "2026-10-22T05:26:27Z",
+          "name": "Build \ud83e\uddf1 / Rust Tier 2 Linux \ud83d\udc27 (tests ON)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:22:20Z",
+              "completed_at": "2026-10-22T05:22:23Z"
+            },
+            {
+              "name": "Initialize containers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:22:23Z",
+              "completed_at": "2026-10-22T05:22:31Z"
+            },
+            {
+              "name": "Install Git \ud83d\udce6",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:22:31Z",
+              "completed_at": "2026-10-22T05:22:42Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:22:42Z",
+              "completed_at": "2026-10-22T05:22:45Z"
+            },
+            {
+              "name": "Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:22:45Z",
+              "completed_at": "2026-10-22T05:22:46Z"
+            },
+            {
+              "name": "Keep apt Downloads \ud83d\udce6",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-22T05:22:46Z",
+              "completed_at": "2026-10-22T05:22:46Z"
+            },
+            {
+              "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-22T05:22:46Z",
+              "completed_at": "2026-10-22T05:22:51Z"
+            },
+            {
+              "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-22T05:22:51Z",
+              "completed_at": "2026-10-22T05:22:59Z"
+            },
+            {
+              "name": "Install Tier 2 Packages \ud83d\udce6",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-22T05:22:59Z",
+              "completed_at": "2026-10-22T05:23:32Z"
+            },
+            {
+              "name": "Unpack Tier 2 Tree \ud83d\udcc2",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-22T05:23:32Z",
+              "completed_at": "2026-10-22T05:23:34Z"
+            },
+            {
+              "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-22T05:23:34Z",
+              "completed_at": "2026-10-22T05:23:35Z"
+            },
+            {
+              "name": "Test Tier 2 (ON) \u2705",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-22T05:23:35Z",
+              "completed_at": "2026-10-22T05:26:21Z"
+            },
+            {
+              "name": "Upload Test Timings \u23f1\ufe0f",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 13,
+              "started_at": "2026-10-22T05:26:21Z",
+              "completed_at": "2026-10-22T05:26:21Z"
+            },
+            {
+              "name": "Post Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-10-22T05:26:21Z",
+              "completed_at": "2026-10-22T05:26:21Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 25,
+              "started_at": "2026-10-22T05:26:21Z",
+              "completed_at": "2026-10-22T05:26:22Z"
+            },
+            {
+              "name": "Stop containers",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 26,
+              "started_at": "2026-10-22T05:26:22Z",
+              "completed_at": "2026-10-22T05:26:25Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 27,
+              "started_at": "2026-10-22T05:26:25Z",
+              "completed_at": "2026-10-22T05:26:25Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119654700074",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000056313,
+          "runner_name": "GitHub Actions 1000056313",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119655875191,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb3AvCdw",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119655875191",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119655875191",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:24:45Z",
+          "started_at": "2026-10-22T05:25:08Z",
+          "completed_at": "2026-10-22T05:30:27Z",
+          "name": "Build \ud83e\uddf1 / Rust Tests \ud83e\udd80 (windows-2025-vs2026)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:25:09Z",
+              "completed_at": "2026-10-22T05:25:12Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:25:12Z",
+              "completed_at": "2026-10-22T05:25:21Z"
+            },
+            {
+              "name": "Set Up soldr \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:25:21Z",
+              "completed_at": "2026-10-22T05:26:17Z"
+            },
+            {
+              "name": "Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:26:17Z",
+              "completed_at": "2026-10-22T05:26:23Z"
+            },
+            {
+              "name": "Run Rust Tests (changed crates) \ud83e\uddea",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5,
+              "started_at": "2026-10-22T05:26:23Z",
+              "completed_at": "2026-10-22T05:26:23Z"
+            },
+            {
+              "name": "Run Rust Tests \ud83e\uddea",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-22T05:26:23Z",
+              "completed_at": "2026-10-22T05:29:44Z"
+            },
+            {
+              "name": "Run Clippy \ud83d\udcce",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-22T05:29:44Z",
+              "completed_at": "2026-10-22T05:30:19Z"
+            },
+            {
+              "name": "Check Formatting \ud83c\udfa8",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-22T05:30:19Z",
+              "completed_at": "2026-10-22T05:30:21Z"
+            },
+            {
+              "name": "Post Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-10-22T05:30:21Z",
+              "completed_at": "2026-10-22T05:30:21Z"
+            },
+            {
+              "name": "Post Set Up soldr \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-22T05:30:21Z",
+              "completed_at": "2026-10-22T05:30:22Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-10-22T05:30:22Z",
+              "completed_at": "2026-10-22T05:30:24Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-10-22T05:30:24Z",
+              "completed_at": "2026-10-22T05:30:24Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119655875191",
+          "labels": [
+            "windows-2025-vs2026"
+          ],
+          "runner_id": 1000056329,
+          "runner_name": "GitHub Actions 1000056329",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119655875223,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb3AvClw",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119655875223",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119655875223",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:24:45Z",
+          "started_at": "2026-10-22T05:25:46Z",
+          "completed_at": "2026-10-22T05:30:29Z",
+          "name": "Build \ud83e\uddf1 / Rust Cross Lint \ud83e\udd80 (Windows, macOS)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:25:47Z",
+              "completed_at": "2026-10-22T05:25:49Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:25:49Z",
+              "completed_at": "2026-10-22T05:25:52Z"
+            },
+            {
+              "name": "Set Up soldr \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:25:52Z",
+              "completed_at": "2026-10-22T05:26:48Z"
+            },
+            {
+              "name": "Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:26:48Z",
+              "completed_at": "2026-10-22T05:26:51Z"
+            },
+            {
+              "name": "Local Gate (cross) \ud83e\uddea",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:26:51Z",
+              "completed_at": "2026-10-22T05:30:24Z"
+            },
+            {
+              "name": "Mark Lane Proof \ud83e\uddfe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-10-22T05:30:24Z",
+              "completed_at": "2026-10-22T05:30:24Z"
+            },
+            {
+              "name": "Upload Lane Proof \ud83e\uddfe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-10-22T05:30:24Z",
+              "completed_at": "2026-10-22T05:30:24Z"
+            },
+            {
+              "name": "Post Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-22T05:30:24Z",
+              "completed_at": "2026-10-22T05:30:24Z"
+            },
+            {
+              "name": "Post Set Up soldr \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-10-22T05:30:24Z",
+              "completed_at": "2026-10-22T05:30:24Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-10-22T05:30:24Z",
+              "completed_at": "2026-10-22T05:30:24Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-22T05:30:24Z",
+              "completed_at": "2026-10-22T05:30:24Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119655875223",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000056332,
+          "runner_name": "GitHub Actions 1000056332",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119655875272,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb3AvCyA",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119655875272",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119655875272",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:24:45Z",
+          "started_at": "2026-10-22T05:27:49Z",
+          "completed_at": "2026-10-22T05:31:11Z",
+          "name": "Build \ud83e\uddf1 / Rust Tests \ud83e\udd80 (macos-26)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:27:49Z",
+              "completed_at": "2026-10-22T05:27:51Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:27:51Z",
+              "completed_at": "2026-10-22T05:27:55Z"
+            },
+            {
+              "name": "Set Up soldr \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:27:55Z",
+              "completed_at": "2026-10-22T05:28:15Z"
+            },
+            {
+              "name": "Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:28:15Z",
+              "completed_at": "2026-10-22T05:28:19Z"
+            },
+            {
+              "name": "Run Rust Tests (changed crates) \ud83e\uddea",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5,
+              "started_at": "2026-10-22T05:28:19Z",
+              "completed_at": "2026-10-22T05:28:19Z"
+            },
+            {
+              "name": "Run Rust Tests \ud83e\uddea",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-22T05:28:19Z",
+              "completed_at": "2026-10-22T05:30:46Z"
+            },
+            {
+              "name": "Run Clippy \ud83d\udcce",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-22T05:30:46Z",
+              "completed_at": "2026-10-22T05:31:03Z"
+            },
+            {
+              "name": "Check Formatting \ud83c\udfa8",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-22T05:31:03Z",
+              "completed_at": "2026-10-22T05:31:04Z"
+            },
+            {
+              "name": "Post Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-10-22T05:31:04Z",
+              "completed_at": "2026-10-22T05:31:05Z"
+            },
+            {
+              "name": "Post Set Up soldr \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-22T05:31:05Z",
+              "completed_at": "2026-10-22T05:31:05Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-10-22T05:31:05Z",
+              "completed_at": "2026-10-22T05:31:05Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-10-22T05:31:05Z",
+              "completed_at": "2026-10-22T05:31:07Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119655875272",
+          "labels": [
+            "macos-26"
+          ],
+          "runner_id": 1000056344,
+          "runner_name": "GitHub Actions 1000056344",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119655875288,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb3AvC2A",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119655875288",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119655875288",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:24:45Z",
+          "started_at": "2026-10-22T05:29:25Z",
+          "completed_at": "2026-10-22T05:42:10Z",
+          "name": "Build \ud83e\uddf1 / Rust Tier 2 macos-26",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:29:26Z",
+              "completed_at": "2026-10-22T05:29:28Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:29:28Z",
+              "completed_at": "2026-10-22T05:29:42Z"
+            },
+            {
+              "name": "Set Up soldr \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:29:42Z",
+              "completed_at": "2026-10-22T05:29:52Z"
+            },
+            {
+              "name": "Restore Tier 2 Xcode Cache \ud83d\uddc4\ufe0f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-22T05:29:52Z",
+              "completed_at": "2026-10-22T05:29:53Z"
+            },
+            {
+              "name": "Validate Tier 2 on macOS (libobs C vs with Rust) \ud83c\udf4f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-22T05:29:53Z",
+              "completed_at": "2026-10-22T05:42:04Z"
+            },
+            {
+              "name": "Save Tier 2 Xcode Cache \ud83d\udcbe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-10-22T05:42:04Z",
+              "completed_at": "2026-10-22T05:42:04Z"
+            },
+            {
+              "name": "Restore Tier 2 ccache \ud83d\uddc4\ufe0f",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 7,
+              "started_at": "2026-10-22T05:42:04Z",
+              "completed_at": "2026-10-22T05:42:04Z"
+            },
+            {
+              "name": "Set Up ccache \ud83d\uddc4\ufe0f",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8,
+              "started_at": "2026-10-22T05:42:04Z",
+              "completed_at": "2026-10-22T05:42:04Z"
+            },
+            {
+              "name": "Cache vcpkg Binaries \ud83d\uddc4\ufe0f",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9,
+              "started_at": "2026-10-22T05:42:04Z",
+              "completed_at": "2026-10-22T05:42:04Z"
+            },
+            {
+              "name": "Validate Tier 2 on Windows (libobs C vs with Rust) \ud83e\ude9f",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-10-22T05:42:04Z",
+              "completed_at": "2026-10-22T05:42:04Z"
+            },
+            {
+              "name": "Save Tier 2 ccache \ud83d\udcbe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-10-22T05:42:04Z",
+              "completed_at": "2026-10-22T05:42:04Z"
+            },
+            {
+              "name": "Save vcpkg Binaries \ud83d\udcbe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 12,
+              "started_at": "2026-10-22T05:42:04Z",
+              "completed_at": "2026-10-22T05:42:04Z"
+            },
+            {
+              "name": "Post Set Up soldr \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-10-22T05:42:04Z",
+              "completed_at": "2026-10-22T05:42:05Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-10-22T05:42:05Z",
+              "completed_at": "2026-10-22T05:42:06Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 25,
+              "started_at": "2026-10-22T05:42:06Z",
+              "completed_at": "2026-10-22T05:42:09Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119655875288",
+          "labels": [
+            "macos-26"
+          ],
+          "runner_id": 1000056350,
+          "runner_name": "GitHub Actions 1000056350",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119655875344,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb3AvDEA",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119655875344",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119655875344",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T05:24:45Z",
+          "started_at": "2026-10-22T05:25:48Z",
+          "completed_at": "2026-10-22T05:38:18Z",
+          "name": "Build \ud83e\uddf1 / Rust Tier 2 windows-2025-vs2026",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:25:48Z",
+              "completed_at": "2026-10-22T05:25:50Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-22T05:25:50Z",
+              "completed_at": "2026-10-22T05:26:14Z"
+            },
+            {
+              "name": "Set Up soldr \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-22T05:26:14Z",
+              "completed_at": "2026-10-22T05:26:56Z"
+            },
+            {
+              "name": "Restore Tier 2 Xcode Cache \ud83d\uddc4\ufe0f",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 4,
+              "started_at": "2026-10-22T05:26:56Z",
+              "completed_at": "2026-10-22T05:26:56Z"
+            },
+            {
+              "name": "Validate Tier 2 on macOS (libobs C vs with Rust) \ud83c\udf4f",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 5,
+              "started_at": "2026-10-22T05:26:56Z",
+              "completed_at": "2026-10-22T05:26:56Z"
+            },
+            {
+              "name": "Save Tier 2 Xcode Cache \ud83d\udcbe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-10-22T05:26:56Z",
+              "completed_at": "2026-10-22T05:26:56Z"
+            },
+            {
+              "name": "Restore Tier 2 ccache \ud83d\uddc4\ufe0f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-22T05:26:56Z",
+              "completed_at": "2026-10-22T05:26:58Z"
+            },
+            {
+              "name": "Set Up ccache \ud83d\uddc4\ufe0f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-22T05:26:58Z",
+              "completed_at": "2026-10-22T05:26:59Z"
+            },
+            {
+              "name": "Cache vcpkg Binaries \ud83d\uddc4\ufe0f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-22T05:26:59Z",
+              "completed_at": "2026-10-22T05:27:00Z"
+            },
+            {
+              "name": "Validate Tier 2 on Windows (libobs C vs with Rust) \ud83e\ude9f",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 10,
+              "started_at": "2026-10-22T05:27:00Z",
+              "completed_at": "2026-10-22T05:38:11Z"
+            },
+            {
+              "name": "Save Tier 2 ccache \ud83d\udcbe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11,
+              "started_at": "2026-10-22T05:38:11Z",
+              "completed_at": "2026-10-22T05:38:11Z"
+            },
+            {
+              "name": "Save vcpkg Binaries \ud83d\udcbe",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 12,
+              "started_at": "2026-10-22T05:38:11Z",
+              "completed_at": "2026-10-22T05:38:11Z"
+            },
+            {
+              "name": "Post Set Up soldr \ud83e\udd80",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 23,
+              "started_at": "2026-10-22T05:38:11Z",
+              "completed_at": "2026-10-22T05:38:11Z"
+            },
+            {
+              "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 24,
+              "started_at": "2026-10-22T05:38:11Z",
+              "completed_at": "2026-10-22T05:38:16Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 25,
+              "started_at": "2026-10-22T05:38:16Z",
+              "completed_at": "2026-10-22T05:38:16Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119655875344",
+          "labels": [
+            "windows-2025-vs2026"
+          ],
+          "runner_id": 1000056333,
+          "runner_name": "GitHub Actions 1000056333",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119656386006,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb3BON1g",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119656386006",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119656386006",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-22T05:26:28Z",
+          "started_at": "2026-10-22T05:26:28Z",
+          "completed_at": "2026-10-22T05:26:27Z",
+          "name": "Build \ud83e\uddf1 / Rust Tier 2 Linux \ud83d\udc27",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119656386006",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "runner_id": null,
+          "runner_name": null,
+          "runner_group_id": null,
+          "runner_group_name": null
+        },
+        {
+          "id": 119661127089,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb3FvlsQ",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119661127089",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119661127089",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-10-22T05:42:11Z",
+          "started_at": "2026-10-22T05:42:14Z",
+          "completed_at": "2026-10-22T05:42:19Z",
+          "name": "CI Gate \u2705",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-22T05:42:15Z",
+              "completed_at": "2026-10-22T05:42:17Z"
+            },
+            {
+              "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 2,
+              "started_at": "2026-10-22T05:42:17Z",
+              "completed_at": "2026-10-22T05:42:17Z"
+            },
+            {
+              "name": "Set Up uv \ud83d\udc0d",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 3,
+              "started_at": "2026-10-22T05:42:17Z",
+              "completed_at": "2026-10-22T05:42:17Z"
+            },
+            {
+              "name": "Report Queue Run \ud83d\udcca",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 4,
+              "started_at": "2026-10-22T05:42:17Z",
+              "completed_at": "2026-10-22T05:42:17Z"
+            },
+            {
+              "name": "Check Job Results \u2705",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 5,
+              "started_at": "2026-10-22T05:42:17Z",
+              "completed_at": "2026-10-22T05:42:17Z"
+            },
+            {
+              "name": "Run echo 'All required jobs passed or were skipped.'",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 6,
+              "started_at": "2026-10-22T05:42:17Z",
+              "completed_at": "2026-10-22T05:42:17Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-22T05:42:17Z",
+              "completed_at": "2026-10-22T05:42:17Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119661127089",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": 1000056432,
+          "runner_name": "GitHub Actions 1000056432",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 119661128279,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb3FvqVw",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119661128279",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119661128279",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-22T05:42:11Z",
+          "started_at": "2026-10-22T05:42:11Z",
+          "completed_at": "2026-10-22T05:42:11Z",
+          "name": "Tier 2 Setup Producer \ud83d\udce6",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119661128279",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": null,
+          "runner_name": null,
+          "runner_group_id": null,
+          "runner_group_name": null
+        },
+        {
+          "id": 119661128786,
+          "run_id": 39725882580,
+          "workflow_name": "infra/1269-flatpak-pruned-build pull request run \ud83d\ude80",
+          "head_branch": "infra/1269-flatpak-pruned-build",
+          "run_url": "https://api.github.com/repos/obs-rust/obs-studio/actions/runs/39725882580",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOVAc9yc8AAAAb3FvsUg",
+          "head_sha": "659756295b0edd68ea2513687156afc3e294f9f1",
+          "url": "https://api.github.com/repos/obs-rust/obs-studio/actions/jobs/119661128786",
+          "html_url": "https://github.com/obs-rust/obs-studio/actions/runs/39725882580/job/119661128786",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-22T05:42:11Z",
+          "started_at": "2026-10-22T05:42:11Z",
+          "completed_at": "2026-10-22T05:42:11Z",
+          "name": "Tier 2 Setup (${{ matrix.variant }}, trial ${{ matrix.trial }})",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/obs-rust/obs-studio/check-runs/119661128786",
+          "labels": [
+            "ubuntu-26.04"
+          ],
+          "runner_id": null,
+          "runner_name": null,
+          "runner_group_id": null,
+          "runner_group_name": null
+        }
+      ]
+    }
+  },
+  "coverage": {
+    "windows": {
+      "job_id": 119655875344,
+      "source": "659756295b0edd68ea2513687156afc3e294f9f1",
+      "ctest_passes": 4,
+      "registered_per_pass": 175,
+      "differential_test_passed": true,
+      "raw_log_sha256": "ceec24bc4cf78ecb1fdbeeb2851b9e03aef39b9105940acb361078892a695928",
+      "literal_excerpts": [
+        "2026-10-22T05:32:23.2611157Z 100% tests passed out of 175",
+        "2026-10-22T05:32:23.2611675Z Total Test time (real) =  85.10 sec",
+        "2026-10-22T05:33:47.0868096Z 100% tests passed out of 175",
+        "2026-10-22T05:33:47.0869428Z Total Test time (real) =  83.76 sec",
+        "2026-10-22T05:35:01.2404180Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 42 filtered out; finished in 40.75s",
+        "2026-10-22T05:36:48.1696186Z 100% tests passed out of 175",
+        "2026-10-22T05:36:48.1696639Z Total Test time (real) =  83.99 sec",
+        "2026-10-22T05:38:11.3523125Z 100% tests passed out of 175",
+        "2026-10-22T05:38:11.3523706Z Total Test time (real) =  82.81 sec"
+      ]
+    },
+    "macos": {
+      "job_id": 119655875288,
+      "registered_per_pass": 200,
+      "ctest_passes": 4,
+      "skipped_per_pass": 1,
+      "differential_test_passed": true,
+      "raw_log_sha256": "fef3106d96a0bcb16604002cf06d3e9cdb5348b7fc9fa77411a4cb8eece70195",
+      "literal_excerpts": [
+        "2026-10-22T05:32:15.5825760Z  41/200 Test  #41: test_svt_av1 ........................***Skipped   0.02 sec",
+        "2026-10-22T05:34:13.9935090Z 100% tests passed out of 200",
+        "2026-10-22T05:34:13.9935500Z Total Test time (real) = 119.73 sec",
+        "2026-10-22T05:34:15.3560130Z  41/200 Test  #41: test_svt_av1 ........................***Skipped   0.02 sec",
+        "2026-10-22T05:36:22.9300590Z 100% tests passed out of 200",
+        "2026-10-22T05:36:22.9301330Z Total Test time (real) = 128.86 sec",
+        "2026-10-22T05:37:32.5730070Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 42 filtered out; finished in 37.33s",
+        "2026-10-22T05:37:45.7661700Z  41/200 Test  #41: test_svt_av1 ........................***Skipped   0.02 sec",
+        "2026-10-22T05:39:54.2513300Z 100% tests passed out of 200",
+        "2026-10-22T05:39:54.2513710Z Total Test time (real) = 129.91 sec",
+        "2026-10-22T05:39:55.6778950Z  41/200 Test  #41: test_svt_av1 ........................***Skipped   0.02 sec",
+        "2026-10-22T05:42:03.9820470Z 100% tests passed out of 200",
+        "2026-10-22T05:42:03.9821210Z Total Test time (real) = 129.47 sec"
+      ]
+    },
+    "linux_off": {
+      "job_id": 119654700007,
+      "registered": 355,
+      "executed": 352,
+      "skipped": 3,
+      "failed": 0,
+      "raw_log_sha256": "fc5de26acc47ef2c579853c2aa978b514e748d9b1b4673a2f7ff208b48ec4f8e",
+      "literal_excerpts": [
+        "2026-10-22T05:25:38.9294765Z 353/355 Test #239: test_pulse_monitor_device .............................................***Skipped   0.00 sec",
+        "2026-10-22T05:25:38.9295450Z 354/355 Test #247: test_pulse_stream_restart .............................................***Skipped   0.00 sec",
+        "2026-10-22T05:25:38.9296788Z 355/355 Test #249: test_pulse_two_sources ................................................***Skipped   0.00 sec",
+        "2026-10-22T05:25:38.9315285Z 100% tests passed, 0 tests failed out of 355",
+        "2026-10-22T05:25:38.9315990Z Total Test time (real) = 165.68 sec",
+        "2026-10-22T05:25:38.9317081Z \t239 - test_pulse_monitor_device (Skipped)",
+        "2026-10-22T05:25:38.9317562Z \t247 - test_pulse_stream_restart (Skipped)",
+        "2026-10-22T05:25:38.9318034Z \t249 - test_pulse_two_sources (Skipped)"
+      ]
+    },
+    "linux_on": {
+      "job_id": 119654700074,
+      "registered": 355,
+      "executed": 352,
+      "skipped": 3,
+      "failed": 0,
+      "raw_log_sha256": "d64a034e05c1c1afb8f1cecd342d7ae2602a2828dad044657d8efdb42bbd65eb",
+      "literal_excerpts": [
+        "2026-10-22T05:26:21.7290098Z 353/355 Test #239: test_pulse_monitor_device .............................................***Skipped   0.00 sec",
+        "2026-10-22T05:26:21.7297820Z 354/355 Test #247: test_pulse_stream_restart .............................................***Skipped   0.00 sec",
+        "2026-10-22T05:26:21.7301148Z 355/355 Test #249: test_pulse_two_sources ................................................***Skipped   0.00 sec",
+        "2026-10-22T05:26:21.7321294Z 100% tests passed, 0 tests failed out of 355",
+        "2026-10-22T05:26:21.7321724Z Total Test time (real) = 166.19 sec",
+        "2026-10-22T05:26:21.7322455Z \t239 - test_pulse_monitor_device (Skipped)",
+        "2026-10-22T05:26:21.7322810Z \t247 - test_pulse_stream_restart (Skipped)",
+        "2026-10-22T05:26:21.7323163Z \t249 - test_pulse_two_sources (Skipped)"
+      ]
+    }
+  }
 }

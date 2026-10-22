@@ -82,3 +82,22 @@ dependency hits and output validation. After the initial full run is terminal,
 one explicitly defined new-source experiment may qualify the changed
 projection. Never retry the unchanged workflow or treat the original failure
 as successful validation. Production transport/allocation remains unchanged.
+
+
+### Terminal first-trial outcome
+
+First full run39725882580 completed FAILURE. Only the Flatpak probe job
+and final aggregate gate failed; all other selected jobs passed. Windows
+completed four175-test CTest passes and differential. macOS completed
+four200-registered/199-executed passes with one SVT skip each and
+differential. Exact Linux OFF/ON counts, skips, log hashes and excerpts
+are in the failed record alongside appended terminal run/job metadata.
+Earlier capture-time metadata is retained. None establishes pruned rebuild
+success: the optional guard failed before the isolated build began.
+
+After the first run was terminal, the single revised trial39729660321
+was dispatched on446a12945b44a3c647995d5e86c2f96502638cad with
+flatpak-pruned-build-probe=true, flatpak-cache-probe=false and
+native-cache-probe=false. It preserves full selection and existing normal
+validation before probing the narrower dependency projection. No result
+claimed yet; no unchanged-workflow retry or production policy adoption.
