@@ -373,6 +373,13 @@ not get a line.
   own signed feed. *Windows*, 2026-10-21. PR
   [#1733](https://github.com/obs-rust/obs-studio/pull/1733).
 
+- **In-app updates on macOS from OBS-Studio-Rust's own feed.** The macOS
+  app checks OBS-Studio-Rust's Sparkle feed, signed with the project's own
+  key, and offers the newest daily release from GitHub Releases. The feed is
+  published after each release. Windows updates stay off for now. *macOS*,
+  2026-10-22. Issue
+  [#1730](https://github.com/obs-rust/obs-studio/issues/1730).
+
 ## Fixed upstream bugs
 
 Bugs inherited from OBS Studio (and obs-websocket) that are fixed here, by
