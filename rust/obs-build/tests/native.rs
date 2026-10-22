@@ -172,6 +172,18 @@ fn production_runtime_stages_selected_artifacts_and_rejects_stale_outputs() {
 }
 
 #[test]
+fn bundled_frontend_plugins_follow_application_feature_selection() {
+    let mut options = obs_build::application::BuildOptions::for_target("x86_64-unknown-linux-gnu").unwrap();
+    for (tools, websocket) in [(true, true), (true, false), (false, true), (false, false)] {
+        options.frontend_tools = tools;
+        options.websocket = websocket.then(Default::default);
+        let names = options.core_module_names();
+        assert_eq!(names.iter().any(|name| name == "frontend-tools"), tools);
+        assert_eq!(names.iter().any(|name| name == "obs-websocket"), websocket);
+    }
+}
+
+#[test]
 fn production_command_selects_explicit_profile_target_and_features() {
     use obs_build::{NativeProfile, cli};
     let invocation = cli::parse([
