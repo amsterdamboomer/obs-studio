@@ -244,6 +244,51 @@ class NativeCacheReleaseProtocolTest(unittest.TestCase):
             self.assertEqual((root / 'restored/object').read_text(), 'compiler payload ' + SHA)
             self.assertTrue(all(call[0] == 'download' for call in store.calls))
 
+    def test_invalid_publication_contract_does_not_touch_previous_seed(self):
+        for field, value in (('schema', 999), ('format', 'zip'), ('entries', 0),
+                             ('expanded_bytes', TRANSPORT.MAX_EXPANDED_BYTES + 1),
+                             ('expanded_bytes', 0), ('corrupt_payload', True)):
+            with self.subTest(field=field, value=value), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                store = MemoryReleaseStore()
+                self.produce(root, store)
+                original = dict(store.objects)
+                source = root / 'candidate'
+                source.mkdir()
+                (source / 'object').write_text('new payload')
+                archive = root / 'candidate.tar.gz'
+                metadata = TRANSPORT.pack(source, archive, IDENTITY, 'b' * 40)
+                if field == 'corrupt_payload':
+                    archive.write_bytes(b'not a tar archive')
+                    metadata['bytes'] = archive.stat().st_size
+                    metadata['sha256'] = hashlib.sha256(archive.read_bytes()).hexdigest()
+                else:
+                    metadata[field] = value
+                store.calls.clear()
+                context = {'repository': 'obs-rust/obs-studio', 'ref': 'refs/heads/master',
+                           'event_name': 'workflow_dispatch', 'sha': 'b' * 40, 'actions': 'true'}
+                with self.assertRaises(ValueError):
+                    TRANSPORT.publish(archive, metadata, store, context)
+                self.assertEqual(store.objects, original)
+                self.assertEqual(store.calls, [])
+
+    def test_nonobject_newest_manifest_falls_back_to_previous_seed(self):
+        for value in ([], None, 'invalid', 42):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                store = MemoryReleaseStore()
+                self.produce(root, store)
+                self.produce(root, store, 'b' * 40)
+                name = next(name for name in store.objects if 'b' * 40 in name and name.endswith('.json'))
+                data, asset = store.objects[name]
+                data = json.dumps(value).encode()
+                asset.update(size=len(data), digest='sha256:' + hashlib.sha256(data).hexdigest())
+                store.objects[name] = (data, asset)
+                report = TRANSPORT.consume(IDENTITY, root / 'restored', store)
+                self.assertEqual(report['status'], 'hit')
+                self.assertEqual(report['source_sha'], SHA)
+                self.assertEqual(len(report['errors']), 1)
+
     def test_retry_reuses_identical_immutable_assets_without_upload(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
