@@ -493,7 +493,7 @@ jobs:
   ci-gate:
     name: CI Gate ✅
     if: always()
-    needs: [cancel-superseded, check-format, build-project, validate-data, update-documentation, tier2-setup-producer, tier2-setup-consumer, native-cache-transport, flatpak-runtime-reuse, native-cache-consumer]
+    needs: [cancel-superseded, check-format, build-project, validate-data, update-documentation, tier2-setup-producer, tier2-setup-consumer, native-cache-transport, native-cache-consumer, flatpak-runtime-reuse]
     runs-on: ubuntu-26.04
     permissions:
       actions: read

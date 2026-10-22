@@ -42,7 +42,8 @@ class TransportWorkflowTest(unittest.TestCase):
         self.assertIn('fail-fast: false', job)
         self.assertIn('runs-on: ubuntu-26.04', job)
         gate = workflow.split('  ci-gate:\n', 1)[1]
-        self.assertIn('native-cache-consumer]', gate)
+        needs = next(line.strip() for line in gate.splitlines() if line.strip().startswith('needs: ['))
+        self.assertIn('native-cache-consumer', needs.removeprefix('needs: [').removesuffix(']').split(', '))
 
     def test_identity_evidence_is_default_off_and_matches_native_axes(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
