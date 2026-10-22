@@ -369,6 +369,12 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         "test_hevc",
         "test_deque",
         "test_platform_time",
+        "test_scene_blend",
+        "test_output_delay",
+        "test_output_interleave",
+        "test_context_name_helpers",
+        "test_video_output_plan",
+        "test_audio_buffering_subsample",
         "test_portal_shortcut_ids",
         "test_portal_shortcut_sets",
         "test_hotkey_load",
@@ -402,6 +408,9 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
     let selected = graph.select(&facts).unwrap();
     assert_eq!(graph.tests["test_svt_av1"].timeout_seconds, Some(60));
     assert_eq!(graph.tests["test_svt_av1"].skip_return_code, Some(77));
+    for name in ["test_context_name_helpers", "test_video_output_plan"] {
+        assert_eq!(graph.targets[name].sanitizers.as_deref(), Some("address,undefined"));
+    }
     assert_eq!(
         graph.tests["test_dstr_regressions"].timeout_seconds,
         Some(60)
