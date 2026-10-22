@@ -62,7 +62,8 @@ class QtCacheBudgetTest(unittest.TestCase):
             cache.mkdir()
             env = {**os.environ, "PATH": f"{tools}{os.pathsep}{os.environ['PATH']}",
                    "GITHUB_OUTPUT": str(output), "CACHE_CALLS": str(calls),
-                   "CCACHE_DIR": str(cache), "CCACHE_MAXSIZE": "1200M",
+                   "CCACHE_DIR": str(cache),
+                   "CCACHE_MAXSIZE": re.search(r"CCACHE_MAXSIZE: (\d+M)", self.job)[1],
                    "GITHUB_REF": ref, "TEST_NOW": "1000"}
             if prepare:
                 subprocess.run(["bash", "-euo", "pipefail", "-c", script("Set Qt Cache Limit")],
