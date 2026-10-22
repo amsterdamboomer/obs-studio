@@ -117,6 +117,20 @@ class NoUpstreamUpdaterTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     module.check_bundle(bundle(scratch, feed, key))
 
+    def test_windows_frontend_uses_obs_rust_feed(self) -> None:
+        # The manifest, branches and updater.exe live on the update-feed release (#1736).
+        text = (ROOT / "frontend/utility/AutoUpdateThread.cpp.hpp").read_text(encoding="utf-8")
+        self.assertNotRegex(text, r'"https://[^"]*obsproject\.com')
+        for name in ("manifest.json", "branches.json", "updater.exe"):
+            with self.subTest(name=name):
+                self.assertIn(f'"{FEED_PREFIX}{name}"', text)
+        self.assertIn(f'#define WIN_MANIFEST_BASE_URL "{FEED_PREFIX}"', text)
+
+    def test_publish_workflow_writes_signed_windows_manifest(self) -> None:
+        text = (ROOT / ".github/workflows/publish.yaml").read_text(encoding="utf-8")
+        self.assertIn("ci/win_update_manifest.py", text)
+        self.assertIn("windows-x64.zip", text)
+
     def test_windows_updater_is_off_while_it_points_at_upstream(self) -> None:
         sources = [
             ROOT / "frontend/utility/AutoUpdateThread.cpp.hpp",
