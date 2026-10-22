@@ -9,19 +9,23 @@ fn native_test_graph_cmake_builds_and_runs_selected_contract() {
     let output = root.join("output");
     let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let consumer = repository.join("test/cmocka/native-test-graph.cmake");
-    fs::write(root.join("answer.c"), r#"
+    fs::write(
+        root.join("answer.c"),
+        r#"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 int main(int argc, char **argv) {
     const char *value = getenv("OBS_GRAPH_VALUE");
     if (EXPECTED != 42 || argc != 2 || strcmp(argv[1], "two words") ||
-        !value || strcmp(value, "two words")) return 1;
+        !value || strcmp(value, "first;second")) return 1;
     FILE *file = fopen("marker.txt", "w");
     if (!file) return 2;
     return fclose(file);
 }
-"#).unwrap();
+"#,
+    )
+    .unwrap();
     let graph = serde_json::json!({
         "schema": 1,
         "targets": {
@@ -31,7 +35,7 @@ int main(int argc, char **argv) {
         },
         "tests": {
             "answer-case": {"target": "answer", "command": ["${target}", "two words"],
-                "environment": {"OBS_GRAPH_VALUE": "two words"},
+                "environment": {"OBS_GRAPH_VALUE": "first;second"},
                 "working_directory": "${build}", "timeout_seconds": 17,
                 "skip_return_code": 77, "resource_locks": ["fixture-lock"]},
             "disabled-case": {"target": "disabled"}
@@ -43,15 +47,40 @@ int main(int argc, char **argv) {
         consumer.to_string_lossy().replace('\\', "/")
     )).unwrap();
     for arguments in [
-        vec!["-S".into(), root.to_string_lossy().into_owned(), "-B".into(), output.to_string_lossy().into_owned()],
-        vec!["--build".into(), output.to_string_lossy().into_owned(), "--config".into(), "Release".into()],
+        vec![
+            "-S".into(),
+            root.to_string_lossy().into_owned(),
+            "-B".into(),
+            output.to_string_lossy().into_owned(),
+        ],
+        vec![
+            "--build".into(),
+            output.to_string_lossy().into_owned(),
+            "--config".into(),
+            "Release".into(),
+        ],
     ] {
-        let result = std::process::Command::new("cmake").args(arguments).output().unwrap();
-        assert!(result.status.success(), "{}\n{}", String::from_utf8_lossy(&result.stdout), String::from_utf8_lossy(&result.stderr));
+        let result = std::process::Command::new("cmake")
+            .args(arguments)
+            .output()
+            .unwrap();
+        assert!(
+            result.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&result.stdout),
+            String::from_utf8_lossy(&result.stderr)
+        );
     }
     let inventory = std::process::Command::new("ctest")
-        .args(["--test-dir", output.to_str().unwrap(), "-C", "Release", "--show-only=json-v1"])
-        .output().unwrap();
+        .args([
+            "--test-dir",
+            output.to_str().unwrap(),
+            "-C",
+            "Release",
+            "--show-only=json-v1",
+        ])
+        .output()
+        .unwrap();
     assert!(inventory.status.success());
     let inventory: serde_json::Value = serde_json::from_slice(&inventory.stdout).unwrap();
     let tests = inventory["tests"].as_array().unwrap();
@@ -62,14 +91,78 @@ int main(int argc, char **argv) {
         ("SKIP_RETURN_CODE", serde_json::json!(77)),
         ("RESOURCE_LOCK", serde_json::json!(["fixture-lock"])),
     ] {
-        assert!(tests[0]["properties"].as_array().unwrap().iter()
-            .any(|property| property["name"] == name && property["value"] == value), "missing {name}: {tests:?}");
+        assert!(
+            tests[0]["properties"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|property| property["name"] == name && property["value"] == value),
+            "missing {name}: {tests:?}"
+        );
     }
     let result = std::process::Command::new("ctest")
-        .args(["--test-dir", output.to_str().unwrap(), "-C", "Release", "--output-on-failure"])
-        .output().unwrap();
-    assert!(result.status.success(), "{}\n{}", String::from_utf8_lossy(&result.stdout), String::from_utf8_lossy(&result.stderr));
+        .args([
+            "--test-dir",
+            output.to_str().unwrap(),
+            "-C",
+            "Release",
+            "--output-on-failure",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&result.stdout),
+        String::from_utf8_lossy(&result.stderr)
+    );
     assert!(output.join("marker.txt").is_file());
+    for (pointer, value, message) in [
+        ("/schema", serde_json::json!(2), "schema"),
+        (
+            "/targets/answer/requires",
+            serde_json::json!("UNKNOWN_FEATURE"),
+            "UNKNOWN_FEATURE",
+        ),
+        (
+            "/tests/answer-case/target",
+            serde_json::json!("absent"),
+            "absent",
+        ),
+        (
+            "/tests/answer-case/command",
+            serde_json::json!([]),
+            "command",
+        ),
+        (
+            "/tests/answer-case/command",
+            serde_json::json!(["${unknown}"]),
+            "unknown",
+        ),
+    ] {
+        let mut invalid = graph.clone();
+        *invalid.pointer_mut(pointer).unwrap() = value;
+        fs::write(root.join("graph.json"), invalid.to_string()).unwrap();
+        let result = std::process::Command::new("cmake")
+            .args(["-S", root.to_str().unwrap(), "-B", output.to_str().unwrap()])
+            .output()
+            .unwrap();
+        assert!(!result.status.success());
+        assert!(
+            String::from_utf8_lossy(&result.stderr).contains(message),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+    }
+    let mut invalid = graph;
+    invalid["targets"]["answer"]["sorces"] = serde_json::json!(["typo.c"]);
+    fs::write(root.join("graph.json"), invalid.to_string()).unwrap();
+    let result = std::process::Command::new("cmake")
+        .args(["-S", root.to_str().unwrap(), "-B", output.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("sorces"));
 }
 
 #[test]
