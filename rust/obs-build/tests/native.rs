@@ -389,7 +389,12 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
     let graph =
         obs_build::validation::graph::Graph::load(&root.join("test/cmocka/build/test-graph.json"))
             .unwrap();
-    assert!(!root.join("rust/obs-build/manifests/c-tests-linux.json").exists(), "independent Linux test inventory remains");
+    assert!(
+        !root
+            .join("rust/obs-build/manifests/c-tests-linux.json")
+            .exists(),
+        "independent Linux test inventory remains"
+    );
     for name in [
         "test_rtmp_error",
         "test_rtmp_chunk_size",
@@ -434,7 +439,6 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         "test_vec4",
     ] {
         assert!(graph.targets.contains_key(name), "missing canonical {name}");
-
     }
     let facts = std::collections::BTreeMap::from([
         ("OS_LINUX".into(), false),
@@ -526,6 +530,31 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
     assert_eq!(
         raw["targets"]["test_pulse_default_id"]["header_libraries"],
         serde_json::json!(["PulseAudio::PulseAudio"])
+    );
+    let output_tests = [
+        "test_rtmp_error",
+        "test_rtmp_chunk_size",
+        "test_amf_decode",
+        "test_flv_mux",
+    ];
+    for name in output_tests {
+        assert!(!selected.tests.contains_key(name));
+    }
+    let mut with_outputs = facts.clone();
+    with_outputs.insert("HAVE_OBS_OUTPUTS".into(), true);
+    let output_selection = graph.select(&with_outputs).unwrap();
+    for name in output_tests {
+        assert!(output_selection.tests.contains_key(name));
+    }
+    assert_eq!(
+        raw["targets"]["test_amf_decode"]["compile_options"][2],
+        serde_json::json!({"name": "-fsigned-char", "requires": {"not": "MSVC"}})
+    );
+    assert_eq!(
+        graph.targets["test_scene_audio_action_steps"]
+            .sanitizers
+            .as_deref(),
+        Some("address,undefined")
     );
     assert!(selected.tests.contains_key("test_avc"));
     assert!(!selected.tests.contains_key("test_formatted_filename"));

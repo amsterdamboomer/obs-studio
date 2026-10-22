@@ -876,6 +876,8 @@ pub fn native_test_facts(
         ("OS_LINUX".into(), target.contains("linux")),
         ("OS_FREEBSD".into(), target.contains("freebsd")),
         ("OS_WINDOWS".into(), target.contains("windows")),
+        ("OS_MACOS".into(), target.contains("apple")),
+        ("OS_OPENBSD".into(), target.contains("openbsd")),
         ("ENABLE_PULSEAUDIO".into(), pulseaudio),
         ("ENABLE_HEVC".into(), hevc),
         ("MSVC".into(), target.contains("msvc")),
@@ -1233,4 +1235,39 @@ pub fn configure_websocket(target: &str, library: &mut crate::SharedLibrary) -> 
         library.link_options.push("-lqrcodegencpp".into());
     }
     Ok(())
+}
+
+pub fn native_test_compiler_is_clang(build: &crate::NativeBuild) -> bool {
+    let compiler = build
+        .compiler(&crate::SharedLibrary::default(), &build.output, false)
+        .get_compiler();
+    compiler.is_like_clang() || compiler.is_like_clang_cl()
+}
+
+pub fn native_test_happy_includes(target: &str, root: &Path) -> Vec<PathBuf> {
+    let host = if target.contains("windows") {
+        "windows"
+    } else {
+        "posix"
+    };
+    vec![
+        root.join("shared/happy-eyeballs"),
+        root.join(format!("shared/happy-eyeballs/hosts/{host}")),
+    ]
+}
+
+pub fn native_test_system_library(target: &str, name: &str) -> Vec<String> {
+    vec![if target.contains("msvc") {
+        format!("{name}.lib")
+    } else {
+        format!("-l{name}")
+    }]
+}
+
+pub fn native_test_framework_options(target: &str, name: &str) -> Vec<String> {
+    if target.contains("apple") {
+        vec!["-framework".into(), name.into()]
+    } else {
+        vec![]
+    }
 }

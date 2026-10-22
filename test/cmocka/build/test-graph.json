@@ -805,6 +805,283 @@
         "OBS::native-test-cmocka"
       ],
       "requires": "HAVE_OBS_PULSEAUDIO"
+    },
+    "test_rtmp_error": {
+      "sources": [
+        "test/cmocka/test_rtmp_error.c",
+        "plugins/obs-outputs/librtmp/rtmp.c",
+        "plugins/obs-outputs/librtmp/amf.c",
+        "plugins/obs-outputs/librtmp/log.c",
+        "plugins/obs-outputs/librtmp/parseurl.c",
+        "plugins/obs-outputs/librtmp/hashswf.c"
+      ],
+      "requires": "HAVE_OBS_OUTPUTS",
+      "includes": [
+        "plugins/obs-outputs"
+      ],
+      "definitions": [
+        "USE_MBEDTLS",
+        "CRYPTO"
+      ],
+      "compile_options": [
+        {
+          "name": "-Wno-comma",
+          "requires": "C_COMPILER_CLANG"
+        },
+        {
+          "name": "-Wno-error=unreachable-code",
+          "requires": {
+            "all": [
+              "C_COMPILER_CLANG",
+              {
+                "any": [
+                  "OS_LINUX",
+                  "OS_FREEBSD",
+                  "OS_OPENBSD"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::happy-eyeballs",
+        "MbedTLS::mbedtls",
+        "ZLIB::ZLIB",
+        "OBS::native-test-cmocka",
+        {
+          "name": "crypt32",
+          "requires": "OS_WINDOWS"
+        },
+        {
+          "name": "iphlpapi",
+          "requires": "OS_WINDOWS"
+        },
+        {
+          "name": "winmm",
+          "requires": "OS_WINDOWS"
+        },
+        {
+          "name": "ws2_32",
+          "requires": "OS_WINDOWS"
+        },
+        {
+          "name": "OBS::native-test-foundation",
+          "requires": "OS_MACOS"
+        },
+        {
+          "name": "OBS::native-test-security",
+          "requires": "OS_MACOS"
+        }
+      ]
+    },
+    "test_rtmp_chunk_size": {
+      "sources": [
+        "test/cmocka/test_rtmp_chunk_size.c",
+        "plugins/obs-outputs/librtmp/rtmp.c",
+        "plugins/obs-outputs/librtmp/amf.c",
+        "plugins/obs-outputs/librtmp/log.c",
+        "plugins/obs-outputs/librtmp/parseurl.c",
+        "plugins/obs-outputs/librtmp/hashswf.c"
+      ],
+      "requires": "HAVE_OBS_OUTPUTS",
+      "includes": [
+        "plugins/obs-outputs"
+      ],
+      "definitions": [
+        "USE_MBEDTLS",
+        "CRYPTO"
+      ],
+      "compile_options": [
+        {
+          "name": "-Wno-comma",
+          "requires": "C_COMPILER_CLANG"
+        },
+        {
+          "name": "-Wno-error=unreachable-code",
+          "requires": {
+            "all": [
+              "C_COMPILER_CLANG",
+              {
+                "any": [
+                  "OS_LINUX",
+                  "OS_FREEBSD",
+                  "OS_OPENBSD"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::happy-eyeballs",
+        "MbedTLS::mbedtls",
+        "ZLIB::ZLIB",
+        "OBS::native-test-cmocka",
+        {
+          "name": "crypt32",
+          "requires": "OS_WINDOWS"
+        },
+        {
+          "name": "iphlpapi",
+          "requires": "OS_WINDOWS"
+        },
+        {
+          "name": "winmm",
+          "requires": "OS_WINDOWS"
+        },
+        {
+          "name": "ws2_32",
+          "requires": "OS_WINDOWS"
+        },
+        {
+          "name": "OBS::native-test-foundation",
+          "requires": "OS_MACOS"
+        },
+        {
+          "name": "OBS::native-test-security",
+          "requires": "OS_MACOS"
+        }
+      ]
+    },
+    "test_amf_decode": {
+      "sources": [
+        "test/cmocka/test_amf_decode.c",
+        "plugins/obs-outputs/librtmp/rtmp.c",
+        "plugins/obs-outputs/librtmp/amf.c",
+        "plugins/obs-outputs/librtmp/log.c",
+        "plugins/obs-outputs/librtmp/parseurl.c",
+        "plugins/obs-outputs/librtmp/hashswf.c"
+      ],
+      "requires": "HAVE_OBS_OUTPUTS",
+      "includes": [
+        "plugins/obs-outputs"
+      ],
+      "definitions": [
+        "USE_MBEDTLS",
+        "CRYPTO"
+      ],
+      "compile_options": [
+        {
+          "name": "-Wno-comma",
+          "requires": "C_COMPILER_CLANG"
+        },
+        {
+          "name": "-Wno-error=unreachable-code",
+          "requires": {
+            "all": [
+              "C_COMPILER_CLANG",
+              {
+                "any": [
+                  "OS_LINUX",
+                  "OS_FREEBSD",
+                  "OS_OPENBSD"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "-fsigned-char",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::happy-eyeballs",
+        "MbedTLS::mbedtls",
+        "ZLIB::ZLIB",
+        "OBS::native-test-cmocka",
+        {
+          "name": "crypt32",
+          "requires": "OS_WINDOWS"
+        },
+        {
+          "name": "iphlpapi",
+          "requires": "OS_WINDOWS"
+        },
+        {
+          "name": "winmm",
+          "requires": "OS_WINDOWS"
+        },
+        {
+          "name": "ws2_32",
+          "requires": "OS_WINDOWS"
+        },
+        {
+          "name": "OBS::native-test-foundation",
+          "requires": "OS_MACOS"
+        },
+        {
+          "name": "OBS::native-test-security",
+          "requires": "OS_MACOS"
+        }
+      ],
+      "sanitizers": "undefined"
+    },
+    "test_flv_mux": {
+      "sources": [
+        "test/cmocka/test_flv_mux.c",
+        "plugins/obs-outputs/flv-mux.c.h",
+        "plugins/obs-outputs/librtmp/amf.c",
+        "plugins/obs-outputs/librtmp/log.c"
+      ],
+      "requires": "HAVE_OBS_OUTPUTS",
+      "includes": [
+        "plugins/obs-outputs",
+        "shared/bpm",
+        "shared/opts-parser"
+      ],
+      "definitions": [
+        "NO_CRYPTO"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "ws2_32",
+          "requires": "OS_WINDOWS"
+        }
+      ]
+    },
+    "test_scene_audio_action_steps": {
+      "sources": [
+        "test/cmocka/test_scene_audio_action_steps.c",
+        "libobs/obs-scene-audio-actions.c.h",
+        "libobs/obs-scene-item-audio-actions.c.h"
+      ],
+      "includes": [
+        "libobs",
+        "deps/libcaption"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "Uthash::Uthash",
+        "OBS::native-test-cmocka"
+      ],
+      "sanitizers": "address,undefined"
+    },
+    "test_output_protocol_list_steps": {
+      "sources": [
+        "test/cmocka/test_output_protocol_list_steps.c",
+        "libobs/obs-output-protocols.c.h"
+      ],
+      "includes": [
+        "libobs",
+        "deps/libcaption"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "Uthash::Uthash",
+        "OBS::native-test-cmocka"
+      ],
+      "sanitizers": "address,undefined"
     }
   },
   "tests": {
@@ -1009,6 +1286,42 @@
     },
     "test_pulse_default_id": {
       "target": "test_pulse_default_id"
+    },
+    "test_rtmp_error": {
+      "target": "test_rtmp_error",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_rtmp_chunk_size": {
+      "target": "test_rtmp_chunk_size",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_amf_decode": {
+      "target": "test_amf_decode",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_flv_mux": {
+      "target": "test_flv_mux",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_scene_audio_action_steps": {
+      "target": "test_scene_audio_action_steps",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_output_protocol_list_steps": {
+      "target": "test_output_protocol_list_steps",
+      "command": [
+        "${target}"
+      ]
     }
   }
 }

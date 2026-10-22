@@ -3,7 +3,7 @@ pub mod graph;
 
 use crate::{NativeBuild, SharedLibrary, libobs::add_package};
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::BTreeMap,
     path::{Path, PathBuf},
 };
 
@@ -25,6 +25,7 @@ impl Executable {
 }
 
 pub struct Options {
+    pub outputs: bool,
     pub filters: bool,
     pub pipewire: bool,
     /// Plugin availability is independent of libobs audio monitoring.
@@ -37,6 +38,7 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
+            outputs: true,
             filters: true,
             pipewire: true,
             pulseaudio_plugin: true,
@@ -190,138 +192,7 @@ pub fn build_c_tests(
     options: &Options,
 ) -> Result<Vec<Executable>, String> {
     let root = dunce::canonicalize(root).map_err(|e| e.to_string())?;
-    let manifest: Vec<serde_json::Value> =
-        serde_json::from_str(include_str!("../manifests/c-tests-linux.json"))
-            .map_err(|e| e.to_string())?;
     let mut result = Vec::new();
-    let mut archives = HashMap::new();
-    let mut watched: BTreeSet<PathBuf> = ["libobs", "test/cmocka", "deps/libcaption"]
-        .into_iter()
-        .map(|path| root.join(path))
-        .collect();
-    let mut base = SharedLibrary {
-        include_dirs: vec![
-            root.clone(),
-            root.join("libobs"),
-            root.join("deps/libcaption"),
-            root.join("test/cmocka"),
-            build.output.join("config"),
-        ],
-        dependencies: vec![core.into()],
-        ..SharedLibrary::default()
-    };
-    if options.hevc {
-        base.definitions.push(("ENABLE_HEVC".into(), None));
-    }
-    for package in ["cmocka", "simde"] {
-        add_package(&mut base, &build.target, package)?;
-    }
-    // Shared group headers expose Jansson declarations even to a private AVC
-    // implementation fixture. Header discovery adds no new runtime link edge.
-    headers_only(&mut base, "jansson")?;
-    for spec in manifest {
-        let name = spec["name"].as_str().ok_or("C test name missing")?;
-        let mut library = SharedLibrary {
-            name: name.into(),
-            ..base.clone()
-        };
-        let sanitizer = options
-            .per_target_sanitizers
-            .then(|| spec["sanitizers"].as_str())
-            .flatten();
-        crate::platform::configure_c_tests(build, &mut library, sanitizer, core)?;
-        for source in strings(&spec, "sources")? {
-            // Watch each selected component, including its group headers, rather
-            // than the repository root (which may contain native build output).
-            let component: PathBuf = Path::new(source).components().take(2).collect();
-            if source.starts_with("plugins/") || source.starts_with("shared/") {
-                watched.insert(root.join(component));
-            }
-            let source = root.join(source);
-            let source = if source.to_string_lossy().ends_with(".c.h") {
-                let relative = source.strip_prefix(&root).map_err(|e| e.to_string())?;
-                let wrapper = build
-                    .output
-                    .join(name)
-                    .join("inputs")
-                    .join(relative)
-                    .with_extension("h.c");
-                let include = source
-                    .to_str()
-                    .ok_or("non-UTF8 C test source")?
-                    .replace('\\', "/");
-                if include.contains(['\n', '\r', '"']) {
-                    return Err(format!("unrepresentable C test include {include:?}"));
-                }
-                std::fs::create_dir_all(wrapper.parent().ok_or("C test wrapper has no parent")?)
-                    .map_err(|e| e.to_string())?;
-                crate::frontend::write(&wrapper, &format!("#include \"{include}\"\n"))?;
-                wrapper
-            } else {
-                source
-            };
-            library.sources.push(source);
-        }
-        for include in strings(&spec, "includes")? {
-            library.include_dirs.push(root.join(include));
-        }
-        for define in strings(&spec, "definitions")? {
-            let define = graph::expand_compile_definition(define, &root, &build.output)?;
-            let (name, value) = define
-                .split_once('=')
-                .map_or((define.as_str(), None), |(name, value)| {
-                    (name, Some(value.to_string()))
-                });
-            library.definitions.push((name.into(), value));
-        }
-        for package in strings(&spec, "packages")? {
-            add_package(&mut library, &build.target, package)?;
-        }
-        for package in strings(&spec, "header_packages")? {
-            headers_only(&mut library, package)?;
-        }
-        library.compile_options.extend(
-            strings(&spec, "compile_options")?
-                .into_iter()
-                .map(String::from),
-        );
-        for flag in strings(&spec, "compile_options_if_supported")? {
-            if build
-                .compiler(&library, &build.output, false)
-                .is_flag_supported(flag)
-                .map_err(|e| e.to_string())?
-            {
-                library.compile_options.push(flag.into());
-            }
-        }
-        library.link_options.extend(
-            strings(&spec, "link_options")?
-                .into_iter()
-                .map(String::from),
-        );
-        // Resolve native archive references before shared libobs. With GNU
-        // --as-needed, placing libobs first can drop it before happy-eyeballs
-        // introduces its allocator/event imports (test_rtmp_error).
-        let mut static_dependencies = Vec::new();
-        for archive in strings(&spec, "archives")? {
-            if !archives.contains_key(archive) {
-                let path = if archive == "caption" {
-                    crate::libobs::build_caption(build, &root)?
-                } else {
-                    crate::deps::shared_archive(build, &root, archive)?
-                };
-                archives.insert(archive.to_string(), path);
-            }
-            static_dependencies.push(archives[archive].clone());
-        }
-        static_dependencies.append(&mut library.dependencies);
-        library.dependencies = static_dependencies;
-        result.push(Executable {
-            name: name.into(),
-            path: build.executable(&library)?,
-            runtime: None,
-        });
-    }
     let graph_path = root.join("test/cmocka/build/test-graph.json");
     println!("cargo:rerun-if-changed={}", graph_path.display());
     let mut graph = graph::Graph::load(&graph_path)?;
@@ -333,6 +204,11 @@ pub fn build_c_tests(
     let mut facts =
         crate::platform::native_test_facts(&build.target, options.pulseaudio, options.hevc);
     facts.extend([
+        ("HAVE_OBS_OUTPUTS".into(), options.outputs),
+        (
+            "C_COMPILER_CLANG".into(),
+            crate::platform::native_test_compiler_is_clang(build),
+        ),
         ("HAVE_OBS_FILTERS".into(), options.filters),
         ("HAVE_OBS_PIPEWIRE".into(), options.pipewire),
         ("HAVE_OBS_PULSEAUDIO".into(), options.pulseaudio_plugin),
@@ -376,10 +252,7 @@ pub fn build_c_tests(
             },
         ),
     ]);
-    let caption = match archives.get("caption") {
-        Some(path) => path.clone(),
-        None => crate::libobs::build_caption(build, &root)?,
-    };
+    let caption = crate::libobs::build_caption(build, &root)?;
     interfaces.insert(
         "OBS::caption".into(),
         graph::Dependency {
@@ -410,13 +283,43 @@ pub fn build_c_tests(
         add_package(&mut dependency, &build.target, "libpulse")?;
         interfaces.insert("PulseAudio::PulseAudio".into(), dependency.into());
     }
+    if options.outputs {
+        let mut happy = graph::Dependency {
+            artifacts: vec![crate::deps::shared_archive(build, &root, "happy-eyeballs")?],
+            include_dirs: crate::platform::native_test_happy_includes(&build.target, &root),
+            ..Default::default()
+        };
+        happy.artifacts.push(core.into());
+        interfaces.insert("OBS::happy-eyeballs".into(), happy);
+        let mut tls = SharedLibrary::default();
+        for package in ["mbedtls", "mbedx509", "mbedcrypto"] {
+            add_package(&mut tls, &build.target, package)?;
+        }
+        interfaces.insert("MbedTLS::mbedtls".into(), tls.into());
+        for name in ["crypt32", "iphlpapi", "winmm", "ws2_32"] {
+            interfaces.insert(
+                name.into(),
+                graph::Dependency {
+                    link_options: crate::platform::native_test_system_library(&build.target, name),
+                    ..Default::default()
+                },
+            );
+        }
+        for name in ["Foundation", "Security"] {
+            interfaces.insert(
+                format!("OBS::native-test-{}", name.to_lowercase()),
+                graph::Dependency {
+                    link_options: crate::platform::native_test_framework_options(
+                        &build.target,
+                        name,
+                    ),
+                    ..Default::default()
+                },
+            );
+        }
+    }
     let artifacts = graph.compile(build, &root, &facts, &interfaces)?;
     for (name, test) in graph.select(&facts)?.tests {
-        if result.iter().any(|existing| existing.name == name) {
-            return Err(format!(
-                "native test {name} appears in both legacy and canonical inventories"
-            ));
-        }
         result.push(Executable {
             name: name.into(),
             path: artifacts
@@ -426,8 +329,8 @@ pub fn build_c_tests(
             runtime: Some(test.clone()),
         });
     }
-    for directory in watched {
-        println!("cargo:rerun-if-changed={}", directory.display());
+    for directory in ["libobs", "test/cmocka", "deps/libcaption"] {
+        println!("cargo:rerun-if-changed={}", root.join(directory).display());
     }
     Ok(result)
 }
@@ -442,19 +345,4 @@ fn headers_only(library: &mut SharedLibrary, package: &str) -> Result<(), String
     definitions.sort();
     library.definitions.extend(definitions);
     Ok(())
-}
-
-fn strings<'a>(spec: &'a serde_json::Value, key: &str) -> Result<Vec<&'a str>, String> {
-    match spec.get(key) {
-        None => Ok(vec![]),
-        Some(value) => value
-            .as_array()
-            .ok_or_else(|| format!("C test {key} is not an array"))?
-            .iter()
-            .map(|item| {
-                item.as_str()
-                    .ok_or_else(|| format!("C test {key} entry is not a string"))
-            })
-            .collect(),
-    }
 }

@@ -258,66 +258,7 @@ find_package(FFmpeg 8.0 REQUIRED avcodec avformat avutil)
 # Exercise AMF decoding and RTMP server messages through the same
 # authentication-enabled sources as obs-outputs, without starting OBS or
 # connecting to a server.
-if(TARGET OBS::outputs)
-  foreach(test_name IN ITEMS test_rtmp_error test_rtmp_chunk_size test_amf_decode)
-    add_executable(
-      ${test_name}
-      ${test_name}.c
-      "${CMAKE_SOURCE_DIR}/plugins/obs-outputs/librtmp/rtmp.c"
-      "${CMAKE_SOURCE_DIR}/plugins/obs-outputs/librtmp/amf.c"
-      "${CMAKE_SOURCE_DIR}/plugins/obs-outputs/librtmp/log.c"
-      "${CMAKE_SOURCE_DIR}/plugins/obs-outputs/librtmp/parseurl.c"
-      "${CMAKE_SOURCE_DIR}/plugins/obs-outputs/librtmp/hashswf.c"
-    )
-    target_compile_definitions(${test_name} PRIVATE USE_MBEDTLS CRYPTO)
-    target_compile_options(
-      ${test_name}
-      PRIVATE
-        $<$<COMPILE_LANG_AND_ID:C,AppleClang,Clang>:-Wno-comma>
-        $<$<AND:$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>,$<COMPILE_LANG_AND_ID:C,Clang>>:-Wno-error=unreachable-code>
-    )
-    target_include_directories(${test_name} PRIVATE ${CMOCKA_INCLUDE_DIR} "${CMAKE_SOURCE_DIR}/plugins/obs-outputs")
-    target_link_libraries(
-      ${test_name}
-      PRIVATE
-        OBS::libobs
-        OBS::happy-eyeballs
-        MbedTLS::mbedtls
-        ZLIB::ZLIB
-        ${CMOCKA_LIBRARIES}
-        $<$<PLATFORM_ID:Windows>:crypt32>
-        $<$<PLATFORM_ID:Windows>:iphlpapi>
-        $<$<PLATFORM_ID:Windows>:winmm>
-        $<$<PLATFORM_ID:Windows>:ws2_32>
-        "$<$<PLATFORM_ID:Darwin>:$<LINK_LIBRARY:FRAMEWORK,Foundation.framework>>"
-        "$<$<PLATFORM_ID:Darwin>:$<LINK_LIBRARY:FRAMEWORK,Security.framework>>"
-    )
-    add_dependencies(cmocka-tests ${test_name})
-    add_test(${test_name} ${CMAKE_CURRENT_BINARY_DIR}/${test_name})
-  endforeach()
-
-  if(NOT MSVC)
-    target_compile_options(test_amf_decode PRIVATE -fsigned-char)
-    obs_test_sanitize(test_amf_decode undefined)
-  endif()
-endif()
-
-# Build obs-outputs' FLV tags from flv-mux.c, without librtmp's network code.
-if(TARGET OBS::outputs)
-  add_executable(
-    test_flv_mux
-    test_flv_mux.c
-    "${CMAKE_SOURCE_DIR}/plugins/obs-outputs/flv-mux.c.h"
-    "${CMAKE_SOURCE_DIR}/plugins/obs-outputs/librtmp/amf.c"
-    "${CMAKE_SOURCE_DIR}/plugins/obs-outputs/librtmp/log.c"
-  )
-  # No network code is built, so librtmp's TLS types are not needed.
-  target_compile_definitions(test_flv_mux PRIVATE NO_CRYPTO)
-  target_include_directories(test_flv_mux PRIVATE ${CMOCKA_INCLUDE_DIR} "${CMAKE_SOURCE_DIR}/plugins/obs-outputs")
-  target_link_libraries(test_flv_mux PRIVATE OBS::libobs ${CMOCKA_LIBRARIES} $<$<PLATFORM_ID:Windows>:ws2_32>)
-  add_dependencies(cmocka-tests test_flv_mux)
-  add_test(test_flv_mux ${CMAKE_CURRENT_BINARY_DIR}/test_flv_mux)
-endif()
+# RTMP, AMF and FLV tests are defined in build/test-graph.json.
 
 # Load .cube LUTs through the Color Grade filter's loader.
 # test_cube_lut defined in build/test-graph.json.
@@ -379,7 +320,7 @@ foreach(_fragment IN LISTS _cmocka_test_fragments)
 endforeach()
 include("${CMAKE_CURRENT_SOURCE_DIR}/native-test-graph.cmake")
 # Match the existing plugin-target guards independently of core feature options.
-foreach(_graph_plugin IN ITEMS filters pipewire pulseaudio)
+foreach(_graph_plugin IN ITEMS filters pipewire pulseaudio outputs)
   string(TOUPPER "${_graph_plugin}" _graph_plugin_upper)
   if(TARGET OBS::${_graph_plugin})
     set(HAVE_OBS_${_graph_plugin_upper} TRUE)
@@ -393,11 +334,26 @@ endforeach()
 foreach(
   _graph_fact
   IN
-  ITEMS MSVC OS_LINUX OS_FREEBSD OS_WINDOWS ENABLE_PULSEAUDIO ENABLE_HEVC
+  ITEMS MSVC OS_LINUX OS_FREEBSD OS_OPENBSD OS_WINDOWS OS_MACOS ENABLE_PULSEAUDIO ENABLE_HEVC
 )
   if(NOT DEFINED ${_graph_fact})
     set(${_graph_fact} FALSE)
   endif()
 endforeach()
+set(C_COMPILER_CLANG FALSE)
+if(CMAKE_C_COMPILER_ID MATCHES "^(AppleClang|Clang)$")
+  set(C_COMPILER_CLANG TRUE)
+endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
+  set(OS_OPENBSD TRUE)
+endif()
+if(OS_MACOS)
+  foreach(_framework IN ITEMS Foundation Security)
+    string(TOLOWER "${_framework}" _framework_lower)
+    add_library(native-test-${_framework_lower} INTERFACE)
+    add_library(OBS::native-test-${_framework_lower} ALIAS native-test-${_framework_lower})
+    target_link_libraries(native-test-${_framework_lower} INTERFACE "$<LINK_LIBRARY:FRAMEWORK,${_framework}.framework>")
+  endforeach()
+endif()
 obs_native_test_graph("${CMAKE_CURRENT_SOURCE_DIR}/build/test-graph.json" "${CMAKE_SOURCE_DIR}")
 include("${CMAKE_CURRENT_SOURCE_DIR}/parallel-environment.cmake")
