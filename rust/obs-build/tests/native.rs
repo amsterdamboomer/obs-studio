@@ -22,9 +22,10 @@ fn native_test_graph_cmake_builds_and_runs_selected_contract() {
 #include <stdlib.h>
 #include <string.h>
 #include "dependency.h"
+int selected_answer(void);
 int main(int argc, char **argv) {
     const char *value = getenv("OBS_GRAPH_VALUE");
-    if (EXPECTED != 42 || DEPENDENCY_ANSWER != 42 || DEPENDENCY_REQUIRED != 5 || argc != 2 || strcmp(argv[1], "two words") ||
+    if (selected_answer() != 42 || EXPECTED != 42 || DEPENDENCY_ANSWER != 42 || DEPENDENCY_REQUIRED != 5 || argc != 2 || strcmp(argv[1], "two words") ||
         !value || strcmp(value, "first;second")) return 1;
     FILE *input = fopen(SOURCE_HEADER, "r");
     if (!input) return 3;
@@ -36,10 +37,11 @@ int main(int argc, char **argv) {
 "#,
     )
     .unwrap();
+    fs::write(root.join("selected.c"), "int selected_answer(void) { return 42; }\n").unwrap();
     let graph = serde_json::json!({
         "schema": 1,
         "targets": {
-            "answer": {"sources": ["answer.c"], "definitions": ["EXPECTED=42", "SOURCE_HEADER=\"${source}/dependency-include/dependency.h\""],
+            "answer": {"sources": ["answer.c", {"path": "selected.c", "requires": "GRAPH_FEATURE"}, {"path": "missing-disabled.c", "requires": "GRAPH_DISABLED"}], "definitions": ["EXPECTED=42", "SOURCE_HEADER=\"${source}/dependency-include/dependency.h\""],
                 "libraries": ["fixture-dependency", {"name": "disabled-library", "requires": "GRAPH_DISABLED"}],
                 "requires": {"all": ["GRAPH_FEATURE", {"not": "GRAPH_DISABLED"}]}},
             "disabled": {"sources": ["does-not-exist.c"], "requires": "GRAPH_DISABLED"}
