@@ -76,7 +76,9 @@ class NoUpstreamUpdaterTests(unittest.TestCase):
     def test_windows_updater_is_on_and_does_not_build_upstream_updater_exe(self) -> None:
         cmake = text("frontend/cmake/os-windows.cmake")
         self.assertNotIn("ENABLE_WIN_UPDATER", cmake, "the Windows updater has no off switch")
-        self.assertIn("build/frontend.windows-autoupdatethread+.hpp.cpp", cmake)
+        self.assertIn("obs_frontend_add_sources(WINDOWS)", cmake)
+        windows = json.loads(text("frontend/build/source-sets.json"))["WINDOWS"]
+        self.assertIn("build/frontend.windows-autoupdatethread+.hpp.cpp", windows)
         # frontend/updater/ is upstream's per-file installer that downloads
         # from obsproject.com's CDN; obs-rust installs its release ZIP instead.
         self.assertIsNone(re.search(r"^\s*add_subdirectory\(updater\)", cmake, re.M))
