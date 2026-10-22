@@ -8,6 +8,7 @@ use std::{
 
 mod libobs_linux;
 mod libobs_macos;
+pub(crate) mod resources;
 
 pub fn stage_core_identity(target: &str, artifact: &Path) -> Result<(), String> {
     if target.contains("apple-darwin") {
@@ -37,9 +38,13 @@ pub fn configure_core_features(
 pub(crate) enum PchKind {
     Gnu,
     Clang,
+    Msvc,
 }
 
 pub(crate) fn pch_kind(target: &str, compiler: &cc::Tool) -> Result<PchKind, String> {
+    if target.contains("windows-msvc") && compiler.is_like_msvc() {
+        return Ok(PchKind::Msvc);
+    }
     if !target.contains("linux") && !target.contains("apple-darwin") {
         return Err(format!("compiled PCH for {target} is not implemented yet"));
     }

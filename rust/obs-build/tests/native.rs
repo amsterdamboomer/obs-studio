@@ -184,6 +184,7 @@ fn windows_resource_payload_tracks_headers_definitions_and_unity() {
         &source,
         r#"
 #include <windows.h>
+#include "resource-values.h"
 __declspec(dllexport) int obs_fixture_resource(void) {
     HMODULE owner = NULL;
     if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
@@ -193,14 +194,15 @@ __declspec(dllexport) int obs_fixture_resource(void) {
     if (!resource) return -2;
     HGLOBAL loaded = LoadResource(owner, resource);
     const WORD *value = loaded ? LockResource(loaded) : NULL;
-    return value ? *value : -3;
+    return value ? value[0] + value[1] : -3;
 }
+int main(void) { return obs_fixture_resource() == HEADER_VALUE + RESOURCE_VALUE ? 0 : 7; }
 "#,
     )
     .unwrap();
     fs::write(
         &script,
-        "#include \"resource-values.h\"\n17 RCDATA { HEADER_VALUE + RESOURCE_VALUE }\n",
+        "#include \"resource-values.h\"\n17 RCDATA { HEADER_VALUE, RESOURCE_VALUE }\n",
     )
     .unwrap();
     for unity in [false, true] {
@@ -213,6 +215,7 @@ __declspec(dllexport) int obs_fixture_resource(void) {
         let mut library = target("fixture-resources", &source, vec![]);
         library.unity = unity;
         library.resource_files.push(script.clone());
+        library.resource_input_files.push(header.clone());
         library.include_dirs.push(root.into());
         library
             .definitions
@@ -221,18 +224,39 @@ __declspec(dllexport) int obs_fixture_resource(void) {
         library.c_compile_options.push("/std:c17".into());
         library.resource_compile_options.push("/c65001".into());
         let artifact = build.shared_library(&library).unwrap();
-        assert_windows_resource(&artifact, 42, &requested);
+        assert_windows_resource(&artifact, 42, [2, 40], &requested);
         fs::write(&header, "#define HEADER_VALUE 10\n").unwrap();
         let artifact = build.shared_library(&library).unwrap();
-        assert_windows_resource(&artifact, 50, &requested);
+        assert_windows_resource(&artifact, 50, [10, 40], &requested);
         library.definitions[0].1 = Some("50".into());
         let artifact = build.shared_library(&library).unwrap();
-        assert_windows_resource(&artifact, 60, &requested);
+        assert_windows_resource(&artifact, 60, [10, 50], &requested);
+        library.name = "fixture-resource-app".into();
+        let executable = build.executable(&library).unwrap();
+        assert_windows_resource(&executable, 60, [10, 50], &requested);
+        assert!(
+            build
+                .static_library(&library)
+                .unwrap_err()
+                .contains("resources")
+        );
     }
 }
 
-fn assert_windows_resource(library: &Path, expected: i32, target: &str) {
+fn assert_windows_resource(library: &Path, expected: i32, words: [u16; 2], target: &str) {
     if target == obs_build::BUILD_TARGET {
+        if library
+            .extension()
+            .is_some_and(|extension| extension == "exe")
+        {
+            assert!(
+                std::process::Command::new(library)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+            return;
+        }
         // SAFETY: the fixture exports this no-argument C ABI function, and the
         // resource lookup does not retain an extra reference to the DLL.
         assert_eq!(
@@ -255,10 +279,14 @@ fn assert_windows_resource(library: &Path, expected: i32, target: &str) {
             String::from_utf8_lossy(&result.stderr)
         );
         let output = String::from_utf8(result.stdout).unwrap();
-        let payload = format!("{:02X}{:02X}", expected & 255, expected >> 8);
+        let payload = words
+            .into_iter()
+            .flat_map(u16::to_le_bytes)
+            .map(|byte| format!("{byte:02X}"))
+            .collect::<String>();
         assert!(output.contains("Total Number of Resources: 1"), "{output}");
         assert!(output.contains("Name: (ID 17)"), "{output}");
-        assert!(output.contains("DataSize: 2"), "{output}");
+        assert!(output.contains("DataSize: 4"), "{output}");
         assert!(
             output
                 .lines()
@@ -280,6 +308,8 @@ fn msvc_pch_links_its_object_and_preserves_language_header_and_flag_changes() {
     let header = root.join("common.h");
     let c = root.join("part.c");
     let cpp = root.join("part.cpp");
+    let wrapper = root.join("archive-probe.cpp");
+    fs::write(&wrapper, "extern \"C\" int obs_fixture_msvc_pch(void);\nextern \"C\" __declspec(dllexport) int obs_fixture_archive_probe(void) { return obs_fixture_msvc_pch(); }\n").unwrap();
     let write_header = |value| {
         fs::write(
             &header,
@@ -336,27 +366,13 @@ __declspec(selectany) int fixture_c_storage = HEADER_VALUE;
             library.c_compile_options[1] = format!("/DFIXTURE_C={c_flag}");
             library.cpp_compile_options[1] = format!("/DFIXTURE_CPP={cpp_flag}");
             let artifact = build.shared_library(&library).unwrap();
-            if requested == obs_build::BUILD_TARGET {
-                // SAFETY: the fixture defines this no-argument C ABI function.
-                assert_eq!(
-                    unsafe { answer(&artifact, b"obs_fixture_msvc_pch", &[]) },
-                    expected
-                );
-            } else {
-                let result = std::process::Command::new(
-                    std::env::var_os("OBS_NATIVE_WINDOWS_READOBJ")
-                        .unwrap_or_else(|| "llvm-readobj".into()),
-                )
-                .arg("--coff-exports")
-                .arg(&artifact)
-                .output()
-                .unwrap();
-                assert!(result.status.success());
-                assert!(
-                    String::from_utf8_lossy(&result.stdout).contains("Name: obs_fixture_msvc_pch")
-                );
-            }
+            assert_windows_function(&artifact, "obs_fixture_msvc_pch", expected, &requested);
         }
+        let archive = build.static_library(&library).unwrap();
+        let artifact = build
+            .shared_library(&target("fixture-archive-pch", &wrapper, vec![archive]))
+            .unwrap();
+        assert_windows_function(&artifact, "obs_fixture_archive_probe", 84, &requested);
         let pch: Vec<_> = fs::read_dir(build.output.join("pch"))
             .unwrap()
             .map(|entry| entry.unwrap().path())
@@ -373,6 +389,33 @@ __declspec(selectany) int fixture_c_storage = HEADER_VALUE;
                 "MSVC PCH creation also emits a required object"
             );
         }
+    }
+}
+
+fn assert_windows_function(library: &Path, symbol: &str, expected: i32, target: &str) {
+    if target == obs_build::BUILD_TARGET {
+        // SAFETY: both owning fixtures define no-argument C ABI functions;
+        // answer keeps each library loaded throughout the call.
+        assert_eq!(unsafe { answer(library, symbol.as_bytes(), &[]) }, expected);
+    } else {
+        let result = std::process::Command::new(
+            std::env::var_os("OBS_NATIVE_WINDOWS_READOBJ").unwrap_or_else(|| "llvm-readobj".into()),
+        )
+        .arg("--coff-exports")
+        .arg(library)
+        .output()
+        .unwrap();
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let name = format!("Name: {symbol}");
+        assert!(
+            String::from_utf8_lossy(&result.stdout)
+                .lines()
+                .any(|line| line.trim() == name)
+        );
     }
 }
 

@@ -334,6 +334,9 @@ pub fn build_pair(
     common.sources.clear();
     common.precompiled_headers.clear();
     common.source_compile_options.clear();
+    common.resource_files.clear();
+    common.resource_compile_options.clear();
+    common.resource_input_files.clear();
     common.precompiled_objects = objects;
     let mut reference = common.clone();
     reference.name = "obs-c-reference".into();
