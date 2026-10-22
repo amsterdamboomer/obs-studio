@@ -208,6 +208,7 @@ def green_run(run_id: int = 100, sha: str = SHA, event: str = "schedule") -> dic
         "Native macOS arm64 DMG startup 🧪",
         "Release gate 🚦",
         "Publish pre-release 🚀",
+        "Release gate 🚦 / Fast Gate ⚡",
         "Continuous AppImage ♻️",
     ]
     return {
@@ -217,7 +218,11 @@ def green_run(run_id: int = 100, sha: str = SHA, event: str = "schedule") -> dic
         "status": "completed",
         "conclusion": "success",
         "jobs": [{"name": name, "conclusion": "success"} for name in jobs]
-        + [{"name": "Certify release 🏅", "conclusion": "skipped"}],
+        # Skipped by design: a reusable workflow's own job, and certify itself.
+        + [
+            {"name": "AppImage 📦 / Publish to GitHub Releases 🚀", "conclusion": "skipped"},
+            {"name": "Certify release 🏅", "conclusion": "skipped"},
+        ],
     }
 
 
@@ -269,6 +274,8 @@ class CheckCertifiableTests(unittest.TestCase):
             ("AppImage 📦", "skipped"),
             ("Continuous AppImage ♻️", "timed_out"),
             ("Release gate 🚦", None),
+            ("Release gate 🚦", "skipped"),
+            ("Release gate 🚦 / Fast Gate ⚡", "failure"),
         ):
             with self.subTest(name=name, conclusion=conclusion):
                 run = green_run()
@@ -297,7 +304,7 @@ class CheckCertifiableTests(unittest.TestCase):
     def test_the_latest_publishing_run_decides(self) -> None:
         failed = green_run(run_id=100)
         failed["conclusion"] = "failure"
-        failed["jobs"][-2]["conclusion"] = "failure"  # continuous, after publishing
+        failed["jobs"][-3]["conclusion"] = "failure"  # continuous, after publishing
         repair = green_run(run_id=105, event="workflow_dispatch")
         self.assertEqual(self.feed.check_certifiable(facts(runs=[failed, repair]), NOW, 2), [])
         self.refused(facts(runs=[repair, {**failed, "id": 110}]))
