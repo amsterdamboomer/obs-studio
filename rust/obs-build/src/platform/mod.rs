@@ -16,6 +16,31 @@ mod plugins_macos;
 pub(crate) mod resources;
 mod swift_macos;
 
+pub fn qt_wrapper_inputs(target: &str, root: &Path) -> Result<Vec<String>, String> {
+    let path = root.join("shared/qt/wrappers/source-sets.json");
+    println!("cargo:rerun-if-changed={}", path.display());
+    let sets: std::collections::BTreeMap<String, Vec<String>> =
+        serde_json::from_slice(&std::fs::read(&path).map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())?;
+    let host = if target.contains("windows") {
+        "windows"
+    } else if target.contains("apple") {
+        "macos"
+    } else {
+        "posix"
+    };
+    let mut inputs = Vec::new();
+    for key in ["common", host] {
+        for input in sets
+            .get(key)
+            .ok_or_else(|| format!("Qt wrappers source set missing: {key}"))?
+        {
+            inputs.push(format!("shared/qt/wrappers/{input}"));
+        }
+    }
+    Ok(inputs)
+}
+
 pub fn application_sources(
     target: &str,
     udev: bool,

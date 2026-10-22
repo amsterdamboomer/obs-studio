@@ -223,7 +223,7 @@ pub fn build_application_with_options(
             library.include_dirs.push(path.join("include"));
         } else {
             library.include_dirs.push(path);
-            add_inputs(build, &root, &mut library, &inputs)?;
+            add_interface_inputs(build, &root, &mut library, &directory, &inputs)?;
         }
     }
     library.sources.push(root.join("deps/json11/json11.cpp"));
@@ -244,6 +244,21 @@ pub fn build_application_with_options(
         &root.join("frontend/build/frontend-components.pch.hpp"),
     )?;
     build.executable(&library)
+}
+
+pub(crate) fn add_interface_inputs(
+    build: &NativeBuild,
+    root: &Path,
+    library: &mut SharedLibrary,
+    directory: &str,
+    inputs: &[String],
+) -> Result<(), String> {
+    if directory == "shared/qt/wrappers" {
+        let inputs = crate::platform::qt_wrapper_inputs(&build.target, root)?;
+        add_inputs(build, root, library, &inputs)
+    } else {
+        add_inputs(build, root, library, inputs)
+    }
 }
 
 pub(crate) fn add_inputs(
