@@ -5,7 +5,7 @@ fn main() -> std::process::ExitCode {
     match obs_build::cli::run(std::env::args_os().skip(1)) {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("obs-native-build: {error}");
+            eprintln!("obs-build: {error}");
             std::process::ExitCode::FAILURE
         }
     }

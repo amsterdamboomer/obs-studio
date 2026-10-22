@@ -1047,11 +1047,15 @@ pub fn configure_application(
     }
     configure_cpp_module(target, library)?;
     library.file_name = None;
-    let inputs: Vec<String> =
-        serde_json::from_value(manifest["linux"].clone()).map_err(|e| e.to_string())?;
-    library
-        .sources
-        .extend(inputs.iter().map(|path| root.join(path)));
+    let sets: Vec<String> =
+        serde_json::from_value(manifest["linux_sets"].clone()).map_err(|e| e.to_string())?;
+    let inputs = crate::frontend::source_set_inputs(root, &sets)?;
+    library.sources.extend(
+        inputs
+            .iter()
+            .filter(|path| path.ends_with(".cpp") || path.ends_with(".c"))
+            .map(|path| root.join(path)),
+    );
     for package in ["Qt6DBus", "libpci", "x11", "x11-xcb", "xcb"] {
         crate::libobs::add_package(library, target, package)?;
     }
