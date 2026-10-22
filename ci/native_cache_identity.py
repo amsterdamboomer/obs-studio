@@ -4,3 +4,7 @@
 
 def capture(platform, architecture, configuration):
     raise NotImplementedError
+
+
+def tool_versions(platform, architecture):
+    raise NotImplementedError
