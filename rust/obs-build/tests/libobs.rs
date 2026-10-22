@@ -3,6 +3,8 @@ use obs_build::{NativeBuild, frontend, graphics, libobs, plugins, scripting};
 use std::{ffi::c_void, path::PathBuf};
 #[path = "libobs/application.rs"]
 mod application;
+#[path = "libobs/macos_capture.rs"]
+mod macos_capture;
 #[path = "libobs/macos_graphics.rs"]
 mod macos_graphics;
 #[path = "libobs/native_tests.rs"]
@@ -1390,6 +1392,8 @@ fn macos_core_builds_from_the_canonical_manifest() {
     if std::env::var_os("OBS_BUILD_MACOS_CAPTURE").is_some() {
         use obs_build::plugins::{MacosCaptureModule, build_macos_capture};
         let mut symbols_by_module = std::collections::BTreeMap::new();
+        let probe = macos_capture::build_probe(&build, &root, &options, &library);
+        let mut paths = String::new();
         for module in [
             MacosCaptureModule::ScreenAudio,
             MacosCaptureModule::Camera,
@@ -1423,7 +1427,21 @@ fn macos_core_builds_from_the_canonical_manifest() {
                 );
             }
             symbols_by_module.insert(module.name(), symbols);
+            for path in [&artifact.library, &artifact.data, &probe] {
+                assert!(
+                    !path.to_str().unwrap().contains(['\t', '\n', '\r']),
+                    "capture probe manifest needs single-line paths"
+                );
+            }
+            paths.push_str(&format!(
+                "{}\t{}\t{}\t{}\n",
+                module.name(),
+                artifact.library.display(),
+                artifact.data.display(),
+                probe.display()
+            ));
         }
+        std::fs::write(build.output.join("macos-capture-paths.txt"), paths).unwrap();
         std::fs::write(
             build.output.join("macos-capture-symbols.json"),
             serde_json::to_vec_pretty(&symbols_by_module).unwrap(),
