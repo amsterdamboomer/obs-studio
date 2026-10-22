@@ -284,6 +284,12 @@ class FlatpakPrunedBuildTest(unittest.TestCase):
         manifest.write_text(json.dumps({'id': 'com.obsproject.Studio', 'command': 'obs', 'modules': [
             {'name': 'dependency'}, {'name': 'obs', 'post-install': ['existing-command']},
         ]}))
+        # flatpak-builder --state-dir scopes refs to the absolute manifest path.
+        from urllib.parse import quote
+        branch = quote('x86_64-' + str(manifest.resolve())[1:], safe='').replace('%', '_')
+        refs = state / 'cache/refs/heads' / branch
+        refs.mkdir(parents=True)
+        (refs / 'build-dependency').write_text('a' * 64 + '\n')
         return state, manifest
 
     def test_pruned_rebuild_isolated_and_validates_outputs(self):
@@ -314,6 +320,11 @@ class FlatpakPrunedBuildTest(unittest.TestCase):
                     self.assertFalse((copied / 'downloads').exists())
                     self.assertFalse((copied / 'ccache').exists())
                     recipe = Path(command[-1])
+                    from urllib.parse import quote
+                    branch = quote('x86_64-' + str(recipe.resolve())[1:], safe='').replace('%', '_')
+                    selected = copied / 'cache/refs/heads' / branch / 'build-dependency'
+                    self.assertTrue(selected.is_file(), 'temporary manifest must select copied dependency refs')
+                    self.assertEqual(selected.read_text(), 'a' * 64 + '\n')
                     self.assertEqual(recipe.parent, manifest.parent)
                     prepared = json.loads(recipe.read_text())
                     self.assertEqual(prepared['modules'][0], {'name': 'dependency'})
