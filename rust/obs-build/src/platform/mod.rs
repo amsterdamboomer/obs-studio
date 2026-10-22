@@ -58,6 +58,14 @@ pub fn application_rust_archives(
     })
 }
 
+pub fn configure_application_archive_command(
+    build: &crate::NativeBuild,
+    command: &mut Command,
+) -> Result<(), String> {
+    validate_application_build(build)?;
+    application_linux::configure_archive_command(build, command)
+}
+
 pub fn stage_application_runtime(
     build: &crate::NativeBuild,
     inputs: &crate::application::RuntimeInputs<'_>,

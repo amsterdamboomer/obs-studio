@@ -272,6 +272,7 @@ where
             request.profile.assertions().to_string(),
         )
         .env(format!("CARGO_PROFILE_{cargo_profile}_PANIC"), "abort");
+    crate::platform::configure_application_archive_command(&build, &mut cargo)?;
     let status = cargo
         .status()
         .map_err(|e| format!("start soldr Cargo archive build: {e}"))?;
