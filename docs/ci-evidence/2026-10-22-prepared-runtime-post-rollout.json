@@ -2482,5 +2482,33 @@
     "Full-package control image was local; locked inventory is preserved, but immutable apt snapshots are not supplied.",
     "Raw stress rows are worker,trial,exit_status; every referenced log additionally confirms one passed cmocka case and zero inner skips.",
     "The source-added Pulse sample test has software prerequisites, not a hardware-device requirement."
-  ]
+  ],
+  "windows_link_failure_witnesses": [
+    {
+      "run_id": 39728526955,
+      "job_id": 119660751156,
+      "log_sha256": "2e5286295c379401cfb95af9112169ea3049198da2426dc9f20da40a82523571",
+      "linker_excerpts": [
+        "Build \ud83e\uddf1 / Rust Tier 2 windows-2025-vs2026\tUNKNOWN STEP\t2026-10-22T05:45:28.5928156Z test_video_output_plan.obj : error LNK2019: unresolved external symbol cm_print_error referenced in function check_plan [D:\\a\\obs-studio\\obs-studio\\build_rust\\test\\cmocka\\test_video_output_plan.vcxproj]",
+        "Build \ud83e\uddf1 / Rust Tier 2 windows-2025-vs2026\tUNKNOWN STEP\t2026-10-22T05:45:28.5929326Z D:\\a\\obs-studio\\obs-studio\\build_rust\\test\\cmocka\\RelWithDebInfo\\test_video_output_plan.exe : fatal error LNK1120: 1 unresolved externals [D:\\a\\obs-studio\\obs-studio\\build_rust\\test\\cmocka\\test_video_output_plan.vcxproj]"
+      ]
+    },
+    {
+      "run_id": 39730342498,
+      "job_id": 119666870978,
+      "log_sha256": "c28558b5df540aff1ac67838ff490230e0d1339774582a604cacf5450f32f8ad",
+      "linker_excerpts": [
+        "Build \ud83e\uddf1 / Rust Tier 2 windows-2025-vs2026\tUNKNOWN STEP\t2026-10-22T06:06:01.8062941Z test_video_output_plan.obj : error LNK2019: unresolved external symbol cm_print_error referenced in function check_plan [D:\\a\\obs-studio\\obs-studio\\build_rust\\test\\cmocka\\test_video_output_plan.vcxproj]",
+        "Build \ud83e\uddf1 / Rust Tier 2 windows-2025-vs2026\tUNKNOWN STEP\t2026-10-22T06:06:01.8064879Z D:\\a\\obs-studio\\obs-studio\\build_rust\\test\\cmocka\\RelWithDebInfo\\test_video_output_plan.exe : fatal error LNK1120: 1 unresolved externals [D:\\a\\obs-studio\\obs-studio\\build_rust\\test\\cmocka\\test_video_output_plan.vcxproj]"
+      ]
+    }
+  ],
+  "later_master_overall_outcome": {
+    "run_id": 39733445653,
+    "status": "completed",
+    "conclusion": "failure",
+    "failed_job": "Build / Rust Tier 2 windows-2025-vs2026",
+    "linux_qualification": "success",
+    "trusted_cost_publication": "success"
+  }
 }
