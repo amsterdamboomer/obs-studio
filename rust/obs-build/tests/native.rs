@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
             "disabled": {"sources": ["does-not-exist.c"], "requires": "GRAPH_DISABLED"}
         },
         "tests": {
-            "answer-case": {"target": "answer", "suite": "fixture", "optional_prefixes": [["cmake", "-E", "env", "OBS_WRAPPER_VALUE=outer"], ["obs-missing-wrapper-fixture-1332"], ["cmake", "-E", "env", "OBS_WRAPPER_VALUE=wrapped"]], "command": ["${target}", "two words"],
+            "answer-case": {"target": "answer", "suite": "fixture", "optional_prefixes": [["cmake", "-E", "env", "OBS_WRAPPER_VALUE=outer"], ["obs-missing-wrapper-fixture-1332", "${source}", "${build}", "${runtime}", "${target}"], ["cmake", "-E", "env", "OBS_WRAPPER_VALUE=wrapped"]], "command": ["${target}", "two words"],
                 "environment": {"OBS_GRAPH_VALUE": "first;second"},
                 "working_directory": "${runtime}", "timeout_seconds": 17,
                 "skip_return_code": 77, "resource_locks": ["fixture-lock"]},
