@@ -41,6 +41,53 @@ class CacheMetricsTest(unittest.TestCase):
         self.assertIsNone(report["observed_test_output_seconds"])
         self.assertEqual(report["result_summaries"], 0)
 
+    def test_nextest_summary_is_separate_from_compilation_and_cargo_doctests(self):
+        log = "\n".join([
+            "Gate\tTests\t2026-01-01T00:00:00Z + soldr cargo nextest run --workspace --locked",
+            "Gate\tTests\t2026-01-01T00:00:31Z 31.0 ^[[92mFinished^[[0m `test` profile [unoptimized] target(s) in 30.50s",
+            "Gate\tTests\t2026-01-01T00:00:32Z 32.0 ^[[32mStarting^[[0m 2020 tests across 8 binaries (1 test skipped)",
+            "Gate\tTests\t2026-01-01T00:01:44Z 104.0 ^[[32mSummary^[[0m [ 72.242s] 2020 tests run: 2020 passed, 1 skipped",
+            "Gate\tTests\t2026-01-01T00:01:45Z + soldr cargo test --workspace --locked --doc",
+            "Gate\tTests\t2026-01-01T00:01:46Z Doc-tests obs_audio_io",
+            "Gate\tTests\t2026-01-01T00:01:47Z test result: ok. 2 passed; 0 failed; 0 ignored; finished in 0.03s",
+        ])
+        execution, docs = metrics.parse_rust_test_logs(log)['Gate']
+        self.assertEqual(execution['runner'], 'nextest')
+        self.assertEqual(execution['cargo_build_and_link_seconds'], 30.5)
+        self.assertEqual(execution['command_to_first_test_seconds'], 32)
+        self.assertEqual(execution['observed_test_output_seconds'], 72)
+        self.assertEqual(execution['nextest_reported_execution_seconds'], 72.242)
+        self.assertEqual(execution['nextest_summaries'][0]['tests_run'], 2020)
+        self.assertEqual(execution['nextest_summaries'][0]['counts'], {'passed': 2020, 'skipped': 1})
+        self.assertEqual(docs['runner'], 'cargo-doctests')
+        self.assertEqual(docs['cargo_results'][0]['passed'], 2)
+        self.assertEqual(docs['observed_test_output_seconds'], 1)
+
+    def test_interrupted_nextest_and_other_commands_do_not_invent_success(self):
+        log = "\n".join([
+            "Gate\tTests\t2026-01-01T00:00:00Z + soldr cargo nextest run --workspace",
+            "Gate\tTests\t2026-01-01T00:00:01Z Starting 2000 tests across 8 binaries",
+            "Gate\tTests\t2026-01-01T00:00:02Z + soldr cargo check --workspace",
+            "Gate\tTests\t2026-01-01T00:00:03Z Summary [2.0s] 2000 tests run: 2000 passed",
+        ])
+        report = metrics.parse_rust_test_logs(log)['Gate'][0]
+        self.assertIsNone(report['nextest_reported_execution_seconds'])
+        self.assertEqual(report['nextest_summaries'], [])
+        self.assertIsNone(report['observed_test_output_seconds'])
+
+    def test_nextest_failed_partial_execution_retains_explicit_counts_only(self):
+        log = "\n".join([
+            "Gate\tTests\t2026-01-01T00:00:00Z + soldr cargo nextest run --workspace",
+            "Gate\tTests\t2026-01-01T00:00:03Z Summary [1.25s] 4/10 tests run: 3 passed, 1 failed, 6 not run, 1 skipped",
+        ])
+        report = metrics.parse_rust_test_logs(log)['Gate'][0]
+        self.assertEqual(report['nextest_summaries'][0]['tests_run'], 4)
+        self.assertEqual(report['nextest_summaries'][0]['counts'], {'passed': 3, 'failed': 1, 'not run': 6, 'skipped': 1})
+        self.assertNotIn('failed', metrics.parse_rust_test_logs(
+            "Gate\tTests\t2026-01-01T00:00:00Z + soldr cargo nextest run --workspace\n"
+            "Gate\tTests\t2026-01-01T00:00:03Z Summary [1.25s] 4 tests run: 4 passed"
+        )['Gate'][0]['nextest_summaries'][0]['counts'])
+
     def test_dispatch_time_uses_job_creation_not_run_creation(self):
         job = {"created_at": "2026-10-21T00:26:13Z", "started_at": "2026-10-21T00:28:29Z"}
         self.assertEqual(metrics.creation_to_start_seconds(job), 136)
