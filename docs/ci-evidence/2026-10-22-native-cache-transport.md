@@ -237,3 +237,29 @@ Next: retain the complete run outcome and required coverage, then land only the
 integrated default-off experiment through normal PR CI/queue to permit a trusted
 master publication qualification. Do not adopt the backend or claim hosted
 transfer/native consumer reuse before those actual measurements.
+
+
+### Completed first qualification run
+
+Run 39752689352 is now terminal **success** at source
+`121236fc30bff455ea23eb4655e63d8400036486`: 30 jobs total, 22 successful and
+8 explicitly skipped. The evidence bundle preserves both the earlier live
+snapshot and the final complete job/step metadata, plus Tier 2 log provenance.
+No job was cancelled or retried.
+
+- Linux Tier 2 OFF and ON: 360 registered, 356 executed and four Pulse skips
+  per mode, zero failures. CTest times 166.10 / 187.45 seconds respectively.
+- Windows Tier 2: four suites (CMake C/Rust and Cargo C/Rust), 178 tests each,
+  all passing; times 83.48 / 81.37 / 82.85 / 81.86 seconds.
+- macOS Tier 2: four CMake/Cargo C/Rust suites, 203 registered and 202 executed
+  per suite, one SVT-AV1 skip each; times 135.63 / 120.22 / 121.81 / 120.41 seconds.
+- Four native app builds and real local archive checks, Flatpak, Ubuntu app,
+  Qt, Fast Gate, Rust tests/cross lint and format jobs all passed.
+
+The native publisher and prepared-environment experiment were deliberately
+skipped: this branch dispatch cannot publish cache releases. Existing event/scope
+skips and the compatibility Linux summary job are recorded separately in the raw
+job metadata. A green branch run does not qualify hosted transfer or a native
+build consuming that transfer. Proceed through normal PR CI/merge queue with the
+experiment default off, then measure one trusted master producer/read-only
+consumer qualification before deciding backend adoption or #1269 closure.
