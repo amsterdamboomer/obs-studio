@@ -143,3 +143,21 @@ The separate capacity experiment in #1712 has its own defined measurement
 purpose and source; it does not replace this failed full consumer observation.
 Global allocation, native architecture retention and representative durability
 remain incomplete under #1269.
+
+
+## Follow-up inventory at 04:30:08 UTC
+
+The appended `consumer_terminal_followup` snapshot preserves the full
+listing, separate usage response, exact configuration and read-only pinned
+janitor replay. Listed bytes are 11,594,999,856 (857,581,616 above 10 GiB);
+the separate usage endpoint reports 10,693,970,650. These non-atomic
+observations differ and must not be combined into a precise capacity claim.
+
+All four native architecture seeds have observed replacements at source
+`ee148335c2e1e4780c77c07dec2a3ed50bd4faab`: Windows ARM64 ID 9319099738
+(901,029,206 bytes), Windows x64 ID 9318776303 (1,063,370,526), macOS
+x86_64 ID 9318835096 (671,583,563), macOS ARM64 ID 9318871800 (659,997,049).
+The Flatpak seed 9318164547 remains present. Target compiler and apt families
+remain absent. Replacements do not prove retention of the prior native
+entries; presence now does not establish representative durability or explain
+the disappearance of other entries. No deletion callback was supplied.
