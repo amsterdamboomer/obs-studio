@@ -37,6 +37,12 @@ libc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6 (0x234)
         self.assertEqual(m.package_names('libc6:amd64: /usr/lib/libc.so.6\n'), {'libc6:amd64'})
         self.assertEqual(m.pinned_package('libc6:amd64', '2.42-0ubuntu3'), 'libc6:amd64=2.42-0ubuntu3')
 
+    def test_loader_diversions_are_not_package_ownership_records(self):
+        m = module()
+        diversion = 'diversion by libc6 from: /lib64/ld-linux-x86-64.so.2\n'
+        self.assertEqual(m.package_names(diversion), set())
+        self.assertEqual(m.package_names(diversion + 'libc6:amd64: /usr/lib64/ld-linux-x86-64.so.2\n'), {'libc6:amd64'})
+
     def test_malformed_package_metadata_cannot_become_apt_options(self):
         m = module()
         for name, version in [('--allow-unauthenticated', '1'), ('libc6', '1\n--option'), ('libc6', '')]:
@@ -59,9 +65,25 @@ libc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6 (0x234)
     def test_runtime_only_inputs_cover_non_linked_drivers_plugins_and_tools(self):
         m = module()
         for name in ('libgl1-mesa-dri', 'libegl-mesa0', 'vlc-plugin-base', 'pipewire',
-                     'dbus-daemon', 'xvfb', 'xauth', 'cmake', 'python3'):
+                     'dbus-daemon', 'xvfb', 'xauth', 'cmake', 'python3', 'ninja-build',
+                     'gcc', 'libc6-dev', 'libvlc-dev'):
             self.assertIn(name, m.RUNTIME_TOOLS)
         self.assertNotIn('build-essential', m.RUNTIME_TOOLS)
+
+
+class RuntimeWorkflowTest(unittest.TestCase):
+    def test_manifest_is_produced_and_transferred_before_runtime_install(self):
+        text = (ROOT / '.github/workflows/build-project.yaml').read_text()
+        build = text.split('  rust-linux-tier2-build:', 1)[1].split('  rust-linux-tier2:', 1)[0]
+        tests = text.split('  rust-linux-tier2:', 1)[1].split('  rust-linux-tier2-done:', 1)[0]
+        self.assertIn('runtime-packages.py', build)
+        self.assertLess(build.index('runtime-packages.py'), build.index('Upload Tier 2 Tree'))
+        self.assertIn('${{ runner.temp }}/tier2-pack/runtime-packages.txt', build)
+        self.assertLess(tests.index('actions/download-artifact@'), tests.index('Install Tier 2 Packages'))
+        install = tests.split('Install Tier 2 Packages', 1)[1].split('- name: Unpack', 1)[0]
+        self.assertIn('test -s "$RUNNER_TEMP/tier2-pack/runtime-packages.txt"', install)
+        self.assertIn('< "$RUNNER_TEMP/tier2-pack/runtime-packages.txt"', install)
+        self.assertNotIn("grep -v '^#'", install)
 
 
 if __name__ == '__main__':
