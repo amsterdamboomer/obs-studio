@@ -333,6 +333,7 @@ jobs:
           uv run ci/native_cache_identity.py --platform macos
           --architecture '${{ matrix.target }}' --configuration '${{ needs.check-event.outputs.config }}'
           --output '${{ runner.temp }}/native-cache-identity.json'
+          --diagnostics '${{ runner.temp }}/native-cache-identity-diagnostics.json'
 
       - name: Qualify Local Native Cache Archive
         shell: bash
@@ -358,7 +359,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: native-cache-identity-macos-${{ matrix.target }}
-          path: ${{ runner.temp }}/native-cache-identity.json
+          path: |
+            ${{ runner.temp }}/native-cache-identity.json
+            ${{ runner.temp }}/native-cache-identity-diagnostics.json
           retention-days: 1
           if-no-files-found: error
 
@@ -971,6 +974,7 @@ jobs:
           uv run ci/native_cache_identity.py --platform windows
           --architecture '${{ matrix.architecture }}' --configuration '${{ needs.check-event.outputs.config }}'
           --output '${{ runner.temp }}/native-cache-identity.json'
+          --diagnostics '${{ runner.temp }}/native-cache-identity-diagnostics.json'
 
       - name: Qualify Local Native Cache Archive
         shell: bash
@@ -996,7 +1000,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: native-cache-identity-windows-${{ matrix.architecture }}
-          path: ${{ runner.temp }}/native-cache-identity.json
+          path: |
+            ${{ runner.temp }}/native-cache-identity.json
+            ${{ runner.temp }}/native-cache-identity-diagnostics.json
           retention-days: 1
           if-no-files-found: error
 
