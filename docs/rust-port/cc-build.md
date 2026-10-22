@@ -116,7 +116,7 @@ Set `OBS_BUILD_WINDOWS_GRAPHICS=1` on the existing Windows core integration
 contract to build both renderers. `OBS_BUILD_WINDOWS_GPU_PRIORITY` selects the
 D3D11 priority. `OBS_BUILD_WINDOWS_D3D11_REFERENCE` and
 `OBS_BUILD_WINDOWS_OPENGL_REFERENCE` require exact exported symbol agreement with
-actual CMake renderers. Cross builds produced 172 D3D11 and 152 OpenGL exports
+actual CMake renderers. Cross builds produced 171 D3D11 and 151 OpenGL exports
 and version-resource sections; they do not prove native loading or rendering.
 
 The Windows Tier 2 path also builds the original CMake renderers and compares
