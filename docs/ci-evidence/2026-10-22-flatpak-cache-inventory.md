@@ -44,5 +44,61 @@ can target specific redundant state only if the measured contents and actual
 module reuse support it. Keep watcher cancellation disabled for the intentional
 full measurement, so an independent failure cannot silently erase its evidence.
 
-Hosted measurement remains pending. Global allocation and native architecture
-retention are unresolved under #1269; this is the only selected issue.
+Hosted Flatpak observation is recorded below. Global allocation and native
+architecture retention are unresolved under #1269; this is the only selected issue.
+
+## Observed full-run Flatpak job
+
+The defined run [39713423365](https://github.com/obs-rust/obs-studio/actions/runs/39713423365)
+on GREEN source `e8eb1327e29dcaf55796b6e504718911a24acfe3` produced successful
+Flatpak job [119609912965](https://github.com/obs-rust/obs-studio/actions/runs/39713423365/job/119609912965).
+It restored the 2,747,488,816-byte builder archive and 60,766,818-byte compiler
+archive, reused four obs-deps modules plus CEF and the Rust toolchain, built
+OBS and passed existing AppStream/build-directory/repository validation.
+The logged input was `build-bundle: false`; no distributable bundle or
+saved-profile runtime execution is claimed.
+The report step passed. The parent full workflow was still in progress at
+capture; its remaining platform jobs are not claimed successful here.
+
+[Recorded data and literal excerpts](2026-10-22-flatpak-cache-inventory.json):
+
+| Directory | Apparent bytes after builder |
+| --- | ---: |
+| Entire state | 5,670,286,365 |
+| cache | 4,582,107,102 |
+| cache/objects (within cache) | 4,582,106,385 |
+| downloads | 1,026,740,380 |
+| ccache | 61,438,581 |
+| build | 0 |
+
+Rows overlap and must not be added together. The compiler stats printed
+157/360 hits, but the restored counters were not reset after the final state
+restore; they are cumulative observations, **not** this-build cache-hit rates.
+No pruning or smaller allowance is adopted. The object store dominates the
+apparent working state, followed by downloads; determine which content is
+necessary for warm reuse before designing any removal experiment.
+
+## Separately observed restore-prefix mismatch
+
+A [read-only adapter probe](2026-10-22-flatpak-fallback-probe.cjs) extracts the
+pinned distributed action's actual Configuration/prepareBuild bodies. Its
+[results](2026-10-22-flatpak-fallback-probe.json) use the observed master key
+and a hypothetical changed manifest hash. The exact custom key matches; the
+changed key misses because the action's fallback `flatpak-builder-x86_64`
+does not prefix our `flatpak-builder-<hash>-x86_64` namespace.
+
+This is a verified namespace mismatch using injected prefix matching, not
+a real changed-manifest transport miss, build or performance measurement.
+The action body SHA-256 is
+`676fd5f2f7dd0116164a1db0d3abb1a8cb3f5488d764a64f5b4a8e126e05bcae`.
+Reproduce after downloading the distributed file at the action pin above
+and obtaining a read-only cache listing in the probe's recorded format:
+
+```sh
+node docs/ci-evidence/2026-10-22-flatpak-fallback-probe.cjs /path/to/pinned-dist.js /path/to/builder-keys.json
+```
+
+A future correction needs a same-architecture namespace and a migration that
+preserves the known useful master seed. This unit changes no keys or restore
+behavior. Keep that correctness/performance question separate from whether
+any measured directory is redundant.
