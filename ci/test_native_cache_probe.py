@@ -1,14 +1,16 @@
 """The opt-in cache experiment must measure real rebuilds without mutating its seed."""
-import os
+import json
+import importlib.util
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
 
-from ci.native_cache_probe import run_probe
-
-
 ROOT = Path(__file__).resolve().parent.parent
+SPEC = importlib.util.spec_from_file_location("native_cache_probe", ROOT / "ci/native_cache_probe.py")
+PROBE = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(PROBE)
+run_probe = PROBE.run_probe
 
 
 class NativeCacheProbeTest(unittest.TestCase):
@@ -28,7 +30,13 @@ class NativeCacheProbeTest(unittest.TestCase):
                     self.assertEqual((cache / "object").read_bytes(), b"original compiler object")
                     (cache / "object").write_bytes(b"rebuild changed private copy")
                 calls.append((command, env["CCACHE_MAXSIZE"], str(cache)))
-                return subprocess.CompletedProcess(command, 0, stdout="cache statistics\n")
+                if command == ["ccache", "--get-config", "cache_dir"]:
+                    stdout = str(cache)
+                elif command == ["ccache", "--print-stats", "--format=json"]:
+                    stdout = '{"direct_cache_hit": 12, "cache_miss": 3}'
+                else:
+                    stdout = "cache statistics\n"
+                return subprocess.CompletedProcess(command, 0, stdout=stdout)
 
             report = run_probe(seed, root / "probe", "arm64", "RelWithDebInfo", execute=execute)
             builds = [(command, limit, cache) for command, limit, cache in calls if command[0] == "cmake"]
@@ -38,6 +46,12 @@ class NativeCacheProbeTest(unittest.TestCase):
                 self.assertEqual(command, ["cmake", "--build", "--preset", "windows-arm64",
                                           "--config", "RelWithDebInfo", "--clean-first", "--parallel",
                                           "--", "/consoleLoggerParameters:Summary", "/noLogo"])
+            for _, limit, cache in builds:
+                commands = [command for command, _, path in calls if path == cache]
+                clean = commands.index(["ccache", "--cleanup"])
+                build = next(i for i, command in enumerate(commands) if command[0] == "cmake")
+                self.assertLess(commands.index(["ccache", f"--max-size={limit}"]), clean)
+                self.assertLess(clean, build)
             self.assertEqual((seed / "object").read_bytes(), b"original compiler object")
             self.assertEqual(report["status"], "success")
             self.assertEqual(len(report["observations"]), 4)
@@ -51,14 +65,36 @@ class NativeCacheProbeTest(unittest.TestCase):
             def fail(command, **kwargs):
                 if command[0] == "cmake":
                     raise subprocess.CalledProcessError(7, command)
-                return subprocess.CompletedProcess(command, 0, stdout="stats")
+                return subprocess.CompletedProcess(command, 0, stdout=kwargs["env"]["CCACHE_DIR"])
 
             with self.assertRaises(subprocess.CalledProcessError):
                 run_probe(seed, root / "probe", "x64", "RelWithDebInfo", execute=fail)
-            import json
             report = json.loads((root / "probe" / "report.json").read_text())
             self.assertEqual(report["status"], "failure")
             self.assertEqual(report["observations"], [])
+
+    def test_no_compilation_is_rejected_instead_of_reported_as_a_fast_build(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            seed = root / "seed"
+            seed.mkdir()
+
+            def no_compiles(command, **kwargs):
+                stdout = "{}" if "--print-stats" in command else kwargs["env"]["CCACHE_DIR"]
+                return subprocess.CompletedProcess(command, 0, stdout=stdout)
+
+            with self.assertRaisesRegex(RuntimeError, "no cacheable"):
+                run_probe(seed, root / "probe", "x64", "RelWithDebInfo", execute=no_compiles)
+            report = json.loads((root / "probe" / "report.json").read_text())
+            self.assertEqual(report["status"], "failure")
+            self.assertEqual(report["observations"], [])
+
+    def test_probe_refuses_recursive_copy_into_the_seed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            seed = Path(directory)
+            with self.assertRaisesRegex(ValueError, "separate directory trees"):
+                run_probe(seed, seed / "probe", "x64", "RelWithDebInfo")
+            self.assertFalse((seed / "probe").exists())
 
     def test_workflow_probe_is_explicit_manual_only_and_defaults_off(self):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text()
