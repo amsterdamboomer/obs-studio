@@ -127,7 +127,9 @@ fn native_test_graph_preserves_cpp_helper_build_requirements() {
         assert_eq!(target["includes"], serde_json::json!(["frontend/utility"]));
         let mut watched = vec!["frontend/utility".to_owned()];
         if let Some(implementation) = implementation {
-            watched.push(format!("frontend/build/frontend-utility-{implementation}.pch.hpp"));
+            watched.push(format!(
+                "frontend/build/frontend-utility-{implementation}.pch.hpp"
+            ));
         }
         assert_eq!(target["watch_inputs"], serde_json::json!(watched));
         let mut libraries = vec!["OBS::libobs"];
