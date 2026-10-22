@@ -467,6 +467,23 @@ class NativeCacheCommandTest(unittest.TestCase):
             report = json.loads((root / 'consume.json').read_text())
             self.assertEqual(report['status'], 'hit')
 
+    def test_local_verification_never_creates_network_store(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'source'
+            source.mkdir()
+            (source / 'object').write_text('local payload')
+            identity = root / 'identity.json'
+            identity.write_text(json.dumps(IDENTITY))
+            factory = mock.Mock(side_effect=AssertionError('network store must not be created'))
+            with mock.patch.dict(TRANSPORT.os.environ, {'GITHUB_SHA': SHA}, clear=True):
+                code = TRANSPORT.main(['verify-local', '--identity', str(identity), '--source', str(source),
+                                       '--report', str(root / 'report.json')], store_factory=factory)
+            self.assertEqual(code, 0)
+            factory.assert_not_called()
+            self.assertEqual(json.loads((root / 'report.json').read_text())['status'], 'verified-local')
+            self.assertEqual(sorted(path.name for path in root.iterdir()), ['identity.json', 'report.json', 'source'])
+
     def test_required_hit_command_fails_on_cold_fallback(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
