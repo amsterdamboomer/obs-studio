@@ -9,8 +9,9 @@ actual transport savings or a successful application rebuild from that state.
 This default-off manual probe copies retained builder state into an isolated
 temporary directory. The revised candidate retains only the cache dependency
 repository, omitting downloads, ccache and transient builder scaffolding. It never
-builds in, moves, deletes or prunes original state. Retained symlinks and
-scratch inside original state are rejected. Copying may affect original atime.
+builds in, moves, deletes or prunes original state. Structural repository symlinks and scratch inside original state are rejected.
+OSTree checksum-addressed file link objects are preserved as opaque links,
+never followed; the copied repository must pass fsck before building. Copying may affect original atime.
 
 A temporary prepared manifest beside the original preserves relative source
 resolution. It adds an executable-existence check and a unique stdout marker
@@ -101,3 +102,60 @@ flatpak-pruned-build-probe=true, flatpak-cache-probe=false and
 native-cache-probe=false. It preserves full selection and existing normal
 validation before probing the narrower dependency projection. No result
 claimed yet; no unchanged-workflow retry or production policy adoption.
+
+
+## Second hosted failure and typed object-copy correction
+
+Second trial39729660321 on446a12945 completed Flatpak job119661622603
+with FAILURE after normal output validation. The diagnostic now identifies
+`cache/objects/19/295cb5c20e23c52c02cb635c5bfcf569a0f02ad8c62de8bdbb24b5f8e74ee2.file`.
+The isolated application rebuild never started. Its link target and repository
+mode were not logged; do not infer them from the builder version. Existing
+caches can predate that builder. Metadata, failed JSON and log excerpts/hash
+are appended under second_trial in the failed record.
+
+Windows job119662888783 independently failed to link cm_print_error from
+test_video_output_plan before CTest. It is recorded with existing #1713
+ownership. #1580 was the resolved occurrence in a different test, not a
+reopened blocker. No C test or public header was changed here. Parent was
+still active at capture; this is not full-green qualification.
+
+REDe5cc741a2 (pre-rebase4d941bfcd) rejects a checksum-shaped OSTree link object in the old guard.
+The correction preserves only paths matching cache/objects/HH/HASH.file as
+links, using copytree(symlinks=True); it never dereferences their targets.
+Control-path links remain rejected. Real ostree fsck validates the isolated
+copy before any application build; version/mode/object count/fsck duration
+are recorded. Original files and link targets are not passed as writable
+state to any command. Failed configuration parsing also produces failed JSON.
+
+The [real format fixture](2026-10-22-ostree-copy-fixture.py) passed with
+local OSTree2026.1 in bare mode: a real committed symlink object survives
+copy/fsck, modifying copied config leaves original config unchanged, original
+link target is unchanged, source fsck still passes and temporary paths clean
+up. The [result](2026-10-22-ostree-copy-fixture.json) records binary/helper/
+fixture identities and limits. It intentionally stops before building OBS;
+this is not a hosted application rebuild or parity of tool versions.
+
+Reproduce with ostree on PATH (the observed invocation used a Nix shell):
+
+```sh
+ostree_fixture_root=$(safe-mktemp /tmp/obs-ostree-copy-fixture)
+nix shell nixpkgs#ostree --command uv run --no-project docs/ci-evidence/2026-10-22-ostree-copy-fixture.py "$ostree_fixture_root"
+safe-rm -r "$ostree_fixture_root"
+```
+
+The Nix package locator may advance; the observed binary identity/version
+is recorded rather than claiming the locator fixes a future tool version.
+After the second full run is terminal and the correction is reviewed, one
+new-source trial must still qualify the actual forced build, six dependency
+hits and output validation. No third dispatch yet, no unchanged workflow retry
+and no production adoption or success claim.
+
+
+### Terminal second-trial outcome
+
+Run39729660321 is now terminal FAILURE. Flatpak and Windows Tier 2 failed
+for the independent reasons above; macOS Tier 2 and all other selected
+non-aggregate jobs passed. The aggregate CI Gate failed. Full terminal
+run/job metadata is appended under second_trial; earlier capture-time
+metadata remains preserved. No isolated application rebuild has succeeded.

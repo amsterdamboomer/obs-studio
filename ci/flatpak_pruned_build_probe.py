@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import configparser
+from itertools import chain
 import json
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
@@ -49,11 +52,18 @@ def measure(state, manifest, temp_root, execute=run):
     retained = [state / 'cache']
     if not (state / 'cache').is_dir():
         raise ValueError('expected populated dependency cache')
+    symbolic_objects = 0
     for path in retained:
-        if path.is_symlink() or (path.is_dir() and any(child.is_symlink() for child in path.rglob('*'))):
-            links = [path] if path.is_symlink() else [child for child in path.rglob('*') if child.is_symlink()]
-            relative = links[0].relative_to(state).as_posix()
-            raise ValueError('retained dependency cache contains symbolic link: ' + relative[:250])
+        for child in chain([path], path.rglob('*')):
+            if not child.is_symlink():
+                continue
+            relative = child.relative_to(state).as_posix()
+            # OSTree bare repositories may encode symlink payloads as link
+            # objects. Preserve those links as data; never follow them. All
+            # repository control paths must remain ordinary files/directories.
+            if not re.fullmatch(r'cache/objects/[0-9a-f]{2}/[0-9a-f]{62}\.file', relative):
+                raise ValueError('retained dependency cache contains structural symbolic link: ' + relative[:250])
+            symbolic_objects += 1
     # Keeping the temporary manifest beside its source preserves relative paths.
     # Both contexts clean up even when a build or validation fails.
     with tempfile.TemporaryDirectory(prefix='flatpak-pruned-build-', dir=scratch) as directory:
@@ -66,9 +76,16 @@ def measure(state, manifest, temp_root, execute=run):
             for source in retained:
                 destination = isolated / source.name
                 if source.is_dir():
-                    shutil.copytree(source, destination)
+                    shutil.copytree(source, destination, symlinks=True)
                 else:
                     shutil.copy2(source, destination)
+            ostree_version = execute(['ostree', '--version'], 30).strip()
+            configuration = configparser.ConfigParser()
+            configuration.read(isolated / 'cache/config')
+            repository_mode = configuration.get('core', 'mode', fallback='unknown')
+            fsck_start = time.monotonic()
+            execute(['ostree', '--repo=' + str(isolated / 'cache'), 'fsck'], 120)
+            fsck_seconds = time.monotonic() - fsck_start
             build, repo = root / 'build', root / 'repo'
             start = time.monotonic()
             output = execute([
@@ -97,11 +114,13 @@ def measure(state, manifest, temp_root, execute=run):
                 execute(['flatpak-builder-lint', '--exceptions', '--user-exceptions', str(EXCEPTIONS), kind, str(path)], 120)
     return {
         'status': 'success', 'architecture': 'x86_64', 'application_rebuilt': True,
+        'ostree_version': ostree_version, 'source_repository_mode': repository_mode,
+        'copied_symbolic_objects': symbolic_objects, 'repository_fsck_seconds': fsck_seconds,
         'reused_dependency_modules': dependencies, 'isolated_build_seconds': elapsed,
         'retained_state': ['cache'], 'omitted_state': ['downloads', 'ccache', 'transient builder state'],
         'limits': 'One isolated application rebuild and output validation, not runtime/profile validation, '
                   'Actions cache transport savings, representative cost or production adoption. '
-                  'Copy/setup and validation excluded from build timer; original state only read (may affect atime).',
+                  'Copy/setup, repository fsck and validation excluded from build timer; original state only read (may affect atime).',
     }
 
 
@@ -114,7 +133,7 @@ def main():
     args = parser.parse_args()
     try:
         result = measure(args.state, args.manifest, args.temp_root)
-    except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
+    except (OSError, ValueError, KeyError, configparser.Error, subprocess.CalledProcessError) as error:
         args.output.write_text(json.dumps({'status': 'failed', 'error': str(error)}, indent=2) + '\n')
         raise
     args.output.write_text(json.dumps(result, indent=2) + '\n')
