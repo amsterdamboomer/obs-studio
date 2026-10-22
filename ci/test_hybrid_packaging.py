@@ -14,6 +14,77 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class HybridPackagingTest(unittest.TestCase):
+    def flatpak_probe_fixture(self, root, fail=False):
+        state = root / '.flatpak-builder'
+        for name, size in [('downloads/archive', 100000), ('ccache/object', 50000), ('cache/object', 1000)]:
+            path = state / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(os.urandom(size))
+        manifest = root / 'manifest.json'
+        manifest.write_text('{}')
+        builder = root / 'flatpak-builder'
+        builder.write_text('''#!/bin/sh
+if [ "$1" = --version ]; then echo 'flatpak-builder fixture'; exit 0; fi
+state=
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = --state-dir ]; then shift; state=$1; fi
+  shift
+done
+mkdir -p "$state/downloads"
+printf reacquired > "$state/downloads/archive"
+''' + ('exit 17\n' if fail else 'exit 0\n'))
+        builder.chmod(0o755)
+        temporary = root / 'temporary'
+        temporary.mkdir()
+        return state, manifest, builder, temporary
+
+    def test_flatpak_capacity_probe_preserves_original_and_measures_exclusions(self):
+        from ci import flatpak_cache_probe
+        with tempfile.TemporaryDirectory() as directory:
+            state, manifest, builder, temporary = self.flatpak_probe_fixture(Path(directory))
+            before = {str(p): (p.read_bytes(), p.stat().st_mtime_ns)
+                      for p in state.rglob('*') if p.is_file()}
+            result = flatpak_cache_probe.measure(state, manifest, 'x86_64', builder, temporary)
+            self.assertEqual(result['status'], 'success')
+            self.assertGreater(result['downloads_apparent_bytes'], 100000)
+            self.assertGreaterEqual(result['warm_download_seconds'], 0)
+            self.assertGreaterEqual(result['fresh_download_seconds'], 0)
+            sizes = result['compression']
+            self.assertGreater(sizes['full']['bytes'], sizes['without_downloads']['bytes'])
+            self.assertGreater(sizes['without_downloads']['bytes'], sizes['without_downloads_or_compiler']['bytes'])
+            self.assertEqual(before, {str(p): (p.read_bytes(), p.stat().st_mtime_ns)
+                                    for p in state.rglob('*') if p.is_file()})
+            self.assertEqual(list(temporary.iterdir()), [])
+            self.assertIn('proxy', result['limits'].lower())
+
+    def test_flatpak_capacity_probe_failure_preserves_original_and_cleans_scratch(self):
+        from ci import flatpak_cache_probe
+        with tempfile.TemporaryDirectory() as directory:
+            state, manifest, builder, temporary = self.flatpak_probe_fixture(Path(directory), fail=True)
+            original = (state / 'downloads/archive').read_bytes()
+            with self.assertRaises(subprocess.CalledProcessError):
+                flatpak_cache_probe.measure(state, manifest, 'x86_64', builder, temporary)
+            self.assertEqual((state / 'downloads/archive').read_bytes(), original)
+            self.assertEqual(list(temporary.iterdir()), [])
+
+    def test_flatpak_capacity_probe_is_default_off_and_keeps_full_validation(self):
+        pull = (ROOT / '.github/workflows/ci.yml').read_text()
+        build = (ROOT / '.github/workflows/build-project.yaml').read_text()
+        for text in (pull, build):
+            self.assertIn('flatpak-cache-probe:', text)
+            block = re.search(r'(?m)^      flatpak-cache-probe:\n((?:        .*\n)+)', text)[1]
+            self.assertIn('type: boolean', block)
+            self.assertIn('default: false', block)
+        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.flatpak-cache-probe", pull)
+        job = build.split('  flatpak-build:\n', 1)[1].split('\n  windows-build:', 1)[0]
+        marker = '- name: Measure Flatpak Cache Capacity'
+        self.assertIn(marker, job)
+        self.assertLess(job.index('- name: Validate repository'), job.index(marker))
+        probe = job.split(marker, 1)[1].split('\n      - ', 1)[0]
+        self.assertIn('inputs.flatpak-cache-probe', probe)
+        self.assertIn('uv run ci/flatpak_cache_probe.py', probe)
+        self.assertNotIn('continue-on-error', probe)
+
     def test_windows_nvenc_reference_has_separate_linker_outputs(self):
         compiler = shutil.which("cc")
         if not compiler or not shutil.which("ninja"):
