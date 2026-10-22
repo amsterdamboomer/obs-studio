@@ -29,7 +29,8 @@
       "test/cmocka/test_hotkey_load.c",
       "libobs/obs-hotkey.c.h",
       "libobs/obs-hotkey-bindings.c.h",
-      "libobs/obs-hotkey-translations.c.h"
+      "libobs/obs-hotkey-translations.c.h",
+      "libobs/obs-hotkey-press.c.h"
     ],
     "definitions": [
       "obs=hotkey_test_obs"
@@ -503,6 +504,13 @@
     ]
   },
   {
+    "name": "test_portal_shortcut_sets",
+    "sources": [
+      "test/cmocka/test_portal_shortcut_sets.c",
+      "libobs/obs-nix-portal-shortcut-sets.c.h"
+    ]
+  },
+  {
     "name": "test_scene_blend",
     "sources": [
       "test/cmocka/test_scene_blend.c"
@@ -532,6 +540,13 @@
     "name": "test_darray_ops",
     "sources": [
       "test/cmocka/test_darray_ops.c"
+    ]
+  },
+  {
+    "name": "test_context_name_helpers",
+    "sources": [
+      "test/cmocka/test_context_name_helpers.c",
+      "libobs/obs-context-names.c.h"
     ]
   },
   {

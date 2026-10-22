@@ -39,6 +39,11 @@
     obs_hotkey_combination_from_data;
     obs_hotkey_combination_bindable;
     obs_hotkey_combination_to_data;
+    /* obs-hotkey-press.c. obs-hotkey.c calls them inside libobs. Not
+     * EXPORT. */
+    obs_hotkey_binding_query;
+    obs_hotkey_binding_inject;
+    obs_hotkeys_query_modifiers;
     /* platform-windows.c. Not EXPORT. */
     get_win_release_id;
     DllMain;
@@ -111,4 +116,10 @@
     obs_nix_portal_shortcut_id;
     obs_nix_portal_shortcut_combo;
     obs_nix_portal_shortcut_trigger;
+    /* obs-video-plan.c. obs.c calls them inside libobs. Not EXPORT. */
+    obs_video_size_valid;
+    obs_video_align_output_size;
+    obs_video_output_size_valid;
+    obs_video_scale_type_name;
+    obs_video_output_plan;
 };

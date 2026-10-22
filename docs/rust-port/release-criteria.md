@@ -202,3 +202,70 @@ parity on the supported configurations. Move the original C source to
 it, and keep differential tests running. Preserve the file's upstream
 copyright and license notices. Removing a production C file must not silently
 remove the behavioral baseline used to test its Rust replacement.
+
+## Certified releases (in-app updates)
+
+Every daily beta from `release-rust.yaml` is published as a GitHub
+**pre-release**, after the release gate and every platform build pass. It is
+never marked Latest, and the in-app updaters never offer it.
+
+A **certified** release is a daily beta a maintainer promotes to a full
+release:
+
+```sh
+gh workflow run release-rust.yaml -f certify=obs-studio-rust-v<version>
+```
+
+The `certify` job accepts only a published `obs-studio-rust-v*` release
+(published only after the gate). Its "Check the release" step runs
+`ci/update_feed.py check-certifiable` (#1757), which refuses the tag unless:
+
+- the `release-rust.yaml` run that published it (the newest run for the
+  tag's commit whose "Publish pre-release" job succeeded) concluded success,
+  with every job successful. Only the certify job and a reusable workflow's
+  own jobs (`Release gate 🚦 / ...`, `AppImage 📦 / ...`) may be skipped;
+- the release has been out at least `min_age_days` days (default 2), so a
+  daily gets two days of use as a beta first. For an emergency,
+  `-f min_age_days=0` skips the age check and logs a warning.
+
+It then checks its assets against `SHA256SUMS`, and
+runs `ci/update_feed.py`. That script writes the Sparkle appcasts
+(`updates_<arch>_v2.xml`, DMGs signed with `OBS_RUST_SPARKLE_PRIVATE_KEY`),
+the Windows `manifest.json` (ZIP URL, SHA-256 and size) and `branches.json`,
+both with `.sig` files signed by `OBS_RUST_UPDATE_RSA_PRIVATE_KEY`. The job
+uploads them to the release, and only then clears the pre-release flag and
+marks it Latest. Both updaters read
+`https://github.com/obs-rust/obs-studio/releases/latest/download/`, which
+GitHub resolves to the newest full release. Certify a build only after a
+maintainer has run it. Certifying an older release makes it Latest again,
+but an app newer than that release won't downgrade.
+
+### Stable, nightly and certify
+
+| Channel | Who gets it | Feed | Written by |
+|---|---|---|---|
+| `stable` (default) | everyone | `releases/latest/download/` (the Latest release) | the `certify` job, on a maintainer's dispatch |
+| `nightly` (opt-in) | users who pick **Nightly** under Settings > General > Updates > Update Channel | `releases/download/continuous/` (the rolling `continuous` pre-release) | the `nightly_feed` job, after every published daily |
+
+1. **Daily:** each day `release-rust.yaml` publishes `obs-studio-rust-v<version>`
+   as a pre-release once the gate and every build pass. Its `nightly_feed`
+   job then runs `ci/update_feed.py build --channel nightly` and uploads the
+   result onto `continuous`: Sparkle appcasts whose items carry
+   `<sparkle:channel>nightly</sparkle:channel>`, and a `manifest.json` (+
+   `.sig`) with `"channel": "nightly"`, all naming the daily's own assets. It
+   is signed with the same two secrets. Without them the job skips with a
+   warning and the daily still succeeds (#1759).
+2. **Certify:** at least two days later, a maintainer runs
+   `gh workflow run release-rust.yaml -f certify=<tag>` (add
+   `-f min_age_days=0` only in an emergency). The gate above checks the run
+   and the age, then the stable feed goes up and the release becomes Latest.
+3. **In the app:** the update channel lives in the global config
+   (`[General] UpdateBranch`, default `stable`). `nightly` is built into the
+   app, next to `stable`. Any other value (an upstream `beta`) falls back to
+   stable. On Windows the updater reads `manifest.json` from the channel's
+   feed. On macOS the Sparkle delegate reads the channel's appcast and
+   allows only that channel, so a stable app never takes a nightly item.
+   Switching from nightly back to stable never downgrades: the app waits for
+   a certified release newer than the nightly it runs. Every feed and
+   download URL must be under `https://github.com/obs-rust/obs-studio/`
+   (`ci/test_no_upstream_updater.py`).

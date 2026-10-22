@@ -556,6 +556,12 @@ record that churn separately from the still-open whole-budget allocation and
 durability work. A current inventory below the global budget does not prove
 that useful seeds survive the next nightly writer burst.
 
+The [24-hour PR and merge-group cohort](ci-evidence/2026-10-22-ci-cache-day-cohort.md)
+records gate latency, failures, cancellations and incomplete timing proxies
+separately for each event. Its companion and offline reproduction preserve
+the API evidence; the mixed population does not establish code-only latency
+or billed runner cost.
+
 ## Where this is going (open gaps)
 
 For a reproducible traffic/cache snapshot, run the read-only collector:
@@ -703,6 +709,25 @@ required-check settings and runner use before enabling it. Do not add a security
 scan to `CI Gate`, merge rules or queue cancellation dependencies. Nightly
 failures are investigated through nightly reports rather than blocking the queue.
 
+### Host Ubuntu package acquisition (#1269)
+
+The existing Fast Gate, Qt frontend, full Ubuntu app and both Flatpak
+saved-profile runtime jobs run
+`sudo bash ci/host_apt_mirrors.sh` before package work. It recognizes the
+runner-image mirror list with Azure HTTP priority 1 and Ubuntu archive HTTPS
+priority 2, then swaps those priorities. All URLs and security fallback remain
+present. Missing, linked, duplicate or unfamiliar layouts keep their original
+configuration; an actual rewrite failure fails the step. The helper needs no
+download or additional setup tool.
+
+Fast Gate, Qt and both runtime jobs use command-line acquire bounds of one retry and 15-second
+HTTP/HTTPS timeouts, on both update and installation. Package lists, trust
+checks, job limits and required tests remain unchanged. The motivation is the
+observed Qt setup in run 39788036193: 104 MB took 19m25s with 347 ignored fetch
+records before successful fallback transfers. Hosted outcomes must still be
+measured; this observation is not a controlled speedup estimate or proof of
+the underlying network fault.
+
 ### Optional Windows cache budget experiment (#1269)
 
 Manual `ci.yml` dispatches accept `native-cache-probe` (default `false`).
@@ -731,6 +756,42 @@ are not compressed GitHub archive sizes. Two samples per size from one runner
 do not establish representative-day latency, repository retention, or a
 universal size recommendation. Compare compile time and actual hits/misses
 before deciding whether to change the production limit.
+
+### Optional native release-cache build qualification (#1269)
+
+Manual `ci.yml` dispatches accept `native-cache-reuse-source` (default empty).
+Set it to a complete producer SHA only for a planned master qualification.
+It uses the existing four native app builds, with no extra compiler unit or
+test executable. The normal full-dispatch coverage still runs. Do not combine
+it with native transport publication or the Windows budget rebuild probe.
+
+Each native runner captures its own compiler/SDK/configuration identity and
+requires an exact-source release-cache hit with that profile before building.
+The restored directory replaces the Actions compiler cache for this run;
+neither compiler-cache save path publishes experimental state. A missing or
+mismatched profile fails qualification rather than becoming a hit. Tokens
+remain read-only in the native app jobs.
+
+`ci/native_cache_freshness.py` temporarily inserts a source/run-specific marker
+into an existing frontend log literal, then checks for that marker in the
+installed main executable after the real build. It records source and binary
+hashes. The always-run cleanup restores the exact original source bytes and
+refuses to overwrite an unrelated edit. Packaging is disabled for these builds.
+The overlay is experimental evidence, not a shipped source change or an app
+runtime test. `native-build-reuse-<platform>-<architecture>-<run>` artifacts
+retain identity, restoration, overlay, binary verification and cleanup reports
+for one day; preserve useful results before expiry.
+
+Archive restoration plus a fresh binary still does not prove compiler reuse
+or a net performance benefit. Retain the native compiler statistics, actual
+build/restore/setup times, failures and cold conditions, and compare costs
+against an appropriate control before adopting a backend. Routine PRs,
+queue runs, pushes, schedules and releases leave this input empty.
+
+The [first native build-reuse attempt](ci-evidence/2026-10-22-native-cache-build-reuse.md)
+failed qualification: Windows profiles were cold, and successful macOS app
+builds lacked installed-binary freshness proof. Its retained evidence includes
+the final failed gate and successful compatibility and protocol checks.
 
 ## Tier 2 execution and Fast Gate overlap
 

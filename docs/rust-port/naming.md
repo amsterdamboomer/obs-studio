@@ -53,13 +53,14 @@ One name per thing, so releases, crates and tags can't be confused (#320).
 | `libobs/obs-nal.c`, `obs-avc.c`, `obs-hevc.c`, `obs-av1.c` | `rust/obs-codec` |
 | `libobs/obs-data.c` | `rust/obs-data` |
 | `libobs/obs-properties.c` | `rust/obs-properties` |
-| `libobs/obs-hotkey-name-map.c`, `obs-hotkey-bindings.c.h`, `obs-hotkey-translations.c.h`, `obs-nix-hotkey-state.c.h`, `obs-nix-portal-shortcut-ids.c.h` | `rust/obs-hotkey` |
+| `libobs/obs-hotkey-name-map.c`, `obs-hotkey-bindings.c.h`, `obs-hotkey-translations.c.h`, `obs-hotkey-press.c.h`, `obs-nix-hotkey-state.c.h`, `obs-nix-portal-shortcut-ids.c.h` | `rust/obs-hotkey` |
 | `libobs/callback/` | `rust/obs-callback` |
 | `libobs/obs-missing-files.c.h` | `rust/obs-missing-files` |
 | `libobs/obs-output-delay.c.h`, `obs-output-interleave.c.h`, `obs-output-caption-text.c.h` | `rust/obs-output` |
 | `libobs/obs-scene*.c.h` | `rust/obs-scene` |
 | `libobs/audio-monitoring/` | `rust/obs-audio-monitoring` |
 | `libobs/obs-audio-controls.c.h` | `rust/obs-audio-controls` |
+| `libobs/obs.c.h` and the units extracted from it (`obs-video-plan.c.h`) | `rust/obs-core` |
 | `plugins/obs-nvenc/` (CUDA/NVENC loader) | `rust/obs-nvenc`, linked through `rust/obs-nvenc-plugin` |
 | GPU acceleration status (frontend, #846) | `rust/obs-gpu-status`, linked through `rust/obs-gpu-status-frontend` |
 | all libobs ports, as one C ABI drop-in | `rust/libobs-rust` |

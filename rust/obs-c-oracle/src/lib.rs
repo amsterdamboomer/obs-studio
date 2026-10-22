@@ -59,6 +59,7 @@ pub mod graphics_math;
 pub mod hevc;
 pub mod hotkey_bindings;
 pub mod hotkey_name_map;
+pub mod hotkey_press;
 pub mod hotkey_translations;
 pub mod lexer;
 pub mod missing_files;
@@ -109,6 +110,7 @@ pub mod video_frame;
 pub mod video_io;
 pub mod video_io_inlines;
 pub mod video_matrices;
+pub mod video_plan;
 
 /// Build directory of the original C archive, for symbol-isolation checks.
 pub const ORACLE_ARCHIVE_DIR: &str = env!("OUT_DIR");

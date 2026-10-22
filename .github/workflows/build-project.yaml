@@ -2,8 +2,24 @@ name: Build Project
 on:
   workflow_call:
     inputs:
+      flatpak-runtime-test:
+        description: Run the exported Flatpak with saved capture/browser sources and Debug extension (extra qualification cost)
+        type: boolean
+        default: false
+      flatpak-dependency-transfer-probe:
+        description: Also transfer actual OSTree cache state (requires compiler transfer probe; extra storage/build cost)
+        type: boolean
+        default: false
+      flatpak-compiler-transfer-probe:
+        description: Transfer an experimental compiler artifact to one fresh Flatpak builder (extra storage/build cost)
+        type: boolean
+        default: false
+      flatpak-cold-build:
+        description: Measure a fresh Flatpak builder and compiler cache without restoring or publishing either cache
+        type: boolean
+        default: false
       flatpak-pruned-build-probe:
-        description: Validate isolated application rebuild without cached downloads or compiler state
+        description: Validate dependency-only application rebuild and subsequent compiler reuse
         type: boolean
         default: false
       full:
@@ -20,11 +36,24 @@ on:
         description: Measure isolated Flatpak downloads and proxy compression after Flatpak output validation
         type: boolean
         default: false
+      native-cache-reuse-source:
+        description: Qualify real native builds from this exact release-cache producer SHA (manual master only)
+        type: string
+        default: ''
+      native-cache-transport-probe:
+        description: Qualify bounded native cache release transport on master (writes cache-only prereleases)
+        type: boolean
+        default: false
       native-cache-probe:
         description: Opt-in manual Windows compiler-cache budget measurement; does not replace full validation
         type: boolean
         required: false
         default: false
+# Keep all application and utility job tokens read-only. Only the guarded
+# transport publisher below overrides this default. Caller grants are ceilings.
+permissions:
+  actions: read
+  contents: read
 env:
   # Pinned soldr can replay stale Rust output (zackees/zccache#1943).
   # Keep cook/target reuse and standalone C/C++ compiler caching enabled.
@@ -60,13 +89,26 @@ jobs:
         with:
           save-cache: ${{ github.ref == 'refs/heads/master' }}
 
+      - name: Check Experimental Flatpak Inputs
+        if: inputs.flatpak-dependency-transfer-probe
+        run: test '${{ inputs.flatpak-compiler-transfer-probe }}' = true
+
       - name: Check Event Data ☑️
         id: setup
         env:
+          NATIVE_REUSE_SOURCE: ${{ inputs.native-cache-reuse-source }}
+          NATIVE_TRANSPORT_PROBE: ${{ inputs.native-cache-transport-probe }}
+          NATIVE_BUDGET_PROBE: ${{ inputs.native-cache-probe }}
           GH_TOKEN: ${{ github.token }}
         run: |
           : Check Event Data ☑️
           if [[ "${RUNNER_DEBUG}" ]]; then set -x; fi
+
+          if [[ -n "$NATIVE_REUSE_SOURCE" ]]; then
+            [[ "$GITHUB_REPOSITORY" == obs-rust/obs-studio && "$GITHUB_REF" == refs/heads/master && "$GITHUB_EVENT_NAME" == workflow_dispatch ]]
+            [[ "$NATIVE_REUSE_SOURCE" =~ ^[0-9a-f]{40}$ ]]
+            [[ "$NATIVE_TRANSPORT_PROBE" != true && "$NATIVE_BUDGET_PROBE" != true ]]
+          fi
 
           case "${GITHUB_EVENT_NAME}" in
             pull_request)
@@ -227,13 +269,32 @@ jobs:
 
           print "xcodeCasPath=${xcode_cas_path}" >> $GITHUB_OUTPUT
 
+      - name: Set Up uv for Native Release Reuse
+        if: inputs.native-cache-reuse-source != ''
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          save-cache: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Prepare Native Release Reuse
+        id: native-reuse
+        if: inputs.native-cache-reuse-source != ''
+        shell: bash
+        env:
+          NATIVE_REUSE_SOURCE: ${{ inputs.native-cache-reuse-source }}
+          NATIVE_CACHE_JOB_TOKEN: ${{ github.token }}
+        run: |
+          uv run ci/native_cache_identity.py --platform macos --architecture '${{ matrix.target }}' --configuration '${{ needs.check-event.outputs.config }}' --output "$RUNNER_TEMP/native-reuse-identity.json" --diagnostics "$RUNNER_TEMP/native-reuse-identity-diagnostics.json"
+          uv run ci/native_cache_transport.py consume --require-hit --expected-source "$NATIVE_REUSE_SOURCE" --identity "$RUNNER_TEMP/native-reuse-identity.json" --destination "$RUNNER_TEMP/native-reuse-cache" --report "$RUNNER_TEMP/native-reuse-consume.json"
+          uv run ci/native_cache_freshness.py prepare --root "$GITHUB_WORKSPACE" --state "$RUNNER_TEMP/native-reuse-state.json" --report "$RUNNER_TEMP/native-reuse-prepare.json"
+          echo "cache_path=$RUNNER_TEMP/native-reuse-cache" >> "$GITHUB_OUTPUT"
+
       # Compiler cache policy (zackees/ci.yml): only master pushes save, keyed by
       # commit so the cache follows master instead of freezing at its first save.
       # Master pushes build cold so the saved Xcode CAS holds only what the
       # current tree uses (the CAS cannot be pruned by age like ccache).
       - uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         id: macos-compiler-cache
-        if: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/master') }}
+        if: ${{ inputs.native-cache-reuse-source == '' && !(github.event_name == 'push' && github.ref == 'refs/heads/master') }}
         with:
           path: ${{ steps.setup.outputs.xcodeCasPath }}
           key: ${{ runner.os }}-xcode-${{ matrix.target }}-${{ needs.check-event.outputs.config }}-${{ github.sha }}
@@ -274,7 +335,7 @@ jobs:
           YOUTUBE_CLIENTID_HASH: ${{ secrets.YOUTUBE_CLIENTID_HASH }}
           YOUTUBE_SECRET: ${{ secrets.YOUTUBE_SECRET }}
           YOUTUBE_SECRET_HASH: ${{ secrets.YOUTUBE_SECRET_HASH }}
-          XCODE_CAS_PATH: ${{ steps.setup.outputs.xcodeCasPath }}
+          XCODE_CAS_PATH: ${{ steps.native-reuse.outputs.cache_path || steps.setup.outputs.xcodeCasPath }}
         with:
           target: ${{ matrix.target }}
           config: ${{ needs.check-event.outputs.config }}
@@ -283,9 +344,33 @@ jobs:
           codesignTeam: ${{ steps.codesign.outputs.codesignTeam }}
           provisioningProfileUUID: ${{ steps.codesign.outputs.provisioningProfileUUID }}
 
+      - name: Verify Native Installed Binary Freshness
+        if: inputs.native-cache-reuse-source != ''
+        shell: bash
+        run: |
+          uv run ci/native_cache_identity.py --platform macos --architecture '${{ matrix.target }}' --configuration '${{ needs.check-event.outputs.config }}' --expected "$RUNNER_TEMP/native-reuse-identity.json" --output "$RUNNER_TEMP/native-reuse-final-identity.json" --diagnostics "$RUNNER_TEMP/native-reuse-final-identity-diagnostics.json"
+          uv run ci/native_cache_freshness.py verify --root "$GITHUB_WORKSPACE" --state "$RUNNER_TEMP/native-reuse-state.json" --platform macos --architecture '${{ matrix.target }}' --report "$RUNNER_TEMP/native-reuse-freshness.json"
+
+      - name: Restore Native Freshness Source
+        if: always() && inputs.native-cache-reuse-source != ''
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/native-reuse-state.json" ]]; then
+            uv run ci/native_cache_freshness.py restore --root "$GITHUB_WORKSPACE" --state "$RUNNER_TEMP/native-reuse-state.json" --report "$RUNNER_TEMP/native-reuse-restore.json"
+          fi
+
+      - name: Upload Native Build Reuse Evidence
+        if: always() && inputs.native-cache-reuse-source != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-build-reuse-macos-${{ matrix.target }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/native-reuse-*.json
+          retention-days: 1
+          if-no-files-found: warn
+
       - name: Package OBS Studio 📀
         uses: ./.github/actions/package-obs
-        if: ${{ fromJSON(needs.check-event.outputs.package) }}
+        if: ${{ inputs.native-cache-reuse-source == '' && fromJSON(needs.check-event.outputs.package) }}
         with:
           target: ${{ matrix.target }}
           config: ${{ needs.check-event.outputs.config }}
@@ -298,7 +383,7 @@ jobs:
 
       - name: Upload Artifacts 📡
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: ${{ fromJSON(needs.check-event.outputs.package) }}
+        if: ${{ inputs.native-cache-reuse-source == '' && fromJSON(needs.check-event.outputs.package) }}
         with:
           name: obs-studio-macos-${{ matrix.target }}-${{ needs.check-event.outputs.commitHash }}
           path: ${{ github.workspace }}/build_macos/obs-studio-*-macos-${{ steps.setup.outputs.cpuName }}.*
@@ -311,10 +396,71 @@ jobs:
           path: ${{ github.workspace }}/build_macos/obs-studio-*-macos-${{ steps.setup.outputs.cpuName }}-dSYMs.tar.xz
 
       - uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && steps.macos-compiler-cache.outputs.cache-hit != 'true'
+        if: ${{ inputs.native-cache-reuse-source == '' && !inputs.native-cache-transport-probe && github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && steps.macos-compiler-cache.outputs.cache-hit != 'true' }}
         with:
           path: ${{ steps.setup.outputs.xcodeCasPath }}
           key: ${{ runner.os }}-xcode-${{ matrix.target }}-${{ needs.check-event.outputs.config }}-${{ github.sha }}
+
+      # Identity evidence only; the separate manual publisher has its own token.
+      - name: Set Up uv for Native Transport Identity
+        if: inputs.native-cache-transport-probe
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          save-cache: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Record Native Transport Identity
+        if: inputs.native-cache-transport-probe
+        run: >-
+          uv run ci/native_cache_identity.py --platform macos
+          --architecture '${{ matrix.target }}' --configuration '${{ needs.check-event.outputs.config }}'
+          --output '${{ runner.temp }}/native-cache-identity.json'
+          --diagnostics '${{ runner.temp }}/native-cache-identity-diagnostics.json'
+
+      - name: Bind Native Transport Seed
+        id: native-seed
+        if: inputs.native-cache-transport-probe
+        shell: bash
+        run: >-
+          uv run ci/native_cache_seed.py
+          --identity '${{ runner.temp }}/native-cache-identity.json'
+          --source-sha '${{ github.sha }}' --output "$GITHUB_OUTPUT"
+
+      - name: Qualify Local Native Cache Archive
+        shell: bash
+        if: inputs.native-cache-transport-probe
+        env:
+          CACHE_SOURCE: ${{ steps.setup.outputs.xcodeCasPath }}
+        run: >-
+          uv run ci/native_cache_transport.py verify-local
+          --identity '${{ runner.temp }}/native-cache-identity.json' --source "$CACHE_SOURCE"
+          --report '${{ runner.temp }}/native-cache-local.json'
+
+      - name: Save Qualified Native Transport Seed
+        if: inputs.native-cache-reuse-source == '' && inputs.native-cache-transport-probe && github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ${{ steps.setup.outputs.xcodeCasPath }}
+          key: macOS-xcode-${{ steps.native-seed.outputs.suffix }}
+
+      - name: Upload Local Native Cache Evidence
+        if: always() && inputs.native-cache-transport-probe
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-cache-local-macos-${{ matrix.target }}
+          path: ${{ runner.temp }}/native-cache-local.json
+          retention-days: 1
+          if-no-files-found: warn
+
+      - name: Upload Native Transport Identity
+        if: inputs.native-cache-transport-probe
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-cache-identity-macos-${{ matrix.target }}
+          path: |
+            ${{ runner.temp }}/native-cache-identity.json
+            ${{ runner.temp }}/native-cache-identity-diagnostics.json
+          retention-days: 1
+          if-no-files-found: error
 
   ubuntu-build:
     name: Ubuntu 🐧 ${{ matrix.rust == 'ON' && '(OBS-Studio-Rust) ' || '' }}
@@ -343,6 +489,9 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+
+      - name: Configure Host apt Mirrors
+        run: sudo bash ci/host_apt_mirrors.sh
 
       # Compiler cache policy (zackees/ci.yml): only master pushes save, keyed by
       # commit so the cache follows master instead of freezing at its first save.
@@ -610,34 +759,43 @@ jobs:
           artifact: manifest
           path: build-aux/com.obsproject.Studio.json
 
-      # v6.8 appends -x86_64 to our custom key and falls back to the
-      # architecture-first prefix. During migration preserve the measured
-      # legacy master seed only if no new-namespace seed is available.
-      # Lookup-only avoids downloading the same builder archive twice.
+      # New snapshots keep OSTree and compiler state together, omitting
+      # downloaded inputs and transient build directories. Refresh by source
+      # generation so compiler direct manifests do not freeze at first save.
+      - uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        id: flatpak-state-cache
+        if: ${{ !inputs.flatpak-cold-build }}
+        with:
+          path: |
+            .flatpak-builder/cache
+            .flatpak-builder/ccache
+          key: flatpak-builder-state-v1-x86_64-${{ hashFiles('build-aux/com.obsproject.Studio.json') }}-${{ github.sha }}
+          restore-keys: |
+            flatpak-builder-state-v1-x86_64-${{ hashFiles('build-aux/com.obsproject.Studio.json') }}-
+            flatpak-builder-state-v1-x86_64-
+
+      # Migration only: restore an old whole builder and then its newer
+      # standalone compiler snapshot. Never overlay either on a new-state hit.
       - uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         id: flatpak-builder-cache-lookup
+        if: ${{ !inputs.flatpak-cold-build && steps.flatpak-state-cache.outputs.cache-matched-key == '' }}
         with:
           path: .flatpak-builder
           key: flatpak-builder-x86_64-${{ hashFiles('build-aux/com.obsproject.Studio.json') }}-x86_64
           restore-keys: flatpak-builder-x86_64
-          lookup-only: true
 
       - name: Restore legacy Flatpak builder seed
-        if: steps.flatpak-builder-cache-lookup.outputs.cache-matched-key == ''
+        if: ${{ !inputs.flatpak-cold-build && steps.flatpak-state-cache.outputs.cache-matched-key == '' && steps.flatpak-builder-cache-lookup.outputs.cache-matched-key == '' }}
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: .flatpak-builder
           key: flatpak-builder-7bb71f0a48a885ca4bfe218d34814d0c108cb0ee80df664119c10c6a24945d77-x86_64
 
-      # flatpak-builder --ccache keeps its compiler cache in
-      # .flatpak-builder/ccache, inside the dependency cache that the action
-      # saves under a manifest-hash key, so that ccache froze at its first
-      # save. Restore a commit-keyed copy of just that directory first; the
-      # action's restore then extracts its snapshot on top (ccache entries are
-      # content-addressed, so the union is safe). Non-master runs restore;
-      # only master publishes both snapshots and prunes the compiler cache.
+      # Preserve the measured legacy overlay order only during migration.
+      # A restored projected state already contains its current compiler data.
       - uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         id: flatpak-compiler-cache
+        if: ${{ !inputs.flatpak-cold-build && steps.flatpak-state-cache.outputs.cache-matched-key == '' }}
         with:
           path: .flatpak-builder/ccache
           key: flatpak-ccache-x86_64-${{ github.sha }}
@@ -646,6 +804,15 @@ jobs:
       - name: Record Start Time ⏱️
         id: start
         run: echo "epoch=$(date +%s)" >> "${GITHUB_OUTPUT}"
+
+      - name: Reset Flatpak Compiler Counters
+        run: |
+          # The image already supplies this manifest's SDK. Reset only after
+          # both archives are restored, so old stats cannot replace the reset.
+          ccache_dir="${PWD}/.flatpak-builder/ccache"
+          mkdir -p "${ccache_dir}"
+          sdk="org.freedesktop.Sdk//$(sed -n 's/^ *"runtime-version": *"\([^" ]*\)".*/\1/p' build-aux/com.obsproject.Studio.json)"
+          flatpak run --command=ccache --filesystem="${ccache_dir}" --env=CCACHE_DIR="${ccache_dir}" "${sdk}" --zero-stats
 
       - name: Build Flatpak Manifest 🧾
         uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6.8
@@ -661,12 +828,14 @@ jobs:
           # when `cache` is true. It used to be off for a PR whose manifest
           # hash had no master cache, so a full PR compiled all ~700 files
           # without ccache (~9 min instead of ~1.5 min, #651). The restore
-          # falls back to the newest flatpak-builder-x86_64 cache, and
+          # uses a projected snapshot or the explicit legacy bridge above.
           # flatpak-builder only reuses a module whose own manifest entry and
           # source checksums are unchanged.
           cache: true
-          restore-cache: true
-          save-cache: ${{ github.ref == 'refs/heads/master' }}
+          # Already restored above; avoid overwriting newer compiler manifests.
+          restore-cache: false
+          # Publish the pruned projection explicitly after validators below.
+          save-cache: false
           cache-key: ${{ steps.setup.outputs.cacheKey }}
           mirror-screenshots-url: https://dl.flathub.org/media
 
@@ -706,18 +875,12 @@ jobs:
             run_ccache --evict-older-than "$(( $(date +%s) - ${{ steps.start.outputs.epoch }} + 60 ))s"
           fi
           {
-            echo '### Flatpak Ccache Stats'
+            echo '### Flatpak Ccache Stats (this build)'
             echo '```'
             run_ccache --show-stats --verbose
             echo '```'
           } | tee -a "${GITHUB_STEP_SUMMARY}"
           du -sh "${ccache_dir}"
-
-      - uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        if: github.ref == 'refs/heads/master' && steps.ccache-stats.outcome == 'success' && steps.flatpak-compiler-cache.outputs.cache-hit != 'true'
-        with:
-          path: .flatpak-builder/ccache
-          key: flatpak-ccache-x86_64-${{ github.sha }}
 
       - name: Validate AppStream
         uses: ./.github/actions/flatpak-builder-lint
@@ -744,6 +907,17 @@ jobs:
           artifact: repo
           path: repo
 
+      # The existing master-only ccache eviction keeps this to one useful build.
+      # The existing builder-family allocation/backend remain unchanged.
+      - name: Publish Flatpak Projected State
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        if: ${{ !inputs.flatpak-cold-build && github.ref == 'refs/heads/master' && steps.ccache-stats.outcome == 'success' && steps.flatpak-state-cache.outputs.cache-hit != 'true' }}
+        with:
+          path: |
+            .flatpak-builder/cache
+            .flatpak-builder/ccache
+          key: flatpak-builder-state-v1-x86_64-${{ hashFiles('build-aux/com.obsproject.Studio.json') }}-${{ github.sha }}
+
       - name: Measure Flatpak Cache Capacity
         if: inputs.flatpak-cache-probe
         timeout-minutes: 15
@@ -765,7 +939,7 @@ jobs:
         if: inputs.flatpak-pruned-build-probe
         timeout-minutes: 40
         run: |
-          uv run ci/flatpak_pruned_build_probe.py \
+          uv run ci/flatpak_pruned_build_probe.py --compiler-reuse \
             --manifest build-aux/flatpak-github-action-modified-com.obsproject.Studio.json \
             --temp-root "${RUNNER_TEMP}" --output "${RUNNER_TEMP}/flatpak-pruned-build.json"
 
@@ -778,9 +952,296 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+
+      - name: Pack Experimental Flatpak Dependency Artifact
+        if: inputs.flatpak-dependency-transfer-probe
+        run: |
+          timeout 600s uv run ci/flatpak_dependency_cache.py pack --manifest build-aux/com.obsproject.Studio.json \
+            --cache .flatpak-builder/cache --artifact "$RUNNER_TEMP/flatpak-dependency-transfer"
+      - name: Upload Experimental Flatpak Dependency Artifact
+        if: inputs.flatpak-dependency-transfer-probe
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flatpak-dependency-transfer-${{ github.run_id }}
+          path: ${{ runner.temp }}/flatpak-dependency-transfer
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+      - name: Pack Experimental Flatpak Compiler Artifact
+        if: inputs.flatpak-compiler-transfer-probe
+        run: |
+          uv run ci/flatpak_compiler_cache.py pack --manifest build-aux/com.obsproject.Studio.json \
+            --cache .flatpak-builder/ccache --artifact "$RUNNER_TEMP/flatpak-compiler-transfer"
+      - name: Upload Experimental Flatpak Compiler Artifact
+        if: inputs.flatpak-compiler-transfer-probe
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flatpak-compiler-transfer-${{ github.run_id }}
+          path: ${{ runner.temp }}/flatpak-compiler-transfer
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Archive Exported Flatpak for Runtime Qualification
+        if: inputs.flatpak-runtime-test && !inputs.flatpak-dependency-transfer-probe
+        run: |
+          tar -cf "$RUNNER_TEMP/flatpak-runtime-repo.tar" repo
+          stat -c 'qualification-export-bytes=%s' "$RUNNER_TEMP/flatpak-runtime-repo.tar"
+
+      - name: Upload Exported Flatpak for Runtime Qualification
+        if: inputs.flatpak-runtime-test && !inputs.flatpak-dependency-transfer-probe
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flatpak-runtime-repo
+          path: ${{ runner.temp }}/flatpak-runtime-repo.tar
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+  flatpak-compiler-consumer:
+    name: Flatpak Compiler Consumer 🧪
+    if: inputs.flatpak-compiler-transfer-probe
+    needs: flatpak-build
+    runs-on: ubuntu-26.04
+    timeout-minutes: 35
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-26.08
+      options: --privileged
+      volumes:
+        - /usr/local/lib/android:/to_clean/android
+        - /opt/hostedtoolcache/CodeQL:/to_clean/codeql
+        - /usr/local/.ghcup:/to_clean/ghcup
+        - /opt/hostedtoolcache/Python:/to_clean/python
+        - /usr/share/swift:/to_clean/swift
+        - /usr/share/dotnet:/to_clean/dotnet
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Prepare build space
+        shell: bash
+        run: |
+          : Prepare build space
+
+          echo ::group::Available storage
+          df -h
+          echo ::endgroup::
+
+          # The build peaks at about 16 GiB (measured in #428 on a runner with
+          # 84 GiB free). Deleting the runner's preinstalled tools takes 1-2
+          # minutes, so do it only when free space is short of that with a margin.
+          required_gib=40
+          avail_gib=$(df --output=avail -BG /__w | tail -1 | tr -dc 0-9)
+          if (( avail_gib >= required_gib )); then
+            echo "${avail_gib} GiB free, ${required_gib} GiB needed: skipping cleanup"
+            exit 0
+          fi
+
+          echo ::group::Remove Android stuff
+          rm -rf /to_clean/android/*
+          echo ::endgroup::
+
+          echo ::group::Remove CodeQL stuff
+          rm -rf /to_clean/codeql/*
+          echo ::endgroup::
+
+          echo ::group::Remove GHCup stuff
+          rm -rf /to_clean/ghcup/*
+          echo ::endgroup::
+
+          echo ::group::Remove Python stuff
+          rm -rf /to_clean/python/*
+          echo ::endgroup::
+
+          echo ::group::Remove Swift stuff
+          rm -rf /to_clean/swift/*
+          echo ::endgroup::
+
+          echo ::group::Remove .NET stuff
+          rm -rf /to_clean/dotnet/*
+          echo ::endgroup::
+
+          echo ::group::Available storage
+          df -h
+          echo ::endgroup::
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: false
+          save-cache: ${{ github.ref == 'refs/heads/master' }}
+      - name: Prepare Compiler Consumer Sources
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          cmake -P cmake/common/prepare-flatpak-soldr.cmake
+      - name: Vendor Flatpak Compiler Consumer Sources
+        run: build-aux/prepare-flatpak-rust.sh
+      - name: Restore Dependency State Before Compiler Artifact
+        if: ${{ !inputs.flatpak-dependency-transfer-probe }}
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: .flatpak-builder
+          key: flatpak-builder-x86_64-${{ hashFiles('build-aux/com.obsproject.Studio.json') }}-x86_64
+          restore-keys: flatpak-builder-x86_64
+      - name: Download Experimental Compiler Artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: flatpak-compiler-transfer-${{ github.run_id }}
+          path: ${{ runner.temp }}/flatpak-compiler-transfer
+      - name: Prepare Compiler Consumer SDK
+        run: |
+          # The producer's builder updates the image SDK before compilation.
+          # Use the same dependency preparation before comparing identities;
+          # any remaining SDK/compiler drift must still reject the archive.
+          timeout 300s flatpak-builder --install-deps-only --install-deps-from=flathub \
+            --arch=x86_64 --state-dir "$RUNNER_TEMP/flatpak-sdk-prep" flatpak_app build-aux/com.obsproject.Studio.json
+      - name: Download Experimental Dependency Artifact
+        if: inputs.flatpak-dependency-transfer-probe
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: flatpak-dependency-transfer-${{ github.run_id }}
+          path: ${{ runner.temp }}/flatpak-dependency-transfer
+      - name: Restore Experimental Dependency Artifact
+        if: inputs.flatpak-dependency-transfer-probe
+        run: |
+          timeout 600s uv run ci/flatpak_dependency_cache.py restore --manifest build-aux/com.obsproject.Studio.json \
+            --cache .flatpak-builder/cache --artifact "$RUNNER_TEMP/flatpak-dependency-transfer"
+      - name: Verify and Restore Compiler Artifact Last
+        run: |
+          uv run ci/flatpak_compiler_cache.py restore --manifest build-aux/com.obsproject.Studio.json \
+            --cache .flatpak-builder/ccache --artifact "$RUNNER_TEMP/flatpak-compiler-transfer" \
+            > "$RUNNER_TEMP/flatpak-compiler-transfer/consumer-restore.json"
+          uv run ci/flatpak_compiler_cache.py reset --manifest build-aux/com.obsproject.Studio.json \
+            --cache .flatpak-builder/ccache --artifact "$RUNNER_TEMP/flatpak-compiler-transfer"
+      - name: Force Application Work Without Changing Compiler Inputs
+        run: |
+          uv run ci/flatpak_compiler_cache.py force --manifest build-aux/com.obsproject.Studio.json \
+            --cache .flatpak-builder/ccache --artifact "$RUNNER_TEMP/flatpak-compiler-transfer"
+      - name: Record Experimental Dependency Reuse
+        if: inputs.flatpak-dependency-transfer-probe
+        run: |
+          uv run ci/flatpak_dependency_cache.py instrument --manifest build-aux/com.obsproject.Studio.json \
+            --cache .flatpak-builder/cache --artifact "$RUNNER_TEMP/flatpak-dependency-transfer" >> "$GITHUB_PATH"
+      - name: Build Full Flatpak Compiler Consumer
+        uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6.8
+        with:
+          manifest-path: ${{ github.workspace }}/build-aux/com.obsproject.Studio.json
+          build-bundle: false
+          cache: true
+          restore-cache: false
+          save-cache: false
+          mirror-screenshots-url: https://dl.flathub.org/media
+      - name: Verify All Dependency Modules Were Reused
+        if: inputs.flatpak-dependency-transfer-probe
+        run: |
+          uv run ci/flatpak_dependency_cache.py verify --manifest build-aux/com.obsproject.Studio.json \
+            --cache .flatpak-builder/cache --artifact "$RUNNER_TEMP/flatpak-dependency-transfer"
+      - name: Verify Substantial Cross Runner Compiler Reuse
+        run: |
+          uv run ci/flatpak_compiler_cache.py verify --manifest build-aux/com.obsproject.Studio.json \
+            --cache .flatpak-builder/ccache --artifact "$RUNNER_TEMP/flatpak-compiler-transfer"
+      - name: Validate Compiler Consumer AppStream
+        uses: ./.github/actions/flatpak-builder-lint
+        with:
+          artifact: appstream
+          path: flatpak_app/files/share/metainfo/com.obsproject.Studio.metainfo.xml
+      - name: Validate Compiler Consumer Build Directory
+        uses: ./.github/actions/flatpak-builder-lint
+        with:
+          artifact: builddir
+          path: flatpak_app
+      - name: Validate Compiler Consumer Repository
+        uses: ./.github/actions/flatpak-builder-lint
+        with:
+          artifact: repo
+          path: repo
+      - name: Archive Compiler Consumer for Runtime Qualification
+        if: inputs.flatpak-runtime-test && inputs.flatpak-dependency-transfer-probe
+        run: |
+          tar -cf "$RUNNER_TEMP/flatpak-runtime-repo.tar" repo
+          stat -c 'qualification-consumer-export-bytes=%s' "$RUNNER_TEMP/flatpak-runtime-repo.tar"
+      - name: Upload Compiler Consumer for Runtime Qualification
+        if: inputs.flatpak-runtime-test && inputs.flatpak-dependency-transfer-probe
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flatpak-runtime-repo
+          path: ${{ runner.temp }}/flatpak-runtime-repo.tar
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+      - name: Stage Compiler Consumer Measurements
+        if: ${{ !cancelled() }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/flatpak-compiler-result"
+          shopt -s nullglob
+          for report in "$RUNNER_TEMP/flatpak-compiler-transfer/"*.json "$RUNNER_TEMP/flatpak-dependency-transfer/"*.json; do
+            cp -- "$report" "$RUNNER_TEMP/flatpak-compiler-result/"
+          done
+          if [[ -f "$RUNNER_TEMP/flatpak-dependency-transfer/builder.log" ]]; then
+            cp -- "$RUNNER_TEMP/flatpak-dependency-transfer/builder.log" "$RUNNER_TEMP/flatpak-compiler-result/"
+          fi
+      - name: Upload Compiler Consumer Measurements
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flatpak-compiler-consumer-${{ github.run_id }}
+          path: ${{ runner.temp }}/flatpak-compiler-result
+          if-no-files-found: error
+          retention-days: 7
+
+  flatpak-runtime-test:
+    name: Flatpak Saved Profile 🧪
+    if: ${{ !cancelled() && inputs.flatpak-runtime-test && needs.flatpak-build.result == 'success' && (!inputs.flatpak-dependency-transfer-probe || needs.flatpak-compiler-consumer.result == 'success') }}
+    needs: [flatpak-build, flatpak-compiler-consumer]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          save-cache: ${{ github.ref == 'refs/heads/master' }}
+          enable-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: flatpak-runtime-repo
+          path: ${{ runner.temp }}/flatpak-runtime-input
+      - name: Install Runtime Test Infrastructure
+        run: |
+          sudo bash ci/host_apt_mirrors.sh
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 update -qq
+          sudo apt-get install -o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 -y --no-install-recommends flatpak xvfb dbus-daemon pipewire wireplumber \
+            pipewire-pulse pipewire-bin pulseaudio-utils gstreamer1.0-tools gstreamer1.0-plugins-base \
+            gstreamer1.0-pipewire libgl1-mesa-dri gcc pkg-config libglib2.0-dev libpipewire-0.3-dev \
+            libpulse-dev libcurl4-openssl-dev ffmpeg gdb binutils
+      - name: Run Installed Flatpak with Saved Capture Profile
+        run: |
+          tar -xf "$RUNNER_TEMP/flatpak-runtime-input/flatpak-runtime-repo.tar" -C "$RUNNER_TEMP/flatpak-runtime-input"
+          uv run ci/flatpak_runtime.py --repo "$RUNNER_TEMP/flatpak-runtime-input/repo" \
+            --output "$RUNNER_TEMP/flatpak-runtime-result"
+      - name: Upload Flatpak Runtime Evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flatpak-runtime-evidence
+          path: |
+            ${{ runner.temp }}/flatpak-runtime-result/result.json
+            ${{ runner.temp }}/flatpak-runtime-result/*.log
+            ${{ runner.temp }}/flatpak-runtime-result/profile/obs-studio/logs/*.txt
+            ${{ runner.temp }}/flatpak-runtime-result/recordings/*.mkv
+          if-no-files-found: error
+          retention-days: 7
+
   windows-build:
     name: Windows 🪟
     strategy:
+      # A missing qualification profile must not cancel the other axis.
+      fail-fast: ${{ inputs.native-cache-reuse-source == '' }}
       matrix:
         architecture: [x64, arm64]
     runs-on: windows-2025-vs2026
@@ -797,6 +1258,25 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      - name: Set Up uv for Native Release Reuse
+        if: inputs.native-cache-reuse-source != ''
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          save-cache: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Prepare Native Release Reuse
+        id: native-reuse
+        if: inputs.native-cache-reuse-source != ''
+        shell: bash
+        env:
+          NATIVE_REUSE_SOURCE: ${{ inputs.native-cache-reuse-source }}
+          NATIVE_CACHE_JOB_TOKEN: ${{ github.token }}
+        run: |
+          uv run ci/native_cache_identity.py --platform windows --architecture '${{ matrix.architecture }}' --configuration '${{ needs.check-event.outputs.config }}' --output "$RUNNER_TEMP/native-reuse-identity.json" --diagnostics "$RUNNER_TEMP/native-reuse-identity-diagnostics.json"
+          uv run ci/native_cache_transport.py consume --require-hit --expected-source "$NATIVE_REUSE_SOURCE" --identity "$RUNNER_TEMP/native-reuse-identity.json" --destination "$RUNNER_TEMP/native-reuse-cache" --report "$RUNNER_TEMP/native-reuse-consume.json"
+          uv run ci/native_cache_freshness.py prepare --root "$GITHUB_WORKSPACE" --state "$RUNNER_TEMP/native-reuse-state.json" --report "$RUNNER_TEMP/native-reuse-prepare.json"
+          echo "cache_path=$RUNNER_TEMP/native-reuse-cache" >> "$GITHUB_OUTPUT"
+
       # Compiler cache: ccache masquerading as cl.exe through MSBuild's
       # CLToolExe (cmake/windows/compilerconfig.cmake, ENABLE_CCACHE in the
       # windows-ci presets). zccache and sccache cannot serve the Visual Studio
@@ -805,6 +1285,7 @@ jobs:
       # Policy (zackees/ci.yml): only master pushes save, keyed by commit.
       - uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         id: windows-compiler-cache
+        if: inputs.native-cache-reuse-source == ''
         with:
           path: ${{ github.workspace }}/.ccache
           key: windows-ccache-${{ matrix.architecture }}-${{ needs.check-event.outputs.config }}-${{ github.sha }}
@@ -812,6 +1293,8 @@ jobs:
 
       - name: Set Up ccache 🗄️
         id: ccache
+        env:
+          NATIVE_REUSE_CACHE_PATH: ${{ steps.native-reuse.outputs.cache_path }}
         run: |
           # Set Up ccache 🗄️
           $Version = '4.14.1'
@@ -824,7 +1307,7 @@ jobs:
           Expand-Archive -Path $Zip -DestinationPath $env:RUNNER_TEMP
 
           $CcacheHome = Join-Path $env:RUNNER_TEMP $Name
-          $env:CCACHE_DIR = Join-Path $env:GITHUB_WORKSPACE '.ccache'
+          $env:CCACHE_DIR = if ($env:NATIVE_REUSE_CACHE_PATH) { $env:NATIVE_REUSE_CACHE_PATH } else { Join-Path $env:GITHUB_WORKSPACE '.ccache' }
           $CcacheHome >> $env:GITHUB_PATH
           @(
             "CCACHE_DIR=${env:CCACHE_DIR}"
@@ -862,6 +1345,30 @@ jobs:
           target: ${{ matrix.architecture }}
           config: ${{ needs.check-event.outputs.config }}
 
+      - name: Verify Native Installed Binary Freshness
+        if: inputs.native-cache-reuse-source != ''
+        shell: bash
+        run: |
+          uv run ci/native_cache_identity.py --platform windows --architecture '${{ matrix.architecture }}' --configuration '${{ needs.check-event.outputs.config }}' --expected "$RUNNER_TEMP/native-reuse-identity.json" --output "$RUNNER_TEMP/native-reuse-final-identity.json" --diagnostics "$RUNNER_TEMP/native-reuse-final-identity-diagnostics.json"
+          uv run ci/native_cache_freshness.py verify --root "$GITHUB_WORKSPACE" --state "$RUNNER_TEMP/native-reuse-state.json" --platform windows --architecture '${{ matrix.architecture }}' --report "$RUNNER_TEMP/native-reuse-freshness.json"
+
+      - name: Restore Native Freshness Source
+        if: always() && inputs.native-cache-reuse-source != ''
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/native-reuse-state.json" ]]; then
+            uv run ci/native_cache_freshness.py restore --root "$GITHUB_WORKSPACE" --state "$RUNNER_TEMP/native-reuse-state.json" --report "$RUNNER_TEMP/native-reuse-restore.json"
+          fi
+
+      - name: Upload Native Build Reuse Evidence
+        if: always() && inputs.native-cache-reuse-source != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-build-reuse-windows-${{ matrix.architecture }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/native-reuse-*.json
+          retention-days: 1
+          if-no-files-found: warn
+
       - name: Set Up uv for Cache Probe 🐍
         if: github.event_name == 'workflow_dispatch' && inputs.native-cache-probe
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
@@ -884,7 +1391,7 @@ jobs:
       # Drop entries this build did not use so the saved cache stays the size
       # of one build.
       - name: Prune ccache 🧹
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        if: inputs.native-cache-reuse-source == '' && github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
         run: |
           # Prune ccache 🧹
           $Age = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - ${{ steps.ccache.outputs.epoch }} + 60
@@ -892,14 +1399,14 @@ jobs:
           ccache --show-stats
 
       - uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && steps.windows-compiler-cache.outputs.cache-hit != 'true'
+        if: ${{ inputs.native-cache-reuse-source == '' && !inputs.native-cache-transport-probe && github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && steps.windows-compiler-cache.outputs.cache-hit != 'true' }}
         with:
           path: ${{ github.workspace }}/.ccache
           key: windows-ccache-${{ matrix.architecture }}-${{ needs.check-event.outputs.config }}-${{ github.sha }}
 
       - name: Package OBS Studio 📀
         uses: ./.github/actions/package-obs
-        if: ${{ fromJSON(needs.check-event.outputs.package) }}
+        if: ${{ inputs.native-cache-reuse-source == '' && fromJSON(needs.check-event.outputs.package) }}
         with:
           target: ${{ matrix.architecture }}
           config: ${{ needs.check-event.outputs.config }}
@@ -907,10 +1414,71 @@ jobs:
 
       - name: Upload Artifacts 📡
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: ${{ fromJSON(needs.check-event.outputs.package) }}
+        if: ${{ inputs.native-cache-reuse-source == '' && fromJSON(needs.check-event.outputs.package) }}
         with:
           name: obs-studio-windows-${{ matrix.architecture }}-${{ needs.check-event.outputs.commitHash }}
           path: ${{ github.workspace }}/build_${{ matrix.architecture }}/obs-studio-*-windows-${{ matrix.architecture }}.zip
+
+      # Identity evidence only; the separate manual publisher has its own token.
+      - name: Set Up uv for Native Transport Identity
+        if: inputs.native-cache-transport-probe
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          save-cache: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Record Native Transport Identity
+        if: inputs.native-cache-transport-probe
+        run: >-
+          uv run ci/native_cache_identity.py --platform windows
+          --architecture '${{ matrix.architecture }}' --configuration '${{ needs.check-event.outputs.config }}'
+          --output '${{ runner.temp }}/native-cache-identity.json'
+          --diagnostics '${{ runner.temp }}/native-cache-identity-diagnostics.json'
+
+      - name: Bind Native Transport Seed
+        id: native-seed
+        if: inputs.native-cache-transport-probe
+        shell: bash
+        run: >-
+          uv run ci/native_cache_seed.py
+          --identity '${{ runner.temp }}/native-cache-identity.json'
+          --source-sha '${{ github.sha }}' --output "$GITHUB_OUTPUT"
+
+      - name: Qualify Local Native Cache Archive
+        shell: bash
+        if: inputs.native-cache-transport-probe
+        env:
+          CACHE_SOURCE: ${{ github.workspace }}/.ccache
+        run: >-
+          uv run ci/native_cache_transport.py verify-local
+          --identity '${{ runner.temp }}/native-cache-identity.json' --source "$CACHE_SOURCE"
+          --report '${{ runner.temp }}/native-cache-local.json'
+
+      - name: Save Qualified Native Transport Seed
+        if: inputs.native-cache-reuse-source == '' && inputs.native-cache-transport-probe && github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: windows-ccache-${{ steps.native-seed.outputs.suffix }}
+
+      - name: Upload Local Native Cache Evidence
+        if: always() && inputs.native-cache-transport-probe
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-cache-local-windows-${{ matrix.architecture }}
+          path: ${{ runner.temp }}/native-cache-local.json
+          retention-days: 1
+          if-no-files-found: warn
+
+      - name: Upload Native Transport Identity
+        if: inputs.native-cache-transport-probe
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-cache-identity-windows-${{ matrix.architecture }}
+          path: |
+            ${{ runner.temp }}/native-cache-identity.json
+            ${{ runner.temp }}/native-cache-identity-diagnostics.json
+          retention-days: 1
+          if-no-files-found: error
 
   # zackees/ci.yml GATE-008/010: an attested, in-policy PR head (local-gate.toml,
   # ci-attestations.yml) skips the Linux unit-test jobs the local gate already
@@ -1017,7 +1585,13 @@ jobs:
       # The obs-util D-Bus and portal inhibitors link GIO. The portal oracle
       # needs the headers even when the gio Cargo feature is off.
       - name: Install libuuid and GIO
-        run: sudo apt-get update && sudo apt-get install -y uuid-dev libglib2.0-dev
+        run: |
+          sudo bash ci/host_apt_mirrors.sh
+          # Match runner-images' bounded mirror failover (#1269). CLI options
+          # take precedence over older images' late apt.conf.d overrides.
+          apt_options=(-o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15)
+          sudo apt-get "${apt_options[@]}" update
+          sudo apt-get install "${apt_options[@]}" -y uuid-dev libglib2.0-dev
 
       # Same soldr-wrapped commands as docs/rust-port/testing-policy.md.
       # setup-soldr provisions the toolchain (with the clippy/rustfmt
@@ -1683,8 +2257,12 @@ jobs:
       # supply them.
       - name: Install Build Dependencies 📦
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          sudo bash ci/host_apt_mirrors.sh
+          # Preserve the runner's fallback routes, but bound each failed acquire
+          # before fallback. Installation errors still fail the job (#1269).
+          apt_options=(-o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15)
+          sudo apt-get "${apt_options[@]}" update
+          sudo apt-get install "${apt_options[@]}" -y --no-install-recommends \
             build-essential cmake ninja-build pkg-config ccache git curl zstd \
             libcurl4-openssl-dev libjansson-dev libx11-dev libx11-xcb-dev libxcb1-dev \
             libxcb-randr0-dev libxcb-shm0-dev libxcb-xinerama0-dev libxcb-composite0-dev \
@@ -1906,3 +2484,100 @@ jobs:
         with:
           path: ${{ github.workspace }}/.vcpkg-bin
           key: vcpkg-bin-cmocka-x64-windows-v1
+
+  # Manual candidate only. Existing application jobs keep read-only tokens.
+  # Use the job GITHUB_TOKEN: its release/tag writes do not recursively trigger
+  # product workflows. No PAT, Actions artifact cache transport or PR writer.
+  native-cache-transport:
+    name: Native Cache Transport (${{ matrix.platform }} ${{ matrix.architecture }})
+    if: github.repository == 'obs-rust/obs-studio' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.native-cache-transport-probe
+    needs: [macos-build, windows-build]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: write
+    concurrency:
+      group: native-cache-release-${{ matrix.platform }}-${{ matrix.architecture }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {platform: windows, architecture: x64, runner: windows-2025-vs2026}
+          - {platform: windows, architecture: arm64, runner: windows-2025-vs2026}
+          - {platform: macos, architecture: arm64, runner: macos-26}
+          - {platform: macos, architecture: x86_64, runner: macos-26}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          save-cache: ${{ github.ref == 'refs/heads/master' }}
+      - name: Select Matching Xcode
+        if: matrix.platform == 'macos'
+        run: sudo xcode-select --switch /Applications/Xcode_26.5.app/Contents/Developer
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: native-cache-identity-${{ matrix.platform }}-${{ matrix.architecture }}
+          path: ${{ runner.temp }}/native-cache-build-identity
+      - name: Record Transport Copier Identity
+        run: >-
+          uv run ci/native_cache_identity.py --platform '${{ matrix.platform }}'
+          --architecture '${{ matrix.architecture }}' --configuration RelWithDebInfo
+          --output '${{ runner.temp }}/native-cache-current-identity.json'
+          --diagnostics '${{ runner.temp }}/native-cache-current-identity-diagnostics.json'
+      - name: Bind Native Transport Seed
+        id: native-seed
+        run: >-
+          uv run ci/native_cache_seed.py
+          --identity '${{ runner.temp }}/native-cache-build-identity/native-cache-identity.json'
+          --source-sha '${{ github.sha }}' --output "$GITHUB_OUTPUT"
+      - name: Select Native Cache Path
+        id: path
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            echo "cache=$HOME/Library/Developer/Xcode/DerivedData/CompilationCache.noindex" >> "$GITHUB_OUTPUT"
+          else
+            echo "cache=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Restore Exact Completed Windows Seed
+        if: matrix.platform == 'windows'
+        id: windows-seed
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ${{ steps.path.outputs.cache }}
+          key: windows-ccache-${{ steps.native-seed.outputs.suffix }}
+          fail-on-cache-miss: true
+      - name: Restore Exact Completed macOS Seed
+        if: matrix.platform == 'macos'
+        id: macos-seed
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ${{ steps.path.outputs.cache }}
+          key: macOS-xcode-${{ steps.native-seed.outputs.suffix }}
+          fail-on-cache-miss: true
+      - name: Require Exact Seed
+        if: (matrix.platform == 'windows' && steps.windows-seed.outputs.cache-hit != 'true') || (matrix.platform == 'macos' && steps.macos-seed.outputs.cache-hit != 'true')
+        run: exit 1
+      - name: Publish Bounded Cache Generation
+        env:
+          NATIVE_CACHE_JOB_TOKEN: ${{ github.token }}
+          CACHE_SOURCE: ${{ steps.path.outputs.cache }}
+        run: >-
+          uv run ci/native_cache_transport.py publish
+          --identity '${{ runner.temp }}/native-cache-build-identity/native-cache-identity.json' --source "$CACHE_SOURCE"
+          --report '${{ runner.temp }}/native-cache-publish.json'
+      - name: Upload Native Transport Evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-cache-transport-${{ matrix.platform }}-${{ matrix.architecture }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/native-cache-*.json
+          retention-days: 1
+          if-no-files-found: warn

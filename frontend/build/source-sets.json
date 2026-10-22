@@ -63,6 +63,7 @@
     "utility/OBSSparkle.hpp",
     "build/frontend.sparkle-arc-mm+.hpp.mm",
     "utility/OBSUpdateDelegate.h",
+    "utility/obs-rust-update.hpp",
     "build/frontend.sparkle-delegate-mm+.hpp.mm"
   ],
   "TWITCH": [
@@ -134,6 +135,7 @@
     "obs.rc",
     "build/frontend.windows-autoupdatethread+.hpp.cpp",
     "utility/AutoUpdateThread.hpp",
+    "utility/obs-rust-update.hpp",
     "build/frontend.windows-nativeeventfilter+.hpp.cpp",
     "build/frontend.whatsnew+.hpp.cpp",
     "utility/WhatsNewBrowserInitThread.hpp",

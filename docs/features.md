@@ -377,6 +377,30 @@ not get a line.
   [#454](https://github.com/obs-rust/obs-studio/pull/454),
   [#1086](https://github.com/obs-rust/obs-studio/pull/1086).
 
+- **No updates from upstream OBS Studio on macOS.** The macOS app no
+  longer checks upstream's update feed, so it can't offer to replace itself
+  with upstream OBS Studio. Its in-app updater stays off until OBS-Studio-Rust
+  has its own feed. *macOS*, 2026-10-22. PR
+  [#1727](https://github.com/obs-rust/obs-studio/pull/1727).
+
+- **In-app updates from certified OBS-Studio-Rust releases.** The Windows
+  and macOS updaters are on and offer only certified releases from
+  obs-rust/obs-studio, never a daily beta or upstream OBS Studio. Daily betas
+  are GitHub pre-releases; a maintainer certifies one, which attaches an
+  RSA-signed update manifest and EdDSA-signed Sparkle appcasts and makes it
+  the Latest release. Only a daily whose release run passed every job and
+  that has been out at least two days can be certified (#1757). Windows downloads the release ZIP, checks its SHA-256
+  against the signed manifest, installs it and restarts. *Windows, macOS*,
+  2026-10-22. PR [#1742](https://github.com/obs-rust/obs-studio/pull/1742).
+
+- **Opt-in nightly updates.** Settings > General > Updates > Update Channel
+  offers **Nightly** next to **Stable** (the default). On Nightly, the
+  Windows and macOS updaters offer each day's build as soon as it passes the
+  release gate, from a signed feed on the rolling `continuous` pre-release,
+  instead of waiting for a certified release. Switching back to Stable never
+  downgrades. *Windows, macOS*, 2026-10-22. Issue
+  [#1759](https://github.com/obs-rust/obs-studio/issues/1759).
+
 ## Fixed upstream bugs
 
 Bugs inherited from OBS Studio (and obs-websocket) that are fixed here, by
@@ -1020,6 +1044,11 @@ area.
   is not a keyframe. *All*, 2026-10-21. Issue
   [#1611](https://github.com/obs-rust/obs-studio/issues/1611), PR
   [#1612](https://github.com/obs-rust/obs-studio/pull/1612).
+- Captions sent to an output whose video codec cannot carry them (not
+  H.264, HEVC or AV1, for example ProRes or a plugin's codec) no longer
+  leak a copy of a video frame for each caption. *All*, 2026-10-22. Issue
+  [#1777](https://github.com/obs-rust/obs-studio/issues/1777), PR
+  [#1778](https://github.com/obs-rust/obs-studio/pull/1778).
 
 ### Sources and filters
 

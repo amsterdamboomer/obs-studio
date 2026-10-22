@@ -318,6 +318,34 @@ struct obs_hotkey_binding {
 	obs_hotkey_t *hotkey;
 };
 
+/* The fields of one binding that the hotkey press state machine reads and
+ * writes, as pointers into the binding, so it needs no layout of
+ * struct obs_hotkey_binding. It only reads the key combination and the
+ * pressed flag (obs_hotkey_binding_press() and obs_hotkey_binding_release()
+ * set the flag), and reads and writes the modifiers_match latch. */
+struct obs_hotkey_binding_fields {
+	const obs_key_combination_t *key;
+	const bool *pressed;
+	bool *modifiers_match;
+};
+
+/* The hotkey press state machine (obs-hotkey-press.c): whether one binding is
+ * pressed or released. The hotkey thread calls obs_hotkey_binding_query() for
+ * every binding on each poll, and obs_hotkey_inject_event() calls
+ * obs_hotkey_binding_inject(), with the hotkey mutex held. It reaches the
+ * binding through obs_hotkey_binding_fields(), reads the key state through
+ * obs_hotkey_key_is_pressed(), and presses or releases a binding (its
+ * hotkey's pressed count and callback) through obs_hotkey_binding_press() and
+ * obs_hotkey_binding_release(), in obs-hotkey.c. Not exported. */
+uint32_t obs_hotkeys_query_modifiers(void);
+void obs_hotkey_binding_query(obs_hotkey_binding_t *binding, uint32_t modifiers, bool no_press, bool strict_modifiers);
+void obs_hotkey_binding_inject(obs_hotkey_binding_t *binding, obs_key_combination_t hotkey, bool pressed,
+			       bool strict_modifiers);
+struct obs_hotkey_binding_fields obs_hotkey_binding_fields(obs_hotkey_binding_t *binding);
+bool obs_hotkey_key_is_pressed(obs_key_t key);
+void obs_hotkey_binding_press(obs_hotkey_binding_t *binding);
+void obs_hotkey_binding_release(obs_hotkey_binding_t *binding);
+
 struct obs_hotkey_name_map_item;
 void obs_hotkey_name_map_free(void);
 
@@ -756,6 +784,18 @@ extern void obs_context_wait(struct obs_context_data *context);
 
 extern void obs_context_data_setname(struct obs_context_data *context, const char *name);
 extern void obs_context_data_setname_ht(struct obs_context_data *context, const char *name, void *phead);
+
+/* Context names (obs-context-names.c): pure, no libobs state. Both return a
+ * bmalloc'd name, or NULL, that the caller owns. obs_context_name_dup():
+ * NULL for a private context without a name, "__unnamed%04lld" from
+ * *unnamed_index (then incremented) for a NULL or empty name, else a copy.
+ * obs_context_name_deduplicate(): NULL when exists() says the name is
+ * free, else "<name> <n>" with the first n from 2 up that it says is free.
+ * obs.c keeps the counter and the name tables. Not exported. */
+typedef bool (*obs_context_name_exists_t)(void *param, const char *name);
+
+char *obs_context_name_dup(const char *name, bool private, long long *unnamed_index);
+char *obs_context_name_deduplicate(const char *name, obs_context_name_exists_t exists, void *param);
 
 /* ------------------------------------------------------------------------- */
 /* ref-counting  */

@@ -24,6 +24,10 @@ _obs_hotkey_name_map_free
 _obs_hotkey_combination_from_data
 _obs_hotkey_combination_bindable
 _obs_hotkey_combination_to_data
+# obs-hotkey-press.c: obs-hotkey.c calls them inside libobs. Not EXPORT.
+_obs_hotkey_binding_query
+_obs_hotkey_binding_inject
+_obs_hotkeys_query_modifiers
 # platform-nix.c is not exported by the C libobs.
 _get_plugin_info
 # platform-windows.c is not exported for these two.
@@ -95,6 +99,12 @@ _obs_nix_hotkey_state_is_pressed
 _obs_nix_portal_shortcut_id
 _obs_nix_portal_shortcut_combo
 _obs_nix_portal_shortcut_trigger
+# obs-video-plan.c: obs.c calls them inside libobs. Not EXPORT.
+_obs_video_size_valid
+_obs_video_align_output_size
+_obs_video_output_size_valid
+_obs_video_scale_type_name
+_obs_video_output_plan
 # compiler-rt @available helpers (__isOSVersionAtLeast,
 # __isPlatformVersionAtLeast) that Rust's compiler_builtins brings in; the C
 # build does not export them. Wildcards: no error if absent.
