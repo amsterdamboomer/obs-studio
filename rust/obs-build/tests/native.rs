@@ -10,6 +10,8 @@ fn native_test_graph_cmake_builds_and_runs_selected_contract() {
     let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let consumer = repository.join("test/cmocka/native-test-graph.cmake");
     fs::create_dir_all(root.join("dependency-include")).unwrap();
+    fs::create_dir_all(root.join("header-only-include")).unwrap();
+    fs::write(root.join("header-only-include/headers-only.h"), "#define HEADER_ONLY_ANSWER 17\n").unwrap();
     fs::write(
         root.join("dependency-include/dependency.h"),
         "#define DEPENDENCY_ANSWER 42\n",
@@ -22,10 +24,14 @@ fn native_test_graph_cmake_builds_and_runs_selected_contract() {
 #include <stdlib.h>
 #include <string.h>
 #include "dependency.h"
+#include "headers-only.h"
+#ifdef HEADER_POLICY_LEAKED
+#error Header imports must not inherit compile definitions or link policy
+#endif
 int selected_answer(void);
 int main(int argc, char **argv) {
     const char *value = getenv("OBS_GRAPH_VALUE");
-    if (selected_answer() != 42 || EXPECTED != 42 || DEPENDENCY_ANSWER != 42 || DEPENDENCY_REQUIRED != 5 || argc != 2 || strcmp(argv[1], "two words") ||
+    if (HEADER_ONLY_ANSWER != 17 || selected_answer() != 42 || EXPECTED != 42 || DEPENDENCY_ANSWER != 42 || DEPENDENCY_REQUIRED != 5 || argc != 2 || strcmp(argv[1], "two words") ||
         !value || strcmp(value, "first;second")) return 1;
     FILE *input = fopen(SOURCE_HEADER, "r");
     if (!input) return 3;
@@ -47,6 +53,7 @@ int main(int argc, char **argv) {
         "targets": {
             "answer": {"sources": ["answer.c", {"path": "selected.c", "requires": "GRAPH_FEATURE"}, {"path": "missing-disabled.c", "requires": "GRAPH_DISABLED"}], "definitions": ["EXPECTED=42", "SOURCE_HEADER=\"${source}/dependency-include/dependency.h\""],
                 "libraries": ["fixture-dependency", {"name": "disabled-library", "requires": "GRAPH_DISABLED"}],
+                "header_libraries": ["fixture-headers"],
                 "requires": {"all": ["GRAPH_FEATURE", {"not": "GRAPH_DISABLED"}]}},
             "disabled": {"sources": ["does-not-exist.c"], "requires": "GRAPH_DISABLED"}
         },
@@ -60,7 +67,7 @@ int main(int argc, char **argv) {
     });
     fs::write(root.join("graph.json"), graph.to_string()).unwrap();
     fs::write(root.join("CMakeLists.txt"), format!(
-        "cmake_minimum_required(VERSION 3.28)\nproject(graph-fixture C)\nenable_testing()\nset(GRAPH_FEATURE ON)\nset(GRAPH_DISABLED OFF)\nadd_library(fixture-dependency INTERFACE)\ntarget_include_directories(fixture-dependency INTERFACE \"${{CMAKE_CURRENT_SOURCE_DIR}}/dependency-include\")\ntarget_compile_definitions(fixture-dependency INTERFACE DEPENDENCY_REQUIRED=5)\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\n",
+        "cmake_minimum_required(VERSION 3.28)\nproject(graph-fixture C)\nenable_testing()\nset(GRAPH_FEATURE ON)\nset(GRAPH_DISABLED OFF)\nadd_library(fixture-dependency INTERFACE)\ntarget_include_directories(fixture-dependency INTERFACE \"${{CMAKE_CURRENT_SOURCE_DIR}}/dependency-include\")\ntarget_compile_definitions(fixture-dependency INTERFACE DEPENDENCY_REQUIRED=5)\nadd_library(fixture-headers INTERFACE)\ntarget_include_directories(fixture-headers INTERFACE \"${{CMAKE_CURRENT_SOURCE_DIR}}/header-only-include\")\ntarget_compile_definitions(fixture-headers INTERFACE HEADER_POLICY_LEAKED=1)\ntarget_compile_options(fixture-headers INTERFACE -invalid-header-policy)\ntarget_link_libraries(fixture-headers INTERFACE missing-header-link-library)\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\n",
         consumer.to_string_lossy().replace('\\', "/")
     )).unwrap();
     for arguments in [
@@ -145,14 +152,27 @@ int main(int argc, char **argv) {
         ("GRAPH_FEATURE".into(), true),
         ("GRAPH_DISABLED".into(), false),
     ]);
-    let dependencies = std::collections::BTreeMap::from([(
-        "fixture-dependency".into(),
-        obs_build::validation::graph::Dependency {
-            include_dirs: vec![root.join("dependency-include")],
-            definitions: vec![("DEPENDENCY_REQUIRED".into(), Some("5".into()))],
-            ..Default::default()
-        },
-    )]);
+    let dependencies = std::collections::BTreeMap::from([
+        (
+            "fixture-dependency".into(),
+            obs_build::validation::graph::Dependency {
+                include_dirs: vec![root.join("dependency-include")],
+                definitions: vec![("DEPENDENCY_REQUIRED".into(), Some("5".into()))],
+                ..Default::default()
+            },
+        ),
+        (
+            "fixture-headers".into(),
+            obs_build::validation::graph::Dependency {
+                include_dirs: vec![root.join("header-only-include")],
+                artifacts: vec![root.join("missing-header-library.a")],
+                definitions: vec![("HEADER_POLICY_LEAKED".into(), Some("1".into()))],
+                compile_options: vec!["-invalid-header-policy".into()],
+                link_options: vec!["-invalid-header-policy".into()],
+                ..Default::default()
+            },
+        ),
+    ]);
     let artifacts = rust_graph
         .compile(&build, root, &facts, &dependencies)
         .unwrap();
@@ -178,6 +198,11 @@ int main(int argc, char **argv) {
     assert!(build.output.join("marker.txt").is_file());
     for (pointer, value, message) in [
         ("/schema", serde_json::json!(2), "schema"),
+        (
+            "/targets/answer/header_libraries",
+            serde_json::json!(["absent-header-library"]),
+            "absent-header-library",
+        ),
         (
             "/targets/answer/sources",
             serde_json::json!([{"path": "selected.c", "requires": "UNKNOWN_SOURCE_FEATURE"}]),
