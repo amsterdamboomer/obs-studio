@@ -502,7 +502,10 @@
         "OBS::libobs",
         "OBS::native-test-cmocka"
       ],
-      "sanitizers": "undefined"
+      "sanitizers": "undefined",
+      "includes": [
+        "deps/libcaption"
+      ]
     },
     "test_formatted_filename": {
       "sources": [
