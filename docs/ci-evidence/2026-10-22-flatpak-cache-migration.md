@@ -50,3 +50,35 @@ No pruning, quota decrease, compressed-byte saving, runtime speedup or
 representative-day retention is claimed. First trusted publication temporarily
 requires both namespaces until ordinary janitor/eviction retires the old one;
 the current inventory's free space is a snapshot, not a future guarantee.
+
+## Observed legacy consumer
+
+Full run [39716240224](https://github.com/obs-rust/obs-studio/actions/runs/39716240224)
+on `bab5bc2b83570e9493cac4c48e5f526661b2a878` completed Flatpak job
+[119619029863](https://github.com/obs-rust/obs-studio/actions/runs/39716240224/job/119619029863)
+successfully. [Recorded metadata/excerpts](2026-10-22-flatpak-cache-migration-hosted.json)
+show the new-namespace lookup missed, the exact legacy 2,747,488,816-byte
+archive restored, and the independent 60,766,818-byte compiler snapshot
+restored afterward. All six dependency modules were reused. OBS built and
+AppStream, build-directory and repository validation passed. The action also
+logged its existing cache pruning; no extra pruning was introduced.
+
+The input was `build-bundle:false`; no distributable bundle or saved-profile
+runtime validation is claimed. Restored counters were not reset after the
+final restore, so 156/360 hits and 204 misses are not reported as this-build
+deltas. Apparent-byte directory rows retain the earlier inventory limitations.
+The parent full run was still active when captured; remaining native jobs
+are not claimed successful. Linux OFF/ON each registered 354 tests, executed
+351, skipped three PulseAudio cases, and had zero failures.
+
+This demonstrates a real warm legacy migration path. Trusted new-namespace
+publication and an actual new-namespace consumer remain unproven. No storage
+saving, speedup, quota decrease or representative durability follows.
+
+The same record separately preserves current #1269 janitor-isolation evidence:
+fork PR #1698 (`rdoupe/obs-studio`) run39711017914 skipped the janitor and passed
+CI Gate; trusted merge-group run39715838880 executed the janitor and passed
+CI Gate. Its log identifies deletion of one superseded 7,366-byte timing
+entry9316347423 while retaining newer9316639430. Twelve current dependency/
+trusted-event tests passed. This proves the isolation acceptance, not global
+capacity or native-cache retention.
