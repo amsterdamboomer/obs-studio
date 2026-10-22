@@ -174,10 +174,6 @@ class NativeCacheTransportTest(unittest.TestCase):
             self.assertEqual(output.read_bytes(), b'keep')
 
 
-if __name__ == '__main__':
-    unittest.main()
-
-
 class MemoryReleaseStore:
     """Local protocol fixture: assets are immutable and downloads are real bytes."""
     def __init__(self):
@@ -286,3 +282,7 @@ class NativeCacheReleaseProtocolTest(unittest.TestCase):
                 with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'trusted'):
                     TRANSPORT.publish(archive, metadata, store, dict(valid, **{field: value}))
                 self.assertEqual(store.calls, [])
+
+
+if __name__ == '__main__':
+    unittest.main()

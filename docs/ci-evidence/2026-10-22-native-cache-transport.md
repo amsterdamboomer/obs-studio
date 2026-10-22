@@ -59,3 +59,37 @@ Review follow-up RED3651d6f66 covers a destination created concurrently at
 publication and case-insensitive collisions (including directory components).
 Publication now uses exclusive mkdir ownership rather than POSIX rename;
 path aliases are rejected on pack and restore.
+
+## Local generation protocol (not hosted publication)
+
+REDde912a329 adds five failing protocol cases. The implementation publishes
+an immutable archive first and an immutable generation manifest last. That
+manifest is the commit point; there is no mutable latest-pointer replacement.
+Read-only consumers discover at most two matching complete generations,
+verify downloaded bytes and archive metadata, and report a cold fallback
+without installing partial data when no usable seed exists.
+
+A local in-memory release fixture exercises actual archive bytes: round trip,
+failed promotion retaining the previous usable seed, two completed retained
+generations, missing/incompatible cold fallback, and untrusted context rejected
+before external operations. Fifteen archive/protocol cases plus two stdlib
+checks pass in0.419s. This is not a GitHub API, publication, native build or
+performance measurement.
+
+The proposed external bound is6GiB and6 assets per OS/architecture release,
+including incomplete uploads, with two completed steady-state generations and
+one publication in flight. Four native architecture releases therefore have a
+24GiB hard maximum, independent of the10GiB Actions cache quota. These are
+explicit candidate ceilings, not measured need or an adopted storage policy.
+No assets/permissions have changed. Orphan recovery, retry reproducibility,
+the actual GitHub adapter and workflow/consumer integration remain to be
+finished and qualified before this draft is ready.
+
+API references for the adapter design:
+
+- [Release asset size/digest metadata](https://docs.github.com/en/rest/releases/assets).
+- [Repository GITHUB_TOKEN event behavior](https://docs.github.com/en/actions/concepts/security/github_token).
+
+Publication must use the explicit repository job token, never an inherited PAT
+or custom token that could trigger product tag/release workflows. The actual
+trusted job wiring and cache-only release namespace still require verification.

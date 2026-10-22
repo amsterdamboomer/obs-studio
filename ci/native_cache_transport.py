@@ -8,6 +8,7 @@ ordinary files/directories; unsupported entries fail rather than disappearing.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -15,6 +16,7 @@ import shutil
 import stat
 import tarfile
 import tempfile
+import time
 
 # GitHub release assets must be strictly below 2 GiB. Expanded/native-store
 # and entry limits are separate, explicit safeguards, not storage reservations.
@@ -189,9 +191,142 @@ def restore(archive: Path, metadata: dict, destination: Path, identity: dict) ->
             publish_directory(staged, destination)
 
 
+# Per OS/architecture release: at most two complete steady-state generations
+# plus one in-flight generation. All bytes, including orphans, count toward
+# the hard ceiling. Four architecture releases imply a 24 GiB remote maximum;
+# these are proposed remote bounds, never an Actions-cache capacity claim.
+MAX_RELEASE_BYTES = 6 << 30
+MAX_RELEASE_ASSETS = 6
+MAX_MANIFEST_BYTES = 64 << 10
+ASSET_NAME = re.compile(r'native-([0-9a-f]{64})-([0-9a-f]{40})\.(tar\.gz|json)')
+
+
+def profile(identity: dict) -> str:
+    validate_identity(identity)
+    return hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
+def checked_assets(store) -> list:
+    assets = store.assets()
+    if (len(assets) > MAX_RELEASE_ASSETS
+            or any(not ASSET_NAME.fullmatch(asset['name']) or type(asset['size']) is not int or asset['size'] < 0 for asset in assets)
+            or sum(asset['size'] for asset in assets) > MAX_RELEASE_BYTES):
+        raise ValueError('native release inventory exceeds owned namespace/budget')
+    if len({asset['name'] for asset in assets}) != len(assets):
+        raise ValueError('duplicate native release asset names')
+    return assets
+
+
+def complete_generations(assets: list) -> list:
+    names = {asset['name'] for asset in assets}
+    return sorted((asset for asset in assets if asset['name'].endswith('.json')
+                   and asset['name'][:-5] + '.tar.gz' in names),
+                  key=lambda asset: (asset['created_at'], asset['id']), reverse=True)
+
+
+def trim_generations(store, assets: list) -> None:
+    for manifest in complete_generations(assets)[2:]:
+        # Remove the commit point first; readers can fall back to a retained
+        # complete generation if deletion races a previously captured listing.
+        store.delete(manifest['name'])
+        store.delete(manifest['name'][:-5] + '.tar.gz')
+
+
+def matching_asset(asset: dict, path: Path) -> bool:
+    with path.open('rb') as stream:
+        return asset['size'] == path.stat().st_size and asset.get('digest') == 'sha256:' + digest(stream)
+
+
 def publish(archive: Path, metadata: dict, store, context: dict) -> dict:
-    raise NotImplementedError('trusted native cache publication')
+    if (context.get('repository') != 'obs-rust/obs-studio' or context.get('ref') != 'refs/heads/master'
+            or context.get('event_name') not in ('push', 'schedule', 'workflow_dispatch')
+            or context.get('actions') != 'true' or context.get('sha') != metadata.get('source_sha')):
+        raise ValueError('publication requires trusted master Actions context')
+    identity = metadata['identity']
+    fingerprint = profile(identity)
+    source_sha = metadata['source_sha']
+    if not re.fullmatch('[0-9a-f]{40}', str(source_sha)):
+        raise ValueError('publication requires trusted producer commit')
+    archive = Path(archive)
+    if (not 0 < archive.stat().st_size <= MAX_ARCHIVE_BYTES
+            or not matching_asset({'size': metadata['bytes'], 'digest': 'sha256:' + metadata['sha256']}, archive)):
+        raise ValueError('local publication archive size/digest mismatch')
+    stem = 'native-' + fingerprint + '-' + source_sha
+    manifest = dict(metadata, archive_name=stem + '.tar.gz')
+    encoded = json.dumps(manifest, sort_keys=True, separators=(',', ':')).encode() + b'\n'
+    if len(encoded) > MAX_MANIFEST_BYTES:
+        raise ValueError('native cache manifest budget exceeded')
+    assets = checked_assets(store)
+    # Recover a prior interrupted cleanup without discarding either retained
+    # complete generation. Incomplete uploads still count against admission.
+    trim_generations(store, assets)
+    assets = checked_assets(store)
+    names = {asset['name']: asset for asset in assets}
+    additions = [(stem + '.tar.gz', archive.stat().st_size), (stem + '.json', len(encoded))]
+    new_sizes = [size for name, size in additions if name not in names]
+    if (sum(asset['size'] for asset in assets) + sum(new_sizes) > MAX_RELEASE_BYTES
+            or len(assets) + len(new_sizes) > MAX_RELEASE_ASSETS):
+        raise ValueError('native release publication budget exceeded')
+    store.ensure(source_sha)
+    with tempfile.TemporaryDirectory(prefix='native-cache-generation-', dir=archive.parent) as directory:
+        root = Path(directory)
+        payload = root / (stem + '.tar.gz')
+        os.link(archive, payload)
+        pointer = root / (stem + '.json')
+        pointer.write_bytes(encoded)
+        for path in (payload, pointer):
+            existing = names.get(path.name)
+            asset = existing if existing is not None else store.upload(path)
+            if not matching_asset(asset, path):
+                raise ValueError('remote asset size/digest mismatch')
+    # Manifest upload is the commit point: no old generation is retired before
+    # both immutable new assets are uploaded and verified.
+    trim_generations(store, checked_assets(store))
+    retained = checked_assets(store)
+    return {'status': 'published', 'source_sha': source_sha, 'profile': fingerprint,
+            'remote_bytes': sum(asset['size'] for asset in retained), 'remote_assets': len(retained)}
 
 
 def consume(identity: dict, destination: Path, store) -> dict:
-    raise NotImplementedError('read-only native cache consumption')
+    fingerprint = profile(identity)
+    destination = Path(destination)
+    if destination.exists() or destination.is_symlink():
+        raise ValueError('destination already exists')
+    started = time.monotonic()
+    errors = []
+    try:
+        assets = checked_assets(store)
+    except (OSError, ValueError) as error:
+        return {'status': 'cold', 'errors': [str(error)[:300]], 'elapsed_seconds': time.monotonic() - started}
+    names = {asset['name']: asset for asset in assets}
+    candidates = [asset for asset in complete_generations(assets)
+                  if asset['name'].startswith('native-' + fingerprint + '-')][:2]
+    for candidate in candidates:
+        try:
+            if not 0 < candidate['size'] <= MAX_MANIFEST_BYTES:
+                raise ValueError('remote manifest budget exceeded')
+            with tempfile.TemporaryDirectory(prefix='native-cache-download-', dir=destination.parent) as directory:
+                root = Path(directory)
+                manifest_path = root / candidate['name']
+                store.download(candidate['name'], manifest_path)
+                if not matching_asset(candidate, manifest_path):
+                    raise ValueError('remote manifest size/digest mismatch')
+                metadata = json.loads(manifest_path.read_text())
+                expected_archive = candidate['name'][:-5] + '.tar.gz'
+                if (metadata.get('archive_name') != expected_archive
+                        or metadata.get('source_sha') != ASSET_NAME.fullmatch(candidate['name']).group(2)):
+                    raise ValueError('remote manifest generation identity mismatch')
+                asset = names[expected_archive]
+                if not 0 < asset['size'] <= MAX_ARCHIVE_BYTES:
+                    raise ValueError('remote archive budget exceeded')
+                payload = root / expected_archive
+                store.download(expected_archive, payload)
+                if not matching_asset(asset, payload):
+                    raise ValueError('remote archive size/digest mismatch')
+                restore(payload, metadata, destination, identity)
+                return {'status': 'hit', 'source_sha': metadata['source_sha'], 'profile': fingerprint,
+                        'downloaded_bytes': candidate['size'] + asset['size'],
+                        'elapsed_seconds': time.monotonic() - started, 'errors': errors}
+        except (OSError, ValueError, KeyError, tarfile.TarError) as error:
+            errors.append(str(error)[:300])
+    return {'status': 'cold', 'elapsed_seconds': time.monotonic() - started, 'errors': errors}
