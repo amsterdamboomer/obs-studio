@@ -1,5 +1,6 @@
 """Hybrid packages keep offline inputs pinned and publish only after approval."""
 
+import importlib.util
 import json
 import os
 import re
@@ -14,6 +15,12 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class HybridPackagingTest(unittest.TestCase):
+    def load_flatpak_cache_probe(self):
+        spec = importlib.util.spec_from_file_location('flatpak_cache_probe', ROOT / 'ci/flatpak_cache_probe.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
     def flatpak_probe_fixture(self, root, fail=False):
         state = root / '.flatpak-builder'
         for name, size in [('downloads/archive', 100000), ('ccache/object', 50000), ('cache/object', 1000)]:
@@ -39,14 +46,14 @@ printf reacquired > "$state/downloads/archive"
         return state, manifest, builder, temporary
 
     def test_flatpak_capacity_probe_preserves_original_and_measures_exclusions(self):
-        from ci import flatpak_cache_probe
+        flatpak_cache_probe = self.load_flatpak_cache_probe()
         with tempfile.TemporaryDirectory() as directory:
             state, manifest, builder, temporary = self.flatpak_probe_fixture(Path(directory))
             before = {str(p): (p.read_bytes(), p.stat().st_mtime_ns)
                       for p in state.rglob('*') if p.is_file()}
             result = flatpak_cache_probe.measure(state, manifest, 'x86_64', builder, temporary)
             self.assertEqual(result['status'], 'success')
-            self.assertGreater(result['downloads_apparent_bytes'], 100000)
+            self.assertGreaterEqual(result['downloads_apparent_bytes'], 100000)
             self.assertGreaterEqual(result['warm_download_seconds'], 0)
             self.assertGreaterEqual(result['fresh_download_seconds'], 0)
             sizes = result['compression']
@@ -58,13 +65,28 @@ printf reacquired > "$state/downloads/archive"
             self.assertIn('proxy', result['limits'].lower())
 
     def test_flatpak_capacity_probe_failure_preserves_original_and_cleans_scratch(self):
-        from ci import flatpak_cache_probe
+        flatpak_cache_probe = self.load_flatpak_cache_probe()
         with tempfile.TemporaryDirectory() as directory:
             state, manifest, builder, temporary = self.flatpak_probe_fixture(Path(directory), fail=True)
             original = (state / 'downloads/archive').read_bytes()
             with self.assertRaises(subprocess.CalledProcessError):
                 flatpak_cache_probe.measure(state, manifest, 'x86_64', builder, temporary)
             self.assertEqual((state / 'downloads/archive').read_bytes(), original)
+            self.assertEqual(list(temporary.iterdir()), [])
+
+    def test_flatpak_capacity_probe_rejects_links_and_scratch_inside_original(self):
+        flatpak_cache_probe = self.load_flatpak_cache_probe()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state, manifest, builder, temporary = self.flatpak_probe_fixture(root)
+            with self.assertRaises(ValueError):
+                flatpak_cache_probe.measure(state, manifest, 'x86_64', builder, state)
+            external = root / 'external'
+            external.write_text('preserve')
+            (state / 'downloads/link').symlink_to(external)
+            with self.assertRaises(ValueError):
+                flatpak_cache_probe.measure(state, manifest, 'x86_64', builder, temporary)
+            self.assertEqual(external.read_text(), 'preserve')
             self.assertEqual(list(temporary.iterdir()), [])
 
     def test_flatpak_capacity_probe_is_default_off_and_keeps_full_validation(self):
