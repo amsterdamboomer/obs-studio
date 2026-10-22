@@ -85,6 +85,26 @@ def owners(path: str) -> set[str]:
     raise ValueError(f'No installed package owns runtime library {path}')
 
 
+def ownership_packages(paths: list[str]) -> set[str]:
+    if not paths:
+        return set()
+    # dpkg reads the same ownership database for every request. Resolve normal
+    # paths once, retaining the original per-path alias/diversion fallback.
+    result = query('dpkg-query', '-S', *paths)
+    if result.returncode not in (0, 1):
+        raise ValueError(f'Package ownership query failed: {result.stderr.strip()}')
+    records = {}
+    for line in result.stdout.splitlines():
+        names = package_names(line)
+        if names:
+            _, _, suffix = line.partition(': /')
+            records.setdefault('/' + suffix, set()).update(names)
+    packages = set()
+    for path in paths:
+        packages.update(records.get(path) or owners(path))
+    return packages
+
+
 def collect(root: Path) -> list[str]:
     root = root.resolve(strict=True)
     paths = set()
@@ -100,9 +120,8 @@ def collect(root: Path) -> list[str]:
             raise ValueError(f'ldd failed for {binary}: {output.strip()}')
         paths.update(library_paths(output))
     packages = set(RUNTIME_TOOLS)
-    for path in sorted(paths):
-        if not Path(path).resolve().is_relative_to(root):
-            packages.update(owners(path))
+    external = [path for path in sorted(paths) if not Path(path).resolve().is_relative_to(root)]
+    packages.update(ownership_packages(external))
     pinned = []
     for package in sorted(packages):
         result = query('dpkg-query', '-W', '-f=${Version}', package)

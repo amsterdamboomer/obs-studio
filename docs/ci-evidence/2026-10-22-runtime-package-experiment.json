@@ -4504,5 +4504,57 @@
       "ON": 82.88
     },
     "decision": "Retain unchanged assertions, frame pacing and RUN_SERIAL. No algorithm/resource isolation change justified by these samples. Timing floor excludes startup, reset and extra warmup polling; this is source-derived attribution, not CPU sampling."
+  },
+  "manifest_generation_profile": {
+    "before": {
+      "profile_total_seconds": 14.562187050000004,
+      "functions": {
+        "elf_files": {
+          "calls": 395,
+          "cumulative_seconds": 0.53519576
+        },
+        "collect": {
+          "calls": 1,
+          "cumulative_seconds": 14.534758102000001
+        },
+        "query": {
+          "calls": 456,
+          "cumulative_seconds": 8.534908746000001
+        },
+        "owners": {
+          "calls": 231,
+          "cumulative_seconds": 7.050461696
+        }
+      }
+    },
+    "after": {
+      "profile_total_seconds": 7.662517489999997,
+      "functions": {
+        "ownership_packages": {
+          "calls": 1,
+          "cumulative_seconds": 0.098797113
+        },
+        "collect": {
+          "calls": 1,
+          "cumulative_seconds": 7.639714672
+        },
+        "elf_files": {
+          "calls": 395,
+          "cumulative_seconds": 0.506998214
+        },
+        "query": {
+          "calls": 227,
+          "cumulative_seconds": 1.640449618
+        },
+        "owners": {
+          "calls": 1,
+          "cumulative_seconds": 0.06294356400000001
+        }
+      }
+    },
+    "manifest_sha256": "c2f464277440f3beefc14f8138e3350daa05577bb5154dfcd53ca29ab1b5c0fa",
+    "manifest_byte_identical": true,
+    "environment": "local bosn, pinned full Ubuntu image; same hosted artifact and package database; one sequential cProfile run per version; not hosted latency",
+    "decision": "Batch ownership reads; retain per-path fallback and missing ownership failures; no package selection change"
   }
 }
