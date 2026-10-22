@@ -49,3 +49,12 @@ safe-rm -r "$probe_scratch"
 The probe requires a new output directory and keeps all fixture data inside
 it. It does not alter the developer's existing compiler cache. No smaller
 production cache allowance or global-budget completion is claimed.
+
+## Hosted lane selection correction
+
+The first rebased PR run, 39704674207, skipped Qt: its scope table included
+`ci/test_qt_fastpath.py` but omitted the cache budget and identity contract tests.
+That run supplies no hosted pruning evidence. A separate local RED commit
+2889dce5e fails for both omitted paths. The scope correction selects Qt for
+`ci/test_qt_cache_budget.py` and `ci/test_qt_cache_identity.py`; all 40 scope tests
+and the 28 Qt/configuration tests then pass. Other lane selection stays intact.
