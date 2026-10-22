@@ -369,6 +369,8 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         "test_hevc",
         "test_deque",
         "test_platform_time",
+        "test_hotkey_load",
+        "test_svt_av1",
         "test_avc",
         "test_formatted_filename",
         "test_utf8",
@@ -395,6 +397,8 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         ("ENABLE_HEVC".into(), false),
     ]);
     let selected = graph.select(&facts).unwrap();
+    assert_eq!(graph.tests["test_svt_av1"].timeout_seconds, Some(60));
+    assert_eq!(graph.tests["test_svt_av1"].skip_return_code, Some(77));
     assert_eq!(
         graph.tests["test_dstr_regressions"].timeout_seconds,
         Some(60)
