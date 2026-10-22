@@ -253,3 +253,31 @@ actual builddir/repository validation remains unproven.
 The large trial records use deterministic gzip without changing their JSON
 bytes. Read one with `gzip -dc <record.json.gz>`; decompression was verified
 byte-for-byte against its original, including preserved failure evidence.
+
+## Fifth trial: isolated rebuild and output validation succeeded
+
+[Run39739711001](https://github.com/obs-rust/obs-studio/actions/runs/39739711001)
+on ae128dc16 is terminal FAILURE solely due to Windows Tier 2 and the
+aggregate gate. Flatpak job119694606911 completed SUCCESS. The
+[fifth-trial record](2026-10-22-flatpak-pruned-build-fifth-trial.json.gz)
+retains terminal metadata, the success artifact, hashes/excerpts, Linux
+OFF/ON and macOS coverage, and the independent Windows failure.
+
+The actual copied repository reports bare-user-only with70 symbolic objects;
+hosted OSTree2026.2 fsck passed in18.644s. All six dependencies hit cache,
+OBS rebuilt and emitted its marker, required binary/icon/XML checks passed,
+and AppStream/builddir/repository lint all succeeded. Screenshot composition
+and media ref commit used the production options. Isolated build935.793s;
+copy, fsck and output validation are excluded from that build timer.
+
+Linux OFF/ON each registered358 tests with355 executed and3 expected
+PulseAudio skips. macOS passed four202-registered runs with201 executed
+and1 SVT skip each. Windows failed before CTest on cm_print_error in
+test_video_output_plan; it remains owned under #1713 and explained by #1739.
+No full-green trial or Windows coverage success is claimed.
+
+This qualifies the isolated cache-only rebuild/output-validation mechanism.
+It does not establish actual Actions archive savings, release/registry
+transport, a trusted producer/consumer rollout, runtime with a saved profile,
+representative cost or global allocation. No production cache policy changed.
+#1269 and the global retention work remain open; #1723 remains held.
