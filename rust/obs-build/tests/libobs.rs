@@ -1401,6 +1401,7 @@ fn macos_core_builds_from_the_canonical_manifest() {
         ] {
             let artifact = build_macos_capture(&build, &root, &library, &options, module).unwrap();
             assert!(artifact.library.is_file());
+            assert_macos_module_image(&artifact.library);
             assert!(artifact.data.join("locale/en-US.ini").is_file());
             let symbols = macos_graphics_exports(&artifact.library);
             for required in [
@@ -1419,6 +1420,7 @@ fn macos_core_builds_from_the_canonical_manifest() {
                 "OBS_BUILD_MACOS_{}_REFERENCE",
                 module.name().replace('-', "_").to_uppercase()
             )) {
+                assert_macos_module_image(std::path::Path::new(&reference));
                 assert_eq!(
                     symbols,
                     macos_graphics_exports(std::path::Path::new(&reference)),
@@ -1510,6 +1512,21 @@ fn macos_core_builds_from_the_canonical_manifest() {
         library.to_str().unwrap(),
     )
     .unwrap();
+}
+
+fn assert_macos_module_image(path: &std::path::Path) {
+    let bytes = std::fs::read(path).unwrap();
+    assert_eq!(
+        &bytes[..4],
+        &[0xcf, 0xfa, 0xed, 0xfe],
+        "not a 64-bit Mach-O image"
+    );
+    assert_eq!(
+        u32::from_le_bytes(bytes[12..16].try_into().unwrap()),
+        8,
+        "{} must be an MH_BUNDLE module, as in CMake",
+        path.display()
+    );
 }
 
 fn macos_graphics_exports(path: &std::path::Path) -> std::collections::BTreeSet<String> {
