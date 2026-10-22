@@ -369,6 +369,8 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         "test_hevc",
         "test_deque",
         "test_platform_time",
+        "test_portal_shortcut_ids",
+        "test_portal_shortcut_sets",
         "test_hotkey_load",
         "test_svt_av1",
         "test_avc",
@@ -395,6 +397,7 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         ("ENABLE_PULSEAUDIO".into(), false),
         ("MSVC".into(), true),
         ("ENABLE_HEVC".into(), false),
+        ("OS_FREEBSD".into(), false),
     ]);
     let selected = graph.select(&facts).unwrap();
     assert_eq!(graph.tests["test_svt_av1"].timeout_seconds, Some(60));
@@ -426,6 +429,16 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         2
     );
     assert!(selected.tests.contains_key("test_serializer"));
+    for name in ["test_portal_shortcut_ids", "test_portal_shortcut_sets"] {
+        assert!(!selected.tests.contains_key(name));
+    }
+    let mut freebsd_facts = facts.clone();
+    freebsd_facts.insert("OS_FREEBSD".into(), true);
+    freebsd_facts.insert("MSVC".into(), false);
+    let freebsd = graph.select(&freebsd_facts).unwrap();
+    for name in ["test_portal_shortcut_ids", "test_portal_shortcut_sets"] {
+        assert!(freebsd.tests.contains_key(name));
+    }
     assert!(selected.tests.contains_key("test_avc"));
     assert!(!selected.tests.contains_key("test_formatted_filename"));
     assert!(!selected.tests.contains_key("test_utf8"));
