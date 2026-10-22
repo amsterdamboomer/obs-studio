@@ -880,6 +880,16 @@ pub fn native_test_facts(
     ])
 }
 
+/// Match the native thread interface: Darwin uses libSystem, while the other
+/// non-MSVC toolchains need the driver flag during both compilation and linking.
+pub fn native_test_thread_options(target: &str) -> Vec<String> {
+    if target.contains("msvc") || target.contains("apple") {
+        vec![]
+    } else {
+        vec!["-pthread".into()]
+    }
+}
+
 pub fn native_test_math_options(target: &str) -> Vec<String> {
     if target.contains("msvc") {
         vec![]

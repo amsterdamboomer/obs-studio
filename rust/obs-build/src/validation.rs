@@ -343,7 +343,16 @@ pub fn build_c_tests(
     crate::platform::configure_c_tests(build, &mut core_interface, None, core)?;
     let mut cmocka_interface = SharedLibrary::default();
     add_package(&mut cmocka_interface, &build.target, "cmocka")?;
+    let thread_options = crate::platform::native_test_thread_options(&build.target);
     let interfaces = BTreeMap::from([
+        (
+            "Threads::Threads".into(),
+            graph::Dependency {
+                compile_options: thread_options.clone(),
+                link_options: thread_options,
+                ..Default::default()
+            },
+        ),
         ("OBS::libobs".into(), core_interface.into()),
         ("OBS::native-test-cmocka".into(), cmocka_interface.into()),
         (

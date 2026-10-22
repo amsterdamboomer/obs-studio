@@ -359,6 +359,134 @@
         "OBS::libobs",
         "OBS::native-test-cmocka"
       ]
+    },
+    "test_dstr_regressions": {
+      "sources": [
+        "test/cmocka/test_dstr_regressions.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_threading": {
+      "sources": [
+        "test/cmocka/test_threading.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "Threads::Threads",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_video_stats_race": {
+      "sources": [
+        "test/cmocka/test_video_stats_race.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        {
+          "name": "Threads::Threads",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_task": {
+      "sources": [
+        "test/cmocka/test_task.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "Threads::Threads",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_quat": {
+      "sources": [
+        "test/cmocka/test_quat.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_axisang": {
+      "sources": [
+        "test/cmocka/test_axisang.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_vec2": {
+      "sources": [
+        "test/cmocka/test_vec2.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_vec3": {
+      "sources": [
+        "test/cmocka/test_vec3.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_vec4": {
+      "sources": [
+        "test/cmocka/test_vec4.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
     }
   },
   "tests": {
@@ -482,6 +610,34 @@
     },
     "test_platform_time": {
       "target": "test_platform_time"
+    },
+    "test_dstr_regressions": {
+      "target": "test_dstr_regressions",
+      "timeout_seconds": 60
+    },
+    "test_threading": {
+      "target": "test_threading"
+    },
+    "test_video_stats_race": {
+      "target": "test_video_stats_race"
+    },
+    "test_task": {
+      "target": "test_task"
+    },
+    "test_quat": {
+      "target": "test_quat"
+    },
+    "test_axisang": {
+      "target": "test_axisang"
+    },
+    "test_vec2": {
+      "target": "test_vec2"
+    },
+    "test_vec3": {
+      "target": "test_vec3"
+    },
+    "test_vec4": {
+      "target": "test_vec4"
     }
   }
 }

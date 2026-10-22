@@ -41,60 +41,6 @@
     "sanitizers": "address,undefined"
   },
   {
-    "name": "test_dstr_regressions",
-    "sources": [
-      "test/cmocka/test_dstr_regressions.c"
-    ]
-  },
-  {
-    "name": "test_threading",
-    "sources": [
-      "test/cmocka/test_threading.c"
-    ]
-  },
-  {
-    "name": "test_video_stats_race",
-    "sources": [
-      "test/cmocka/test_video_stats_race.c"
-    ]
-  },
-  {
-    "name": "test_task",
-    "sources": [
-      "test/cmocka/test_task.c"
-    ]
-  },
-  {
-    "name": "test_quat",
-    "sources": [
-      "test/cmocka/test_quat.c"
-    ]
-  },
-  {
-    "name": "test_axisang",
-    "sources": [
-      "test/cmocka/test_axisang.c"
-    ]
-  },
-  {
-    "name": "test_vec2",
-    "sources": [
-      "test/cmocka/test_vec2.c"
-    ]
-  },
-  {
-    "name": "test_vec3",
-    "sources": [
-      "test/cmocka/test_vec3.c"
-    ]
-  },
-  {
-    "name": "test_vec4",
-    "sources": [
-      "test/cmocka/test_vec4.c"
-    ]
-  },
-  {
     "name": "test_svt_av1",
     "sources": [
       "test/cmocka/test_svt_av1.c",

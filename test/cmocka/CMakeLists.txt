@@ -212,14 +212,7 @@ endif()
 # test_dstr is defined in build/test-graph.json.
 
 # dstr regression tests (obs-rust/obs-studio#46, #47)
-add_executable(test_dstr_regressions test_dstr_regressions.c)
-target_include_directories(test_dstr_regressions PRIVATE ${CMOCKA_INCLUDE_DIR})
-target_link_libraries(test_dstr_regressions PRIVATE OBS::libobs ${CMOCKA_LIBRARIES})
-
-add_dependencies(cmocka-tests test_dstr_regressions)
-add_test(test_dstr_regressions ${CMAKE_CURRENT_BINARY_DIR}/test_dstr_regressions)
-# A regression of #47 loops forever: fail fast instead.
-set_tests_properties(test_dstr_regressions PROPERTIES TIMEOUT 60)
+# test_dstr_regressions is defined in build/test-graph.json.
 
 # lexer test
 # test_lexer is defined in build/test-graph.json.
@@ -243,25 +236,11 @@ set_tests_properties(test_dstr_regressions PROPERTIES TIMEOUT 60)
 # test_config_file is defined in build/test-graph.json.
 
 # threading test (threading-posix.c, threading-windows.c)
-add_executable(test_threading test_threading.c)
-target_include_directories(test_threading PRIVATE ${CMOCKA_INCLUDE_DIR})
-target_link_libraries(test_threading PRIVATE OBS::libobs ${CMOCKA_LIBRARIES})
-if(NOT MSVC)
-  target_link_libraries(test_threading PRIVATE Threads::Threads)
-endif()
-
-add_dependencies(cmocka-tests test_threading)
-add_test(test_threading ${CMAKE_CURRENT_BINARY_DIR}/test_threading)
+# test_threading is defined in build/test-graph.json.
 
 # Concurrent reads and writes of the private video-stat storage (#175).
 # The sanitizer lane compiles this test with TSan to detect data races.
-add_executable(test_video_stats_race test_video_stats_race.c)
-target_link_libraries(test_video_stats_race PRIVATE OBS::libobs)
-if(NOT MSVC)
-  target_link_libraries(test_video_stats_race PRIVATE Threads::Threads)
-endif()
-add_dependencies(cmocka-tests test_video_stats_race)
-add_test(test_video_stats_race ${CMAKE_CURRENT_BINARY_DIR}/test_video_stats_race)
+# test_video_stats_race is defined in build/test-graph.json.
 
 # Qt-free concurrency check for the frontend meter's locked snapshot (#131).
 add_executable(test_volume_meter_snapshot test_volume_meter_snapshot.cpp)
@@ -272,15 +251,7 @@ add_dependencies(cmocka-tests test_volume_meter_snapshot)
 add_test(test_volume_meter_snapshot ${CMAKE_CURRENT_BINARY_DIR}/test_volume_meter_snapshot)
 
 # task test (task.c)
-add_executable(test_task test_task.c)
-target_include_directories(test_task PRIVATE ${CMOCKA_INCLUDE_DIR})
-target_link_libraries(test_task PRIVATE OBS::libobs ${CMOCKA_LIBRARIES})
-if(NOT MSVC)
-  target_link_libraries(test_task PRIVATE Threads::Threads)
-endif()
-
-add_dependencies(cmocka-tests test_task)
-add_test(test_task ${CMAKE_CURRENT_BINARY_DIR}/test_task)
+# test_task is defined in build/test-graph.json.
 
 # pipe test (pipe.c, pipe-posix.c, pipe-windows.c)
 # test_pipe is defined in build/test-graph.json.
@@ -295,59 +266,19 @@ add_test(test_task ${CMAKE_CURRENT_BINARY_DIR}/test_task)
 # test_dtostr_exponent is defined in build/test-graph.json.
 
 # quat test (graphics/quat.h inline setters)
-add_executable(test_quat test_quat.c)
-target_include_directories(test_quat PRIVATE ${CMOCKA_INCLUDE_DIR})
-target_link_libraries(test_quat PRIVATE OBS::libobs ${CMOCKA_LIBRARIES})
-if(NOT MSVC)
-  target_link_libraries(test_quat PRIVATE m)
-endif()
-
-add_dependencies(cmocka-tests test_quat)
-add_test(test_quat ${CMAKE_CURRENT_BINARY_DIR}/test_quat)
+# test_quat is defined in build/test-graph.json.
 
 # axisang test (graphics/axisang.c)
-add_executable(test_axisang test_axisang.c)
-target_include_directories(test_axisang PRIVATE ${CMOCKA_INCLUDE_DIR})
-target_link_libraries(test_axisang PRIVATE OBS::libobs ${CMOCKA_LIBRARIES})
-if(NOT MSVC)
-  target_link_libraries(test_axisang PRIVATE m)
-endif()
-
-add_dependencies(cmocka-tests test_axisang)
-add_test(test_axisang ${CMAKE_CURRENT_BINARY_DIR}/test_axisang)
+# test_axisang is defined in build/test-graph.json.
 
 # vec2 test (graphics/vec2.c)
-add_executable(test_vec2 test_vec2.c)
-target_include_directories(test_vec2 PRIVATE ${CMOCKA_INCLUDE_DIR})
-target_link_libraries(test_vec2 PRIVATE OBS::libobs ${CMOCKA_LIBRARIES})
-if(NOT MSVC)
-  target_link_libraries(test_vec2 PRIVATE m)
-endif()
-
-add_dependencies(cmocka-tests test_vec2)
-add_test(test_vec2 ${CMAKE_CURRENT_BINARY_DIR}/test_vec2)
+# test_vec2 is defined in build/test-graph.json.
 
 # vec3 test (graphics/vec3.c)
-add_executable(test_vec3 test_vec3.c)
-target_include_directories(test_vec3 PRIVATE ${CMOCKA_INCLUDE_DIR})
-target_link_libraries(test_vec3 PRIVATE OBS::libobs ${CMOCKA_LIBRARIES})
-if(NOT MSVC)
-  target_link_libraries(test_vec3 PRIVATE m)
-endif()
-
-add_dependencies(cmocka-tests test_vec3)
-add_test(test_vec3 ${CMAKE_CURRENT_BINARY_DIR}/test_vec3)
+# test_vec3 is defined in build/test-graph.json.
 
 # vec4 test (graphics/vec4.c)
-add_executable(test_vec4 test_vec4.c)
-target_include_directories(test_vec4 PRIVATE ${CMOCKA_INCLUDE_DIR})
-target_link_libraries(test_vec4 PRIVATE OBS::libobs ${CMOCKA_LIBRARIES})
-if(NOT MSVC)
-  target_link_libraries(test_vec4 PRIVATE m)
-endif()
-
-add_dependencies(cmocka-tests test_vec4)
-add_test(test_vec4 ${CMAKE_CURRENT_BINARY_DIR}/test_vec4)
+# test_vec4 is defined in build/test-graph.json.
 
 # video fourcc test (media-io/video-fourcc.c)
 # test_video_fourcc is defined in build/test-graph.json.
