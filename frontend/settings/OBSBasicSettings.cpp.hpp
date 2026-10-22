@@ -598,7 +598,7 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	ui->advOutFFVBitrate->setSuffix(" Kbps");
 	ui->advOutFFABitrate->setSuffix(" Kbps");
 
-#if !defined(_WIN32) && !defined(ENABLE_SPARKLE_UPDATER)
+#ifndef OBS_PLATFORM_HAS_UPDATE_BRANCHES
 	delete ui->updateSettingsGroupBox;
 	ui->updateSettingsGroupBox = nullptr;
 	ui->updateChannelLabel = nullptr;
@@ -1218,7 +1218,7 @@ void OBSBasicSettings::LoadLanguageList()
 	ui->language->model()->sort(0);
 }
 
-#if defined(_WIN32) || defined(ENABLE_SPARKLE_UPDATER)
+#ifdef OBS_PLATFORM_HAS_UPDATE_BRANCHES
 void TranslateBranchInfo(const QString &name, QString &displayName, QString &description)
 {
 	QString translatedName = QTStr(QT_TO_UTF8(("Basic.Settings.General.ChannelName." + name)));
@@ -1235,7 +1235,7 @@ void TranslateBranchInfo(const QString &name, QString &displayName, QString &des
 
 void OBSBasicSettings::LoadBranchesList()
 {
-#if defined(_WIN32) || defined(ENABLE_SPARKLE_UPDATER)
+#ifdef OBS_PLATFORM_HAS_UPDATE_BRANCHES
 	bool configBranchRemoved = true;
 	QString configBranch = config_get_string(App()->GetAppConfig(), "General", "UpdateBranch");
 
@@ -1287,7 +1287,7 @@ void OBSBasicSettings::LoadGeneralSettings()
 
 	LoadLanguageList();
 
-#if defined(_WIN32) || defined(ENABLE_SPARKLE_UPDATER)
+#ifdef OBS_PLATFORM_HAS_UPDATE_BRANCHES
 	bool enableAutoUpdates = config_get_bool(App()->GetAppConfig(), "General", "EnableAutoUpdates");
 	ui->enableAutoUpdates->setChecked(enableAutoUpdates);
 
@@ -3176,7 +3176,7 @@ void OBSBasicSettings::SaveGeneralSettings()
 		config_set_string(App()->GetUserConfig(), "General", "Language", language.c_str());
 	}
 
-#if defined(_WIN32) || defined(ENABLE_SPARKLE_UPDATER)
+#ifdef OBS_PLATFORM_HAS_UPDATE_BRANCHES
 	if (WidgetChanged(ui->enableAutoUpdates)) {
 		config_set_bool(App()->GetAppConfig(), "General", "EnableAutoUpdates",
 				ui->enableAutoUpdates->isChecked());

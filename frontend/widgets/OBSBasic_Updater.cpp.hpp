@@ -163,7 +163,7 @@ void OBSBasic::TimedCheckForUpdates()
 
 #if defined(ENABLE_SPARKLE_UPDATER)
 	CheckForUpdates(false);
-#elif _WIN32
+#elif defined(ENABLE_WIN_UPDATER)
 	long long lastUpdate = config_get_int(App()->GetAppConfig(), "General", "LastUpdateCheck");
 	uint32_t lastVersion = config_get_int(App()->GetAppConfig(), "General", "LastVersion");
 
@@ -183,7 +183,7 @@ void OBSBasic::TimedCheckForUpdates()
 
 void OBSBasic::CheckForUpdates(bool manualUpdate)
 {
-#if _WIN32
+#if defined(ENABLE_WIN_UPDATER)
 	ui->actionCheckForUpdates->setEnabled(false);
 	ui->actionRepair->setEnabled(false);
 

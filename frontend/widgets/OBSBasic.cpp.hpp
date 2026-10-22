@@ -1156,17 +1156,22 @@ void OBSBasic::OBSInit()
 
 	ui->sources->UpdateIcons();
 
-#if !defined(_WIN32)
-	delete ui->actionRepair;
-	ui->actionRepair = nullptr;
-#if !defined(__APPLE__)
+#if !defined(_WIN32) && !defined(__APPLE__)
 	delete ui->actionShowCrashLogs;
 	delete ui->actionUploadLastCrashLog;
 	delete ui->menuCrashLogs;
-	delete ui->actionCheckForUpdates;
 	ui->actionShowCrashLogs = nullptr;
 	ui->actionUploadLastCrashLog = nullptr;
 	ui->menuCrashLogs = nullptr;
+#endif
+
+	/* Without an updater (Windows without ENABLE_WIN_UPDATER, macOS without
+	 * a Sparkle feed, Linux), there is nothing to check or repair (#1729). */
+#ifndef ENABLE_WIN_UPDATER
+	delete ui->actionRepair;
+	ui->actionRepair = nullptr;
+#ifndef ENABLE_SPARKLE_UPDATER
+	delete ui->actionCheckForUpdates;
 	ui->actionCheckForUpdates = nullptr;
 #endif
 #endif
@@ -1181,14 +1186,14 @@ void OBSBasic::OBSInit()
 	ui->actionShowMacPermissions = nullptr;
 #endif
 
-#if defined(_WIN32) || defined(__APPLE__)
 	if (App()->IsUpdaterDisabled()) {
-		ui->actionCheckForUpdates->setEnabled(false);
-#if defined(_WIN32)
-		ui->actionRepair->setEnabled(false);
-#endif
+		if (ui->actionCheckForUpdates) {
+			ui->actionCheckForUpdates->setEnabled(false);
+		}
+		if (ui->actionRepair) {
+			ui->actionRepair->setEnabled(false);
+		}
 	}
-#endif
 
 #ifndef WHATSNEW_ENABLED
 	delete ui->actionShowWhatsNew;

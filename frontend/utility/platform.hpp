@@ -32,7 +32,7 @@ class QWidget;
 
 /* Features the shared frontend code compiles in. Defined here once so the
  * shared files do not test platform macros themselves (#847). */
-#if defined(_WIN32) || defined(ENABLE_SPARKLE_UPDATER)
+#if defined(ENABLE_WIN_UPDATER) || defined(ENABLE_SPARKLE_UPDATER)
 #define OBS_PLATFORM_HAS_UPDATE_BRANCHES 1
 #endif
 

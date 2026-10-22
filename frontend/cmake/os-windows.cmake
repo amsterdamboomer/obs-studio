@@ -48,8 +48,6 @@ macro(obs_frontend_platform_sources)
       dialogs/OBSUpdate.hpp
       forms/OBSUpdate.ui
       obs.rc
-      build/frontend.windows-autoupdatethread+.hpp.cpp
-      utility/AutoUpdateThread.hpp
       build/frontend.windows-nativeeventfilter+.hpp.cpp
       build/frontend.whatsnew+.hpp.cpp
       utility/WhatsNewBrowserInitThread.hpp
@@ -86,19 +84,31 @@ macro(obs_frontend_platform_sources)
 
   target_link_options(obs-studio PRIVATE /IGNORE:4099 $<$<CONFIG:DEBUG>:/NODEFAULTLIB:MSVCRT>)
 
-  # Set commit for untagged version comparisons in the Windows updater
-  if(OBS_VERSION MATCHES ".+g[a-f0-9]+.*")
-    string(REGEX REPLACE ".+g([a-f0-9]+).*$" "\\1" OBS_COMMIT ${OBS_VERSION})
+  # The Windows updater fetches and installs upstream OBS Studio's signed
+  # manifests from obsproject.com, which would replace OBS-Studio-Rust with
+  # upstream OBS. It stays off until obs-rust has its own signed feed (#1729,
+  # #1730), as macOS builds Sparkle only with a feed URL and key.
+  option(ENABLE_WIN_UPDATER "Build the Windows auto-updater, which fetches from obsproject.com" OFF)
+  if(ENABLE_WIN_UPDATER)
+    target_sources(obs-studio PRIVATE build/frontend.windows-autoupdatethread+.hpp.cpp utility/AutoUpdateThread.hpp)
+
+    # Set commit for untagged version comparisons in the Windows updater
+    if(OBS_VERSION MATCHES ".+g[a-f0-9]+.*")
+      string(REGEX REPLACE ".+g([a-f0-9]+).*$" "\\1" OBS_COMMIT ${OBS_VERSION})
+    else()
+      set(OBS_COMMIT "")
+    endif()
+
+    set_source_files_properties(
+      build/frontend.windows-autoupdatethread+.hpp.cpp
+      PROPERTIES COMPILE_DEFINITIONS OBS_COMMIT="${OBS_COMMIT}"
+    )
+
+    add_subdirectory(updater)
+    target_enable_feature(obs-studio "Windows updater" ENABLE_WIN_UPDATER)
   else()
-    set(OBS_COMMIT "")
+    target_disable_feature(obs-studio "Windows updater")
   endif()
-
-  set_source_files_properties(
-    build/frontend.windows-autoupdatethread+.hpp.cpp
-    PROPERTIES COMPILE_DEFINITIONS OBS_COMMIT="${OBS_COMMIT}"
-  )
-
-  add_subdirectory(updater)
 
   set_property(TARGET obs-studio APPEND PROPERTY AUTORCC_OPTIONS --format-version 1)
 
