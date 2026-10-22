@@ -58,3 +58,25 @@ That run supplies no hosted pruning evidence. A separate local RED commit
 2889dce5e fails for both omitted paths. The scope correction selects Qt for
 `ci/test_qt_cache_budget.py` and `ci/test_qt_cache_identity.py`; all 40 scope tests
 and the 28 Qt/configuration tests then pass. Other lane selection stays intact.
+
+## Hosted PR and merge-group qualification
+
+#1690 merged as `224602f79e0afd027c274dfe641051b8d68e5401` after required
+PR run 39705091053 and merge-group run 39705788492 passed. The [hosted
+record](2026-10-22-qt-cache-used-hosted.json) preserves measurement excerpts.
+
+| Observation | Local bytes before | Local bytes after | Hits / cacheable calls |
+| --- | ---: | ---: | ---: |
+| PR Qt job 119583323367 | 1,196,582,208 | 507,503,415 | 303 / 310 |
+| Queue Qt job 119585476202 | 1,196,582,200 | 507,503,407 | 303 / 310 |
+
+Both hosted ccache 4.12.3 jobs passed five facade tests and all 19 CTest cases.
+Both removed 689,078,793 local bytes (57.59%), ending with 615 stored files.
+These related source observations are not independent randomized trials.
+The hit counts were measured during builds before pruning; they do not
+establish the next consumer's hit rate. Neither event publishes a remote
+replacement. Master archive publication and subsequent reuse remain pending.
+
+The [rollout-day baseline](2026-10-21-rollout-day.md) separately reports code
+PR and queue timing/cost samples; it precedes this pruning publication and
+must not be used as a post-change speedup claim.
