@@ -450,6 +450,37 @@ fn executable_runs_against_its_shared_core_dependency() {
     );
 }
 
+#[test]
+fn staged_executable_prefers_runtime_core_over_build_outputs() {
+    if !obs_build::BUILD_TARGET.contains("linux") {
+        return;
+    }
+    let directory = tempfile::tempdir().unwrap();
+    let source = directory.path().join("core.c");
+    let main = directory.path().join("main.c");
+    fs::write(&main, "extern int fixture_value(void); int main(void) { return fixture_value() == 42 ? 0 : 7; }").unwrap();
+    let build = NativeBuild {
+        profile: Default::default(),
+        host: obs_build::BUILD_HOST.into(),
+        target: obs_build::BUILD_TARGET.into(),
+        output: directory.path().join("original"),
+    };
+    fs::write(&source, "int fixture_value(void) { return 1; }").unwrap();
+    let original = build.shared_library(&target("fixture-core", &source, vec![])).unwrap();
+    let executable = build.executable(&target("fixture-app", &main, vec![original])).unwrap();
+    fs::write(&source, "int fixture_value(void) { return 42; }").unwrap();
+    let runtime_build = NativeBuild { output: directory.path().join("replacement"), ..build };
+    let replacement = runtime_build.shared_library(&target("fixture-core", &source, vec![])).unwrap();
+    let runtime = directory.path().join("runtime");
+    fs::create_dir_all(runtime.join("bin")).unwrap();
+    fs::create_dir_all(runtime.join("lib64")).unwrap();
+    let staged = runtime.join("bin/fixture-app");
+    fs::copy(&executable, &staged).unwrap();
+    fs::copy(&replacement, runtime.join("lib64").join(replacement.file_name().unwrap())).unwrap();
+    let status = std::process::Command::new(&staged).env_remove("LD_LIBRARY_PATH").status().unwrap();
+    assert!(status.success(), "staged executable loaded the original core: {status}");
+}
+
 const EXPORT: &str = "\n#if defined(_WIN32)\n__declspec(dllexport)\n#endif\n";
 
 #[test]
