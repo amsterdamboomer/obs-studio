@@ -296,6 +296,11 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/watched-inputs.txt" "${graph_inputs}")
             "prefix",
         ),
         (
+            "/tests/answer-case/optional_prefixes",
+            serde_json::json!([["obs-missing-wrapper-fixture-1332", "${unknown}"]]),
+            "unknown",
+        ),
+        (
             "/targets/answer/watch_inputs",
             serde_json::json!([""]),
             "watch input",
