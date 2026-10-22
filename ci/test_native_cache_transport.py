@@ -467,6 +467,17 @@ class NativeCacheCommandTest(unittest.TestCase):
             report = json.loads((root / 'consume.json').read_text())
             self.assertEqual(report['status'], 'hit')
 
+    def test_required_hit_command_fails_on_cold_fallback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            identity = root / 'identity.json'
+            identity.write_text(json.dumps(IDENTITY))
+            factory = mock.Mock(return_value=MemoryReleaseStore())
+            code = TRANSPORT.main(['consume', '--identity', str(identity), '--destination', str(root / 'restored'),
+                                   '--require-hit', '--report', str(root / 'report.json')], store_factory=factory)
+            self.assertEqual(code, 1)
+            self.assertEqual(json.loads((root / 'report.json').read_text())['status'], 'cold')
+
     def test_untrusted_command_rejected_before_store_creation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
