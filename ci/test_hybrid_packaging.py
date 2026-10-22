@@ -265,3 +265,92 @@ set_target_properties(obs-nvenc PROPERTIES PREFIX "")
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             config = tomllib.loads((root / ".flatpak-rust/cargo/config.toml").read_text())
             self.assertEqual(config["source"]["vendored-sources"]["directory"], "/run/build/obs/.flatpak-rust/vendor")
+
+
+class FlatpakPrunedBuildTest(unittest.TestCase):
+    def load_probe(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('flatpak_pruned_build_probe', ROOT / 'ci/flatpak_pruned_build_probe.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def fixture(self, root):
+        state = root / 'state'
+        for name in ('cache', 'downloads', 'ccache'):
+            (state / name).mkdir(parents=True)
+            (state / name / 'original').write_text(name)
+        manifest = root / 'manifest.json'
+        manifest.write_text(json.dumps({'id': 'com.obsproject.Studio', 'command': 'obs', 'modules': [
+            {'name': 'dependency'}, {'name': 'obs', 'post-install': ['existing-command']},
+        ]}))
+        return state, manifest
+
+    def test_pruned_rebuild_isolated_and_validates_outputs(self):
+        probe = self.load_probe()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state, manifest = self.fixture(root)
+            original = manifest.read_bytes()
+            calls = []
+
+            def execute(command, seconds):
+                calls.append(command)
+                if 'flatpak-builder' in command:
+                    copied = Path(command[command.index('--state-dir') + 1])
+                    self.assertNotEqual(copied, state)
+                    self.assertTrue((copied / 'cache/original').exists())
+                    self.assertFalse((copied / 'downloads').exists())
+                    self.assertFalse((copied / 'ccache').exists())
+                    recipe = Path(command[-1])
+                    self.assertEqual(recipe.parent, manifest.parent)
+                    prepared = json.loads(recipe.read_text())
+                    self.assertEqual(prepared['modules'][0], {'name': 'dependency'})
+                    self.assertEqual(prepared['modules'][-1]['post-install'][0], 'existing-command')
+                    build = Path(command[-2])
+                    for path in ('bin/obs', 'share/app-info/icons/flatpak/128x128/com.obsproject.Studio.png',
+                                 'share/app-info/xmls/com.obsproject.Studio.xml.gz'):
+                        target = build / 'files' / path
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_text('fixture')
+                    return 'Cache hit for dependency, skipping build\nOBS_PRUNED_REBUILD_EXECUTED\n'
+                return '{}'
+
+            result = probe.measure(state, manifest, root, execute=execute)
+            self.assertEqual(result['status'], 'success')
+            self.assertEqual(manifest.read_bytes(), original)
+            self.assertEqual((state / 'cache/original').read_text(), 'cache')
+            self.assertEqual(sorted(p.name for p in root.iterdir()), ['manifest.json', 'state'])
+            lint_kinds = [command[-2] for command in calls if command[0] == 'flatpak-builder-lint']
+            self.assertEqual(lint_kinds, ['appstream', 'builddir', 'repo'])
+
+    def test_pruned_rebuild_failure_cleans_temporary_state_and_manifest(self):
+        probe = self.load_probe()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state, manifest = self.fixture(root)
+            original = manifest.read_bytes()
+            def execute(command, seconds):
+                raise subprocess.CalledProcessError(1, command)
+            with self.assertRaises(subprocess.CalledProcessError):
+                probe.measure(state, manifest, root, execute=execute)
+            self.assertEqual(manifest.read_bytes(), original)
+            self.assertEqual(sorted(p.name for p in root.iterdir()), ['manifest.json', 'state'])
+
+    def test_pruned_rebuild_rejects_missing_rebuild_signal(self):
+        probe = self.load_probe()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state, manifest = self.fixture(root)
+            with self.assertRaisesRegex(ValueError, 'rebuild'):
+                probe.measure(state, manifest, root, execute=lambda command, seconds: 'Cache hit for obs, skipping build')
+            self.assertEqual(sorted(p.name for p in root.iterdir()), ['manifest.json', 'state'])
+
+    def test_pruned_rebuild_manual_default_off_after_validation(self):
+        for file in ('ci.yml', 'build-project.yaml'):
+            workflow = (ROOT / '.github/workflows' / file).read_text()
+            self.assertRegex(workflow, r'flatpak-pruned-build-probe:\n(?:[^\n]*\n){0,4}\s+default: false')
+        workflow = (ROOT / '.github/workflows/build-project.yaml').read_text()
+        self.assertLess(workflow.index('- name: Validate repository'), workflow.index('- name: Probe Pruned Flatpak Rebuild'))
+        self.assertIn('if: inputs.flatpak-pruned-build-probe', workflow)
+        self.assertIn('uv run ci/flatpak_pruned_build_probe.py', workflow)
