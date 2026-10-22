@@ -390,7 +390,7 @@ not get a line.
   RSA-signed update manifest and EdDSA-signed Sparkle appcasts and makes it
   the Latest release. Windows downloads the release ZIP, checks its SHA-256
   against the signed manifest, installs it and restarts. *Windows, macOS*,
-  2026-10-22. PR [#PR](https://github.com/obs-rust/obs-studio/pull/PR).
+  2026-10-22. PR [#1742](https://github.com/obs-rust/obs-studio/pull/1742).
 
 ## Fixed upstream bugs
 
