@@ -274,8 +274,8 @@ jobs:
   # and an RSA-signed branches.json as assets of the fixed `update-feed`
   # release: the stable URLs that CMakePresets.json (SPARKLE_APPCAST_URL),
   # OBSSparkle.mm.hpp and MacUpdateThread.cpp.hpp name. Each enclosure points
-  # at the DMG on the tagged release itself. The Windows updater stays off
-  # (ENABLE_WIN_UPDATER) until its manifest and patches are published too.
+  # at the DMG on the tagged release itself. The Windows manifest (#1736) is
+  # published too; ENABLE_WIN_UPDATER stays off until per-file payloads are hosted.
   update-feed:
     name: Publish obs-rust Update Feed 🎙️
     if: >-
@@ -381,6 +381,43 @@ jobs:
           openssl dgst -sha512 -sign "${keys}/rsa.pem" -out feed/branches.json.bin feed/branches.json
           xxd -p feed/branches.json.bin | tr -d '\n' > feed/branches.json.sig
           rm feed/branches.json.bin
+
+      - name: Set Up uv 🐍
+        if: steps.release.outputs.skip == 'false'
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          save-cache: ${{ github.ref == 'refs/heads/master' }}
+
+      # Windows (#1736): a manifest of every file in the release's x64 zip
+      # (BLAKE2b-160 hashes and sizes), signed like branches.json and served as
+      # manifest.json + manifest.json.sig, the URLs AutoUpdateThread.cpp.hpp
+      # names. ENABLE_WIN_UPDATER stays OFF: updater.exe still downloads the
+      # per-file payloads from its built-in CDN, which obs-rust doesn't host.
+      - name: Generate Windows Manifest 🪟
+        if: steps.release.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          RSA_KEY: ${{ secrets.OBS_RUST_UPDATE_RSA_PRIVATE_KEY }}
+        run: |
+          : Generate Windows Manifest 🪟
+          local keys="${RUNNER_TEMP}/winkeys"
+          mkdir -m 700 -p "${keys}"
+          trap 'rm -rf "${keys}"' EXIT
+          print -r -- "${RSA_KEY}" > "${keys}/rsa.pem"
+
+          local version="${TAG#obs-studio-rust-v}"
+          local commit="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${TAG}" --jq .sha)"
+          mkdir -p builds/windows-x64
+          gh release download "${TAG}" --repo "${GITHUB_REPOSITORY}" --pattern "*-${version}-windows-x64.zip" --dir builds/windows-x64
+          uv run ci/win_update_manifest.py \
+            --zip builds/windows-x64/*-windows-x64.zip \
+            --version "${version}" \
+            --commit "${commit}" \
+            --notes-url "https://github.com/obs-rust/obs-studio/releases/tag/${TAG}" \
+            --key "${keys}/rsa.pem" \
+            --work "${RUNNER_TEMP}/win-update-work" \
+            --out feed
+          test -s feed/manifest.json.sig
 
       - name: Publish Feed 📡
         if: steps.release.outputs.skip == 'false'

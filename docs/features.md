@@ -379,6 +379,12 @@ not get a line.
   published after each release. Windows updates stay off for now. *macOS*,
   2026-10-22. Issue
   [#1730](https://github.com/obs-rust/obs-studio/issues/1730).
+- **A signed Windows update manifest on OBS-Studio-Rust's own feed.** Each
+  release publishes a signed list of the Windows build's files next to the
+  macOS feed, and the Windows update check now asks OBS-Studio-Rust, never
+  obsproject.com. Windows updates stay off until the files themselves are
+  hosted. *Windows*, 2026-10-22. Issue
+  [#1736](https://github.com/obs-rust/obs-studio/issues/1736).
 
 ## Fixed upstream bugs
 
