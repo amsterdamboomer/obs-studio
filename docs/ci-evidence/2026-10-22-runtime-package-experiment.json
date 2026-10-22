@@ -4556,5 +4556,212 @@
     "manifest_byte_identical": true,
     "environment": "local bosn, pinned full Ubuntu image; same hosted artifact and package database; one sequential cProfile run per version; not hosted latency",
     "decision": "Batch ownership reads; retain per-path fallback and missing ownership failures; no package selection change"
+  },
+  "hosted_before_ownership_batch": {
+    "run_id": 39717762825,
+    "head_sha": "d7b9a2a65",
+    "modes": {
+      "OFF": {
+        "job_id": 119624977751,
+        "conclusion": "success",
+        "registered": 354,
+        "executed": 351,
+        "skips": [
+          "test_pulse_monitor_device",
+          "test_pulse_stream_restart",
+          "test_pulse_two_sources"
+        ],
+        "ctest_seconds": 165.5,
+        "log_sha256": "10fad79c9981fc0634526e8eb622ac49125ac7b22ac23befba00c4694430962e",
+        "steps": [
+          {
+            "name": "Set up job",
+            "seconds": 2.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Initialize containers",
+            "seconds": 8.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Git \ud83d\udce6",
+            "seconds": 11.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+            "seconds": 2.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Set Up uv \ud83d\udc0d",
+            "seconds": 1.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep apt Downloads \ud83d\udce6",
+            "seconds": 0.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+            "seconds": 2.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+            "seconds": 3.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Tier 2 Packages \ud83d\udce6",
+            "seconds": 28.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Unpack Tier 2 Tree \ud83d\udcc2",
+            "seconds": 2.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+            "seconds": 1.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Test Tier 2 (OFF) \u2705",
+            "seconds": 165.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Upload Test Timings \u23f1\ufe0f",
+            "seconds": 0.0,
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Post Set Up uv \ud83d\udc0d",
+            "seconds": 1.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+            "seconds": 0.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Stop containers",
+            "seconds": 3.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "seconds": 0.0,
+            "conclusion": "success"
+          }
+        ]
+      },
+      "ON": {
+        "job_id": 119624977916,
+        "conclusion": "success",
+        "registered": 354,
+        "executed": 351,
+        "skips": [
+          "test_pulse_monitor_device",
+          "test_pulse_stream_restart",
+          "test_pulse_two_sources"
+        ],
+        "ctest_seconds": 163.95,
+        "log_sha256": "b8d31a668f85b08c47599bb14bf6a9aa1f9da05698b6261fd616e297a2182e48",
+        "steps": [
+          {
+            "name": "Set up job",
+            "seconds": 1.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Initialize containers",
+            "seconds": 2.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Git \ud83d\udce6",
+            "seconds": 15.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+            "seconds": 3.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Set Up uv \ud83d\udc0d",
+            "seconds": 1.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep apt Downloads \ud83d\udce6",
+            "seconds": 0.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+            "seconds": 2.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+            "seconds": 4.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Tier 2 Packages \ud83d\udce6",
+            "seconds": 24.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Unpack Tier 2 Tree \ud83d\udcc2",
+            "seconds": 1.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae",
+            "seconds": 1.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Test Tier 2 (ON) \u2705",
+            "seconds": 165.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Upload Test Timings \u23f1\ufe0f",
+            "seconds": 0.0,
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Post Set Up uv \ud83d\udc0d",
+            "seconds": 0.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+            "seconds": 0.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Stop containers",
+            "seconds": 3.0,
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "seconds": 0.0,
+            "conclusion": "success"
+          }
+        ]
+      }
+    },
+    "limit": "single PR qualification; not a matched population or before/after causality claim; full test count increased on current master"
   }
 }
