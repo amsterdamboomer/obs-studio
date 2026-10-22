@@ -83,9 +83,11 @@ class QtCacheIdentityTest(unittest.TestCase):
         for name in ("ci/test_ci_toml.py", "ci.toml", ".github/ISSUE_TEMPLATE/bug.yml"):
             with self.subTest(path=name):
                 original = (self.root / name).read_text()
-                self.stage(name, "updated CI metadata\n")
-                self.assertEqual(self.key(), initial)
-                self.stage(name, original)
+                try:
+                    self.stage(name, "updated CI metadata\n")
+                    self.assertEqual(self.key(), initial)
+                finally:
+                    self.stage(name, original)
 
     def test_build_and_tests_are_not_conditional_on_cache_hit(self):
         build = self.job.split("- name: Build Frontend and Run Qt Tests", 1)[1].split("- name:", 1)[0]
@@ -100,7 +102,7 @@ class QtCacheIdentityTest(unittest.TestCase):
                 self.assertNotEqual(self.key(**{variable: "changed"}), initial)
 
     def test_restore_and_save_share_identity_and_exact_hits_skip_upload(self):
-        reference = "key: qt-ccache-linux-inputs-v1-${{ steps.qt-cache-identity.outputs.digest }}"
+        reference = "key: qt-ccache-linux-inputs-v2-${{ steps.qt-cache-identity.outputs.digest }}"
         self.assertEqual(self.job.count(reference), 2)
         self.assertIn("id: qt-compiler-cache", self.job)
         save = self.job.split("- name: Save Qt ccache", 1)[1]
