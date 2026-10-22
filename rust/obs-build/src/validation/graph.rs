@@ -56,12 +56,15 @@ impl Requirement {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(untagged, deny_unknown_fields)]
-pub enum Library {
+pub enum ConditionalValue {
     Name(String),
     Conditional { name: String, requires: Requirement },
 }
 
-impl Library {
+pub type Library = ConditionalValue;
+pub type CompilerOption = ConditionalValue;
+
+impl ConditionalValue {
     fn selected(&self, facts: &BTreeMap<String, bool>) -> Result<Option<&str>, String> {
         match self {
             Self::Name(name) => Ok(Some(name)),
@@ -120,7 +123,7 @@ pub struct Target {
     #[serde(default)]
     pub libraries: Vec<Library>,
     #[serde(default)]
-    pub compile_options: Vec<String>,
+    pub compile_options: Vec<CompilerOption>,
     #[serde(default)]
     pub compile_options_if_supported: Vec<String>,
     #[serde(default)]
@@ -315,7 +318,12 @@ impl Graph {
             let mut target = SharedLibrary {
                 name: name.into(),
                 include_dirs: vec![root.clone()],
-                compile_options: spec.compile_options.clone(),
+                compile_options: spec
+                    .compile_options
+                    .iter()
+                    .filter_map(|option| option.selected(facts).transpose())
+                    .map(|value| value.map(str::to_owned))
+                    .collect::<Result<Vec<_>, _>>()?,
                 link_options: spec.link_options.clone(),
                 ..Default::default()
             };

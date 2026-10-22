@@ -203,7 +203,11 @@ int main(int argc, char **argv) {
     assert!(build.output.join("marker.txt").is_file());
     for (pointer, value, message) in [
         ("/schema", serde_json::json!(2), "schema"),
-        ("/targets/answer/compile_options", serde_json::json!([{ "name": "-DUNKNOWN", "requires": "UNKNOWN_COMPILER_FEATURE" }]), "UNKNOWN_COMPILER_FEATURE"),
+        (
+            "/targets/answer/compile_options",
+            serde_json::json!([{ "name": "-DUNKNOWN", "requires": "UNKNOWN_COMPILER_FEATURE" }]),
+            "UNKNOWN_COMPILER_FEATURE",
+        ),
         (
             "/targets/answer/header_libraries",
             serde_json::json!(["absent-header-library"]),
