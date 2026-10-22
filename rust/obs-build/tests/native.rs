@@ -172,6 +172,29 @@ fn production_runtime_stages_selected_artifacts_and_rejects_stale_outputs() {
 }
 
 #[test]
+fn production_nvenc_defaults_and_explicit_selection_match_cmake() {
+    use obs_build::{application::BuildOptions, cli};
+    let options = BuildOptions::for_target("x86_64-unknown-linux-gnu").unwrap();
+    assert!(
+        options.core_module_names().iter().any(|name| name == "obs-nvenc"),
+        "the production graph must include CMake's default-enabled NVENC module"
+    );
+    for arguments in [
+        vec!["build", "--without-nvenc"],
+        vec!["build", "--without-nvenc-ffmpeg-ids"],
+    ] {
+        let cli::Invocation::Build(request) = cli::parse(arguments.clone()).unwrap() else {
+            panic!("expected a production build request");
+        };
+        let enabled = !arguments.contains(&"--without-nvenc");
+        assert_eq!(
+            request.options.core_module_names().iter().any(|name| name == "obs-nvenc"),
+            enabled
+        );
+    }
+}
+
+#[test]
 fn bundled_frontend_plugins_follow_application_feature_selection() {
     let mut options =
         obs_build::application::BuildOptions::for_target("x86_64-unknown-linux-gnu").unwrap();
