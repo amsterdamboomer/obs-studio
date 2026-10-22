@@ -149,9 +149,9 @@ def pack(source: Path, output: Path, identity: dict, source_sha: str) -> dict:
             'bytes': size, 'expanded_bytes': expanded, 'entries': len(entries), 'sha256': checksum}
 
 
-def restore(archive: Path, metadata: dict, destination: Path, identity: dict) -> None:
+def validate_metadata(metadata: dict, identity: dict) -> None:
     validate_identity(identity)
-    if not isinstance(metadata, dict) or metadata.get('schema') != 1 or metadata.get('format') != 'tar.gz':
+    if not isinstance(metadata, dict) or type(metadata.get('schema')) is not int or metadata.get('schema') != 1 or metadata.get('format') != 'tar.gz':
         raise ValueError('unsupported cache metadata schema/format')
     if metadata.get('identity') != identity:
         raise ValueError('cache identity mismatch')
@@ -163,38 +163,54 @@ def restore(archive: Path, metadata: dict, destination: Path, identity: dict) ->
             raise ValueError('cache metadata budget exceeded: ' + field)
     if not re.fullmatch('[0-9a-f]{64}', str(metadata.get('sha256', ''))):
         raise ValueError('invalid archive digest')
-    destination = Path(destination).absolute()
-    if destination.exists() or destination.is_symlink():
-        raise ValueError('destination already exists')
+
+
+def validate_archive(archive: Path, metadata: dict, identity: dict, staged: Path | None = None) -> None:
+    validate_metadata(metadata, identity)
     with Path(archive).open('rb') as stream:
         if os.fstat(stream.fileno()).st_size != metadata['bytes']:
             raise ValueError('archive size mismatch')
         if digest(stream) != metadata['sha256']:
             raise ValueError('archive digest mismatch')
         stream.seek(0)
-        with tempfile.TemporaryDirectory(prefix='native-cache-restore-', dir=destination.parent) as directory:
-            staged = Path(directory) / 'payload'
-            staged.mkdir()
-            seen, expanded, aliases = set(), 0, {}
-            try:
-                with tarfile.open(fileobj=stream, mode='r|gz') as payload:
-                    for member in payload:
-                        safe_name(member.name)
-                        reject_case_collision(member.name, aliases)
-                        if not (member.isfile() or member.isdir()) or member.name in seen:
-                            raise ValueError('unsupported or duplicate archive entry')
-                        seen.add(member.name)
-                        expanded += member.size if member.isfile() else 0
-                        if len(seen) > MAX_ENTRIES or expanded > MAX_EXPANDED_BYTES:
-                            raise ValueError('archive expanded size/entry budget exceeded')
+        seen, expanded, aliases = set(), 0, {}
+        try:
+            with tarfile.open(fileobj=stream, mode='r|gz') as payload:
+                for member in payload:
+                    safe_name(member.name)
+                    reject_case_collision(member.name, aliases)
+                    if not (member.isfile() or member.isdir()) or member.name in seen:
+                        raise ValueError('unsupported or duplicate archive entry')
+                    seen.add(member.name)
+                    expanded += member.size if member.isfile() else 0
+                    if len(seen) > MAX_ENTRIES or expanded > MAX_EXPANDED_BYTES:
+                        raise ValueError('archive expanded size/entry budget exceeded')
+                    if staged is not None:
                         payload.extract(member, staged, filter='data')
-            except (tarfile.TarError, EOFError) as error:
-                raise ValueError('invalid native cache archive') from error
-            if expanded != metadata['expanded_bytes'] or len(seen) != metadata['entries']:
-                raise ValueError('archive contents do not match metadata')
-            if destination.exists() or destination.is_symlink():
-                raise ValueError('destination already exists')
-            publish_directory(staged, destination)
+                    elif member.isfile():
+                        # Validate the complete stream without creating another
+                        # expanded copy of a potentially multi-gigabyte cache.
+                        with payload.extractfile(member) as data:
+                            count = 0
+                            for chunk in iter(lambda: data.read(1 << 20), b''):
+                                count += len(chunk)
+                            if count != member.size:
+                                raise ValueError('truncated cache payload')
+        except (tarfile.TarError, EOFError) as error:
+            raise ValueError('invalid native cache archive') from error
+        if expanded != metadata['expanded_bytes'] or len(seen) != metadata['entries']:
+            raise ValueError('archive contents do not match metadata')
+
+
+def restore(archive: Path, metadata: dict, destination: Path, identity: dict) -> None:
+    destination = Path(destination).absolute()
+    if destination.exists() or destination.is_symlink():
+        raise ValueError('destination already exists')
+    with tempfile.TemporaryDirectory(prefix='native-cache-restore-', dir=destination.parent) as directory:
+        staged = Path(directory) / 'payload'
+        staged.mkdir()
+        validate_archive(archive, metadata, identity, staged)
+        publish_directory(staged, destination)
 
 
 # Per OS/architecture release: at most two complete steady-state generations
@@ -268,10 +284,12 @@ def matching_asset(asset: dict, path: Path) -> bool:
 
 
 def publish(archive: Path, metadata: dict, store, context: dict) -> dict:
-    if (context.get('repository') != 'obs-rust/obs-studio' or context.get('ref') != 'refs/heads/master'
+    if (not isinstance(context, dict) or not isinstance(metadata, dict)
+            or context.get('repository') != 'obs-rust/obs-studio' or context.get('ref') != 'refs/heads/master'
             or context.get('event_name') not in ('push', 'schedule', 'workflow_dispatch')
             or context.get('actions') != 'true' or context.get('sha') != metadata.get('source_sha')):
         raise ValueError('publication requires trusted master Actions context')
+    validate_archive(archive, metadata, metadata['identity'])
     identity = metadata['identity']
     fingerprint = profile(identity)
     source_sha = metadata['source_sha']
@@ -343,6 +361,8 @@ def consume(identity: dict, destination: Path, store) -> dict:
                 if not matching_asset(candidate, manifest_path):
                     raise ValueError('remote manifest size/digest mismatch')
                 metadata = json.loads(manifest_path.read_text())
+                if not isinstance(metadata, dict):
+                    raise ValueError('remote manifest must be an object')
                 expected_archive = candidate['name'][:-5] + '.tar.gz'
                 if (metadata.get('archive_name') != expected_archive
                         or metadata.get('source_sha') != ASSET_NAME.fullmatch(candidate['name']).group(2)):

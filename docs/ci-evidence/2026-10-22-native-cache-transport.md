@@ -114,3 +114,16 @@ includes reproducibility across different wall times, a no-upload retry,
 expired orphan recovery, recent orphan protection/budget refusal, and ignoring
 starter manifests while retaining a real usable generation. The fixture is
 local; GitHub adapter, actual publication and native qualification remain open.
+
+
+### Review regressions: publication validation and malformed manifests
+
+The additional local RED run produced six invalid-publication failures and four
+non-object manifest errors. Publication now uses the same complete metadata and
+streaming archive validator as restoration before accessing or mutating the
+remote store. The producer reads the expanded stream without writing an extra
+expanded copy; its CPU and read cost still require native qualification.
+Non-object JSON manifests now fall back to the previous complete generation.
+The focused transport and stdlib-policy suites passed 24 tests in 0.404 seconds.
+These are local protocol fixtures, not evidence of real GitHub transport or
+native build performance. No publication route has been enabled.
