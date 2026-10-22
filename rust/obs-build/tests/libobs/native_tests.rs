@@ -123,16 +123,19 @@ pub fn exercise(
                 .stderr(std::fs::File::create(directory.join("stderr.log")).unwrap())
                 .status()
                 .unwrap();
-            let stdout = std::fs::read_to_string(directory.join("stdout.log")).unwrap();
-            let stderr = std::fs::read_to_string(directory.join("stderr.log")).unwrap();
+            let stdout = std::fs::read(directory.join("stdout.log")).unwrap();
+            let stderr = std::fs::read(directory.join("stderr.log")).unwrap();
             let skip_code = test
                 .runtime
                 .as_ref()
                 .and_then(|test| test.skip_return_code)
                 .unwrap_or(77);
             let skipped = status.code() == Some(skip_code)
-                || stdout.contains("SKIPPED")
-                || stderr.contains("SKIPPED");
+                || [stdout.as_slice(), stderr.as_slice()].iter().any(|output| {
+                    output
+                        .windows(b"SKIPPED".len())
+                        .any(|window| window == b"SKIPPED")
+                });
             let passed = status.success() && !skipped;
             println!(
                 "cc::Build {suite} C test: {variant}/{} exit {status}, skipped={skipped}",

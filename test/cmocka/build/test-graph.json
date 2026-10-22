@@ -1942,6 +1942,458 @@
         "libobs"
       ]
     },
+    "test_output_deactivate_state": {
+      "sources": [
+        "test/cmocka/test_output_deactivate_state.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_cf_preprocessor": {
+      "sources": [
+        "test/cmocka/test_cf_preprocessor.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_output_null_id": {
+      "sources": [
+        "test/cmocka/test_output_null_id.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_output_failed_start_encoders": {
+      "sources": [
+        "test/cmocka/test_output_failed_start_encoders.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "not": "OS_WINDOWS"
+      }
+    },
+    "test_output_rescale": {
+      "sources": [
+        "test/cmocka/test_output_rescale.c",
+        "frontend/utility/output-rescale.c.h"
+      ],
+      "libraries": [
+        "OBS::native-test-cmocka"
+      ],
+      "includes": [
+        "frontend/utility"
+      ],
+      "watch_inputs": [
+        "frontend/utility"
+      ]
+    },
+    "test_output_start_twice": {
+      "sources": [
+        "test/cmocka/test_output_start_twice.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_texture_encoder_raw_format": {
+      "sources": [
+        "test/cmocka/test_texture_encoder_raw_format.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "not": "OS_WINDOWS"
+      }
+    },
+    "test_audio_restart_resampler_tail": {
+      "sources": [
+        "test/cmocka/test_audio_restart_resampler_tail.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "m",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": "OS_LINUX"
+    },
+    "test_obs_enum_outputs_removal": {
+      "sources": [
+        "test/cmocka/test_obs_enum_outputs_removal.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "not": "OS_WINDOWS"
+      }
+    },
+    "test_output_caption_queue": {
+      "sources": [
+        "test/cmocka/test_output_caption_queue.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "OBS::native-test-cmocka"
+      ],
+      "includes": [
+        "libobs",
+        "deps/libcaption"
+      ]
+    },
+    "test_output_caption_text": {
+      "sources": [
+        "test/cmocka/test_output_caption_text.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "OBS::native-test-cmocka"
+      ],
+      "includes": [
+        "libobs",
+        "deps/libcaption"
+      ]
+    },
+    "test_scene_bounds_fit": {
+      "sources": [
+        "test/cmocka/test_scene_bounds_fit.c",
+        "libobs/obs-scene-bounds.c.h"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_scene_coords": {
+      "sources": [
+        "test/cmocka/test_scene_coords.c",
+        "libobs/obs-scene-coords.c.h"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_encoder_fallback": {
+      "sources": [
+        "test/cmocka/test_encoder_fallback.c",
+        "frontend/utility/encoder-fallback.c.h"
+      ],
+      "libraries": [
+        "OBS::native-test-cmocka"
+      ],
+      "includes": [
+        "frontend/utility"
+      ],
+      "watch_inputs": [
+        "frontend/utility"
+      ]
+    },
+    "test_scene_list_remove": {
+      "sources": [
+        "test/cmocka/test_scene_list_remove.c",
+        "frontend/utility/scene-list-remove.c.h"
+      ],
+      "libraries": [
+        "OBS::native-test-cmocka"
+      ],
+      "includes": [
+        "frontend/utility"
+      ],
+      "watch_inputs": [
+        "frontend/utility"
+      ]
+    },
+    "test_output_filename_format": {
+      "sources": [
+        "test/cmocka/test_output_filename_format.c",
+        "frontend/utility/output-filename-format.c.h"
+      ],
+      "libraries": [
+        "OBS::native-test-cmocka"
+      ],
+      "includes": [
+        "frontend/utility"
+      ],
+      "watch_inputs": [
+        "frontend/utility"
+      ]
+    },
+    "test_output_delay_e2e": {
+      "sources": [
+        "test/cmocka/test_output_delay_e2e.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_encoder_video_reset": {
+      "sources": [
+        "test/cmocka/test_encoder_video_reset.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_OBS_OPENGL"
+        ]
+      },
+      "artifact_definitions": {
+        "GRAPHICS_MODULE_PATH": "OBS::libobs-opengl"
+      },
+      "watch_inputs": [
+        "libobs/data"
+      ]
+    },
+    "test_scene_private_canvas": {
+      "sources": [
+        "test/cmocka/test_scene_private_canvas.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_OBS_OPENGL"
+        ]
+      },
+      "artifact_definitions": {
+        "GRAPHICS_MODULE_PATH": "OBS::libobs-opengl"
+      },
+      "watch_inputs": [
+        "libobs/data"
+      ]
+    },
+    "test_scene_rotated_scale_filter": {
+      "sources": [
+        "test/cmocka/test_scene_rotated_scale_filter.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        "m"
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_OBS_OPENGL"
+        ]
+      },
+      "artifact_definitions": {
+        "GRAPHICS_MODULE_PATH": "OBS::libobs-opengl"
+      },
+      "watch_inputs": [
+        "libobs/data"
+      ]
+    },
+    "test_scene_duplicate_scale_ref": {
+      "sources": [
+        "test/cmocka/test_scene_duplicate_scale_ref.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        "m"
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_OBS_OPENGL"
+        ]
+      },
+      "artifact_definitions": {
+        "GRAPHICS_MODULE_PATH": "OBS::libobs-opengl"
+      },
+      "watch_inputs": [
+        "libobs/data"
+      ]
+    },
+    "test_scene_dup_group_children": {
+      "sources": [
+        "test/cmocka/test_scene_dup_group_children.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_OBS_OPENGL"
+        ]
+      },
+      "artifact_definitions": {
+        "GRAPHICS_MODULE_PATH": "OBS::libobs-opengl"
+      },
+      "watch_inputs": [
+        "libobs/data"
+      ]
+    },
+    "test_output_caption_codec": {
+      "sources": [
+        "test/cmocka/test_output_caption_codec.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_OBS_OPENGL"
+        ]
+      },
+      "artifact_definitions": {
+        "GRAPHICS_MODULE_PATH": "OBS::libobs-opengl"
+      },
+      "watch_inputs": [
+        "libobs/data"
+      ],
+      "includes": [
+        "libobs",
+        "deps/libcaption"
+      ]
+    },
+    "test_output_delay_restart": {
+      "sources": [
+        "test/cmocka/test_output_delay_restart.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_OBS_OPENGL"
+        ]
+      },
+      "artifact_definitions": {
+        "GRAPHICS_MODULE_PATH": "OBS::libobs-opengl"
+      },
+      "watch_inputs": [
+        "libobs/data"
+      ]
+    },
+    "test_output_interleave_e2e": {
+      "sources": [
+        "test/cmocka/test_output_interleave_e2e.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_OBS_OPENGL"
+        ]
+      },
+      "artifact_definitions": {
+        "GRAPHICS_MODULE_PATH": "OBS::libobs-opengl"
+      },
+      "watch_inputs": [
+        "libobs/data"
+      ]
+    },
+    "test_output_interleave_restart": {
+      "sources": [
+        "test/cmocka/test_output_interleave_restart.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_OBS_OPENGL"
+        ]
+      },
+      "artifact_definitions": {
+        "GRAPHICS_MODULE_PATH": "OBS::libobs-opengl"
+      },
+      "watch_inputs": [
+        "libobs/data"
+      ]
+    },
+    "test_audio_sync_offset_change": {
+      "sources": [
+        "test/cmocka/test_audio_sync_offset_change.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_OBS_OPENGL"
+        ]
+      },
+      "artifact_definitions": {
+        "GRAPHICS_MODULE_PATH": "OBS::libobs-opengl"
+      },
+      "watch_inputs": [
+        "libobs/data"
+      ]
+    },
+    "test_audio_capture_mix_race": {
+      "sources": [
+        "test/cmocka/test_audio_capture_mix_race.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "all": [
+          "OS_LINUX",
+          "HAVE_OBS_OPENGL"
+        ]
+      },
+      "artifact_definitions": {
+        "GRAPHICS_MODULE_PATH": "OBS::libobs-opengl"
+      },
+      "watch_inputs": [
+        "libobs/data"
+      ]
+    },
     "test_output_protocol_list_steps": {
       "sources": [
         "test/cmocka/test_output_protocol_list_steps.c",
@@ -2526,6 +2978,229 @@
       "target": "test_utf8_insize0",
       "command": [
         "${target}"
+      ]
+    },
+    "test_output_deactivate_state": {
+      "target": "test_output_deactivate_state",
+      "command": [
+        "${target}"
+      ],
+      "timeout_seconds": 60
+    },
+    "test_cf_preprocessor": {
+      "target": "test_cf_preprocessor",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_output_null_id": {
+      "target": "test_output_null_id",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_output_failed_start_encoders": {
+      "target": "test_output_failed_start_encoders",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_output_rescale": {
+      "target": "test_output_rescale",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_output_start_twice": {
+      "target": "test_output_start_twice",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_texture_encoder_raw_format": {
+      "target": "test_texture_encoder_raw_format",
+      "command": [
+        "${target}"
+      ],
+      "timeout_seconds": 180
+    },
+    "test_audio_restart_resampler_tail": {
+      "target": "test_audio_restart_resampler_tail",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_obs_enum_outputs_removal": {
+      "target": "test_obs_enum_outputs_removal",
+      "command": [
+        "${target}"
+      ],
+      "timeout_seconds": 90
+    },
+    "test_output_caption_queue": {
+      "target": "test_output_caption_queue",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_output_caption_text": {
+      "target": "test_output_caption_text",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_scene_bounds_fit": {
+      "target": "test_scene_bounds_fit",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_scene_coords": {
+      "target": "test_scene_coords",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_encoder_fallback": {
+      "target": "test_encoder_fallback",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_scene_list_remove": {
+      "target": "test_scene_list_remove",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_output_filename_format": {
+      "target": "test_output_filename_format",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_output_delay_e2e": {
+      "target": "test_output_delay_e2e",
+      "command": [
+        "${target}"
+      ],
+      "optional_prefixes": [
+        [
+          "xvfb-run",
+          "-a"
+        ]
+      ],
+      "timeout_seconds": 120
+    },
+    "test_encoder_video_reset": {
+      "target": "test_encoder_video_reset",
+      "command": [
+        "${target}"
+      ],
+      "suite": "graphics",
+      "working_directory": "${runtime}",
+      "timeout_seconds": 120
+    },
+    "test_scene_private_canvas": {
+      "target": "test_scene_private_canvas",
+      "command": [
+        "${target}"
+      ],
+      "suite": "graphics",
+      "working_directory": "${runtime}",
+      "timeout_seconds": 120
+    },
+    "test_scene_rotated_scale_filter": {
+      "target": "test_scene_rotated_scale_filter",
+      "command": [
+        "${target}"
+      ],
+      "suite": "graphics",
+      "working_directory": "${runtime}",
+      "timeout_seconds": 120
+    },
+    "test_scene_duplicate_scale_ref": {
+      "target": "test_scene_duplicate_scale_ref",
+      "command": [
+        "${target}"
+      ],
+      "suite": "graphics",
+      "working_directory": "${runtime}",
+      "timeout_seconds": 120
+    },
+    "test_scene_dup_group_children": {
+      "target": "test_scene_dup_group_children",
+      "command": [
+        "${target}"
+      ],
+      "suite": "graphics",
+      "working_directory": "${runtime}",
+      "timeout_seconds": 180
+    },
+    "test_output_caption_codec": {
+      "target": "test_output_caption_codec",
+      "command": [
+        "${target}"
+      ],
+      "suite": "graphics",
+      "working_directory": "${runtime}",
+      "timeout_seconds": 60,
+      "skip_return_code": 77
+    },
+    "test_output_delay_restart": {
+      "target": "test_output_delay_restart",
+      "command": [
+        "${target}"
+      ],
+      "suite": "graphics",
+      "working_directory": "${runtime}",
+      "timeout_seconds": 60,
+      "skip_return_code": 77
+    },
+    "test_output_interleave_e2e": {
+      "target": "test_output_interleave_e2e",
+      "command": [
+        "${target}"
+      ],
+      "suite": "graphics",
+      "working_directory": "${runtime}",
+      "timeout_seconds": 60,
+      "skip_return_code": 77
+    },
+    "test_output_interleave_restart": {
+      "target": "test_output_interleave_restart",
+      "command": [
+        "${target}"
+      ],
+      "suite": "graphics",
+      "working_directory": "${runtime}",
+      "timeout_seconds": 30,
+      "skip_return_code": 77
+    },
+    "test_audio_sync_offset_change": {
+      "target": "test_audio_sync_offset_change",
+      "command": [
+        "${target}"
+      ],
+      "suite": "graphics",
+      "working_directory": "${runtime}",
+      "timeout_seconds": 120
+    },
+    "test_audio_capture_mix_race": {
+      "target": "test_audio_capture_mix_race",
+      "command": [
+        "${target}"
+      ],
+      "suite": "graphics",
+      "working_directory": "${runtime}",
+      "timeout_seconds": 60,
+      "optional_prefixes": [
+        [
+          "xvfb-run",
+          "-a",
+          "-s",
+          "-screen 0 1280x1024x24 -noreset"
+        ]
       ]
     },
     "test_output_protocol_list_steps": {
