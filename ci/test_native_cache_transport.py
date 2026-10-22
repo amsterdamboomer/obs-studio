@@ -176,3 +176,113 @@ class NativeCacheTransportTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class MemoryReleaseStore:
+    """Local protocol fixture: assets are immutable and downloads are real bytes."""
+    def __init__(self):
+        self.objects = {}
+        self.calls = []
+        self.fail_manifest = False
+        self.clock = 0
+
+    def assets(self):
+        return [dict(asset) for _, asset in self.objects.values()]
+
+    def ensure(self, source_sha):
+        self.calls.append(('ensure', source_sha))
+
+    def upload(self, path):
+        self.calls.append(('upload', path.name))
+        if self.fail_manifest and path.suffix == '.json':
+            raise OSError('manifest publication failed')
+        if path.name in self.objects:
+            raise ValueError('immutable asset already exists')
+        data = path.read_bytes()
+        self.clock += 1
+        asset = {'name': path.name, 'size': len(data), 'digest': 'sha256:' + hashlib.sha256(data).hexdigest(),
+                 'created_at': f'2026-10-22T00:00:{self.clock:02d}Z', 'id': self.clock}
+        self.objects[path.name] = (data, asset)
+        return dict(asset)
+
+    def download(self, name, destination):
+        self.calls.append(('download', name))
+        destination.write_bytes(self.objects[name][0])
+
+    def delete(self, name):
+        self.calls.append(('delete', name))
+        del self.objects[name]
+
+
+class NativeCacheReleaseProtocolTest(unittest.TestCase):
+    def produce(self, root, store, sha=SHA):
+        source = root / ('source-' + sha)
+        source.mkdir()
+        (source / 'object').write_text('compiler payload ' + sha)
+        archive = root / (sha + '.tar.gz')
+        metadata = TRANSPORT.pack(source, archive, IDENTITY, sha)
+        context = {'repository': 'obs-rust/obs-studio', 'ref': 'refs/heads/master',
+                   'event_name': 'workflow_dispatch', 'sha': sha, 'actions': 'true'}
+        return TRANSPORT.publish(archive, metadata, store, context)
+
+    def test_trusted_producer_and_read_only_consumer_round_trip(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = MemoryReleaseStore()
+            self.produce(root, store)
+            self.assertTrue(store.calls[-1][1].endswith('.json'), 'manifest is the commit point')
+            store.calls.clear()
+            report = TRANSPORT.consume(IDENTITY, root / 'restored', store)
+            self.assertEqual(report['status'], 'hit')
+            self.assertEqual((root / 'restored/object').read_text(), 'compiler payload ' + SHA)
+            self.assertTrue(all(call[0] == 'download' for call in store.calls))
+
+    def test_failed_promotion_preserves_previous_usable_generation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = MemoryReleaseStore()
+            self.produce(root, store)
+            store.fail_manifest = True
+            with self.assertRaises(OSError):
+                self.produce(root, store, 'b' * 40)
+            self.assertFalse(any(call[0] == 'delete' for call in store.calls))
+            self.assertEqual(TRANSPORT.consume(IDENTITY, root / 'restored', store)['status'], 'hit')
+            self.assertEqual((root / 'restored/object').read_text(), 'compiler payload ' + SHA)
+
+    def test_retention_keeps_two_complete_generations(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = MemoryReleaseStore()
+            for digit in 'abc':
+                self.produce(root, store, digit * 40)
+            self.assertEqual(len(store.objects), 4)
+            self.assertEqual(TRANSPORT.consume(IDENTITY, root / 'restored', store)['status'], 'hit')
+            self.assertEqual((root / 'restored/object').read_text(), 'compiler payload ' + 'c' * 40)
+
+    def test_missing_or_incompatible_remote_seed_is_cold_without_writes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = MemoryReleaseStore()
+            self.assertEqual(TRANSPORT.consume(IDENTITY, root / 'restored', store)['status'], 'cold')
+            self.produce(root, store)
+            store.calls.clear()
+            changed = dict(IDENTITY, sdk='different-sdk')
+            self.assertEqual(TRANSPORT.consume(changed, root / 'restored', store)['status'], 'cold')
+            self.assertFalse((root / 'restored').exists())
+            self.assertFalse(any(call[0] in ('ensure', 'upload', 'delete') for call in store.calls))
+
+    def test_untrusted_publication_context_rejected_before_external_operations(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'source'
+            source.mkdir()
+            archive = root / 'seed.tar.gz'
+            metadata = TRANSPORT.pack(source, archive, IDENTITY, SHA)
+            valid = {'repository': 'obs-rust/obs-studio', 'ref': 'refs/heads/master',
+                     'event_name': 'workflow_dispatch', 'sha': SHA, 'actions': 'true'}
+            for field, value in (('repository', 'other/repo'), ('ref', 'refs/heads/candidate'),
+                                 ('event_name', 'pull_request'), ('sha', 'b' * 40), ('actions', 'false')):
+                store = MemoryReleaseStore()
+                with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'trusted'):
+                    TRANSPORT.publish(archive, metadata, store, dict(valid, **{field: value}))
+                self.assertEqual(store.calls, [])

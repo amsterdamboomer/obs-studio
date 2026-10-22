@@ -187,3 +187,11 @@ def restore(archive: Path, metadata: dict, destination: Path, identity: dict) ->
             if destination.exists() or destination.is_symlink():
                 raise ValueError('destination already exists')
             publish_directory(staged, destination)
+
+
+def publish(archive: Path, metadata: dict, store, context: dict) -> dict:
+    raise NotImplementedError('trusted native cache publication')
+
+
+def consume(identity: dict, destination: Path, store) -> dict:
+    raise NotImplementedError('read-only native cache consumption')
