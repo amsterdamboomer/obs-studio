@@ -35,6 +35,8 @@ fn native_test_graph_cmake_builds_and_runs_selected_contract() {
 int selected_answer(void);
 int main(int argc, char **argv) {
     const char *value = getenv("OBS_GRAPH_VALUE");
+    const char *wrapped = getenv("OBS_WRAPPER_VALUE");
+    if (!wrapped || strcmp(wrapped, "wrapped")) return 5;
     if (COMPILER_OPTION_REQUIRED != 23 || HEADER_ONLY_ANSWER != 17 || selected_answer() != 42 || EXPECTED != 42 || DEPENDENCY_ANSWER != 42 || DEPENDENCY_REQUIRED != 5 || argc != 2 || strcmp(argv[1], "two words") ||
         !value || strcmp(value, "first;second")) return 1;
     FILE *module = fopen(ARTIFACT_PATH, "rb");
@@ -73,7 +75,7 @@ int main(int argc, char **argv) {
             "disabled": {"sources": ["does-not-exist.c"], "requires": "GRAPH_DISABLED"}
         },
         "tests": {
-            "answer-case": {"target": "answer", "suite": "fixture", "command": ["${target}", "two words"],
+            "answer-case": {"target": "answer", "suite": "fixture", "optional_prefixes": [["cmake", "-E", "env", "OBS_WRAPPER_VALUE=wrapped"], ["obs-missing-wrapper-fixture-1332"]], "command": ["${target}", "two words"],
                 "environment": {"OBS_GRAPH_VALUE": "first;second"},
                 "working_directory": "${runtime}", "timeout_seconds": 17,
                 "skip_return_code": 77, "resource_locks": ["fixture-lock"]},
@@ -508,6 +510,37 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         "independent Linux test inventory remains"
     );
     for name in [
+        "test_audio_io_inlines",
+        "test_audio_math",
+        "test_bounds",
+        "test_calldata",
+        "test_decl",
+        "test_dstr_zero_len",
+        "test_audio_io",
+        "test_audio_controls",
+        "test_audio_clock_drift",
+        "test_obs_data",
+        "test_obs_properties",
+        "test_obs_properties_leaks",
+        "test_missing_files",
+        "test_proc",
+        "test_signal",
+        "test_format_conversion",
+        "test_math_extra",
+        "test_matrix3",
+        "test_matrix4",
+        "test_plane",
+        "test_graphics_alias_ordinary",
+        "test_graphics_alias_rest",
+        "test_config_double_window",
+        "test_config_set_double_format",
+        "test_hotkey_name_map",
+        "test_hotkey_bindings_codec",
+        "test_hotkey_pair_steps",
+        "test_hotkey_press_steps",
+        "test_hotkey_translations",
+        "test_shader_param_names",
+        "test_utf8_insize0",
         "test_whip_rtp_timestamp",
         "test_whip_host_os_name",
         "test_group_hide_transition_audio",
