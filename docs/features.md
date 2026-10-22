@@ -377,6 +377,12 @@ not get a line.
   [#454](https://github.com/obs-rust/obs-studio/pull/454),
   [#1086](https://github.com/obs-rust/obs-studio/pull/1086).
 
+- **No updates from upstream OBS Studio on macOS.** The macOS app no
+  longer checks upstream's update feed, so it can't offer to replace itself
+  with upstream OBS Studio. Its in-app updater stays off until OBS-Studio-Rust
+  has its own feed. *macOS*, 2026-10-22. PR
+  [#1727](https://github.com/obs-rust/obs-studio/pull/1727).
+
 ## Fixed upstream bugs
 
 Bugs inherited from OBS Studio (and obs-websocket) that are fixed here, by
