@@ -24,7 +24,7 @@ class TransportWorkflowTest(unittest.TestCase):
         self.assertNotIn('ci/native_cache_transport.py consume', job)
         self.assertNotIn('--expected ', job)
         self.assertIn("--identity '${{ runner.temp }}/native-cache-build-identity/native-cache-identity.json' --source", job)
-        self.assertIn('key: ${{ steps.native-seed.outputs.key }}', job)
+        self.assertIn('key: windows-ccache-${{ steps.native-seed.outputs.suffix }}', job)
         build_job = workflow.split('  build-project:\n', 1)[1].split('\n  #', 1)[0]
         self.assertIn('contents: write', build_job)
         self.assertIn('permissions:\n  actions: read\n  contents: read\n', build)
@@ -56,7 +56,7 @@ class TransportWorkflowTest(unittest.TestCase):
             job = build.split('  ' + platform + '-build:\n', 1)[1].split(boundary, 1)[0]
             self.assertIn('id: native-seed', job)
             self.assertIn('ci/native_cache_seed.py', job)
-            self.assertIn('key: ${{ steps.native-seed.outputs.key }}', job)
+            self.assertIn('key: ' + ('macOS-xcode-' if platform == 'macos' else 'windows-ccache-') + '${{ steps.native-seed.outputs.suffix }}', job)
             self.assertIn("!inputs.native-cache-transport-probe && github.event_name != 'pull_request'", job)
             self.assertLess(job.index('Record Native Transport Identity'), job.index('id: native-seed'))
             self.assertLess(job.index('Qualify Local Native Cache Archive'), job.index('Save Qualified Native Transport Seed'))

@@ -2,8 +2,11 @@
 """Qualification seeds must not alias same-source builds on different images."""
 
 import importlib.util
+import json
 from pathlib import Path
+import tempfile
 import unittest
+from unittest import mock
 
 SPEC = importlib.util.spec_from_file_location('native_cache_seed', Path(__file__).with_name('native_cache_seed.py'))
 SEED = importlib.util.module_from_spec(SPEC)
@@ -34,6 +37,22 @@ class NativeSeedTest(unittest.TestCase):
                 SEED.seed_key(IDENTITY, source)
         with self.assertRaises(ValueError):
             SEED.seed_key(dict(IDENTITY, configuration='Release\nother=value'), 'c' * 40)
+
+    def test_cli_emits_the_same_suffix_and_rejects_oversized_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            identity = root / 'identity.json'
+            output = root / 'output'
+            identity.write_text(json.dumps(IDENTITY))
+            arguments = ['native-cache-seed', '--identity', str(identity), '--source-sha', 'c' * 40, '--output', str(output)]
+            with mock.patch('sys.argv', arguments):
+                SEED.main()
+            expected = SEED.seed_key(IDENTITY, 'c' * 40).removeprefix('windows-ccache-')
+            self.assertEqual(output.read_text(), 'suffix=' + expected + '\n')
+            identity.write_bytes(b' ' * ((64 << 10) + 1))
+            with mock.patch('sys.argv', arguments), self.assertRaisesRegex(ValueError, 'budget'):
+                SEED.main()
+            self.assertEqual(output.read_text(), 'suffix=' + expected + '\n')
 
 
 if __name__ == '__main__':
