@@ -173,7 +173,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
             },
         )
         .unwrap();
-        assert_eq!(executables.len(), if options.hevc { 59 } else { 58 });
+        assert_eq!(executables.len(), if options.hevc { 63 } else { 62 });
         let mut results = Vec::new();
         for core in [&libraries.reference, &libraries.with_rust] {
             let variant = core

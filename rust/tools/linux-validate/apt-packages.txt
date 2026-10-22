@@ -72,6 +72,8 @@ extra-cmake-modules
 rsync
 xvfb
 xauth
+openbox
+x11-utils
 pipewire
 dbus-daemon
 vlc-plugin-base
