@@ -1,12 +1,13 @@
 #!/usr/bin/env -S uv run --script
 """Bounded native compiler-cache archive transport (#1269).
 
-No network or publication policy lives here. Native cache stores must contain
-ordinary files/directories; unsupported entries fail rather than disappearing.
+Native cache stores must contain ordinary files/directories; unsupported entries
+fail rather than disappearing. Publication uses an explicit trusted job token.
 """
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import gzip
 from datetime import datetime
@@ -394,4 +395,65 @@ def consume(identity: dict, destination: Path, store) -> dict:
 
 
 def main(argv=None, store_factory=None):
-    raise NotImplementedError
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('mode', choices=('publish', 'consume'))
+    parser.add_argument('--identity', type=Path, required=True)
+    parser.add_argument('--source', type=Path)
+    parser.add_argument('--destination', type=Path)
+    parser.add_argument('--report', type=Path, required=True)
+    args = parser.parse_args(argv)
+    if args.mode == 'publish' and (args.source is None or args.destination is not None):
+        parser.error('publish requires --source and no --destination')
+    if args.mode == 'consume' and (args.destination is None or args.source is not None):
+        parser.error('consume requires --destination and no --source')
+    # Reserve the report before any operation: a preexisting report cannot cause
+    # publication to succeed without leaving the requested evidence.
+    with args.report.open('x') as output:
+        started = time.monotonic()
+        try:
+            with args.identity.open('rb') as stream:
+                encoded = stream.read(MAX_MANIFEST_BYTES + 1)
+            if len(encoded) > MAX_MANIFEST_BYTES:
+                raise ValueError('identity document budget exceeded')
+            identity = json.loads(encoded)
+            validate_identity(identity)
+            context = {field: os.environ.get(env, '') for field, env in (
+                ('repository', 'GITHUB_REPOSITORY'), ('ref', 'GITHUB_REF'),
+                ('event_name', 'GITHUB_EVENT_NAME'), ('sha', 'GITHUB_SHA'), ('actions', 'GITHUB_ACTIONS'))}
+            if args.mode == 'publish' and (
+                    context['repository'] != 'obs-rust/obs-studio' or context['ref'] != 'refs/heads/master'
+                    or context['event_name'] not in ('push', 'schedule', 'workflow_dispatch')
+                    or context['actions'] != 'true' or not re.fullmatch('[0-9a-f]{40}', context['sha'])):
+                raise ValueError('publication requires trusted master Actions context')
+            if store_factory is None:
+                from native_cache_release_store import ReleaseStore
+                store_factory = ReleaseStore
+            store = store_factory(identity, token=os.environ.get('NATIVE_CACHE_JOB_TOKEN', ''),
+                                  writable=args.mode == 'publish')
+            if args.mode == 'publish':
+                with tempfile.TemporaryDirectory(prefix='native-cache-pack-', dir=args.report.parent) as directory:
+                    archive = Path(directory) / 'cache.tar.gz'
+                    packed_at = time.monotonic()
+                    metadata = pack(args.source, archive, identity, context['sha'])
+                    packing_seconds = time.monotonic() - packed_at
+                    published_at = time.monotonic()
+                    report = publish(archive, metadata, store, context)
+                    report.update(packing_seconds=packing_seconds,
+                                  validation_and_publication_seconds=time.monotonic() - published_at,
+                                  archive_bytes=metadata['bytes'], expanded_bytes=metadata['expanded_bytes'])
+            else:
+                report = consume(identity, args.destination, store)
+            code = 0
+        except (OSError, ValueError, KeyError, tarfile.TarError) as error:
+            report = {'status': 'error', 'error_type': type(error).__name__}
+            # HTTP exception URLs/bodies and external tool messages may contain
+            # credentials. Persist only the exception type at this boundary.
+            code = 1
+        report.update(mode=args.mode, total_seconds=time.monotonic() - started)
+        json.dump(report, output, sort_keys=True, indent=2)
+        output.write('\n')
+    return code
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
