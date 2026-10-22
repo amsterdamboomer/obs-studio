@@ -133,13 +133,17 @@ inline int CompareObsRustVersions(const std::string &a, const std::string &b)
 
 inline bool ObsRustUpdateBranchIsKnown(const std::string &branch)
 {
-	(void)branch;
-	return false;
+	return branch == OBS_RUST_STABLE_BRANCH || branch == OBS_RUST_NIGHTLY_BRANCH;
 }
 
-/* The feed URL for branch, given the stable (certified) feed URL of a file. */
+/* The feed URL for branch, given the stable (certified) feed URL of a file:
+ * a nightly branch reads the same file from the continuous release. A URL
+ * outside obs-rust's certified feed is returned unchanged. */
 inline std::string ObsRustFeedUrl(const std::string &stableUrl, const std::string &branch)
 {
-	(void)branch;
-	return stableUrl;
+	static const std::string stablePrefix = OBS_RUST_STABLE_FEED_URL;
+	if (branch != OBS_RUST_NIGHTLY_BRANCH || stableUrl.compare(0, stablePrefix.size(), stablePrefix) != 0) {
+		return stableUrl;
+	}
+	return OBS_RUST_NIGHTLY_FEED_URL + stableUrl.substr(stablePrefix.size());
 }
