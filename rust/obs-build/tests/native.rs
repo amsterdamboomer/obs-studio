@@ -8,7 +8,7 @@ fn native_test_graph_preserves_cpp_standard_without_changing_c_compilation() {
     let root = directory.path();
     fs::write(
         root.join("answer.c"),
-        "#ifdef __cplusplus\n#error C source compiled as C++\n#endif\n_Static_assert(sizeof(int) >= 2, \"C11 required\");\nint c_answer(void) { return 42; }\n",
+        "#ifdef __cplusplus\n#error C source compiled as C++\n#endif\ntypedef char c_integer_width[(sizeof(int) >= 2) ? 1 : -1];\nint c_answer(void) { return 42; }\n",
     )
     .unwrap();
     fs::write(
