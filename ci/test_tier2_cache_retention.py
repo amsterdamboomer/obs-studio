@@ -61,11 +61,13 @@ class Tier2RetentionTest(unittest.TestCase):
             self.assertNotEqual(owner, self.owner(key))
         family = self.families[owner]
         self.assertEqual(family["evict"], "lru")
+        self.assertTrue(all("-rustON-" in entry["key"] for entry in snapshot["ubuntu_entries"]))
         measured = max(entry["size_in_bytes"] for entry in snapshot["ubuntu_entries"])
         self.assertGreaterEqual(size(family["max"]), measured * 1.25, "retain at least 25% archive growth room")
         self.assertLessEqual(size(family["max"]), size("1.1GB"), "release unused second app reservation")
         # Production app mode is separate from mandatory C-reference/hybrid test coverage.
-        self.assertRegex(workflow, r'mode: \["OFF", "ON"\]')
+        tier2 = re.search(r"^  rust-linux-tier2:\n(.*?)(?=^  [a-z0-9-]+:\n)", workflow, re.M | re.S)[1]
+        self.assertRegex(tier2, r'mode: \["OFF", "ON"\]')
 
     def test_reduced_allowances_retain_measured_seeds_with_growth_room(self):
         snapshot = json.loads((ROOT / "docs/ci-evidence/2026-10-21-cache-retention-report.json").read_text())
