@@ -409,7 +409,10 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
     assert_eq!(graph.tests["test_svt_av1"].timeout_seconds, Some(60));
     assert_eq!(graph.tests["test_svt_av1"].skip_return_code, Some(77));
     for name in ["test_context_name_helpers", "test_video_output_plan"] {
-        assert_eq!(graph.targets[name].sanitizers.as_deref(), Some("address,undefined"));
+        assert_eq!(
+            graph.targets[name].sanitizers.as_deref(),
+            Some("address,undefined")
+        );
     }
     assert_eq!(
         graph.tests["test_dstr_regressions"].timeout_seconds,

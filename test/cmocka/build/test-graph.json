@@ -617,6 +617,120 @@
           "OS_FREEBSD"
         ]
       }
+    },
+    "test_scene_blend": {
+      "sources": [
+        "test/cmocka/test_scene_blend.c"
+      ],
+      "includes": [
+        "libobs",
+        "deps/libcaption"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "Uthash::Uthash",
+        "ZLIB::ZLIB",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_output_delay": {
+      "sources": [
+        "test/cmocka/test_output_delay.c",
+        "test/cmocka/output_delay_fields_stub.c"
+      ],
+      "includes": [
+        "libobs",
+        "deps/libcaption"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "Uthash::Uthash",
+        "ZLIB::ZLIB",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_output_interleave": {
+      "sources": [
+        "test/cmocka/test_output_interleave.c",
+        "test/cmocka/output_interleave_fields_stub.c"
+      ],
+      "includes": [
+        "libobs",
+        "deps/libcaption"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "Uthash::Uthash",
+        "ZLIB::ZLIB",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_context_name_helpers": {
+      "sources": [
+        "test/cmocka/test_context_name_helpers.c",
+        "libobs/obs-context-names.c.h"
+      ],
+      "includes": [
+        "libobs",
+        "deps/libcaption"
+      ],
+      "sanitizers": "address,undefined",
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "Uthash::Uthash",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_video_output_plan": {
+      "sources": [
+        "test/cmocka/test_video_output_plan.c"
+      ],
+      "definitions": [
+        "FORMAT_CONVERSION_EFFECT=\"${source}/libobs/data/format_conversion.effect\""
+      ],
+      "includes": [
+        "libobs",
+        "deps/libcaption"
+      ],
+      "sanitizers": "address,undefined",
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "Uthash::Uthash",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_audio_buffering_subsample": {
+      "sources": [
+        "test/cmocka/test_audio_buffering_subsample.c"
+      ],
+      "compile_options_if_supported": [
+        "-ftrivial-auto-var-init=pattern"
+      ],
+      "link_options": [
+        "-Wl,--gc-sections"
+      ],
+      "includes": [
+        "libobs",
+        "deps/libcaption"
+      ],
+      "requires": "OS_LINUX",
+      "compile_options": [
+        "-ffunction-sections",
+        "-fdata-sections"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "Uthash::Uthash",
+        "ZLIB::ZLIB",
+        "OBS::native-test-cmocka",
+        "m"
+      ]
     }
   },
   "tests": {
@@ -791,6 +905,24 @@
     },
     "test_portal_shortcut_sets": {
       "target": "test_portal_shortcut_sets"
+    },
+    "test_scene_blend": {
+      "target": "test_scene_blend"
+    },
+    "test_output_delay": {
+      "target": "test_output_delay"
+    },
+    "test_output_interleave": {
+      "target": "test_output_interleave"
+    },
+    "test_context_name_helpers": {
+      "target": "test_context_name_helpers"
+    },
+    "test_video_output_plan": {
+      "target": "test_video_output_plan"
+    },
+    "test_audio_buffering_subsample": {
+      "target": "test_audio_buffering_subsample"
     }
   }
 }

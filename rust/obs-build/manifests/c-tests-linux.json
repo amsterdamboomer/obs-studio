@@ -163,51 +163,6 @@
     ]
   },
   {
-    "name": "test_audio_buffering_subsample",
-    "sources": [
-      "test/cmocka/test_audio_buffering_subsample.c"
-    ],
-    "compile_options_if_supported": [
-      "-ftrivial-auto-var-init=pattern"
-    ],
-    "link_options": [
-      "-Wl,--gc-sections"
-    ],
-    "packages": [
-      "zlib"
-    ],
-    "archives": [
-      "caption"
-    ]
-  },
-  {
-    "name": "test_scene_blend",
-    "sources": [
-      "test/cmocka/test_scene_blend.c"
-    ]
-  },
-  {
-    "name": "test_output_delay",
-    "sources": [
-      "test/cmocka/test_output_delay.c",
-      "test/cmocka/output_delay_fields_stub.c"
-    ]
-  },
-  {
-    "name": "test_output_interleave",
-    "sources": [
-      "test/cmocka/test_output_interleave.c",
-      "test/cmocka/output_interleave_fields_stub.c"
-    ]
-  },
-  {
-    "name": "test_context_name_helpers",
-    "sources": [
-      "test/cmocka/test_context_name_helpers.c",
-      "libobs/obs-context-names.c.h"
-    ]
-  },
-  {
     "name": "test_scene_audio_action_steps",
     "sources": [
       "test/cmocka/test_scene_audio_action_steps.c",
@@ -220,15 +175,6 @@
     "sources": [
       "test/cmocka/test_output_protocol_list_steps.c",
       "libobs/obs-output-protocols.c.h"
-    ]
-  },
-  {
-    "name": "test_video_output_plan",
-    "sources": [
-      "test/cmocka/test_video_output_plan.c"
-    ],
-    "definitions": [
-      "FORMAT_CONVERSION_EFFECT=\"${source}/libobs/data/format_conversion.effect\""
     ]
   }
 ]

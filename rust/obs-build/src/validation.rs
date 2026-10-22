@@ -380,6 +380,13 @@ pub fn build_c_tests(
         add_package(&mut dependency, &build.target, &format!("lib{component}"))?;
         interfaces.insert(format!("FFmpeg::{component}"), dependency.into());
     }
+    let mut zlib = SharedLibrary::default();
+    add_package(&mut zlib, &build.target, "zlib")?;
+    interfaces.insert("ZLIB::ZLIB".into(), zlib.into());
+    // This Linux-only compatibility builder inherits the compiler's system
+    // header search (including CFLAGS/CPATH). Uthash is header-only and already
+    // required by the built core; it contributes no artifact or link flags.
+    interfaces.insert("Uthash::Uthash".into(), graph::Dependency::default());
     let artifacts = graph.compile(build, &root, &facts, &interfaces)?;
     for (name, test) in graph.select(&facts)?.tests {
         if result.iter().any(|existing| existing.name == name) {
