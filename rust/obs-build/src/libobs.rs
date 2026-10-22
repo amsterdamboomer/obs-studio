@@ -127,7 +127,7 @@ fn prepare(build: &NativeBuild, root: &Path, options: &Options) -> Result<Plan, 
     if options.hevc {
         library.definitions.push(("ENABLE_HEVC".into(), None));
     }
-    crate::platform::configure_libobs(&build.target, &root, options, &sets, &mut library)?;
+    crate::platform::configure_libobs(build, &root, options, &sets, &mut library)?;
     crate::platform::configure_core_dependencies(&build.target, options, &mut library)?;
     library.dependencies.push(build_caption(build, &root)?);
     let mut header = String::from(

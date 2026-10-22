@@ -8,6 +8,7 @@ use std::{
 
 mod libobs_linux;
 mod libobs_macos;
+mod libobs_windows;
 pub(crate) mod resources;
 
 pub fn stage_core_identity(target: &str, artifact: &Path) -> Result<(), String> {
@@ -58,16 +59,19 @@ pub(crate) fn pch_kind(target: &str, compiler: &cc::Tool) -> Result<PchKind, Str
 }
 
 pub fn configure_libobs(
-    target: &str,
+    build: &crate::NativeBuild,
     root: &Path,
     options: &crate::libobs::Options,
     sets: &std::collections::BTreeMap<String, Vec<String>>,
     library: &mut crate::SharedLibrary,
 ) -> Result<(), String> {
+    let target = &build.target;
     if target.contains("linux") {
         libobs_linux::configure(target, root, options, sets, library)
     } else if target.contains("apple-darwin") {
         libobs_macos::configure(root, sets, library)
+    } else if target.contains("windows-msvc") {
+        libobs_windows::configure(build, root, sets, library)
     } else {
         Err(format!(
             "real libobs native graph for {target} is not implemented yet"
@@ -82,6 +86,9 @@ pub fn configure_core_dependencies(
 ) -> Result<(), String> {
     if target.contains("apple-darwin") {
         return libobs_macos::dependencies(options, library);
+    }
+    if target.contains("windows-msvc") {
+        return libobs_windows::dependencies(options, library);
     }
     for package in [
         "libavformat",
@@ -197,6 +204,8 @@ pub fn configure_libobs_variant(
             rust_archive,
             &build.output.join("config"),
         )
+    } else if build.target.contains("windows-msvc") {
+        libobs_windows::configure_variant(root, options, sets, library, rust_archive)
     } else {
         Err(format!(
             "real libobs variant for {} is not implemented yet",
@@ -341,6 +350,10 @@ pub fn configure_executable_link(
 }
 
 pub fn configure_caption(target: &str, library: &mut crate::SharedLibrary) -> Result<(), String> {
+    if target.contains("windows-msvc") {
+        libobs_windows::defaults(library);
+        return Ok(());
+    }
     if target.contains("apple-darwin") {
         library.c_compile_options.push("-std=gnu17".into());
         library.compile_options.push("-fvisibility=hidden".into());
