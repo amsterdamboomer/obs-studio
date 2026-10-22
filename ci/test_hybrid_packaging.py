@@ -358,3 +358,16 @@ class FlatpakPrunedBuildTest(unittest.TestCase):
         self.assertLess(workflow.index('- name: Validate repository'), workflow.index('- name: Probe Pruned Flatpak Rebuild'))
         self.assertIn('if: inputs.flatpak-pruned-build-probe', workflow)
         self.assertIn('uv run ci/flatpak_pruned_build_probe.py', workflow)
+
+    def test_pruned_rebuild_still_rejects_links_in_dependency_repository(self):
+        probe = self.load_probe()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state, manifest = self.fixture(root)
+            (state / 'cache/escaped-link').symlink_to(state / 'cache/original')
+            def forbidden(command, seconds):
+                self.fail('commands must not run for linked dependency state')
+            with self.assertRaisesRegex(ValueError, 'cache/escaped-link'):
+                probe.measure(state, manifest, root, execute=forbidden)
+            self.assertEqual((state / 'cache/original').read_text(), 'cache')
+            self.assertEqual(sorted(p.name for p in root.iterdir()), ['manifest.json', 'state'])

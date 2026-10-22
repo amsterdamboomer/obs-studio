@@ -74,7 +74,7 @@ regenerated, and no transient checkout tree can supply compiler outputs to
 the rebuild. Symbolic links in retained dependency state remain rejected;
 the error now identifies a bounded relative path. No general permission to
 follow links into original state or external paths is introduced. Regression
-RED9e503de5e reproduces rejection of a transient-tree link by the original
+RED89f231a81 (rebased from local9e503de5e) reproduces rejection of a transient-tree link by the original
 helper; the revised projection passes while preserving original state.
 
 The revised candidate still requires an actual forced application rebuild,
