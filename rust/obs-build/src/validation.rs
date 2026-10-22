@@ -1,4 +1,6 @@
 //! Build the unchanged native C tests through the Cargo native engine.
+pub mod graph;
+
 use crate::{NativeBuild, SharedLibrary, libobs::add_package};
 use std::{
     collections::{BTreeSet, HashMap},
