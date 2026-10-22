@@ -122,3 +122,24 @@ inline int CompareObsRustVersions(const std::string &a, const std::string &b)
 	}
 	return va.pre.size() < vb.pre.size() ? -1 : (va.pre.size() > vb.pre.size() ? 1 : 0);
 }
+
+/* Update channels (#1759). "stable" reads the certified feed on the Latest
+ * release; "nightly" reads the feed the daily run writes onto the rolling
+ * "continuous" pre-release. Any other UpdateBranch falls back to stable. */
+#define OBS_RUST_STABLE_FEED_URL "https://github.com/obs-rust/obs-studio/releases/latest/download/"
+#define OBS_RUST_NIGHTLY_FEED_URL "https://github.com/obs-rust/obs-studio/releases/download/continuous/"
+#define OBS_RUST_STABLE_BRANCH "stable"
+#define OBS_RUST_NIGHTLY_BRANCH "nightly"
+
+inline bool ObsRustUpdateBranchIsKnown(const std::string &branch)
+{
+	(void)branch;
+	return false;
+}
+
+/* The feed URL for branch, given the stable (certified) feed URL of a file. */
+inline std::string ObsRustFeedUrl(const std::string &stableUrl, const std::string &branch)
+{
+	(void)branch;
+	return stableUrl;
+}

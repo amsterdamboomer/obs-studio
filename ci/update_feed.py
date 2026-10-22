@@ -101,7 +101,12 @@ def sign(key_pem: bytes, data: bytes) -> str:
     return key.sign(data, padding.PKCS1v15(), hashes.SHA512()).hex()
 
 
-def build(tag: str, assets: Path, mac_info: dict, key_pem: bytes, out: Path) -> None:
+CHANNELS = ("stable", "nightly")
+
+
+def build(tag: str, assets: Path, mac_info: dict, key_pem: bytes, out: Path, channel: str = "stable") -> None:
+    if channel != "stable":
+        raise NotImplementedError(channel)
     match = TAG_RE.match(tag)
     if not match:
         raise FeedError(f"{tag!r} is not an obs-studio-rust-v<version> release tag")
@@ -225,6 +230,7 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--mac-info", required=True, type=Path)
     b.add_argument("--rsa-key", required=True, type=Path)
     b.add_argument("--out", required=True, type=Path)
+    b.add_argument("--channel", choices=CHANNELS, default="stable")
     c = sub.add_parser("check-certifiable")
     c.add_argument("--facts", required=True, type=Path)
     c.add_argument("--min-age-days", required=True, type=float)
@@ -248,6 +254,7 @@ def main(argv: list[str] | None = None) -> int:
             json.loads(args.mac_info.read_text(encoding="utf-8")),
             args.rsa_key.read_bytes(),
             args.out,
+            args.channel,
         )
     except (FeedError, OSError, ValueError, KeyError) as error:
         print(f"update_feed: {error}", file=sys.stderr)
