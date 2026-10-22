@@ -874,6 +874,7 @@ pub fn native_test_facts(
 ) -> std::collections::BTreeMap<String, bool> {
     std::collections::BTreeMap::from([
         ("OS_LINUX".into(), target.contains("linux")),
+        ("OS_FREEBSD".into(), target.contains("freebsd")),
         ("ENABLE_PULSEAUDIO".into(), pulseaudio),
         ("ENABLE_HEVC".into(), hevc),
         ("MSVC".into(), target.contains("msvc")),

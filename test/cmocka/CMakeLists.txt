@@ -432,7 +432,11 @@ endforeach()
 include("${CMAKE_CURRENT_SOURCE_DIR}/native-test-graph.cmake")
 # These explicit false defaults retain the original if() semantics on hosts
 # where a platform-only option is not declared.
-foreach(_graph_fact IN ITEMS MSVC OS_LINUX ENABLE_PULSEAUDIO ENABLE_HEVC)
+foreach(
+  _graph_fact
+  IN
+  ITEMS MSVC OS_LINUX OS_FREEBSD ENABLE_PULSEAUDIO ENABLE_HEVC
+)
   if(NOT DEFINED ${_graph_fact})
     set(${_graph_fact} FALSE)
   endif()
