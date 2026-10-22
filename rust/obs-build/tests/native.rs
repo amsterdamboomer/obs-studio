@@ -37,7 +37,11 @@ int main(int argc, char **argv) {
 "#,
     )
     .unwrap();
-    fs::write(root.join("selected.c"), "int selected_answer(void) { return 42; }\n").unwrap();
+    fs::write(
+        root.join("selected.c"),
+        "int selected_answer(void) { return 42; }\n",
+    )
+    .unwrap();
     let graph = serde_json::json!({
         "schema": 1,
         "targets": {
@@ -175,6 +179,21 @@ int main(int argc, char **argv) {
     for (pointer, value, message) in [
         ("/schema", serde_json::json!(2), "schema"),
         (
+            "/targets/answer/sources",
+            serde_json::json!([{"path": "selected.c", "requires": "UNKNOWN_SOURCE_FEATURE"}]),
+            "UNKNOWN_SOURCE_FEATURE",
+        ),
+        (
+            "/targets/answer/sources",
+            serde_json::json!([{"path": "selected.c", "requires": false}]),
+            "sources",
+        ),
+        (
+            "/targets/answer/sources",
+            serde_json::json!([{"path": 42, "requires": true}]),
+            "source path",
+        ),
+        (
             "/targets/answer/definitions",
             serde_json::json!(["SELF=${target}"]),
             "compile definition",
@@ -202,6 +221,12 @@ int main(int argc, char **argv) {
     ] {
         let mut invalid = graph.clone();
         *invalid.pointer_mut(pointer).unwrap() = value;
+        let rust_result = obs_build::validation::graph::Graph::parse(&invalid.to_string())
+            .and_then(|graph| graph.compile(&build, root, &facts, &dependencies));
+        assert!(
+            rust_result.is_err(),
+            "Cargo accepted invalid graph at {pointer}"
+        );
         fs::write(root.join("graph.json"), invalid.to_string()).unwrap();
         let result = std::process::Command::new("cmake")
             .args(["-S", root.to_str().unwrap(), "-B", output.to_str().unwrap()])
@@ -344,6 +369,9 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         "test_hevc",
         "test_deque",
         "test_platform_time",
+        "test_avc",
+        "test_formatted_filename",
+        "test_utf8",
         "test_dstr_regressions",
         "test_threading",
         "test_video_stats_race",
@@ -388,6 +416,9 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         2
     );
     assert!(selected.tests.contains_key("test_serializer"));
+    assert!(selected.tests.contains_key("test_avc"));
+    assert!(!selected.tests.contains_key("test_formatted_filename"));
+    assert!(!selected.tests.contains_key("test_utf8"));
     assert!(!selected.tests.contains_key("test_hevc"));
     assert!(!selected.tests.contains_key("test_config_save"));
     assert!(!selected.tests.contains_key("test_pulse_monitor_samples"));
