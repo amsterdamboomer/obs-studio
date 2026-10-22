@@ -383,6 +383,15 @@ not get a line.
   has its own feed. *macOS*, 2026-10-22. PR
   [#1727](https://github.com/obs-rust/obs-studio/pull/1727).
 
+- **In-app updates from certified OBS-Studio-Rust releases.** The Windows
+  and macOS updaters are on and offer only certified releases from
+  obs-rust/obs-studio, never a daily beta or upstream OBS Studio. Daily betas
+  are GitHub pre-releases; a maintainer certifies one, which attaches an
+  RSA-signed update manifest and EdDSA-signed Sparkle appcasts and makes it
+  the Latest release. Windows downloads the release ZIP, checks its SHA-256
+  against the signed manifest, installs it and restarts. *Windows, macOS*,
+  2026-10-22. PR [#PR](https://github.com/obs-rust/obs-studio/pull/PR).
+
 ## Fixed upstream bugs
 
 Bugs inherited from OBS Studio (and obs-websocket) that are fixed here, by

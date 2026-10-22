@@ -60,10 +60,13 @@ pub.verify(sig, open(sys.argv[2], "rb").read(), padding.PKCS1v15(), hashes.SHA51
 
 def uv_python(code: str, *args: str) -> subprocess.CompletedProcess:
     env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
-    return subprocess.run(
-        [UV, "run", "--no-project", "--with", CRYPTO, "python", "-I", "-c", code, *args],
-        capture_output=True, text=True, env=env,
-    )
+    with tempfile.TemporaryDirectory() as tmp:
+        script = Path(tmp) / "helper.py"
+        script.write_text(code)
+        return subprocess.run(
+            [UV, "run", "--no-project", "--with", CRYPTO, str(script), *args],
+            capture_output=True, text=True, env=env,
+        )
 
 
 def job(text: str, name: str) -> str:
