@@ -40,6 +40,325 @@
           "ENABLE_PULSEAUDIO"
         ]
       }
+    },
+    "test_serializer": {
+      "sources": [
+        "test/cmocka/test_serializer.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_darray": {
+      "sources": [
+        "test/cmocka/test_darray.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_bitstream": {
+      "sources": [
+        "test/cmocka/test_bitstream.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_os_path": {
+      "sources": [
+        "test/cmocka/test_os_path.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_config_save": {
+      "sources": [
+        "test/cmocka/test_config_save.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": "OS_LINUX"
+    },
+    "test_file_serializer_safe": {
+      "sources": [
+        "test/cmocka/test_file_serializer_safe.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": "OS_LINUX"
+    },
+    "test_quick_write": {
+      "sources": [
+        "test/cmocka/test_quick_write.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": "OS_LINUX"
+    },
+    "test_av1": {
+      "sources": [
+        "test/cmocka/test_av1.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_nal": {
+      "sources": [
+        "test/cmocka/test_nal.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_avc_parse": {
+      "sources": [
+        "test/cmocka/test_avc_parse.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_hevc": {
+      "sources": [
+        "test/cmocka/test_hevc.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": "ENABLE_HEVC"
+    },
+    "test_crc32": {
+      "sources": [
+        "test/cmocka/test_crc32.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_dstr": {
+      "sources": [
+        "test/cmocka/test_dstr.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_lexer": {
+      "sources": [
+        "test/cmocka/test_lexer.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_cf_lexer": {
+      "sources": [
+        "test/cmocka/test_cf_lexer.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_text_lookup": {
+      "sources": [
+        "test/cmocka/test_text_lookup.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_base": {
+      "sources": [
+        "test/cmocka/test_base.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_bmem": {
+      "sources": [
+        "test/cmocka/test_bmem.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_file_serializer": {
+      "sources": [
+        "test/cmocka/test_file_serializer.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_config_file": {
+      "sources": [
+        "test/cmocka/test_config_file.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_pipe": {
+      "sources": [
+        "test/cmocka/test_pipe.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_profiler": {
+      "sources": [
+        "test/cmocka/test_profiler.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_platform": {
+      "sources": [
+        "test/cmocka/test_platform.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_dtostr_exponent": {
+      "sources": [
+        "test/cmocka/test_dtostr_exponent.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_video_fourcc": {
+      "sources": [
+        "test/cmocka/test_video_fourcc.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_video_matrices": {
+      "sources": [
+        "test/cmocka/test_video_matrices.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_video_io_inlines": {
+      "sources": [
+        "test/cmocka/test_video_io_inlines.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_util_uint64": {
+      "sources": [
+        "test/cmocka/test_util_uint64.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_video_frame": {
+      "sources": [
+        "test/cmocka/test_video_frame.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_darray_ops": {
+      "sources": [
+        "test/cmocka/test_darray_ops.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_deque": {
+      "sources": [
+        "test/cmocka/test_deque.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_platform_conversions": {
+      "sources": [
+        "test/cmocka/test_platform_conversions.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_platform_file": {
+      "sources": [
+        "test/cmocka/test_platform_file.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_platform_mkdirs": {
+      "sources": [
+        "test/cmocka/test_platform_mkdirs.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_platform_time": {
+      "sources": [
+        "test/cmocka/test_platform_time.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
     }
   },
   "tests": {
@@ -58,6 +377,111 @@
       ],
       "timeout_seconds": 60,
       "skip_return_code": 77
+    },
+    "test_serializer": {
+      "target": "test_serializer"
+    },
+    "test_darray": {
+      "target": "test_darray"
+    },
+    "test_bitstream": {
+      "target": "test_bitstream"
+    },
+    "test_os_path": {
+      "target": "test_os_path"
+    },
+    "test_config_save": {
+      "target": "test_config_save"
+    },
+    "test_file_serializer_safe": {
+      "target": "test_file_serializer_safe"
+    },
+    "test_quick_write": {
+      "target": "test_quick_write"
+    },
+    "test_av1": {
+      "target": "test_av1"
+    },
+    "test_nal": {
+      "target": "test_nal"
+    },
+    "test_avc_parse": {
+      "target": "test_avc_parse"
+    },
+    "test_hevc": {
+      "target": "test_hevc"
+    },
+    "test_crc32": {
+      "target": "test_crc32"
+    },
+    "test_dstr": {
+      "target": "test_dstr"
+    },
+    "test_lexer": {
+      "target": "test_lexer"
+    },
+    "test_cf_lexer": {
+      "target": "test_cf_lexer"
+    },
+    "test_text_lookup": {
+      "target": "test_text_lookup"
+    },
+    "test_base": {
+      "target": "test_base"
+    },
+    "test_bmem": {
+      "target": "test_bmem"
+    },
+    "test_file_serializer": {
+      "target": "test_file_serializer"
+    },
+    "test_config_file": {
+      "target": "test_config_file"
+    },
+    "test_pipe": {
+      "target": "test_pipe"
+    },
+    "test_profiler": {
+      "target": "test_profiler"
+    },
+    "test_platform": {
+      "target": "test_platform"
+    },
+    "test_dtostr_exponent": {
+      "target": "test_dtostr_exponent"
+    },
+    "test_video_fourcc": {
+      "target": "test_video_fourcc"
+    },
+    "test_video_matrices": {
+      "target": "test_video_matrices"
+    },
+    "test_video_io_inlines": {
+      "target": "test_video_io_inlines"
+    },
+    "test_util_uint64": {
+      "target": "test_util_uint64"
+    },
+    "test_video_frame": {
+      "target": "test_video_frame"
+    },
+    "test_darray_ops": {
+      "target": "test_darray_ops"
+    },
+    "test_deque": {
+      "target": "test_deque"
+    },
+    "test_platform_conversions": {
+      "target": "test_platform_conversions"
+    },
+    "test_platform_file": {
+      "target": "test_platform_file"
+    },
+    "test_platform_mkdirs": {
+      "target": "test_platform_mkdirs"
+    },
+    "test_platform_time": {
+      "target": "test_platform_time"
     }
   }
 }

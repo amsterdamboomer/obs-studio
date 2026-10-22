@@ -870,10 +870,12 @@ pub fn configure_c_tests(
 pub fn native_test_facts(
     target: &str,
     pulseaudio: bool,
+    hevc: bool,
 ) -> std::collections::BTreeMap<String, bool> {
     std::collections::BTreeMap::from([
         ("OS_LINUX".into(), target.contains("linux")),
         ("ENABLE_PULSEAUDIO".into(), pulseaudio),
+        ("ENABLE_HEVC".into(), hevc),
         ("MSVC".into(), target.contains("msvc")),
     ])
 }

@@ -214,9 +214,6 @@ pub fn build_c_tests(
     headers_only(&mut base, "jansson")?;
     for spec in manifest {
         let name = spec["name"].as_str().ok_or("C test name missing")?;
-        if name == "test_hevc" && !options.hevc {
-            continue;
-        }
         let mut library = SharedLibrary {
             name: name.into(),
             ..base.clone()
@@ -326,7 +323,7 @@ pub fn build_c_tests(
             target.sanitizers = None;
         }
     }
-    let facts = crate::platform::native_test_facts(&build.target, options.pulseaudio);
+    let facts = crate::platform::native_test_facts(&build.target, options.pulseaudio, options.hevc);
     let mut core_interface = SharedLibrary {
         include_dirs: vec![
             root.join("libobs"),

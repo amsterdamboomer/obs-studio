@@ -324,13 +324,37 @@ fn native_test_graph_checks_selection_references_and_commands() {
 #[test]
 fn native_test_graph_replaces_legacy_utility_definitions() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let graph = obs_build::validation::graph::Graph::load(&root.join("test/cmocka/build/test-graph.json")).unwrap();
-    let legacy: Vec<serde_json::Value> = serde_json::from_slice(&fs::read(root.join("rust/obs-build/manifests/c-tests-linux.json")).unwrap()).unwrap();
-    for name in ["test_serializer", "test_darray", "test_bitstream", "test_os_path", "test_config_save", "test_file_serializer_safe", "test_quick_write", "test_hevc", "test_deque", "test_platform_time"] {
+    let graph =
+        obs_build::validation::graph::Graph::load(&root.join("test/cmocka/build/test-graph.json"))
+            .unwrap();
+    let legacy: Vec<serde_json::Value> = serde_json::from_slice(
+        &fs::read(root.join("rust/obs-build/manifests/c-tests-linux.json")).unwrap(),
+    )
+    .unwrap();
+    for name in [
+        "test_serializer",
+        "test_darray",
+        "test_bitstream",
+        "test_os_path",
+        "test_config_save",
+        "test_file_serializer_safe",
+        "test_quick_write",
+        "test_hevc",
+        "test_deque",
+        "test_platform_time",
+    ] {
         assert!(graph.targets.contains_key(name), "missing canonical {name}");
-        assert!(!legacy.iter().any(|test| test["name"] == name), "duplicate legacy {name}");
+        assert!(
+            !legacy.iter().any(|test| test["name"] == name),
+            "duplicate legacy {name}"
+        );
     }
-    let facts = std::collections::BTreeMap::from([("OS_LINUX".into(), false), ("ENABLE_PULSEAUDIO".into(), false), ("MSVC".into(), true), ("ENABLE_HEVC".into(), false)]);
+    let facts = std::collections::BTreeMap::from([
+        ("OS_LINUX".into(), false),
+        ("ENABLE_PULSEAUDIO".into(), false),
+        ("MSVC".into(), true),
+        ("ENABLE_HEVC".into(), false),
+    ]);
     let selected = graph.select(&facts).unwrap();
     assert!(selected.tests.contains_key("test_serializer"));
     assert!(!selected.tests.contains_key("test_hevc"));

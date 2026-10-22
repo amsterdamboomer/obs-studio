@@ -1,29 +1,5 @@
 [
   {
-    "name": "test_serializer",
-    "sources": [
-      "test/cmocka/test_serializer.c"
-    ]
-  },
-  {
-    "name": "test_darray",
-    "sources": [
-      "test/cmocka/test_darray.c"
-    ]
-  },
-  {
-    "name": "test_bitstream",
-    "sources": [
-      "test/cmocka/test_bitstream.c"
-    ]
-  },
-  {
-    "name": "test_os_path",
-    "sources": [
-      "test/cmocka/test_os_path.c"
-    ]
-  },
-  {
     "name": "test_hotkey_load",
     "sources": [
       "test/cmocka/test_hotkey_load.c",
@@ -41,54 +17,12 @@
     ]
   },
   {
-    "name": "test_config_save",
-    "sources": [
-      "test/cmocka/test_config_save.c"
-    ]
-  },
-  {
-    "name": "test_file_serializer_safe",
-    "sources": [
-      "test/cmocka/test_file_serializer_safe.c"
-    ]
-  },
-  {
-    "name": "test_quick_write",
-    "sources": [
-      "test/cmocka/test_quick_write.c"
-    ]
-  },
-  {
-    "name": "test_av1",
-    "sources": [
-      "test/cmocka/test_av1.c"
-    ]
-  },
-  {
-    "name": "test_nal",
-    "sources": [
-      "test/cmocka/test_nal.c"
-    ]
-  },
-  {
     "name": "test_avc",
     "sources": [
       "test/cmocka/test_avc.c",
       "libobs/obs-avc.c.h"
     ],
     "sanitizers": "undefined"
-  },
-  {
-    "name": "test_avc_parse",
-    "sources": [
-      "test/cmocka/test_avc_parse.c"
-    ]
-  },
-  {
-    "name": "test_hevc",
-    "sources": [
-      "test/cmocka/test_hevc.c"
-    ]
   },
   {
     "name": "test_formatted_filename",
@@ -99,12 +33,6 @@
     "sanitizers": "address,undefined"
   },
   {
-    "name": "test_crc32",
-    "sources": [
-      "test/cmocka/test_crc32.c"
-    ]
-  },
-  {
     "name": "test_utf8",
     "sources": [
       "test/cmocka/test_utf8.c",
@@ -113,57 +41,9 @@
     "sanitizers": "address,undefined"
   },
   {
-    "name": "test_dstr",
-    "sources": [
-      "test/cmocka/test_dstr.c"
-    ]
-  },
-  {
     "name": "test_dstr_regressions",
     "sources": [
       "test/cmocka/test_dstr_regressions.c"
-    ]
-  },
-  {
-    "name": "test_lexer",
-    "sources": [
-      "test/cmocka/test_lexer.c"
-    ]
-  },
-  {
-    "name": "test_cf_lexer",
-    "sources": [
-      "test/cmocka/test_cf_lexer.c"
-    ]
-  },
-  {
-    "name": "test_text_lookup",
-    "sources": [
-      "test/cmocka/test_text_lookup.c"
-    ]
-  },
-  {
-    "name": "test_base",
-    "sources": [
-      "test/cmocka/test_base.c"
-    ]
-  },
-  {
-    "name": "test_bmem",
-    "sources": [
-      "test/cmocka/test_bmem.c"
-    ]
-  },
-  {
-    "name": "test_file_serializer",
-    "sources": [
-      "test/cmocka/test_file_serializer.c"
-    ]
-  },
-  {
-    "name": "test_config_file",
-    "sources": [
-      "test/cmocka/test_config_file.c"
     ]
   },
   {
@@ -182,54 +62,6 @@
     "name": "test_task",
     "sources": [
       "test/cmocka/test_task.c"
-    ]
-  },
-  {
-    "name": "test_pipe",
-    "sources": [
-      "test/cmocka/test_pipe.c"
-    ]
-  },
-  {
-    "name": "test_profiler",
-    "sources": [
-      "test/cmocka/test_profiler.c"
-    ]
-  },
-  {
-    "name": "test_platform",
-    "sources": [
-      "test/cmocka/test_platform.c"
-    ]
-  },
-  {
-    "name": "test_platform_file",
-    "sources": [
-      "test/cmocka/test_platform_file.c"
-    ]
-  },
-  {
-    "name": "test_platform_mkdirs",
-    "sources": [
-      "test/cmocka/test_platform_mkdirs.c"
-    ]
-  },
-  {
-    "name": "test_platform_conversions",
-    "sources": [
-      "test/cmocka/test_platform_conversions.c"
-    ]
-  },
-  {
-    "name": "test_platform_time",
-    "sources": [
-      "test/cmocka/test_platform_time.c"
-    ]
-  },
-  {
-    "name": "test_dtostr_exponent",
-    "sources": [
-      "test/cmocka/test_dtostr_exponent.c"
     ]
   },
   {
@@ -260,30 +92,6 @@
     "name": "test_vec4",
     "sources": [
       "test/cmocka/test_vec4.c"
-    ]
-  },
-  {
-    "name": "test_video_fourcc",
-    "sources": [
-      "test/cmocka/test_video_fourcc.c"
-    ]
-  },
-  {
-    "name": "test_video_matrices",
-    "sources": [
-      "test/cmocka/test_video_matrices.c"
-    ]
-  },
-  {
-    "name": "test_video_io_inlines",
-    "sources": [
-      "test/cmocka/test_video_io_inlines.c"
-    ]
-  },
-  {
-    "name": "test_util_uint64",
-    "sources": [
-      "test/cmocka/test_util_uint64.c"
     ]
   },
   {
@@ -474,12 +282,6 @@
     ]
   },
   {
-    "name": "test_video_frame",
-    "sources": [
-      "test/cmocka/test_video_frame.c"
-    ]
-  },
-  {
     "name": "test_audio_buffering_subsample",
     "sources": [
       "test/cmocka/test_audio_buffering_subsample.c"
@@ -525,22 +327,10 @@
     ]
   },
   {
-    "name": "test_deque",
-    "sources": [
-      "test/cmocka/test_deque.c"
-    ]
-  },
-  {
     "name": "test_output_interleave",
     "sources": [
       "test/cmocka/test_output_interleave.c",
       "test/cmocka/output_interleave_fields_stub.c"
-    ]
-  },
-  {
-    "name": "test_darray_ops",
-    "sources": [
-      "test/cmocka/test_darray_ops.c"
     ]
   },
   {
