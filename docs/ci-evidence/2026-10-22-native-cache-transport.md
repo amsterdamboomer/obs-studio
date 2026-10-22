@@ -164,3 +164,39 @@ allow non-PR master dispatches as well as pushes. Therefore a qualification can
 restore an exact same-SHA Actions seed after a successful explicit full dispatch,
 without uploading a multi-gigabyte intermediate artifact or broadening the app
 build token. Existing macOS master-push cold behavior remains distinct.
+
+
+### Default-off native qualification route
+
+The existing Pull and reusable Build Project workflows now expose the manual
+`native-cache-transport-probe` input, default false. Ordinary PR/queue build and
+test selection does not change. Successful full native builds capture selected
+Xcode/clang/SDK identity or the Windows VS/default compiler binary and installed
+toolset/SDK inventory. Windows inventory invalidation is conservative; it is not
+a claim that CMake selected every installed SDK. Object caches keep their own
+compiler/input validation.
+
+The opt-in native steps pack and restore the real cache locally without creating
+a network store, retain only tiny JSON evidence, and clean temporary copies.
+A separate four-axis publisher can run only on a successful master dispatch.
+It selects the matching Xcode, checks its identity against the completed build,
+requires an exact same-SHA Actions seed, and uses an explicitly passed job token
+for cache-only release writes. Its subsequent unauthenticated read-only consumer
+must restore that same source SHA. Falling back to an older good generation is
+valid ordinary consumer behavior but fails this qualification.
+
+CI Gate includes this job, which is skipped outside the opt-in master dispatch.
+Application build tokens stay read-only. Per-axis publication is serialized and
+matrix failure does not cancel other axes. Existing uv master-only save policy
+and literal cache-family prefixes are preserved. No new workflow file, ordinary
+PR lane, actual release/tag/asset, or production cache backend change was made.
+
+Local RED evidence covers the required hit, older-generation rejection, no-store
+local verification and trust/scope wiring. The first full lint exposed existing
+cache-family/uv/gate policy violations; those were corrected without exemptions.
+The combined focused policy/transport suites then passed 60 tests in 0.712 seconds.
+Native runner execution, actual release transport and compiler hit/build effects
+remain unqualified. A branch dispatch can qualify archive handling without
+publication; actual trusted publication needs the integrated route on master.
+This route is a candidate experiment, not production backend adoption or closure
+of #1269 or #1667.
