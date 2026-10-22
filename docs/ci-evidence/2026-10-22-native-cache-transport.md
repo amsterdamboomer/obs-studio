@@ -200,3 +200,40 @@ remain unqualified. A branch dispatch can qualify archive handling without
 publication; actual trusted publication needs the integrated route on master.
 This route is a candidate experiment, not production backend adoption or closure
 of #1269 or #1667.
+
+
+### First actual native archive qualification (121236fc3)
+
+Run [39752689352](https://github.com/obs-rust/obs-studio/actions/runs/39752689352)
+completed all four native application jobs successfully. Each identity capture
+and local pack/restore reported `verified-local` for the tested source SHA.
+The remaining full-run Tier 2/macOS jobs were still active at this snapshot;
+this is not yet a full-run green claim. Machine-readable artifact bytes,
+API metadata, selected numbered log lines and complete-log SHA256 provenance
+are in `2026-10-22-native-cache-first-qualification.json.gz`.
+
+| Native axis | Archive bytes | Expanded bytes | Packing seconds | Total local verification seconds |
+| --- | ---: | ---: | ---: | ---: |
+| Windows x64 | 1,057,077,711 | 1,062,731,467 | 44.421 | 51.359 |
+| Windows ARM64 | 895,505,830 | 900,444,076 | 25.578 | 31.750 |
+| macOS x86_64 | 737,404,708 | 1,594,977,357 | 29.450 | 37.083 |
+| macOS ARM64 | 845,117,547 | 1,826,582,787 | 36.078 | 44.237 |
+
+All archives fit the candidate format bounds. Windows caches were cold: no
+Actions seed found, 0/289 x64 and 0/263 ARM64 cacheable calls hit. macOS x86_64
+also found no Actions seed. macOS ARM64 restored
+`macOS-xcode-arm64-RelWithDebInfo-5db4658e11fb1066ea236223a55e40c584a69797`
+and reported 464/660 cacheable tasks hitting (70%). These describe builds before
+local archive verification, not builds consuming the new release transport.
+
+The report's historical `validation_and_publication_seconds` field means local
+validation/restoration in `verify-local` mode; no publication occurred. Packing
+adds measurable producer cost. These gzip archive sizes cannot be substituted
+for Actions/zstd inventory sizes or #1723 retention reservations. In particular,
+new macOS ARM64 gzip bytes exceed 800 MiB, so a future allocation must use the
+actual selected transport and current data, not silently reuse an older budget.
+
+Next: retain the complete run outcome and required coverage, then land only the
+integrated default-off experiment through normal PR CI/queue to permit a trusted
+master publication qualification. Do not adopt the backend or claim hosted
+transfer/native consumer reuse before those actual measurements.
