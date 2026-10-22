@@ -112,6 +112,9 @@ pub struct Target {
     /// Include paths and definitions only; compiler policy belongs in the
     /// target's explicit compile_options, without introducing a link edge.
     pub header_packages: Vec<String>,
+    /// Public include directories for tests that supply dependency stubs.
+    #[serde(default)]
+    pub header_libraries: Vec<String>,
     #[serde(default)]
     pub archives: Vec<String>,
     #[serde(default)]
@@ -379,6 +382,14 @@ impl Graph {
                         (key, Some(value.to_owned()))
                     });
                 target.definitions.push((key.into(), value));
+            }
+            for name in &spec.header_libraries {
+                let dependency = libraries
+                    .get(name)
+                    .ok_or_else(|| format!("unresolved native test header library {name}"))?;
+                target
+                    .include_dirs
+                    .extend(dependency.include_dirs.iter().cloned());
             }
             for package in &spec.packages {
                 crate::libobs::add_package(&mut target, &build.target, package)?;

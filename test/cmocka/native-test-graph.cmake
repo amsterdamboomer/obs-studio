@@ -228,7 +228,7 @@ function(obs_native_test_graph path root)
       _obs_test_graph_fields(
         "${graph}"
         "targets;${name}"
-        "sources;requires;includes;definitions;packages;header_packages;archives;libraries;compile_options;compile_options_if_supported;link_options;sanitizers"
+        "sources;requires;includes;definitions;packages;header_packages;header_libraries;archives;libraries;compile_options;compile_options_if_supported;link_options;sanitizers"
       )
       _obs_test_graph_requirement(selected "${graph}" targets "${name}" requires)
       if(NOT selected)
@@ -266,6 +266,16 @@ function(obs_native_test_graph path root)
       _obs_test_graph_array(includes "${graph}" targets "${name}" includes)
       foreach(directory IN LISTS includes)
         target_include_directories(${name} PRIVATE "${root}/${directory}")
+      endforeach()
+      _obs_test_graph_array(header_libraries "${graph}" targets "${name}" header_libraries)
+      foreach(library IN LISTS header_libraries)
+        if(NOT TARGET "${library}")
+          message(FATAL_ERROR "Unresolved native test header library ${library}")
+        endif()
+        get_target_property(header_directories "${library}" INTERFACE_INCLUDE_DIRECTORIES)
+        if(header_directories)
+          target_include_directories(${name} PRIVATE ${header_directories})
+        endif()
       endforeach()
       foreach(field IN ITEMS definitions compile_options link_options)
         _obs_test_graph_array(values "${graph}" targets "${name}" ${field})

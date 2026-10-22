@@ -11,7 +11,11 @@ fn native_test_graph_cmake_builds_and_runs_selected_contract() {
     let consumer = repository.join("test/cmocka/native-test-graph.cmake");
     fs::create_dir_all(root.join("dependency-include")).unwrap();
     fs::create_dir_all(root.join("header-only-include")).unwrap();
-    fs::write(root.join("header-only-include/headers-only.h"), "#define HEADER_ONLY_ANSWER 17\n").unwrap();
+    fs::write(
+        root.join("header-only-include/headers-only.h"),
+        "#define HEADER_ONLY_ANSWER 17\n",
+    )
+    .unwrap();
     fs::write(
         root.join("dependency-include/dependency.h"),
         "#define DEPENDENCY_ANSWER 42\n",
