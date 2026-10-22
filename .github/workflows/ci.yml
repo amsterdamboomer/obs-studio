@@ -360,7 +360,7 @@ jobs:
         env:
           NATIVE_CACHE_JOB_TOKEN: ''
         run: >-
-          uv run ci/native_cache_transport.py consume --require-hit
+          uv run ci/native_cache_transport.py consume --require-hit --expected-source '${{ github.sha }}'
           --identity '${{ runner.temp }}/native-cache-current-identity.json'
           --destination '${{ runner.temp }}/native-cache-roundtrip'
           --report '${{ runner.temp }}/native-cache-consume.json'

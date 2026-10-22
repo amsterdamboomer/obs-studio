@@ -335,6 +335,7 @@ jobs:
           --output '${{ runner.temp }}/native-cache-identity.json'
 
       - name: Qualify Local Native Cache Archive
+        shell: bash
         if: inputs.native-cache-transport-probe
         env:
           CACHE_SOURCE: ${{ steps.setup.outputs.xcodeCasPath }}
@@ -972,6 +973,7 @@ jobs:
           --output '${{ runner.temp }}/native-cache-identity.json'
 
       - name: Qualify Local Native Cache Archive
+        shell: bash
         if: inputs.native-cache-transport-probe
         env:
           CACHE_SOURCE: ${{ github.workspace }}/.ccache

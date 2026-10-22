@@ -402,7 +402,10 @@ def main(argv=None, store_factory=None):
     parser.add_argument('--destination', type=Path)
     parser.add_argument('--report', type=Path, required=True)
     parser.add_argument('--require-hit', action='store_true')
+    parser.add_argument('--expected-source')
     args = parser.parse_args(argv)
+    if args.expected_source is not None and (args.mode != 'consume' or not re.fullmatch('[0-9a-f]{40}', args.expected_source)):
+        parser.error('--expected-source requires consume and a complete commit identity')
     if args.mode != 'consume' and args.require_hit:
         parser.error('--require-hit applies only to consume')
     if args.mode != 'consume' and (args.source is None or args.destination is not None):
@@ -451,9 +454,14 @@ def main(argv=None, store_factory=None):
                                   archive_bytes=metadata['bytes'], expanded_bytes=metadata['expanded_bytes'])
             else:
                 report = consume(identity, args.destination, store)
-            code = int(args.require_hit and report['status'] != 'hit')
+            code = int((args.require_hit and report['status'] != 'hit')
+                       or (args.expected_source is not None and report.get('source_sha') != args.expected_source))
+            if args.expected_source is not None:
+                report['expected_source_sha'] = args.expected_source
         except (OSError, ValueError, KeyError, tarfile.TarError) as error:
             report = {'status': 'error', 'error_type': type(error).__name__}
+            if args.mode == 'verify-local':
+                report['error'] = str(error)[:300]
             # HTTP exception URLs/bodies and external tool messages may contain
             # credentials. Persist only the exception type at this boundary.
             code = 1
