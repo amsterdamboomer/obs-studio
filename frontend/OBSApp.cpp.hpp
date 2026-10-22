@@ -85,9 +85,9 @@ UncleanLaunchAction handleUncleanShutdown(bool enableCrashUpload)
 	crashWarning.setText(QTStr("CrashHandling.Labels.Text"));
 
 	if (enableCrashUpload) {
-		crashWarning.setInformativeText(QTStr("CrashHandling.Labels.PrivacyNotice"));
+		crashWarning.setInformativeText(QTStr("CrashHandling.Labels.LocalNotice"));
 
-		QCheckBox *sendCrashReportCheckbox = new QCheckBox(QTStr("CrashHandling.Checkbox.SendReport"));
+		QCheckBox *sendCrashReportCheckbox = new QCheckBox(QTStr("CrashHandling.Checkbox.OpenFolder"));
 		crashWarning.setCheckBox(sendCrashReportCheckbox);
 	}
 
