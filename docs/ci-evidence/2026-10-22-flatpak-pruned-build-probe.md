@@ -60,7 +60,7 @@ profile and does not claim runtime validation or end-to-end speedup.
 Run39725882580 on659756295 completed Flatpak job119650969777 with
 FAILURE. Its normal Flatpak build and output validation passed, but the
 optional probe rejected symbolic links before starting the isolated rebuild.
-The [failed record](2026-10-22-flatpak-pruned-build-failed.json) preserves
+The [failed record](2026-10-22-flatpak-pruned-build-failed.json.gz) preserves
 job metadata, capture-time parent status, failed JSON and log hash/excerpts.
 The original generic error did not identify the link location; do not infer
 which subtree contained it or claim any pruned rebuild succeeded.
@@ -178,7 +178,7 @@ records why the narrowly scoped earlier guard and Linux-only PR selection
 missed the recurrence. #1739 requests proportionate temporary prevention,
 not broad additional Windows CI or permanent infrastructure for cmocka.
 
-The [third-trial record](2026-10-22-flatpak-pruned-build-third-trial.json)
+The [third-trial record](2026-10-22-flatpak-pruned-build-third-trial.json.gz)
 contains capture-time metadata and hashes/excerpts for the completed jobs.
 Parent and Flatpak outcome remain pending in this capture. A green PR Gate
 does not substitute for the actual manual probe, and a later successful
@@ -236,7 +236,7 @@ OBS rebuilt and emitted the marker. Binary/icon/XML checks and AppStream
 lint passed. Build-directory lint then rejected
 `appstream-external-screenshot-url`: screenshots were not mirrored to
 https://dl.flathub.org/media. Repository lint after that failure did not run.
-The [fourth-trial record](2026-10-22-flatpak-pruned-build-fourth-trial.json)
+The [fourth-trial record](2026-10-22-flatpak-pruned-build-fourth-trial.json.gz)
 retains terminal metadata, artifact, hashes/excerpts, Linux OFF/ON and macOS
 coverage, and the independent Windows cm_print_error link failure.
 
@@ -248,3 +248,8 @@ requires the builder options; RED7fdff3615 requires the screenshot commit
 before lint. The correction matches both on the isolated output, preserving
 all validation and exceptions.31 focused checks pass. No fifth dispatch yet;
 actual builddir/repository validation remains unproven.
+
+
+The large trial records use deterministic gzip without changing their JSON
+bytes. Read one with `gzip -dc <record.json.gz>`; decompression was verified
+byte-for-byte against its original, including preserved failure evidence.
