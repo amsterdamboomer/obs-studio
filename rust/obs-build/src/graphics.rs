@@ -2,6 +2,19 @@
 use crate::{NativeBuild, SharedLibrary, libobs::Options};
 use std::path::{Path, PathBuf};
 
+pub fn build_d3d11(
+    build: &NativeBuild,
+    _root: &Path,
+    _core: &Path,
+    _options: &Options,
+    _gpu_priority: i32,
+) -> Result<PathBuf, String> {
+    Err(format!(
+        "native Direct3D 11 graph for {} is not implemented yet",
+        build.target
+    ))
+}
+
 pub fn build_opengl(
     build: &NativeBuild,
     root: &Path,

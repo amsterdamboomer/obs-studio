@@ -1,5 +1,5 @@
 //! Explicit Windows SDK/dependency integration in the existing application harness.
-use obs_build::{NativeBuild, SharedLibrary, libobs};
+use obs_build::{NativeBuild, SharedLibrary, graphics, libobs};
 use std::{
     collections::BTreeSet,
     path::{Path, PathBuf},
@@ -59,6 +59,33 @@ fn core_builds_from_the_canonical_manifest() {
         "the public DLL needs an import library"
     );
     assert!(!exports(&library).is_empty());
+    if std::env::var_os("OBS_BUILD_WINDOWS_GRAPHICS").is_some() {
+        for (name, renderer) in [
+            (
+                "D3D11",
+                graphics::build_d3d11(&build, &root, &library, &options, 0).unwrap(),
+            ),
+            (
+                "OPENGL",
+                graphics::build_opengl(&build, &root, &library, &options).unwrap(),
+            ),
+        ] {
+            let symbols = exports(&renderer);
+            assert!(
+                symbols.contains("device_create"),
+                "{name} needs its public device API"
+            );
+            assert!(symbols.contains("device_destroy"));
+            if let Some(reference) = std::env::var_os(format!("OBS_BUILD_WINDOWS_{name}_REFERENCE"))
+            {
+                assert_eq!(
+                    symbols,
+                    exports(Path::new(&reference)),
+                    "{name} exports differ from CMake"
+                );
+            }
+        }
+    }
     std::fs::write(
         build.output.join("windows-core-path.txt"),
         library.to_str().unwrap(),
