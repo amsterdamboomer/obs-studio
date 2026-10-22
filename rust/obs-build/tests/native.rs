@@ -537,6 +537,13 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         "independent Linux test inventory remains"
     );
     for name in [
+        "test_menu_text",
+        "test_profile_remove",
+        "test_tbar_position",
+        "test_media_time",
+        "test_studio_mode_exit",
+        "test_studio_mode_swap",
+        "test_profile_activate",
         "test_output_deactivate_state",
         "test_cf_preprocessor",
         "test_output_null_id",
@@ -671,7 +678,7 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         ("HAVE_OBS_PIPEWIRE".into(), false),
         ("HAVE_OBS_PULSEAUDIO".into(), false),
     ]);
-    for (suite, count) in [("core", 124), ("graphics", 12), ("vlc", 6), ("webrtc", 2)] {
+    for (suite, count) in [("core", 131), ("graphics", 12), ("vlc", 6), ("webrtc", 2)] {
         let mut partition = obs_build::validation::graph::Graph::load(
             &root.join("test/cmocka/build/test-graph.json"),
         )
