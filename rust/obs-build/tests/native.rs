@@ -100,6 +100,43 @@ fn native_test_graph_preserves_cpp_standard_without_changing_c_compilation() {
 }
 
 #[test]
+fn native_test_graph_preserves_cpp_helper_build_requirements() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let raw: serde_json::Value = serde_json::from_slice(
+        &fs::read(root.join("test/cmocka/build/test-graph.json")).unwrap(),
+    )
+    .unwrap();
+    for (name, implementation) in [
+        ("test_disk_space_monitor", Some("disk-space-monitor")),
+        ("test_scene_collection_migration", Some("scene-collection-migration")),
+        ("test_crash_sentinel_dir", Some("crash-sentinel-dir")),
+        ("test_settings_migration", None),
+        ("test_output_start_log", None),
+        ("test_unclean_launch", None),
+    ] {
+        let target = &raw["targets"][name];
+        assert!(target.is_object(), "missing canonical {name}");
+        let mut sources = vec![format!("test/cmocka/{name}.cpp")];
+        if let Some(implementation) = implementation {
+            sources.push(format!("frontend/utility/{implementation}.cpp.hpp"));
+        }
+        assert_eq!(target["sources"], serde_json::json!(sources));
+        assert_eq!(target["cpp_standard"], "17");
+        assert_eq!(target["includes"], serde_json::json!(["frontend/utility"]));
+        assert_eq!(target["watch_inputs"], serde_json::json!(["frontend/utility"]));
+        let mut libraries = vec!["OBS::libobs"];
+        if name == "test_disk_space_monitor" {
+            libraries.push("Threads::Threads");
+        }
+        libraries.push("OBS::native-test-cmocka");
+        assert_eq!(target["libraries"], serde_json::json!(libraries));
+        assert_eq!(raw["tests"][name]["target"], name);
+        let fragment = fs::read_to_string(root.join(format!("test/cmocka/tests.d/{name}.cmake"))).unwrap();
+        assert!(!fragment.contains("add_executable("));
+    }
+}
+
+#[test]
 fn native_test_graph_cmake_builds_and_runs_selected_contract() {
     let fixture = tempfile::tempdir().unwrap();
     let root = fixture.path();
