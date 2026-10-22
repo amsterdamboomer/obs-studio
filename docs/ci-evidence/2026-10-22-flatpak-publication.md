@@ -83,10 +83,12 @@ safe-rm -r "$publication_replay_root"
 ## Verification status
 
 - [x] Successful Flatpak job and observed new-namespace cache ID/key/bytes.
-- [ ] Actual new-namespace consumer restore, legacy bridge skipped, module reuse,
-  build/output validation and full selected coverage. Use one defined branch
-  consumer to preserve master-only publication and avoid another writer burst.
-- [ ] Final producer/consumer parent results; post-publication inventory captured.
+- [x] Actual new-namespace Flatpak restore, legacy bridge skipped, six-module
+  reuse and build/output validation; branch writers disabled.
+- [x] Final parent results and post-publication inventory captured: producer
+  SUCCESS, consumer FAILURE. See the later terminal observations below.
+- [ ] Successful full consumer coverage: macOS reference-phase failure prevented
+  completion of later macOS phases; Flatpak success does not satisfy this.
 - [ ] Global capacity, native architecture retention and representative durability
   remain under #1269; this report does not close those requirements.
 
@@ -99,8 +101,8 @@ Flatpak job119626666642 completed successfully. The new master entry is
 restore, master save input, six reused dependency modules, OBS build and
 existing AppStream/build-directory/repository validations. Input
 build-bundle:false; no distributable bundle or saved-profile runtime claim.
-The parent full run was still active at this capture. An actual new-namespace
-consumer remains unproven.
+The parent full run was still active at this capture; the later terminal
+observations below preserve its completed result separately.
 
 After publication the listing held11,212,285,251 bytes,474,867,011 above10GiB;
 the separate usage query reported11,293,074,823. The bundle preserves missing
@@ -110,3 +112,34 @@ absent and the new seed is present. Both `targets-ccache-*` and `targets-apt-*`
 have no entry in this post-publication snapshot, so queue-useful retention
 is not established by the successful native/Flatpak publications. Do not
 attribute those disappearances to the janitor or GitHub without direct logs.
+
+
+## Later terminal observations and actual consumer
+
+Producer39718597929 completed **SUCCESS**. Its original capture-time status
+is retained, with later terminal metadata appended to the compressed bundle.
+
+The single defined branch consumer
+[39720695807](https://github.com/obs-rust/obs-studio/actions/runs/39720695807)
+on evidence-only source `29a34dc59b59c409c1851388cbd944b0af5569b2` completed
+**FAILURE**, despite Flatpak job119633287832 completing **SUCCESS**. It
+restored the new architecture-first namespace, skipped the legacy bridge,
+reused all six dependency modules and passed existing build/output validation.
+Writers were disabled and build-bundle:false. This establishes the observed
+Flatpak transport/reuse result, not a successful full consumer or a
+distributable/saved-profile runtime result.
+
+Windows Tier2 completed successfully. macOS Tier2 job119635248579 failed
+in the initial OFF/reference CTest phase: `test_ws_batch_order`, case
+`test_parallel_failure_keeps_slot`, reported segmentation fault11. The
+diagnostic reported no crash in30 lldb runs. Cause remains unproven; do not
+classify it as a flake or infer a Rust failure from this reference-phase
+observation. Later macOS validation phases were not established by this run.
+No existing C test or preserved compatibility plugin was changed, and no
+workflow retry was launched. Terminal run/job metadata and log hashes/excerpts
+are appended to the evidence bundle.
+
+The separate capacity experiment in #1712 has its own defined measurement
+purpose and source; it does not replace this failed full consumer observation.
+Global allocation, native architecture retention and representative durability
+remain incomplete under #1269.
