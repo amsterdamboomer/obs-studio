@@ -128,15 +128,25 @@ int main(int argc, char **argv) {
         ("GRAPH_FEATURE".into(), true),
         ("GRAPH_DISABLED".into(), false),
     ]);
-    let artifacts = rust_graph.compile(&build, root, &facts, &Default::default()).unwrap();
+    let artifacts = rust_graph
+        .compile(&build, root, &facts, &Default::default())
+        .unwrap();
     assert_eq!(artifacts.len(), 1);
     let selected = rust_graph.select(&facts).unwrap();
-    assert_eq!(selected.tests.keys().copied().collect::<Vec<_>>(), vec![tests[0]["name"].as_str().unwrap()]);
+    assert_eq!(
+        selected.tests.keys().copied().collect::<Vec<_>>(),
+        vec![tests[0]["name"].as_str().unwrap()]
+    );
     let mut command = selected.tests["answer-case"]
-        .command(root, &build.output, &artifacts["answer"]).unwrap();
+        .command(root, &build.output, &artifacts["answer"])
+        .unwrap();
     fs::create_dir_all(&build.output).unwrap();
     let result = command.output().unwrap();
-    assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
     assert!(build.output.join("marker.txt").is_file());
     for (pointer, value, message) in [
         ("/schema", serde_json::json!(2), "schema"),

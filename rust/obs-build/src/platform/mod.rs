@@ -864,7 +864,19 @@ pub fn configure_c_tests(
         core.display().to_string(),
         "-Wl,--as-needed".into(),
     ]);
+    configure_test_sanitizers(build, library, sanitizer)
+}
+
+pub fn configure_test_sanitizers(
+    build: &crate::NativeBuild,
+    library: &mut crate::SharedLibrary,
+    sanitizer: Option<&str>,
+) -> Result<(), String> {
     let compiler = build.compiler(library, &build.output, false).get_compiler();
+    // CMake's per-target sanitizer policy excludes MSVC, including clang-cl.
+    if compiler.is_like_msvc() {
+        return Ok(());
+    }
     let mut already_sanitized = compiler
         .args()
         .iter()
