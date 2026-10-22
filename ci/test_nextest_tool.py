@@ -6,7 +6,11 @@ import tarfile
 import tempfile
 import unittest
 
-from ci import nextest_tool
+import importlib.util
+
+spec = importlib.util.spec_from_file_location('nextest_tool_test_target', Path(__file__).with_name('nextest_tool.py'))
+nextest_tool = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(nextest_tool)
 
 
 class NextestToolTest(unittest.TestCase):

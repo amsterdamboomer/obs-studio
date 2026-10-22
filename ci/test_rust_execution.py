@@ -20,7 +20,9 @@ class RustExecutionTest(unittest.TestCase):
 
     def test_workspace_uses_bounded_runner_then_all_doctests(self):
         calls = self.calls(['--workspace'])
-        self.assertEqual(calls[0].args[0], ['nextest', 'run', '--workspace', '--locked', '--no-fail-fast', '--test-threads', '4'])
+        self.assertEqual(calls[0].args[0], ['nextest', 'run', '--workspace', '--locked', '--no-fail-fast', '--test-threads', '4',
+            '--profile', 'default', '--config-file', str(Path(gate.__file__).with_name('nextest.toml')),
+            '--user-config-file', 'none', '--ignore-default-filter', '--retries', '0', '--no-tests', 'fail'])
         self.assertTrue(calls[0].args[1]['PATH'].startswith('/tools:'))
         self.assertEqual(calls[1].args[0], ['test', '--workspace', '--locked', '--doc'])
 
@@ -31,6 +33,11 @@ class RustExecutionTest(unittest.TestCase):
             for package in ('obs-data', 'obs-util'):
                 self.assertIn(package, call.args[0])
             self.assertNotIn('--workspace', call.args[0])
+
+    def test_only_scoped_packages_retain_cargo_zero_test_behavior(self):
+        for scope, expected in [(['--workspace'], 'fail'), (['-p', 'libobs-rust'], 'pass')]:
+            args = self.calls(scope)[0].args[0]
+            self.assertEqual(args[args.index('--no-tests') + 1], expected)
 
     def test_unsupported_host_retains_the_complete_cargo_test_command(self):
         calls = self.calls(['--workspace'], tool=None)
@@ -48,7 +55,7 @@ class RustExecutionTest(unittest.TestCase):
     def test_executor_sources_are_attested_inputs_and_trust_surfaces(self):
         import tomllib
         data = tomllib.loads((Path(__file__).resolve().parent.parent / 'local-gate.toml').read_text())
-        for path in ('ci/local_gate.py', 'ci/nextest_tool.py'):
+        for path in ('ci/local_gate.py', 'ci/nextest_tool.py', 'ci/nextest.toml'):
             self.assertIn(path, data['gate']['lanes']['rust-test']['keep'])
         self.assertIn('ci/nextest_tool.py', data['gate']['trust']['surfaces'])
 
