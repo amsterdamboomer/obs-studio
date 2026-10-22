@@ -350,6 +350,11 @@ class FlatpakPrunedBuildTest(unittest.TestCase):
             fsck_index = next(i for i, command in enumerate(calls) if command[0] == 'ostree' and 'fsck' in command)
             builder_index = next(i for i, command in enumerate(calls) if 'flatpak-builder' in command)
             self.assertLess(fsck_index, builder_index)
+            screenshots = next(command for command in calls if command[0] == 'ostree' and 'commit' in command)
+            self.assertIn('--canonical-permissions', screenshots)
+            self.assertIn('--branch=screenshots/x86_64', screenshots)
+            self.assertTrue(screenshots[-1].endswith('/build/files/share/app-info/media'))
+            self.assertLess(calls.index(screenshots), next(i for i, command in enumerate(calls) if command[0] == 'flatpak-builder-lint'))
 
     def test_pruned_rebuild_failure_cleans_temporary_state_and_manifest(self):
         probe = self.load_probe()
