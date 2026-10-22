@@ -10,6 +10,7 @@ from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 
 SPEC = importlib.util.spec_from_file_location('native_cache_transport', Path(__file__).with_name('native_cache_transport.py'))
 TRANSPORT = importlib.util.module_from_spec(SPEC)
@@ -77,19 +78,50 @@ class NativeCacheTransportTest(unittest.TestCase):
             root = Path(directory)
             _, archive, metadata = self.fixture(root)
             for name, kind in (('../escape', tarfile.REGTYPE), ('/absolute', tarfile.REGTYPE),
-                               ('link', tarfile.SYMTYPE), ('fifo', tarfile.FIFOTYPE)):
+                               ('link', tarfile.SYMTYPE), ('hardlink', tarfile.LNKTYPE),
+                               ('C:/escape', tarfile.REGTYPE), ('NUL', tarfile.REGTYPE),
+                               ('trailing.', tarfile.REGTYPE), ('fifo', tarfile.FIFOTYPE)):
                 member = tarfile.TarInfo(name)
                 member.type = kind
                 member.linkname = '../../escape'
                 with tarfile.open(archive, 'w:gz') as stream:
                     stream.addfile(member, io.BytesIO(b''))
                 modified = copy.deepcopy(metadata)
+                modified['entries'] = 1
+                modified['expanded_bytes'] = 0
                 modified['bytes'] = archive.stat().st_size
                 modified['sha256'] = hashlib.sha256(archive.read_bytes()).hexdigest()
                 with self.subTest(name=name), self.assertRaises(ValueError):
                     TRANSPORT.restore(archive, modified, root / 'restored', IDENTITY)
                 self.assertFalse((root / 'restored').exists())
                 self.assertFalse((root / 'escape').exists())
+
+    def test_hardlinked_regular_cache_files_remain_complete(self):
+        import os
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'source'
+            source.mkdir()
+            (source / 'one').write_bytes(b'shared compiler object')
+            os.link(source / 'one', source / 'two')
+            archive = root / 'seed.tar.gz'
+            metadata = TRANSPORT.pack(source, archive, IDENTITY, SHA)
+            TRANSPORT.restore(archive, metadata, root / 'restored', IDENTITY)
+            self.assertEqual((root / 'restored/one').read_bytes(), (root / 'restored/two').read_bytes())
+
+    def test_resource_limits_reject_pack_and_restore_without_partial_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, archive, metadata = self.fixture(root)
+            for setting, limit in (('MAX_ARCHIVE_BYTES', 1), ('MAX_EXPANDED_BYTES', 1), ('MAX_ENTRIES', 1)):
+                with self.subTest(setting=setting), mock.patch.object(TRANSPORT, setting, limit):
+                    with self.assertRaisesRegex(ValueError, 'budget'):
+                        TRANSPORT.pack(source, root / 'rejected.tar.gz', IDENTITY, SHA)
+                    with self.assertRaisesRegex(ValueError, 'budget'):
+                        TRANSPORT.restore(archive, metadata, root / 'restored', IDENTITY)
+                self.assertFalse((root / 'rejected.tar.gz').exists())
+                self.assertFalse((root / 'restored').exists())
+                self.assertFalse(list(root.glob('native-cache-*')))
 
     def test_pack_rejects_links_and_preserves_existing_output(self):
         with tempfile.TemporaryDirectory() as directory:
