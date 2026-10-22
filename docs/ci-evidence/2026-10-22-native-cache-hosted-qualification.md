@@ -21,7 +21,7 @@ backend adoption or proof of a native compile consuming release transport.
 All four exact-SHA Actions seeds were initially observed after their native
 builds. The pre-publisher inventory retained only ARM64 entries. Janitor job
 [119777525456](https://github.com/obs-rust/obs-studio/actions/runs/39764812601/job/119777525456)
-explicitly selected Windows x64 seed 9334004266 for deletion at 10:40:23 UTC:
+deleted Windows x64 seed 9334004266 at 10:40:23 UTC:
 the pooled `windows-ccache` family exceeded its 838,860,800-byte footprint.
 That seed's initially recorded size was 1,062,667,849 bytes. The deletion actor
 for macOS x86_64 has not been established; its absence alone does not prove one.
