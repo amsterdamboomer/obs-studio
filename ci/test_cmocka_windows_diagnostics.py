@@ -21,6 +21,7 @@ definition, which reproduces the Windows unresolved-symbol link failure.
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import subprocess
@@ -120,6 +121,25 @@ class CmockaWindowsDiagnosticsTest(unittest.TestCase):
         for condition in ("TARGET Qt6::Widgets", "TARGET OBS::media-playback", "OS_LINUX OR OS_WINDOWS",
                           "NOT OS_LINUX", "OS_WINDOWS", "TARGET OBS::libobs"):
             self.assertFalse(excludes_windows(condition, plugins), condition)
+
+    def test_shared_graph_reader_keeps_possible_windows_sources(self):
+        graph = {"schema": 1, "targets": {
+            "portable": {"sources": ["portable.c",
+                {"path": "unix-helper.c", "requires": "OS_LINUX"},
+                {"path": "msvc-helper.c", "requires": "MSVC"},
+                {"path": "maybe.c", "requires": {"not": "OPTIONAL"}}]},
+            "unix": {"requires": {"any": ["OS_LINUX", "OS_FREEBSD"]}, "sources": ["unix.c"]},
+            "possible": {"requires": {"any": ["OS_LINUX", "OPTIONAL"]}, "sources": ["possible.c"]},
+            "impossible": {"requires": {"all": ["OS_LINUX", "OPTIONAL"]}, "sources": ["impossible.c"]},
+            "non-msvc": {"requires": {"not": "MSVC"}, "sources": ["non-msvc.c"]},
+            "non-linux": {"requires": {"not": "OS_LINUX"}, "sources": ["non-linux.c"]},
+        }}
+        with tempfile.TemporaryDirectory(prefix="obs-windows-graph-") as tmp:
+            path = Path(tmp) / "graph.json"
+            path.write_text(json.dumps(graph))
+            self.assertEqual(windows_graph_sources(path), {
+                ROOT / name for name in ("portable.c", "msvc-helper.c", "maybe.c", "possible.c", "non-linux.c")
+            })
 
     def test_windows_built_tests_do_not_call_fail_msg(self):
         plugins = non_windows_plugins()
