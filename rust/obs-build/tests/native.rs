@@ -13,7 +13,7 @@ fn native_test_graph_preserves_cpp_standard_without_changing_c_compilation() {
     .unwrap();
     fs::write(
         root.join("answer.cpp"),
-        "#include <bit>\nextern \"C\" int c_answer(void);\nconsteval unsigned answer_bits() { return std::bit_width(42u); }\nstatic_assert(answer_bits() == 6);\nint main() { return c_answer() != 42; }\n",
+        "#include <bit>\n#if defined(__GNUC__) && !defined(__STRICT_ANSI__)\n#error ISO C++ mode required\n#endif\nextern \"C\" int c_answer(void);\nconsteval unsigned answer_bits() { return std::bit_width(42u); }\nstatic_assert(answer_bits() == 6);\nint main() { return c_answer() != 42; }\n",
     )
     .unwrap();
     let graph = serde_json::json!({
@@ -43,7 +43,7 @@ fn native_test_graph_preserves_cpp_standard_without_changing_c_compilation() {
     fs::write(
         root.join("CMakeLists.txt"),
         format!(
-            "cmake_minimum_required(VERSION 3.28)\nproject(standards C CXX)\nenable_testing()\nset(CMAKE_CXX_STANDARD 11)\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\nget_target_property(extensions answer CXX_EXTENSIONS)\nif(extensions)\nmessage(FATAL_ERROR \"C++ extensions must be disabled\")\nendif()\n",
+            "cmake_minimum_required(VERSION 3.28)\nproject(standards C CXX)\nenable_testing()\nset(CMAKE_CXX_STANDARD 11)\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\nget_target_property(extensions answer CXX_EXTENSIONS)\nif(extensions MATCHES \"NOTFOUND$\" OR extensions)\nmessage(FATAL_ERROR \"C++ extensions must be disabled\")\nendif()\n",
             consumer.to_string_lossy().replace('\\', "/")
         ),
     )
