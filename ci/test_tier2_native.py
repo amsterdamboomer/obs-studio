@@ -57,7 +57,7 @@ class ValidatePathsTest(unittest.TestCase):
 
     def test_submodules_are_initialized_only_when_building(self):
         block = self.text.split('if [ "$stage" != test ]; then', 1)[1].split('\nfi', 1)[0]
-        self.assertIn('git submodule update', block)
+        self.assertIn('submodule update', block)
 
     def test_no_hardcoded_container_paths_remain(self):
         body = "\n".join(l for l in self.text.splitlines() if not l.lstrip().startswith("#"))
@@ -115,7 +115,7 @@ class GitOwnershipTest(unittest.TestCase):
         self.assertIn(line, text)
         # Unconditional (not inside an if), and before the first git command.
         self.assertTrue(text.splitlines()[text[: text.index(line)].count("\n")].startswith("git config"))
-        self.assertLess(text.index(line), text.index("git submodule update"))
+        self.assertLess(text.index(line), text.index('git -C "$SRC" submodule update'))
 
     def test_no_temporary_diagnostic_left(self):
         self.assertNotIn("Diagnose Group Tests", WORKFLOW.read_text(encoding="utf-8"))
