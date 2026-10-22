@@ -41,6 +41,17 @@ class NativeCacheTransportTest(unittest.TestCase):
             TRANSPORT.restore(archive, metadata, root / 'restored', IDENTITY)
             self.assertEqual((root / 'restored/nested/object').read_bytes(), (source / 'nested/object').read_bytes())
 
+    def test_same_snapshot_archive_is_reproducible_across_retry_times(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, _, _ = self.fixture(root)
+            with mock.patch.object(TRANSPORT.time, 'time', return_value=1000):
+                first = TRANSPORT.pack(source, root / 'first.tar.gz', IDENTITY, SHA)
+            with mock.patch.object(TRANSPORT.time, 'time', return_value=2000):
+                second = TRANSPORT.pack(source, root / 'second.tar.gz', IDENTITY, SHA)
+            self.assertEqual(first, second)
+            self.assertEqual((root / 'first.tar.gz').read_bytes(), (root / 'second.tar.gz').read_bytes())
+
     def test_identity_changes_reject_seed_without_touching_destination(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -197,7 +208,7 @@ class MemoryReleaseStore:
         data = path.read_bytes()
         self.clock += 1
         asset = {'name': path.name, 'size': len(data), 'digest': 'sha256:' + hashlib.sha256(data).hexdigest(),
-                 'created_at': f'2026-10-22T00:00:{self.clock:02d}Z', 'id': self.clock}
+                 'created_at': f'2026-10-22T00:00:{self.clock:02d}Z', 'id': self.clock, 'state': 'uploaded'}
         self.objects[path.name] = (data, asset)
         return dict(asset)
 
@@ -233,6 +244,22 @@ class NativeCacheReleaseProtocolTest(unittest.TestCase):
             self.assertEqual((root / 'restored/object').read_text(), 'compiler payload ' + SHA)
             self.assertTrue(all(call[0] == 'download' for call in store.calls))
 
+    def test_retry_reuses_identical_immutable_assets_without_upload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = MemoryReleaseStore()
+            with mock.patch.object(TRANSPORT.time, 'time', return_value=1000):
+                self.produce(root, store)
+            store.calls.clear()
+            with mock.patch.object(TRANSPORT.time, 'time', return_value=2000):
+                archive = root / 'retry.tar.gz'
+                metadata = TRANSPORT.pack(root / ('source-' + SHA), archive, IDENTITY, SHA)
+                context = {'repository': 'obs-rust/obs-studio', 'ref': 'refs/heads/master',
+                           'event_name': 'workflow_dispatch', 'sha': SHA, 'actions': 'true'}
+                TRANSPORT.publish(archive, metadata, store, context)
+            self.assertEqual(len(store.objects), 2)
+            self.assertFalse(any(call[0] in ('upload', 'delete') for call in store.calls))
+
     def test_failed_promotion_preserves_previous_usable_generation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -242,6 +269,60 @@ class NativeCacheReleaseProtocolTest(unittest.TestCase):
             with self.assertRaises(OSError):
                 self.produce(root, store, 'b' * 40)
             self.assertFalse(any(call[0] == 'delete' for call in store.calls))
+            self.assertEqual(TRANSPORT.consume(IDENTITY, root / 'restored', store)['status'], 'hit')
+            self.assertEqual((root / 'restored/object').read_text(), 'compiler payload ' + SHA)
+
+    def test_old_orphan_recovery_allows_later_publication_within_bounds(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = MemoryReleaseStore()
+            self.produce(root, store)
+            store.fail_manifest = True
+            with self.assertRaises(OSError):
+                self.produce(root, store, 'b' * 40)
+            orphan = next(name for name in store.objects if 'b' * 40 in name)
+            store.objects[orphan][1]['created_at'] = '2000-01-01T00:00:00Z'
+            store.fail_manifest = False
+            for digit in 'cd':
+                self.produce(root, store, digit * 40)
+            self.assertNotIn(orphan, store.objects)
+            self.assertEqual(len(store.objects), 4)
+            self.assertEqual(TRANSPORT.consume(IDENTITY, root / 'restored', store)['status'], 'hit')
+            self.assertEqual((root / 'restored/object').read_text(), 'compiler payload ' + 'd' * 40)
+
+    def test_recent_orphan_is_protected_and_budget_refusal_preserves_seed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = MemoryReleaseStore()
+            self.produce(root, store)
+            store.fail_manifest = True
+            with self.assertRaises(OSError):
+                self.produce(root, store, 'b' * 40)
+            orphan = next(name for name in store.objects if 'b' * 40 in name)
+            store.objects[orphan][1]['created_at'] = '2099-01-01T00:00:00Z'
+            store.fail_manifest = False
+            self.produce(root, store, 'c' * 40)
+            with self.assertRaisesRegex(ValueError, 'budget'):
+                self.produce(root, store, 'd' * 40)
+            self.assertIn(orphan, store.objects)
+            self.assertEqual(TRANSPORT.consume(IDENTITY, root / 'restored', store)['status'], 'hit')
+            self.assertEqual((root / 'restored/object').read_text(), 'compiler payload ' + 'c' * 40)
+
+    def test_starter_manifests_do_not_hide_the_previous_complete_seed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = MemoryReleaseStore()
+            self.produce(root, store)
+            original_manifest = next(name for name in store.objects if name.endswith('.json'))
+            for digit in 'bc':
+                name = original_manifest.replace(SHA, digit * 40)
+                archive = root / (name[:-5] + '.tar.gz')
+                archive.write_bytes(b'incomplete generation')
+                store.upload(archive)
+                manifest = root / name
+                manifest.write_bytes(b'')
+                store.upload(manifest)
+                store.objects[name][1]['state'] = 'starter'
             self.assertEqual(TRANSPORT.consume(IDENTITY, root / 'restored', store)['status'], 'hit')
             self.assertEqual((root / 'restored/object').read_text(), 'compiler payload ' + SHA)
 
