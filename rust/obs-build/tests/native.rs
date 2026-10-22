@@ -85,6 +85,14 @@ int main(int argc, char **argv) {
         "cmake_minimum_required(VERSION 3.28)\nproject(graph-fixture C)\nenable_testing()\nset(OBS_OUTPUT_DIR \"${{CMAKE_CURRENT_BINARY_DIR}}/runtime root\")\nfile(MAKE_DIRECTORY \"${{OBS_OUTPUT_DIR}}\" \"${{OBS_OUTPUT_DIR}}/Release\")\nadd_library(fixture-module MODULE fixture-module.c)\nset_target_properties(fixture-module PROPERTIES LIBRARY_OUTPUT_DIRECTORY \"${{CMAKE_CURRENT_BINARY_DIR}}/module output\")\nset(GRAPH_FEATURE ON)\nset(GRAPH_DISABLED OFF)\nadd_library(fixture-dependency INTERFACE)\ntarget_include_directories(fixture-dependency INTERFACE \"${{CMAKE_CURRENT_SOURCE_DIR}}/dependency-include\")\ntarget_compile_definitions(fixture-dependency INTERFACE DEPENDENCY_REQUIRED=5)\nadd_library(fixture-headers INTERFACE)\ntarget_include_directories(fixture-headers INTERFACE \"${{CMAKE_CURRENT_SOURCE_DIR}}/header-only-include\")\ntarget_compile_definitions(fixture-headers INTERFACE HEADER_POLICY_LEAKED=1)\ntarget_compile_options(fixture-headers INTERFACE -invalid-header-policy)\ntarget_link_libraries(fixture-headers INTERFACE missing-header-link-library)\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\n",
         consumer.to_string_lossy().replace('\\', "/")
     )).unwrap();
+    let mut project = fs::read_to_string(root.join("CMakeLists.txt")).unwrap();
+    project.push_str(
+        r#"
+get_property(graph_inputs DIRECTORY PROPERTY CMAKE_CONFIGURE_DEPENDS)
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/watched-inputs.txt" "${graph_inputs}")
+"#,
+    );
+    fs::write(root.join("CMakeLists.txt"), project).unwrap();
     for arguments in [
         vec![
             "-S".into(),
@@ -109,6 +117,10 @@ int main(int argc, char **argv) {
             String::from_utf8_lossy(&result.stdout),
             String::from_utf8_lossy(&result.stderr)
         );
+    }
+    let registered_inputs = fs::read_to_string(output.join("watched-inputs.txt")).unwrap();
+    for input in ["dependency-include", "fixture-module.c"] {
+        assert!(registered_inputs.contains(&root.join(input).to_string_lossy().replace('\\', "/")));
     }
     let inventory = std::process::Command::new("ctest")
         .args([
@@ -260,6 +272,26 @@ int main(int argc, char **argv) {
     for (pointer, value, message) in [
         ("/schema", serde_json::json!(2), "schema"),
         (
+            "/targets/answer/watch_inputs",
+            serde_json::json!([""]),
+            "watch input",
+        ),
+        (
+            "/targets/answer/watch_inputs",
+            serde_json::json!(["../outside"]),
+            "watch input",
+        ),
+        (
+            "/targets/answer/watch_inputs",
+            serde_json::json!(["/outside"]),
+            "watch input",
+        ),
+        (
+            "/targets/answer/watch_inputs",
+            serde_json::json!(["C:/outside"]),
+            "watch input",
+        ),
+        (
             "/targets/answer/artifact_definitions",
             serde_json::json!({"ARTIFACT_PATH":"absent-artifact"}),
             "absent-artifact",
@@ -344,7 +376,10 @@ int main(int argc, char **argv) {
             .args(["-S", root.to_str().unwrap(), "-B", output.to_str().unwrap()])
             .output()
             .unwrap();
-        assert!(!result.status.success());
+        assert!(
+            !result.status.success(),
+            "CMake accepted invalid graph at {pointer}"
+        );
         assert!(
             String::from_utf8_lossy(&result.stderr).contains(message),
             "{}",
@@ -558,6 +593,14 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         assert_eq!(partition.tests.len(), count);
         assert!(partition.tests.values().all(|test| test.suite == suite));
         assert_eq!(partition.targets.len(), count);
+        if suite != "core" {
+            assert!(
+                partition
+                    .targets
+                    .values()
+                    .all(|target| !target.watch_inputs.is_empty())
+            );
+        }
     }
     let selected = graph.select(&facts).unwrap();
     assert_eq!(graph.tests["test_svt_av1"].timeout_seconds, Some(60));

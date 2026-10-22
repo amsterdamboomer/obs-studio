@@ -234,11 +234,30 @@ function(obs_native_test_graph path root)
       _obs_test_graph_fields(
         "${graph}"
         "targets;${name}"
-        "sources;requires;includes;definitions;artifact_definitions;packages;header_packages;header_libraries;archives;libraries;compile_options;compile_options_if_supported;link_options;sanitizers"
+        "sources;requires;includes;definitions;artifact_definitions;watch_inputs;packages;header_packages;header_libraries;archives;libraries;compile_options;compile_options_if_supported;link_options;sanitizers"
       )
       _obs_test_graph_requirement(selected "${graph}" targets "${name}" requires)
       if(NOT selected)
         continue()
+      endif()
+      _obs_test_graph_array(watch_inputs "${graph}" targets "${name}" watch_inputs)
+      string(JSON watch_count ERROR_VARIABLE watch_error LENGTH "${graph}" targets "${name}" watch_inputs)
+      if(NOT watch_error AND watch_count GREATER 0)
+        math(EXPR watch_last "${watch_count} - 1")
+        foreach(watch_index RANGE ${watch_last})
+          string(JSON input GET "${graph}" targets "${name}" watch_inputs ${watch_index})
+          string(FIND "${input}" "\\" backslash)
+          if(
+            input STREQUAL ""
+            OR IS_ABSOLUTE "${input}"
+            OR NOT backslash EQUAL -1
+            OR input MATCHES "[:;\n\r\t]"
+            OR input MATCHES "(^|/)\\.\\.?(/|$)|//|/$"
+          )
+            message(FATAL_ERROR "Invalid native test watch input ${input}")
+          endif()
+          set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${root}/${input}")
+        endforeach()
       endif()
       _obs_test_graph_sources(sources "${graph}" "${name}")
       if(NOT sources)
@@ -332,7 +351,10 @@ function(obs_native_test_graph path root)
         if(field STREQUAL "definitions")
           foreach(value IN LISTS values)
             if(value MATCHES "\\$\\{(target|runtime)\\}")
-              message(FATAL_ERROR "Native test compile definition cannot reference its target executable")
+              message(
+                FATAL_ERROR
+                "Native test compile definition cannot reference its target executable or runtime directory"
+              )
             endif()
             _obs_test_graph_expand(value "${value}" "${root}" "${name}")
             target_compile_definitions(${name} PRIVATE "${value}")

@@ -112,6 +112,9 @@ pub struct Target {
     /// Quoted C string definitions referring to separately built artifacts.
     #[serde(default)]
     pub artifact_definitions: BTreeMap<String, String>,
+    /// Repository-relative headers or data read indirectly by these sources/tests.
+    #[serde(default)]
+    pub watch_inputs: Vec<String>,
     #[serde(default)]
     pub packages: Vec<String>,
     #[serde(default)]
@@ -301,6 +304,18 @@ impl Graph {
         }
         for (name, target) in &graph.targets {
             validate_name(name)?;
+            for input in &target.watch_inputs {
+                if input.is_empty()
+                    || input.starts_with('/')
+                    || input.contains(['\\', ':', ';'])
+                    || input.chars().any(char::is_control)
+                    || input
+                        .split('/')
+                        .any(|part| part.is_empty() || part == "." || part == "..")
+                {
+                    return Err(format!("invalid native test watch input {input:?}"));
+                }
+            }
             for (definition, artifact) in &target.artifact_definitions {
                 if definition.is_empty()
                     || !definition.bytes().enumerate().all(|(i, b)| {
@@ -389,7 +404,7 @@ impl Graph {
         let root = dunce::canonicalize(root).map_err(|error| error.to_string())?;
         let selected = self.select(facts)?;
         let mut artifacts = BTreeMap::new();
-        let mut watched_components = BTreeSet::new();
+        let mut watched_inputs = BTreeSet::new();
         for (name, spec) in selected.targets {
             let mut target = SharedLibrary {
                 name: name.into(),
@@ -413,7 +428,7 @@ impl Graph {
                 // moving standalone tests out of the legacy native inventory.
                 if source.starts_with("plugins/") || source.starts_with("shared/") {
                     let component: PathBuf = Path::new(source).components().take(2).collect();
-                    watched_components.insert(root.join(component));
+                    watched_inputs.insert(root.join(component));
                 }
                 let path = root.join(source);
                 println!("cargo:rerun-if-changed={}", path.display());
@@ -480,6 +495,9 @@ impl Graph {
                     definition.clone(),
                     Some(serde_json::to_string(&path).map_err(|error| error.to_string())?),
                 ));
+            }
+            for input in &spec.watch_inputs {
+                watched_inputs.insert(root.join(input));
             }
             for directory in &spec.includes {
                 target.include_dirs.push(root.join(directory));
@@ -548,7 +566,7 @@ impl Graph {
             )?;
             artifacts.insert(name.into(), build.executable(&target)?);
         }
-        for directory in watched_components {
+        for directory in watched_inputs {
             println!("cargo:rerun-if-changed={}", directory.display());
         }
         Ok(artifacts)
