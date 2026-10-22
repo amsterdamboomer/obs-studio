@@ -5,6 +5,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import re
 import tempfile
 import unittest
 
@@ -92,11 +93,46 @@ class NativeCacheFreshnessTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             freshness.restore(self.root, self.state)
 
-    def test_source_drift_and_symlink_are_rejected(self):
+    def test_source_drift_is_rejected(self):
         self.source.write_bytes(b"unexpected source layout")
         with self.assertRaises(ValueError):
             freshness.prepare(self.root, self.state, CONTEXT)
         self.assertFalse(self.state.exists())
+
+
+class NativeReuseWorkflowTest(unittest.TestCase):
+    def test_input_is_default_empty_and_forwarded_only_on_dispatch(self):
+        root = Path(__file__).resolve().parent.parent
+        for name in ('ci.yml', 'build-project.yaml'):
+            text = (root / '.github/workflows' / name).read_text()
+            self.assertRegex(text, r"native-cache-reuse-source:\n(?:        .*\n)*?        default: ''")
+        caller = (root / '.github/workflows/ci.yml').read_text()
+        self.assertIn("native-cache-reuse-source: ${{ github.event_name == 'workflow_dispatch' && inputs.native-cache-reuse-source || '' }}", caller)
+
+    def test_real_build_uses_release_restore_then_verifies_and_restores_source(self):
+        text = (Path(__file__).resolve().parent.parent / '.github/workflows/build-project.yaml').read_text()
+        for name in ('macos-build', 'windows-build'):
+            body = re.search(rf'^  {name}:\n(.*?)(?=^  [a-z0-9-]+:|\Z)', text, re.S | re.M).group(1)
+            with self.subTest(job=name):
+                prepare = body.index('- name: Prepare Native Release Reuse')
+                build = body.index('- name: Build OBS Studio')
+                verify = body.index('- name: Verify Native Installed Binary Freshness')
+                restore = body.index('- name: Restore Native Freshness Source')
+                self.assertLess(prepare, build)
+                self.assertLess(build, verify)
+                self.assertLess(verify, restore)
+                self.assertIn('consume --require-hit --expected-source "$NATIVE_REUSE_SOURCE"', body)
+                self.assertIn('native_cache_freshness.py prepare', body[prepare:build])
+                self.assertIn('native_cache_freshness.py verify', body[verify:restore])
+                self.assertIn("if: always() && inputs.native-cache-reuse-source != ''", body[restore:])
+                self.assertIn('native_cache_freshness.py restore', body[restore:])
+                self.assertIn('native-reuse-*.json', body[restore:])
+                # Neither Actions compiler restoration nor publication may
+                # confound this experiment's source or publish the overlay.
+                for block in body.split('      - ')[1:]:
+                    if 'actions/cache/restore@' in block or 'actions/cache/save@' in block:
+                        self.assertIn("inputs.native-cache-reuse-source == ''", block)
+                self.assertIn('steps.native-reuse.outputs.cache_path', body)
 
 
 if __name__ == "__main__":
