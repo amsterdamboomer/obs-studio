@@ -391,3 +391,7 @@ def consume(identity: dict, destination: Path, store) -> dict:
         except (OSError, ValueError, KeyError, tarfile.TarError) as error:
             errors.append(str(error)[:300])
     return {'status': 'cold', 'elapsed_seconds': time.monotonic() - started, 'errors': errors}
+
+
+def main(argv=None, store_factory=None):
+    raise NotImplementedError

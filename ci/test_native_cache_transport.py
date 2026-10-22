@@ -435,5 +435,51 @@ class NativeCacheReleaseProtocolTest(unittest.TestCase):
                 self.assertEqual(store.calls, [])
 
 
+class NativeCacheCommandTest(unittest.TestCase):
+    def test_command_publishes_then_read_only_consumer_restores(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            identity = root / 'identity.json'
+            identity.write_text(json.dumps(IDENTITY))
+            source = root / 'source'
+            source.mkdir()
+            (source / 'object').write_text('command payload')
+            store = MemoryReleaseStore()
+            factory = mock.Mock(return_value=store)
+            context = {'GITHUB_REPOSITORY': 'obs-rust/obs-studio', 'GITHUB_REF': 'refs/heads/master',
+                       'GITHUB_EVENT_NAME': 'workflow_dispatch', 'GITHUB_SHA': SHA,
+                       'GITHUB_ACTIONS': 'true', 'NATIVE_CACHE_JOB_TOKEN': 'explicit-job-token'}
+            with mock.patch.dict(TRANSPORT.os.environ, context, clear=True):
+                code = TRANSPORT.main(['publish', '--identity', str(identity), '--source', str(source),
+                                       '--report', str(root / 'publish.json')], store_factory=factory)
+            self.assertEqual(code, 0)
+            self.assertTrue(factory.call_args.kwargs['writable'])
+            self.assertEqual(factory.call_args.kwargs['token'], 'explicit-job-token')
+            store.calls.clear()
+            with mock.patch.dict(TRANSPORT.os.environ, {'GH_TOKEN': 'must-not-use-pat'}, clear=True):
+                code = TRANSPORT.main(['consume', '--identity', str(identity), '--destination', str(root / 'restored'),
+                                       '--report', str(root / 'consume.json')], store_factory=factory)
+            self.assertEqual(code, 0)
+            self.assertFalse(factory.call_args.kwargs['writable'])
+            self.assertEqual(factory.call_args.kwargs['token'], '')
+            self.assertEqual((root / 'restored/object').read_text(), 'command payload')
+            self.assertTrue(all(call[0] == 'download' for call in store.calls))
+            report = json.loads((root / 'consume.json').read_text())
+            self.assertEqual(report['status'], 'hit')
+
+    def test_untrusted_command_rejected_before_store_creation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            identity = root / 'identity.json'
+            identity.write_text(json.dumps(IDENTITY))
+            factory = mock.Mock()
+            with mock.patch.dict(TRANSPORT.os.environ, {}, clear=True):
+                code = TRANSPORT.main(['publish', '--identity', str(identity), '--source', str(root / 'missing'),
+                                       '--report', str(root / 'report.json')], store_factory=factory)
+            self.assertEqual(code, 1)
+            factory.assert_not_called()
+            self.assertEqual(json.loads((root / 'report.json').read_text())['status'], 'error')
+
+
 if __name__ == '__main__':
     unittest.main()
