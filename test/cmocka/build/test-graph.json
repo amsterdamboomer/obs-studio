@@ -1576,6 +1576,372 @@
         "libobs/data"
       ]
     },
+    "test_audio_io_inlines": {
+      "sources": [
+        "test/cmocka/test_audio_io_inlines.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_audio_math": {
+      "sources": [
+        "test/cmocka/test_audio_math.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_bounds": {
+      "sources": [
+        "test/cmocka/test_bounds.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_calldata": {
+      "sources": [
+        "test/cmocka/test_calldata.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_decl": {
+      "sources": [
+        "test/cmocka/test_decl.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_dstr_zero_len": {
+      "sources": [
+        "test/cmocka/test_dstr_zero_len.c",
+        "libobs/util/dstr.c.h"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "not": "MSVC"
+      },
+      "sanitizers": "undefined"
+    },
+    "test_audio_controls": {
+      "sources": [
+        "test/cmocka/test_audio_controls.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_audio_clock_drift": {
+      "sources": [
+        "test/cmocka/test_audio_clock_drift.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "m",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": "OS_LINUX"
+    },
+    "test_obs_data": {
+      "sources": [
+        "test/cmocka/test_obs_data.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_obs_properties": {
+      "sources": [
+        "test/cmocka/test_obs_properties.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_obs_properties_leaks": {
+      "sources": [
+        "test/cmocka/test_obs_properties_leaks.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "sanitizers": "address"
+    },
+    "test_missing_files": {
+      "sources": [
+        "test/cmocka/test_missing_files.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_proc": {
+      "sources": [
+        "test/cmocka/test_proc.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_signal": {
+      "sources": [
+        "test/cmocka/test_signal.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "sanitizers": "address"
+    },
+    "test_format_conversion": {
+      "sources": [
+        "test/cmocka/test_format_conversion.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_math_extra": {
+      "sources": [
+        "test/cmocka/test_math_extra.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_matrix3": {
+      "sources": [
+        "test/cmocka/test_matrix3.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_matrix4": {
+      "sources": [
+        "test/cmocka/test_matrix4.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_plane": {
+      "sources": [
+        "test/cmocka/test_plane.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_graphics_alias_ordinary": {
+      "sources": [
+        "test/cmocka/test_graphics_alias_ordinary.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_graphics_alias_rest": {
+      "sources": [
+        "test/cmocka/test_graphics_alias_rest.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "MSVC"
+          }
+        }
+      ]
+    },
+    "test_config_double_window": {
+      "sources": [
+        "test/cmocka/test_config_double_window.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_config_set_double_format": {
+      "sources": [
+        "test/cmocka/test_config_set_double_format.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_hotkey_name_map": {
+      "sources": [
+        "test/cmocka/test_hotkey_name_map.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_hotkey_bindings_codec": {
+      "sources": [
+        "test/cmocka/test_hotkey_bindings_codec.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_hotkey_pair_steps": {
+      "sources": [
+        "test/cmocka/test_hotkey_pair_steps.c",
+        "libobs/obs-hotkey.c.h",
+        "libobs/obs-hotkey-bindings.c.h",
+        "libobs/obs-hotkey-translations.c.h",
+        "libobs/obs-hotkey-press.c.h",
+        "libobs/obs-hotkey-pair.c.h"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "OBS::native-test-cmocka"
+      ],
+      "definitions": [
+        "obs=hotkey_test_obs"
+      ],
+      "includes": [
+        "libobs"
+      ]
+    },
+    "test_hotkey_press_steps": {
+      "sources": [
+        "test/cmocka/test_hotkey_press_steps.c",
+        "libobs/obs-hotkey.c.h",
+        "libobs/obs-hotkey-bindings.c.h",
+        "libobs/obs-hotkey-translations.c.h",
+        "libobs/obs-hotkey-press.c.h",
+        "libobs/obs-hotkey-pair.c.h"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::caption",
+        "OBS::native-test-cmocka"
+      ],
+      "definitions": [
+        "obs=hotkey_test_obs"
+      ],
+      "includes": [
+        "libobs"
+      ]
+    },
+    "test_hotkey_translations": {
+      "sources": [
+        "test/cmocka/test_hotkey_translations.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "any": [
+          "OS_LINUX",
+          "OS_FREEBSD"
+        ]
+      }
+    },
+    "test_shader_param_names": {
+      "sources": [
+        "test/cmocka/test_shader_param_names.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
+    },
+    "test_utf8_insize0": {
+      "sources": [
+        "test/cmocka/test_utf8_insize0.c",
+        "libobs/util/utf8.c.h"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": {
+        "not": "MSVC"
+      },
+      "sanitizers": "address,undefined",
+      "includes": [
+        "libobs"
+      ]
+    },
     "test_output_protocol_list_steps": {
       "sources": [
         "test/cmocka/test_output_protocol_list_steps.c",
@@ -1955,6 +2321,212 @@
       "working_directory": "${runtime}",
       "timeout_seconds": 120,
       "skip_return_code": 77
+    },
+    "test_audio_io_inlines": {
+      "target": "test_audio_io_inlines",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_audio_math": {
+      "target": "test_audio_math",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_bounds": {
+      "target": "test_bounds",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_calldata": {
+      "target": "test_calldata",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_decl": {
+      "target": "test_decl",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_dstr_zero_len": {
+      "target": "test_dstr_zero_len",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_audio_controls": {
+      "target": "test_audio_controls",
+      "command": [
+        "${target}"
+      ],
+      "optional_prefixes": [
+        [
+          "xvfb-run",
+          "-a"
+        ]
+      ]
+    },
+    "test_audio_clock_drift": {
+      "target": "test_audio_clock_drift",
+      "command": [
+        "${target}"
+      ],
+      "timeout_seconds": 300
+    },
+    "test_obs_data": {
+      "target": "test_obs_data",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_obs_properties": {
+      "target": "test_obs_properties",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_obs_properties_leaks": {
+      "target": "test_obs_properties_leaks",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_missing_files": {
+      "target": "test_missing_files",
+      "command": [
+        "${target}"
+      ],
+      "optional_prefixes": [
+        [
+          "xvfb-run",
+          "-a"
+        ]
+      ]
+    },
+    "test_proc": {
+      "target": "test_proc",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_signal": {
+      "target": "test_signal",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_format_conversion": {
+      "target": "test_format_conversion",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_math_extra": {
+      "target": "test_math_extra",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_matrix3": {
+      "target": "test_matrix3",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_matrix4": {
+      "target": "test_matrix4",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_plane": {
+      "target": "test_plane",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_graphics_alias_ordinary": {
+      "target": "test_graphics_alias_ordinary",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_graphics_alias_rest": {
+      "target": "test_graphics_alias_rest",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_config_double_window": {
+      "target": "test_config_double_window",
+      "command": [
+        "${target}"
+      ],
+      "timeout_seconds": 20
+    },
+    "test_config_set_double_format": {
+      "target": "test_config_set_double_format",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_hotkey_name_map": {
+      "target": "test_hotkey_name_map",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_hotkey_bindings_codec": {
+      "target": "test_hotkey_bindings_codec",
+      "command": [
+        "${target}"
+      ],
+      "optional_prefixes": [
+        [
+          "xvfb-run",
+          "-a"
+        ]
+      ]
+    },
+    "test_hotkey_pair_steps": {
+      "target": "test_hotkey_pair_steps",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_hotkey_press_steps": {
+      "target": "test_hotkey_press_steps",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_hotkey_translations": {
+      "target": "test_hotkey_translations",
+      "command": [
+        "${target}"
+      ],
+      "optional_prefixes": [
+        [
+          "xvfb-run",
+          "-a"
+        ]
+      ]
+    },
+    "test_shader_param_names": {
+      "target": "test_shader_param_names",
+      "command": [
+        "${target}"
+      ]
+    },
+    "test_utf8_insize0": {
+      "target": "test_utf8_insize0",
+      "command": [
+        "${target}"
+      ]
     },
     "test_output_protocol_list_steps": {
       "target": "test_output_protocol_list_steps",

@@ -1270,3 +1270,80 @@ pub fn native_test_framework_options(target: &str, name: &str) -> Vec<String> {
         vec![]
     }
 }
+
+cfg_select! {
+    unix => {
+        fn native_program_wrapper(program: &str, executable: &Path, root: &Path, output: &Path) -> Result<PathBuf, String> {
+            use std::os::unix::fs::PermissionsExt;
+            let template = root.join("test/cmocka/xvfb-run-or-display.sh.in");
+            if program != "xvfb-run" || !template.is_file() { return Ok(executable.into()); }
+            let executable = executable.to_str().ok_or("non-UTF8 native test display program")?;
+            let quoted = executable.replace('\\', r"\\").replace('"', r#"\""#).replace('$', r"\$").replace('`', r"\`");
+            let content = std::fs::read_to_string(template).map_err(|error| error.to_string())?.replace("@OBS_XVFB_RUN_REAL@", &quoted);
+            let script = output.join("test-programs/xvfb-run-or-display.sh");
+            std::fs::create_dir_all(script.parent().ok_or("native test wrapper has no parent")?).map_err(|error| error.to_string())?;
+            crate::frontend::write(&script, &content)?;
+            std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).map_err(|error| error.to_string())?;
+            dunce::canonicalize(&script).map_err(|error| error.to_string())
+        }
+        fn native_program_suffixes() -> Vec<String> { vec![String::new()] }
+        fn native_program_executable(path: &Path) -> bool {
+            use std::os::unix::fs::PermissionsExt;
+            path.metadata().is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+        }
+    }
+    windows => {
+        fn native_program_wrapper(_: &str, executable: &Path, _: &Path, _: &Path) -> Result<PathBuf, String> { Ok(executable.into()) }
+        fn native_program_suffixes() -> Vec<String> {
+            let extensions = std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into());
+            let mut suffixes = vec![String::new()];
+            suffixes.extend(extensions.split(';').filter(|extension| !extension.is_empty()).map(str::to_owned));
+            suffixes
+        }
+        fn native_program_executable(path: &Path) -> bool { path.is_file() }
+    }
+    _ => {
+        fn native_program_wrapper(_: &str, executable: &Path, _: &Path, _: &Path) -> Result<PathBuf, String> { Ok(executable.into()) }
+        fn native_program_suffixes() -> Vec<String> { vec![String::new()] }
+        fn native_program_executable(path: &Path) -> bool { path.is_file() }
+    }
+}
+
+/// Resolve an optional test command on the execution host without a shell.
+pub fn native_test_program(program: &str) -> Option<PathBuf> {
+    let suffixes = native_program_suffixes();
+    let path = Path::new(program);
+    let candidates = if path.components().count() > 1 || path.is_absolute() {
+        vec![path.to_owned()]
+    } else {
+        std::env::split_paths(&std::env::var_os("PATH")?)
+            .map(|directory| directory.join(program))
+            .collect()
+    };
+    for candidate in candidates {
+        for suffix in &suffixes {
+            let mut path = candidate.as_os_str().to_owned();
+            path.push(suffix);
+            let path = PathBuf::from(path);
+            if native_program_executable(&path) {
+                // Keep symlinks: resolving a busybox-style executable changes argv[0].
+                return Some(if path.is_absolute() {
+                    path
+                } else {
+                    std::env::current_dir().ok()?.join(path)
+                });
+            }
+        }
+    }
+    None
+}
+
+pub fn native_test_command_program(
+    program: &str,
+    root: &Path,
+    output: &Path,
+) -> Result<Option<PathBuf>, String> {
+    native_test_program(program)
+        .map(|path| native_program_wrapper(program, &path, root, output))
+        .transpose()
+}

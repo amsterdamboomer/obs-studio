@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
             "disabled": {"sources": ["does-not-exist.c"], "requires": "GRAPH_DISABLED"}
         },
         "tests": {
-            "answer-case": {"target": "answer", "suite": "fixture", "optional_prefixes": [["cmake", "-E", "env", "OBS_WRAPPER_VALUE=wrapped"], ["obs-missing-wrapper-fixture-1332"]], "command": ["${target}", "two words"],
+            "answer-case": {"target": "answer", "suite": "fixture", "optional_prefixes": [["cmake", "-E", "env", "OBS_WRAPPER_VALUE=outer"], ["obs-missing-wrapper-fixture-1332"], ["cmake", "-E", "env", "OBS_WRAPPER_VALUE=wrapped"]], "command": ["${target}", "two words"],
                 "environment": {"OBS_GRAPH_VALUE": "first;second"},
                 "working_directory": "${runtime}", "timeout_seconds": 17,
                 "skip_return_code": 77, "resource_locks": ["fixture-lock"]},
@@ -273,6 +273,21 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/watched-inputs.txt" "${graph_inputs}")
     assert!(runtime.join("marker.txt").is_file());
     for (pointer, value, message) in [
         ("/schema", serde_json::json!(2), "schema"),
+        (
+            "/tests/answer-case/optional_prefixes",
+            serde_json::json!([[]]),
+            "prefix",
+        ),
+        (
+            "/tests/answer-case/optional_prefixes",
+            serde_json::json!([[""]]),
+            "prefix",
+        ),
+        (
+            "/tests/answer-case/optional_prefixes",
+            serde_json::json!([["${target}"]]),
+            "prefix",
+        ),
         (
             "/targets/answer/watch_inputs",
             serde_json::json!([""]),
@@ -516,7 +531,6 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         "test_calldata",
         "test_decl",
         "test_dstr_zero_len",
-        "test_audio_io",
         "test_audio_controls",
         "test_audio_clock_drift",
         "test_obs_data",
@@ -617,7 +631,7 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         ("HAVE_OBS_PIPEWIRE".into(), false),
         ("HAVE_OBS_PULSEAUDIO".into(), false),
     ]);
-    for (suite, count) in [("core", 77), ("graphics", 1), ("vlc", 6), ("webrtc", 2)] {
+    for (suite, count) in [("core", 107), ("graphics", 1), ("vlc", 6), ("webrtc", 2)] {
         let mut partition = obs_build::validation::graph::Graph::load(
             &root.join("test/cmocka/build/test-graph.json"),
         )
@@ -636,6 +650,25 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         }
     }
     let selected = graph.select(&facts).unwrap();
+    for name in [
+        "test_audio_controls",
+        "test_missing_files",
+        "test_hotkey_bindings_codec",
+        "test_hotkey_translations",
+    ] {
+        assert_eq!(
+            graph.tests[name].optional_prefixes,
+            vec![vec!["xvfb-run", "-a"]]
+        );
+    }
+    assert_eq!(
+        graph.tests["test_audio_clock_drift"].timeout_seconds,
+        Some(300)
+    );
+    assert_eq!(
+        graph.tests["test_config_double_window"].timeout_seconds,
+        Some(20)
+    );
     assert_eq!(graph.tests["test_svt_av1"].timeout_seconds, Some(60));
     assert_eq!(graph.tests["test_svt_av1"].skip_return_code, Some(77));
     for name in ["test_context_name_helpers", "test_video_output_plan"] {

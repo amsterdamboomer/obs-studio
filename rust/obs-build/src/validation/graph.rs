@@ -181,6 +181,9 @@ pub struct Test {
     pub requires: Requirement,
     #[serde(default = "default_command")]
     pub command: Vec<String>,
+    /// Outer-to-inner argv prefixes used when their executable is available.
+    #[serde(default)]
+    pub optional_prefixes: Vec<Vec<String>>,
     /// None inherits the runner's configured default; Some(0) is unbounded,
     /// matching CTest's explicit TIMEOUT 0 semantics.
     #[serde(default)]
@@ -212,11 +215,30 @@ impl Test {
         target: &Path,
         runtime: &Path,
     ) -> Result<Command, String> {
-        let arguments = self
+        let mut arguments = self
             .command
             .iter()
             .map(|value| expand(value, root, output, target, runtime))
             .collect::<Result<Vec<_>, _>>()?;
+        for prefix in self.optional_prefixes.iter().rev() {
+            if let Some(program) =
+                crate::platform::native_test_command_program(&prefix[0], root, output)?
+            {
+                let mut expanded = vec![
+                    program
+                        .to_str()
+                        .ok_or("non-UTF8 native test command prefix")?
+                        .to_owned(),
+                ];
+                expanded.extend(
+                    prefix[1..]
+                        .iter()
+                        .map(|value| expand(value, root, output, target, runtime))
+                        .collect::<Result<Vec<_>, _>>()?,
+                );
+                arguments.splice(0..0, expanded);
+            }
+        }
         let (program, arguments) = arguments
             .split_first()
             .ok_or("native test has no command")?;
@@ -348,6 +370,16 @@ impl Graph {
             }
             if test.command.is_empty() || test.command[0].is_empty() {
                 return Err(format!("native test {name} has no command"));
+            }
+            for prefix in &test.optional_prefixes {
+                if prefix.is_empty() || prefix[0].is_empty() || prefix[0].contains("${") {
+                    return Err(format!(
+                        "native test {name} command prefix needs a literal program"
+                    ));
+                }
+                for value in &prefix[1..] {
+                    validate_template(value)?;
+                }
             }
             for value in test
                 .command

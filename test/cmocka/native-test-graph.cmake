@@ -422,7 +422,7 @@ function(obs_native_test_graph path root)
       _obs_test_graph_fields(
         "${graph}"
         "tests;${name}"
-        "target;suite;requires;command;timeout_seconds;skip_return_code;environment;working_directory;resource_locks;run_serial"
+        "target;suite;requires;command;optional_prefixes;timeout_seconds;skip_return_code;environment;working_directory;resource_locks;run_serial"
       )
       string(JSON suite ERROR_VARIABLE suite_error GET "${graph}" tests "${name}" suite)
       if(suite_error)
@@ -457,6 +457,53 @@ function(obs_native_test_graph path root)
         string(REPLACE ";" "\\;" argument "${argument}")
         list(APPEND arguments "${argument}")
       endforeach()
+      string(JSON prefixes_kind ERROR_VARIABLE prefixes_error TYPE "${graph}" tests "${name}" optional_prefixes)
+      if(NOT prefixes_error)
+        if(NOT prefixes_kind STREQUAL "ARRAY")
+          message(FATAL_ERROR "Native test command prefixes must be an array")
+        endif()
+        string(JSON prefixes_count LENGTH "${graph}" tests "${name}" optional_prefixes)
+        if(prefixes_count GREATER 0)
+          math(EXPR prefix_last "${prefixes_count} - 1")
+          foreach(prefix_index RANGE ${prefix_last} 0 -1)
+            _obs_test_graph_array(prefix "${graph}" tests "${name}" optional_prefixes ${prefix_index})
+            string(JSON prefix_count LENGTH "${graph}" tests "${name}" optional_prefixes ${prefix_index})
+            if(prefix_count EQUAL 0)
+              message(FATAL_ERROR "Native test command prefix needs a literal program")
+            endif()
+            string(
+              JSON prefix_program
+              GET "${graph}"
+              tests
+              "${name}"
+              optional_prefixes
+              ${prefix_index}
+              0
+            )
+            if(prefix_program STREQUAL "" OR prefix_program MATCHES "\\$\\{")
+              message(FATAL_ERROR "Native test command prefix needs a literal program")
+            endif()
+            unset(prefix_executable)
+            string(MAKE_C_IDENTIFIER "${prefix_program}" prefix_variable)
+            string(TOUPPER "${prefix_variable}" prefix_variable)
+            if(DEFINED ${prefix_variable} AND ${prefix_variable})
+              set(prefix_executable "${${prefix_variable}}")
+            else()
+              find_program(prefix_executable NAMES "${prefix_program}" NO_CACHE)
+            endif()
+            if(prefix_executable)
+              set(expanded_prefix "${prefix_executable}")
+              list(REMOVE_AT prefix 0)
+              foreach(argument IN LISTS prefix)
+                _obs_test_graph_expand(argument "${argument}" "${root}" "${target}")
+                string(REPLACE ";" "\\;" argument "${argument}")
+                list(APPEND expanded_prefix "${argument}")
+              endforeach()
+              list(PREPEND arguments ${expanded_prefix})
+            endif()
+          endforeach()
+        endif()
+      endif()
       add_test(NAME "${name}" COMMAND ${arguments})
       foreach(
         pair
