@@ -70,6 +70,108 @@ fn native_profile_switch_rebuilds_assertion_policy() {
 }
 
 #[test]
+fn production_runtime_stages_selected_artifacts_and_rejects_stale_outputs() {
+    use obs_build::{application, plugins};
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().join("source");
+    let artifacts = temporary.path().join("artifacts");
+    fs::create_dir_all(root.join("libobs/data")).unwrap();
+    fs::create_dir_all(root.join("frontend/data")).unwrap();
+    fs::create_dir_all(artifacts.join("module-data/locale")).unwrap();
+    fs::write(root.join("libobs/data/default.effect"), "shader").unwrap();
+    fs::write(root.join("frontend/data/theme.qss"), "theme").unwrap();
+    fs::write(root.join("AUTHORS"), "authors").unwrap();
+    for name in [
+        "obs-studio-rust",
+        "libobs.so",
+        "libobs-frontend-api.so",
+        "libobs-opengl.so",
+        "fixture-source.so",
+        "obs-ffmpeg.so",
+        "obs-ffmpeg-mux",
+    ] {
+        fs::write(artifacts.join(name), name).unwrap();
+    }
+    fs::write(artifacts.join("module-data/locale/en-US.ini"), "translated").unwrap();
+    let module = plugins::Module {
+        library: artifacts.join("fixture-source.so"),
+        data: artifacts.join("module-data"),
+    };
+    let ffmpeg = plugins::FfmpegArtifacts {
+        module: plugins::Module {
+            library: artifacts.join("obs-ffmpeg.so"),
+            data: artifacts.join("module-data"),
+        },
+        muxer: artifacts.join("obs-ffmpeg-mux"),
+    };
+    let build = NativeBuild {
+        host: obs_build::BUILD_HOST.into(),
+        target: "x86_64-unknown-linux-gnu".into(),
+        output: artifacts.clone(),
+        profile: Default::default(),
+    };
+    let executable = artifacts.join("obs-studio-rust");
+    let core = artifacts.join("libobs.so");
+    let api = artifacts.join("libobs-frontend-api.so");
+    let renderer = artifacts.join("libobs-opengl.so");
+    let inputs = application::RuntimeInputs {
+        root: &root,
+        executable: &executable,
+        core: &core,
+        api: &api,
+        renderer: &renderer,
+        ffmpeg: &ffmpeg,
+        nvenc_helper: None,
+        modules: &[&module, &ffmpeg.module],
+        browser: None,
+        scripting: None,
+    };
+    let destination = temporary.path().join("runtime");
+    let runtime = application::stage_runtime(&build, &inputs, &destination).unwrap();
+    assert_eq!(
+        fs::read_to_string(&runtime.executable).unwrap(),
+        "obs-studio-rust"
+    );
+    assert_eq!(runtime.modules, ["fixture-source", "obs-ffmpeg"]);
+    for (path, expected) in [
+        ("lib64/libobs.so", "libobs.so"),
+        ("bin/obs-ffmpeg-mux", "obs-ffmpeg-mux"),
+        (
+            "lib64/obs-modules/core/fixture-source.so",
+            "fixture-source.so",
+        ),
+        (
+            "share/obs/obs-modules/core/fixture-source/locale/en-US.ini",
+            "translated",
+        ),
+        ("share/obs/libobs/default.effect", "shader"),
+        ("share/obs/obs-studio/theme.qss", "theme"),
+        ("share/obs/obs-studio/authors", "authors"),
+    ] {
+        assert_eq!(
+            fs::read_to_string(destination.join(path)).unwrap(),
+            expected
+        );
+    }
+    fs::write(destination.join("lib64/obs-modules/core/stale.so"), "stale").unwrap();
+    let error = application::stage_runtime(&build, &inputs, &destination)
+        .err()
+        .unwrap();
+    assert!(error.contains("empty"), "{error}");
+    assert_eq!(
+        fs::read_to_string(destination.join("lib64/obs-modules/core/stale.so")).unwrap(),
+        "stale"
+    );
+    let unsupported = NativeBuild {
+        target: "x86_64-pc-windows-msvc".into(),
+        ..build
+    };
+    let rejected = temporary.path().join("unsupported");
+    assert!(application::stage_runtime(&unsupported, &inputs, &rejected).is_err());
+    assert!(!rejected.exists());
+}
+
+#[test]
 fn swift_bridge_preserves_native_linkage_header_flags_and_source_rebuilds() {
     if native_answer_probe() {
         return;
