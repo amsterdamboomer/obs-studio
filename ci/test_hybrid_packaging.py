@@ -295,6 +295,10 @@ class FlatpakPrunedBuildTest(unittest.TestCase):
             # Transient build trees are not dependency repository inputs.
             (state / 'build').mkdir()
             (state / 'build/transient-link').symlink_to(state / 'cache/original')
+            objects = state / 'cache/objects/ab'
+            objects.mkdir(parents=True)
+            object_link = objects / ('1' * 62 + '.file')
+            object_link.symlink_to('/app/lib/example.so')
             calls = []
 
             def execute(command, seconds):
@@ -304,6 +308,9 @@ class FlatpakPrunedBuildTest(unittest.TestCase):
                     self.assertNotEqual(copied, state)
                     self.assertTrue((copied / 'cache/original').exists())
                     self.assertEqual(sorted(path.name for path in copied.iterdir()), ['cache'])
+                    copied_link = copied / object_link.relative_to(state)
+                    self.assertTrue(copied_link.is_symlink())
+                    self.assertEqual(os.readlink(copied_link), '/app/lib/example.so')
                     self.assertFalse((copied / 'downloads').exists())
                     self.assertFalse((copied / 'ccache').exists())
                     recipe = Path(command[-1])
@@ -327,6 +334,9 @@ class FlatpakPrunedBuildTest(unittest.TestCase):
             self.assertEqual(sorted(p.name for p in root.iterdir()), ['manifest.json', 'state'])
             lint_kinds = [command[-2] for command in calls if command[0] == 'flatpak-builder-lint']
             self.assertEqual(lint_kinds, ['appstream', 'builddir', 'repo'])
+            fsck_index = next(i for i, command in enumerate(calls) if command[0] == 'ostree' and 'fsck' in command)
+            builder_index = next(i for i, command in enumerate(calls) if 'flatpak-builder' in command)
+            self.assertLess(fsck_index, builder_index)
 
     def test_pruned_rebuild_failure_cleans_temporary_state_and_manifest(self):
         probe = self.load_probe()
