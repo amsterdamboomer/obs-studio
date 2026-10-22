@@ -320,66 +320,14 @@ if(TARGET OBS::outputs)
 endif()
 
 # Load .cube LUTs through the Color Grade filter's loader.
-if(TARGET OBS::filters)
-  add_executable(test_cube_lut test_cube_lut.c "${CMAKE_SOURCE_DIR}/plugins/obs-filters/cube-lut.c.h")
-  target_include_directories(test_cube_lut PRIVATE ${CMOCKA_INCLUDE_DIR} "${CMAKE_SOURCE_DIR}/plugins/obs-filters")
-  target_link_libraries(test_cube_lut PRIVATE OBS::libobs ${CMOCKA_LIBRARIES} $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
-  add_dependencies(cmocka-tests test_cube_lut)
-  add_test(test_cube_lut ${CMAKE_CURRENT_BINARY_DIR}/test_cube_lut)
-endif()
+# test_cube_lut defined in build/test-graph.json.
 
 # Linux capture reconnection after a PipeWire restart (obs-rust/obs-studio#108).
 # The decisions are compiled into the tests directly; no PipeWire daemon,
 # portal or PulseAudio server is needed.
-if(TARGET OBS::pipewire)
-  add_executable(
-    test_pipewire_reconnect
-    test_pipewire_reconnect.c
-    "${CMAKE_SOURCE_DIR}/plugins/linux-pipewire/reconnect-policy.c.h"
-  )
-  target_include_directories(
-    test_pipewire_reconnect
-    PRIVATE ${CMOCKA_INCLUDE_DIR} "${CMAKE_SOURCE_DIR}/plugins/linux-pipewire"
-  )
-  target_link_libraries(test_pipewire_reconnect PRIVATE OBS::libobs PipeWire::PipeWire ${CMOCKA_LIBRARIES})
-  add_dependencies(cmocka-tests test_pipewire_reconnect)
-  add_test(test_pipewire_reconnect ${CMAKE_CURRENT_BINARY_DIR}/test_pipewire_reconnect)
-endif()
+# test_pipewire_reconnect defined in build/test-graph.json.
 
-if(TARGET OBS::pulseaudio)
-  add_executable(
-    test_pulse_reconnect
-    test_pulse_reconnect.c
-    "${CMAKE_SOURCE_DIR}/plugins/linux-pulseaudio/pulse-reconnect.c.h"
-  )
-  target_include_directories(
-    test_pulse_reconnect
-    PRIVATE ${CMOCKA_INCLUDE_DIR} "${CMAKE_SOURCE_DIR}/plugins/linux-pulseaudio"
-  )
-  target_link_libraries(test_pulse_reconnect PRIVATE OBS::libobs PulseAudio::PulseAudio ${CMOCKA_LIBRARIES})
-  add_dependencies(cmocka-tests test_pulse_reconnect)
-  add_test(test_pulse_reconnect ${CMAKE_CURRENT_BINARY_DIR}/test_pulse_reconnect)
-
-  # obs-rust/obs-studio#158: pulseaudio-wrapper.c against a fake libpulse
-  # defined in the test (headers only, no libpulse link), with
-  # pulseaudio-monitor-format.c, whose device match devices_match() calls.
-  add_executable(
-    test_pulse_default_id
-    test_pulse_default_id.c
-    "${CMAKE_SOURCE_DIR}/libobs/audio-monitoring/pulse/pulseaudio-monitor-format.c.h"
-    "${CMAKE_SOURCE_DIR}/libobs/audio-monitoring/pulse/pulseaudio-wrapper.c.h"
-  )
-  target_include_directories(
-    test_pulse_default_id
-    PRIVATE
-      ${CMOCKA_INCLUDE_DIR}
-      "${CMAKE_SOURCE_DIR}/libobs/audio-monitoring/pulse"
-      $<TARGET_PROPERTY:PulseAudio::PulseAudio,INTERFACE_INCLUDE_DIRECTORIES>
-  )
-  target_link_libraries(test_pulse_default_id PRIVATE OBS::libobs ${CMOCKA_LIBRARIES})
-  add_dependencies(cmocka-tests test_pulse_default_id)
-  add_test(test_pulse_default_id ${CMAKE_CURRENT_BINARY_DIR}/test_pulse_default_id)
-endif()
+# test_pulse_reconnect and test_pulse_default_id defined in build/test-graph.json.
 
 # video frame test (media-io/video-frame.c + video-frame.h inlines)
 # test_video_frame is defined in build/test-graph.json.
@@ -430,12 +378,22 @@ foreach(_fragment IN LISTS _cmocka_test_fragments)
   include("${_fragment}")
 endforeach()
 include("${CMAKE_CURRENT_SOURCE_DIR}/native-test-graph.cmake")
+# Match the existing plugin-target guards independently of core feature options.
+foreach(_graph_plugin IN ITEMS filters pipewire pulseaudio)
+  string(TOUPPER "${_graph_plugin}" _graph_plugin_upper)
+  if(TARGET OBS::${_graph_plugin})
+    set(HAVE_OBS_${_graph_plugin_upper} TRUE)
+  else()
+    set(HAVE_OBS_${_graph_plugin_upper} FALSE)
+  endif()
+endforeach()
+
 # These explicit false defaults retain the original if() semantics on hosts
 # where a platform-only option is not declared.
 foreach(
   _graph_fact
   IN
-  ITEMS MSVC OS_LINUX OS_FREEBSD ENABLE_PULSEAUDIO ENABLE_HEVC
+  ITEMS MSVC OS_LINUX OS_FREEBSD OS_WINDOWS ENABLE_PULSEAUDIO ENABLE_HEVC
 )
   if(NOT DEFINED ${_graph_fact})
     set(${_graph_fact} FALSE)

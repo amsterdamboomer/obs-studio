@@ -108,61 +108,6 @@
     ]
   },
   {
-    "name": "test_cube_lut",
-    "sources": [
-      "test/cmocka/test_cube_lut.c",
-      "plugins/obs-filters/cube-lut.c.h"
-    ],
-    "includes": [
-      "plugins/obs-filters"
-    ]
-  },
-  {
-    "name": "test_pipewire_reconnect",
-    "sources": [
-      "test/cmocka/test_pipewire_reconnect.c",
-      "plugins/linux-pipewire/reconnect-policy.c.h"
-    ],
-    "includes": [
-      "plugins/linux-pipewire",
-      "deps/glad/include"
-    ],
-    "packages": [
-      "libpipewire-0.3"
-    ],
-    "header_packages": [
-      "libdrm",
-      "gio-unix-2.0"
-    ]
-  },
-  {
-    "name": "test_pulse_reconnect",
-    "sources": [
-      "test/cmocka/test_pulse_reconnect.c",
-      "plugins/linux-pulseaudio/pulse-reconnect.c.h"
-    ],
-    "includes": [
-      "plugins/linux-pulseaudio"
-    ],
-    "packages": [
-      "libpulse"
-    ]
-  },
-  {
-    "name": "test_pulse_default_id",
-    "sources": [
-      "test/cmocka/test_pulse_default_id.c",
-      "libobs/audio-monitoring/pulse/pulseaudio-monitor-format.c.h",
-      "libobs/audio-monitoring/pulse/pulseaudio-wrapper.c.h"
-    ],
-    "includes": [
-      "libobs/audio-monitoring/pulse"
-    ],
-    "header_packages": [
-      "libpulse"
-    ]
-  },
-  {
     "name": "test_scene_audio_action_steps",
     "sources": [
       "test/cmocka/test_scene_audio_action_steps.c",

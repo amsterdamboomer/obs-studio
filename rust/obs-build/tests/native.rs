@@ -489,23 +489,38 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
     for name in ["test_portal_shortcut_ids", "test_portal_shortcut_sets"] {
         assert!(freebsd.tests.contains_key(name));
     }
-    let plugin_tests = ["test_cube_lut", "test_pipewire_reconnect", "test_pulse_reconnect", "test_pulse_default_id"];
+    let plugin_tests = [
+        "test_cube_lut",
+        "test_pipewire_reconnect",
+        "test_pulse_reconnect",
+        "test_pulse_default_id",
+    ];
     for name in plugin_tests {
         assert!(!selected.tests.contains_key(name));
     }
     let mut plugins_enabled = facts.clone();
-    for (fact, value) in [("OS_LINUX", true), ("OS_WINDOWS", false), ("MSVC", false),
-        ("HAVE_OBS_FILTERS", true), ("HAVE_OBS_PIPEWIRE", true), ("HAVE_OBS_PULSEAUDIO", true)] {
+    for (fact, value) in [
+        ("OS_LINUX", true),
+        ("OS_WINDOWS", false),
+        ("MSVC", false),
+        ("HAVE_OBS_FILTERS", true),
+        ("HAVE_OBS_PIPEWIRE", true),
+        ("HAVE_OBS_PULSEAUDIO", true),
+    ] {
         plugins_enabled.insert(fact.into(), value);
     }
     let enabled = graph.select(&plugins_enabled).unwrap();
     for name in plugin_tests {
         assert!(enabled.tests.contains_key(name));
     }
-    assert!(!enabled.tests.contains_key("test_pulse_monitor_samples"),
-        "plugin availability must not enable core PulseAudio monitoring");
-    assert_eq!(raw["targets"]["test_pulse_default_id"]["header_libraries"],
-        serde_json::json!(["PulseAudio::PulseAudio"]));
+    assert!(
+        !enabled.tests.contains_key("test_pulse_monitor_samples"),
+        "plugin availability must not enable core PulseAudio monitoring"
+    );
+    assert_eq!(
+        raw["targets"]["test_pulse_default_id"]["header_libraries"],
+        serde_json::json!(["PulseAudio::PulseAudio"])
+    );
     assert!(selected.tests.contains_key("test_avc"));
     assert!(!selected.tests.contains_key("test_formatted_filename"));
     assert!(!selected.tests.contains_key("test_utf8"));

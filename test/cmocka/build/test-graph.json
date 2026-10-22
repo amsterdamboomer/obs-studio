@@ -731,6 +731,80 @@
         "OBS::native-test-cmocka",
         "m"
       ]
+    },
+    "test_cube_lut": {
+      "sources": [
+        "test/cmocka/test_cube_lut.c",
+        "plugins/obs-filters/cube-lut.c.h"
+      ],
+      "includes": [
+        "plugins/obs-filters"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka",
+        {
+          "name": "m",
+          "requires": {
+            "not": "OS_WINDOWS"
+          }
+        }
+      ],
+      "requires": "HAVE_OBS_FILTERS"
+    },
+    "test_pipewire_reconnect": {
+      "sources": [
+        "test/cmocka/test_pipewire_reconnect.c",
+        "plugins/linux-pipewire/reconnect-policy.c.h"
+      ],
+      "includes": [
+        "plugins/linux-pipewire",
+        "deps/glad/include"
+      ],
+      "header_packages": [
+        "libdrm",
+        "gio-unix-2.0"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "PipeWire::PipeWire",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": "HAVE_OBS_PIPEWIRE"
+    },
+    "test_pulse_reconnect": {
+      "sources": [
+        "test/cmocka/test_pulse_reconnect.c",
+        "plugins/linux-pulseaudio/pulse-reconnect.c.h"
+      ],
+      "includes": [
+        "plugins/linux-pulseaudio"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "PulseAudio::PulseAudio",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": "HAVE_OBS_PULSEAUDIO"
+    },
+    "test_pulse_default_id": {
+      "sources": [
+        "test/cmocka/test_pulse_default_id.c",
+        "libobs/audio-monitoring/pulse/pulseaudio-monitor-format.c.h",
+        "libobs/audio-monitoring/pulse/pulseaudio-wrapper.c.h"
+      ],
+      "includes": [
+        "libobs/audio-monitoring/pulse",
+        "deps/libcaption"
+      ],
+      "header_libraries": [
+        "PulseAudio::PulseAudio"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ],
+      "requires": "HAVE_OBS_PULSEAUDIO"
     }
   },
   "tests": {
@@ -923,6 +997,18 @@
     },
     "test_audio_buffering_subsample": {
       "target": "test_audio_buffering_subsample"
+    },
+    "test_cube_lut": {
+      "target": "test_cube_lut"
+    },
+    "test_pipewire_reconnect": {
+      "target": "test_pipewire_reconnect"
+    },
+    "test_pulse_reconnect": {
+      "target": "test_pulse_reconnect"
+    },
+    "test_pulse_default_id": {
+      "target": "test_pulse_default_id"
     }
   }
 }

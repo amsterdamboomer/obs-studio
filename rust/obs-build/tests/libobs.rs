@@ -172,6 +172,7 @@ fn c_and_rust_twins_preserve_public_data_lifecycle_and_module_apis() {
                 pulseaudio: options.pulseaudio,
                 per_target_sanitizers: std::env::var_os("OBS_BUILD_DISABLE_C_TEST_SANITIZERS")
                     .is_none(),
+                ..Default::default()
             },
         )
         .unwrap();

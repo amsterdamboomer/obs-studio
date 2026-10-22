@@ -25,6 +25,10 @@ impl Executable {
 }
 
 pub struct Options {
+    pub filters: bool,
+    pub pipewire: bool,
+    /// Plugin availability is independent of libobs audio monitoring.
+    pub pulseaudio_plugin: bool,
     pub hevc: bool,
     pub pulseaudio: bool,
     pub per_target_sanitizers: bool,
@@ -33,6 +37,9 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
+            filters: true,
+            pipewire: true,
+            pulseaudio_plugin: true,
             hevc: true,
             pulseaudio: true,
             per_target_sanitizers: true,
@@ -323,7 +330,13 @@ pub fn build_c_tests(
             target.sanitizers = None;
         }
     }
-    let facts = crate::platform::native_test_facts(&build.target, options.pulseaudio, options.hevc);
+    let mut facts =
+        crate::platform::native_test_facts(&build.target, options.pulseaudio, options.hevc);
+    facts.extend([
+        ("HAVE_OBS_FILTERS".into(), options.filters),
+        ("HAVE_OBS_PIPEWIRE".into(), options.pipewire),
+        ("HAVE_OBS_PULSEAUDIO".into(), options.pulseaudio_plugin),
+    ]);
     let mut core_interface = SharedLibrary {
         include_dirs: vec![
             root.join("libobs"),
@@ -387,6 +400,16 @@ pub fn build_c_tests(
     // header search (including CFLAGS/CPATH). Uthash is header-only and already
     // required by the built core; it contributes no artifact or link flags.
     interfaces.insert("Uthash::Uthash".into(), graph::Dependency::default());
+    if options.pipewire {
+        let mut dependency = SharedLibrary::default();
+        add_package(&mut dependency, &build.target, "libpipewire-0.3")?;
+        interfaces.insert("PipeWire::PipeWire".into(), dependency.into());
+    }
+    if options.pulseaudio_plugin {
+        let mut dependency = SharedLibrary::default();
+        add_package(&mut dependency, &build.target, "libpulse")?;
+        interfaces.insert("PulseAudio::PulseAudio".into(), dependency.into());
+    }
     let artifacts = graph.compile(build, &root, &facts, &interfaces)?;
     for (name, test) in graph.select(&facts)?.tests {
         if result.iter().any(|existing| existing.name == name) {
