@@ -2,6 +2,7 @@
 """Exercise mirror preference on isolated files, never the host apt configuration."""
 
 from pathlib import Path
+import os
 import re
 import subprocess
 import tempfile
@@ -23,7 +24,9 @@ class HostAptMirrorsTest(unittest.TestCase):
             path.write_text(text)
             path.chmod(0o640)
             for _ in range(repeat):
-                subprocess.run(['bash', str(SCRIPT), str(path)], check=True, capture_output=True, timeout=5)
+                result = subprocess.run(['bash', str(SCRIPT), str(path)], check=False,
+                                        capture_output=True, text=True, timeout=5)
+                self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(path.stat().st_mode & 0o777, 0o640)
             self.assertEqual([p.name for p in Path(directory).iterdir()], ['apt-mirrors.txt'])
             return path.read_text()
@@ -55,6 +58,21 @@ class HostAptMirrorsTest(unittest.TestCase):
             subprocess.run(['bash', str(SCRIPT), str(link)], check=True, capture_output=True, timeout=5)
             self.assertTrue(link.is_symlink())
             self.assertEqual(target.read_text(), ORIGINAL)
+
+    def test_rewrite_failure_is_not_reported_as_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'apt-mirrors.txt'
+            path.write_text(ORIGINAL)
+            tools = Path(directory) / 'tools'
+            tools.mkdir()
+            sed = tools / 'sed'
+            sed.write_text('#!/usr/bin/env bash\nexit 42\n')
+            sed.chmod(0o755)
+            result = subprocess.run(['bash', str(SCRIPT), str(path)],
+                                    env={**os.environ, 'PATH': str(tools) + os.pathsep + os.environ['PATH']},
+                                    capture_output=True, timeout=5, check=False)
+            self.assertEqual(result.returncode, 42)
+            self.assertEqual(path.read_text(), ORIGINAL)
 
     def test_existing_host_jobs_prepare_mirrors_before_package_work(self):
         workflow = (ROOT / '.github/workflows/build-project.yaml').read_text()
