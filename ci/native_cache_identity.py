@@ -100,8 +100,12 @@ def main():
     parser.add_argument('--architecture', required=True)
     parser.add_argument('--configuration', required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--expected', type=Path)
     args = parser.parse_args()
     identity = capture(args.platform, args.architecture, args.configuration)
+    if args.expected is not None:
+        if args.expected.stat().st_size > 64 << 10 or json.loads(args.expected.read_text()) != identity:
+            raise ValueError('native runner identity differs from completed build')
     with args.output.open('x') as stream:
         json.dump(identity, stream, sort_keys=True, indent=2)
         stream.write('\n')

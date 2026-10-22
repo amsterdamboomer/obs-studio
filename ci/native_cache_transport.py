@@ -401,7 +401,10 @@ def main(argv=None, store_factory=None):
     parser.add_argument('--source', type=Path)
     parser.add_argument('--destination', type=Path)
     parser.add_argument('--report', type=Path, required=True)
+    parser.add_argument('--require-hit', action='store_true')
     args = parser.parse_args(argv)
+    if args.mode == 'publish' and args.require_hit:
+        parser.error('--require-hit applies only to consume')
     if args.mode == 'publish' and (args.source is None or args.destination is not None):
         parser.error('publish requires --source and no --destination')
     if args.mode == 'consume' and (args.destination is None or args.source is not None):
@@ -443,7 +446,7 @@ def main(argv=None, store_factory=None):
                                   archive_bytes=metadata['bytes'], expanded_bytes=metadata['expanded_bytes'])
             else:
                 report = consume(identity, args.destination, store)
-            code = 0
+            code = int(args.require_hit and report['status'] != 'hit')
         except (OSError, ValueError, KeyError, tarfile.TarError) as error:
             report = {'status': 'error', 'error_type': type(error).__name__}
             # HTTP exception URLs/bodies and external tool messages may contain
