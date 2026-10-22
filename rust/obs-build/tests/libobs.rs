@@ -1387,6 +1387,49 @@ fn macos_core_builds_from_the_canonical_manifest() {
         std::fs::read(framework.join("Versions/A/libobs")).unwrap()
     );
     assert_eq!(bytes, std::fs::read(framework.join("libobs")).unwrap());
+    if std::env::var_os("OBS_BUILD_MACOS_CAPTURE").is_some() {
+        use obs_build::plugins::{MacosCaptureModule, build_macos_capture};
+        let mut symbols_by_module = std::collections::BTreeMap::new();
+        for module in [
+            MacosCaptureModule::ScreenAudio,
+            MacosCaptureModule::Camera,
+            MacosCaptureModule::LegacyCamera,
+        ] {
+            let artifact = build_macos_capture(&build, &root, &library, &options, module).unwrap();
+            assert!(artifact.library.is_file());
+            assert!(artifact.data.join("locale/en-US.ini").is_file());
+            let symbols = macos_graphics_exports(&artifact.library);
+            for required in [
+                "_obs_module_load",
+                "_obs_module_ver",
+                "_obs_module_set_pointer",
+                "_obs_module_name",
+            ] {
+                assert!(
+                    symbols.contains(required),
+                    "{} lacks {required}",
+                    module.name()
+                );
+            }
+            if let Some(reference) = std::env::var_os(format!(
+                "OBS_BUILD_MACOS_{}_REFERENCE",
+                module.name().replace('-', "_").to_uppercase()
+            )) {
+                assert_eq!(
+                    symbols,
+                    macos_graphics_exports(std::path::Path::new(&reference)),
+                    "{} exports differ from CMake",
+                    module.name()
+                );
+            }
+            symbols_by_module.insert(module.name(), symbols);
+        }
+        std::fs::write(
+            build.output.join("macos-capture-symbols.json"),
+            serde_json::to_vec_pretty(&symbols_by_module).unwrap(),
+        )
+        .unwrap();
+    }
     if let Ok(mode) = std::env::var("OBS_BUILD_MACOS_GRAPHICS") {
         assert!(
             matches!(mode.as_str(), "1" | "opengl"),

@@ -245,6 +245,20 @@ pub fn configure_module(target: &str, library: &mut crate::SharedLibrary) -> Res
     }
 }
 
+pub fn build_macos_capture(
+    build: &crate::NativeBuild,
+    _root: &Path,
+    _core: &Path,
+    _options: &crate::libobs::Options,
+    module: crate::plugins::MacosCaptureModule,
+) -> Result<crate::plugins::Module, String> {
+    Err(format!(
+        "native {} graph for {} is not implemented yet",
+        module.name(),
+        build.target
+    ))
+}
+
 pub fn configure_d3d11(
     build: &crate::NativeBuild,
     root: &Path,
