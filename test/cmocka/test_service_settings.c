@@ -2,8 +2,9 @@
  * functions in libobs/obs-service.c.h (#1913, #1846 unit 8 slice 2):
  * obs_service_get_display_name(), _defaults(), obs_get_service_properties(),
  * obs_service_get_name(), _get_type(), _get_id(), _get_type_data(),
- * _update(), _get_settings(), _properties(), _apply_encoder_settings() and
- * the signal and proc handler getters. It pins the CURRENT behaviour before
+ * _update(), _get_settings(), _properties(), _apply_encoder_settings(). The
+ * signal and proc handler getters are not in a public header, so the Rust
+ * port tests them. It pins the CURRENT behaviour before
  * the Rust port, through the public API only, so the same test runs on
  * libobs with the C backend, the hybrid libobs and libobs-c-reference. Cases
  * marked "characterized, not endorsed" are odd but real.
@@ -253,16 +254,11 @@ static void test_identity(void **state)
 	assert_string_equal(obs_service_get_id(full), FULL_ID);
 	assert_ptr_equal(obs_service_get_type_data(full), &type_data_tag);
 	assert_null(obs_service_get_type_data(bare));
-	assert_non_null(obs_service_get_signal_handler(full));
-	assert_non_null(obs_service_get_proc_handler(full));
-	assert_ptr_not_equal(obs_service_get_signal_handler(full), obs_service_get_signal_handler(bare));
 
 	assert_null(obs_service_get_name(NULL));
 	assert_null(obs_service_get_type(NULL));
 	assert_null(obs_service_get_id(NULL));
 	assert_null(obs_service_get_type_data(NULL));
-	assert_null(obs_service_get_signal_handler(NULL));
-	assert_null(obs_service_get_proc_handler(NULL));
 }
 
 static void test_properties_on_service(void **state)
