@@ -76,7 +76,7 @@ struct DirHandle {
 mod shims {
     use super::{
         DirHandle, alloc_bytes, c_char, c_int, c_void, cstr, nix, os_dirent, os_glob_info,
-        os_globent, os_proc_memory_usage, ptr, slice, write_out,
+        os_globent, ptr, slice,
     };
 
     /// # Safety
@@ -436,9 +436,8 @@ mod shims {
 
     #[cfg(not(target_os = "macos"))]
     mod non_apple {
-        use super::{
-            alloc_bytes, c_char, c_int, c_void, cstr, nix, os_proc_memory_usage, ptr, write_out,
-        };
+        use super::super::{os_proc_memory_usage, write_out};
+        use super::{alloc_bytes, c_char, c_int, c_void, cstr, nix, ptr};
 
         unsafe extern "C" {
             fn bcrash(format: *const c_char, ...) -> !;
