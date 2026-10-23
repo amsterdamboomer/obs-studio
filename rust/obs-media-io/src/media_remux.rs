@@ -19,6 +19,8 @@
 //!
 //! Intentional differences (also in rust/README.md):
 //!
+//! - a failed `media_remux_job_create` sets `*job` to NULL (C: leaves it
+//!   pointing at the job it freed);
 //! - a NULL output name fails `media_remux_job_create` (C: `strcmp(NULL)`);
 //! - a packet whose stream index has no stream is written unchanged (C:
 //!   reads out of bounds; FFmpeg never returns one);
@@ -186,23 +188,295 @@ impl Job {
         in_filename: &CStr,
         out_filename: Option<&CStr>,
     ) -> Option<Job> {
-        let _ = (host, in_filename, out_filename);
-        todo!()
+        if !host.file_exists(in_filename) {
+            return None;
+        }
+        let out_filename = out_filename?;
+        if in_filename == out_filename {
+            return None;
+        }
+
+        let mut job = Job {
+            in_size: host.file_size(in_filename),
+            ..Job::default()
+        };
+        if job.init_input(host, in_filename) && job.init_output(host, out_filename) {
+            Some(job)
+        } else {
+            job.destroy(host);
+            None
+        }
+    }
+
+    fn init_input<H: Host>(&mut self, host: &mut H, in_filename: &CStr) -> bool {
+        let (ret, input) = host.open_input(in_filename);
+        self.input = input;
+        if ret < 0 {
+            let name = in_filename.to_string_lossy();
+            host.log(
+                LOG_ERROR,
+                &format!("media_remux: Could not open input file '{name}'"),
+            );
+            return false;
+        }
+
+        if host.find_stream_info(self.input) < 0 {
+            host.log(
+                LOG_ERROR,
+                "media_remux: Failed to retrieve input stream information",
+            );
+            return false;
+        }
+
+        host.dump_format(self.input, in_filename, false);
+        true
+    }
+
+    fn init_output<H: Host>(&mut self, host: &mut H, out_filename: &CStr) -> bool {
+        self.output = host.alloc_output(out_filename);
+        if self.output == 0 {
+            host.log(LOG_ERROR, "media_remux: Could not create output context");
+            return false;
+        }
+
+        let nb_streams = host.nb_streams(self.input);
+        if nb_streams != 0 {
+            self.next_audio_ts = Some(vec![NOPTS_VALUE; nb_streams as usize]);
+        }
+
+        for i in 0..nb_streams {
+            if !host.new_stream(self.output) {
+                host.log(LOG_ERROR, "media_remux: Failed to allocate output stream");
+                return false;
+            }
+
+            if host.copy_parameters(self.input, self.output, i) < 0 {
+                host.log(LOG_ERROR, "media_remux: Failed to copy parameters");
+                return false;
+            }
+
+            host.copy_metadata(self.input, self.output, i);
+
+            let in_stream = host.stream(self.input, i);
+            // Tag HEVC with the industry standard hvc1 when the muxer
+            // supports it, for wider device compatibility; otherwise 0, so
+            // FFmpeg picks the tag.
+            let hvc1 = in_stream.codec_id == CODEC_ID_HEVC
+                && host.has_codec_tags(self.output)
+                && host.codec_id_for_tag(self.output, TAG_HVC1)
+                    == host.stream(self.output, i).codec_id;
+            host.set_codec_tag(self.output, i, if hvc1 { TAG_HVC1 } else { 0 });
+
+            if in_stream.codec_type == MEDIA_TYPE_AUDIO {
+                host.default_channel_layout(self.output, i, in_stream.channels);
+                // The default layout for 5 channels is 5.0, which OBS does
+                // not support: 5 channels are 4.1.
+                if in_stream.channels == 5 {
+                    host.set_layout_4point1(self.output, i);
+                }
+            }
+        }
+
+        host.dump_format(self.output, out_filename, true);
+
+        if host.output_flags(self.output) & FMT_NOFILE == 0
+            && host.avio_open(self.output, out_filename) < 0
+        {
+            let name = out_filename.to_string_lossy();
+            host.log(
+                LOG_ERROR,
+                &format!("media_remux: Failed to open output file '{name}'"),
+            );
+            return false;
+        }
+
+        true
+    }
+
+    /// `process_audio_packet`: audio frames have a fixed number of
+    /// samples, but a container with a coarse time base (Matroska stores
+    /// milliseconds) cannot place them exactly. Like `ffmpeg -c copy`, each
+    /// audio frame goes right after the previous one while that is within
+    /// the input's rounding of its timestamp, and follows the input only
+    /// when it really jumps.
+    fn process_audio_packet<H: Host>(
+        &mut self,
+        host: &mut H,
+        pkt: &mut Packet,
+        index: u32,
+        in_stream: &StreamInfo,
+        out_tb: Rational,
+    ) -> bool {
+        let Some(next_audio_ts) = self.next_audio_ts.as_mut() else {
+            return false;
+        };
+        if in_stream.codec_type != MEDIA_TYPE_AUDIO
+            || in_stream.sample_rate <= 0
+            || pkt.dts == NOPTS_VALUE
+        {
+            return false;
+        }
+
+        let mut samples = host.audio_frame_duration(self.input, index, pkt.size);
+        if samples <= 0 {
+            samples = in_stream.frame_size;
+        }
+        if samples <= 0 {
+            return false;
+        }
+
+        let sample_tb = Rational {
+            num: 1,
+            den: in_stream.sample_rate,
+        };
+        let in_tb = in_stream.time_base;
+        let dts = host.rescale_delta(
+            in_tb,
+            pkt.dts,
+            sample_tb,
+            samples,
+            &mut next_audio_ts[index as usize],
+            out_tb,
+        );
+
+        if pkt.pts != NOPTS_VALUE {
+            pkt.pts =
+                dts.wrapping_add(host.rescale_q(pkt.pts.wrapping_sub(pkt.dts), in_tb, out_tb));
+        }
+        pkt.dts = dts;
+
+        // Keep a shorter last frame (trimmed padding) but drop the input's
+        // rounding from full frames.
+        let mut duration = i64::from(samples);
+        if pkt.duration > 0 {
+            let in_duration = host.rescale_q(pkt.duration, in_tb, sample_tb);
+            let in_tick = host.rescale_q_rnd(1, in_tb, sample_tb, ROUND_UP);
+            if in_duration < i64::from(samples).wrapping_sub(in_tick) {
+                duration = in_duration;
+            }
+        }
+        pkt.duration = host.rescale_q(duration, sample_tb, out_tb);
+        pkt.pos = -1;
+        true
+    }
+
+    fn process_packet<H: Host>(&mut self, host: &mut H, pkt: &mut Packet) {
+        let Ok(index) = u32::try_from(pkt.stream_index) else {
+            return;
+        };
+        if index >= host.nb_streams(self.input) || index >= host.nb_streams(self.output) {
+            return;
+        }
+        let in_stream = host.stream(self.input, index);
+        let out_tb = host.stream(self.output, index).time_base;
+
+        if self.process_audio_packet(host, pkt, index, &in_stream, out_tb) {
+            return;
+        }
+
+        let in_tb = in_stream.time_base;
+        let rnd = ROUND_NEAR_INF | ROUND_PASS_MINMAX;
+        pkt.pts = host.rescale_q_rnd(pkt.pts, in_tb, out_tb, rnd);
+        pkt.dts = host.rescale_q_rnd(pkt.dts, in_tb, out_tb, rnd);
+        // The C stores the result through an `(int)` cast.
+        pkt.duration = i64::from(host.rescale_q(pkt.duration, in_tb, out_tb) as i32);
+        pkt.pos = -1;
+    }
+
+    fn process_packets<H: Host>(
+        &mut self,
+        host: &mut H,
+        callback: &mut Option<&mut dyn FnMut(f32) -> bool>,
+    ) -> i32 {
+        let mut throttle = 0;
+        loop {
+            let (ret, mut pkt) = host.read_frame(self.input);
+            if ret < 0 {
+                if ret != ERROR_EOF {
+                    let err = host.error_string(ret);
+                    host.log(
+                        LOG_ERROR,
+                        &format!("media_remux: Error reading packet: {err}"),
+                    );
+                }
+                return ret;
+            }
+
+            if let Some(callback) = callback.as_mut() {
+                let throttled = throttle > 10;
+                throttle += 1;
+                if throttled {
+                    let progress = pkt.pos as f32 / self.in_size as f32 * 100.0;
+                    if !callback(progress) {
+                        return ret;
+                    }
+                    throttle = 0;
+                }
+            }
+
+            self.process_packet(host, &mut pkt);
+
+            let ret = host.write_frame(self.output, &pkt);
+            if ret < 0 {
+                let err = host.error_string(ret);
+                host.log(
+                    LOG_ERROR,
+                    &format!("media_remux: Error muxing packet: {err}"),
+                );
+
+                // "Invalid data found when processing input" and "Invalid
+                // argument" are not fatal.
+                if ret == ERROR_INVALIDDATA || ret == ERROR_EINVAL {
+                    continue;
+                }
+                return ret;
+            }
+        }
     }
 
     /// `media_remux_job_process`.
     pub fn process<H: Host>(
         &mut self,
         host: &mut H,
-        callback: Option<&mut dyn FnMut(f32) -> bool>,
+        mut callback: Option<&mut dyn FnMut(f32) -> bool>,
     ) -> bool {
-        let _ = (host, callback);
-        todo!()
+        let ret = host.write_header(self.output);
+        if ret < 0 {
+            let err = host.error_string(ret);
+            host.log(
+                LOG_ERROR,
+                &format!("media_remux: Error opening output file: {err}"),
+            );
+            return false;
+        }
+
+        if let Some(callback) = callback.as_mut() {
+            callback(0.0);
+        }
+
+        let ret = self.process_packets(host, &mut callback);
+        let mut success = ret >= 0 || ret == ERROR_EOF;
+
+        let ret = host.write_trailer(self.output);
+        if ret < 0 {
+            let err = host.error_string(ret);
+            host.log(LOG_ERROR, &format!("media_remux: av_write_trailer: {err}"));
+            success = false;
+        }
+
+        if let Some(callback) = callback.as_mut() {
+            callback(100.0);
+        }
+
+        success
     }
 
     /// `media_remux_job_destroy`.
     pub fn destroy<H: Host>(self, host: &mut H) {
-        let _ = host;
-        todo!()
+        host.close_input(self.input);
+        if self.output != 0 && host.output_flags(self.output) & FMT_NOFILE == 0 {
+            host.avio_close(self.output);
+        }
+        host.free_context(self.output);
     }
 }
