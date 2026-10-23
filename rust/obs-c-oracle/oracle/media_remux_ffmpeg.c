@@ -98,7 +98,7 @@ static int stream_of(const AVFormatContext *ctx, const AVCodecParameters *par)
 			return (int)i;
 	return -1;
 }
-static const struct AVCodecTag *const fake_tags[1];
+static const struct AVCodecTag *const fake_tags[1] = {NULL};
 
 static void record(const char *format, ...) REMUX_PRINTF(1, 2);
 
@@ -447,7 +447,7 @@ int64_t av_rescale_rnd(int64_t a, int64_t b, int64_t c, enum AVRounding rnd)
 				t1++;
 			}
 		}
-		if (t1 > INT64_MAX)
+		if (t1 > (uint64_t)INT64_MAX)
 			return INT64_MIN;
 		return (int64_t)t1;
 	}
