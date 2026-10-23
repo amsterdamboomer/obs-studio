@@ -3,6 +3,49 @@ use obs_build::{NativeBuild, SharedLibrary};
 use std::{fs, path::Path};
 
 #[test]
+fn native_test_graph_preserves_remux_queue_requirements() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let graph: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("test/cmocka/build/test-graph.json")).unwrap())
+            .unwrap();
+    let target = &graph["targets"]["test_remux_queue_model"];
+    assert!(target.is_object(), "missing canonical remux queue target");
+    assert_eq!(
+        target["sources"],
+        serde_json::json!([
+            "test/cmocka/test_remux_queue_model.cpp",
+            "frontend/utility/RemuxQueueModel.cpp.hpp"
+        ])
+    );
+    assert_eq!(
+        target["qt"]["moc"],
+        serde_json::json!(["frontend/utility/RemuxQueueModel.hpp"])
+    );
+    assert_eq!(target["cpp_standard"], "17");
+    assert_eq!(target["requires"], "HAVE_QT6_WIDGETS");
+    assert_eq!(
+        target["includes_before"],
+        serde_json::json!(["test/cmocka/remux-queue-stubs"])
+    );
+    assert_eq!(
+        target["libraries"],
+        serde_json::json!(["Qt6::Widgets", "OBS::native-test-cmocka"])
+    );
+    assert_eq!(
+        target["watch_inputs"],
+        serde_json::json!(["test/cmocka/remux-queue-stubs"])
+    );
+    let test = &graph["tests"]["test_remux_queue_model"];
+    assert_eq!(test["target"], "test_remux_queue_model");
+    assert_eq!(test["suite"], "qt");
+    assert_eq!(test["timeout_seconds"], 120);
+    assert_eq!(test["qt_runtime"], "Qt6::Core");
+    let fragment =
+        fs::read_to_string(root.join("test/cmocka/tests.d/test_remux_queue_model.cmake")).unwrap();
+    assert!(!fragment.contains("add_executable("));
+}
+
+#[test]
 fn native_test_graph_prepends_runtime_paths_in_order() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
