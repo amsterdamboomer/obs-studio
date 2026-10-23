@@ -89,6 +89,13 @@ if(ENABLE_SCRIPTING_PYTHON)
     APPEND
     PROPERTY COMPILE_OPTIONS "$<$<C_COMPILER_ID:MSVC>:/wd4115>"
   )
+  # The SWIG runtime obs-scripting-python.h includes: unused parameters,
+  # non-constant aggregate initializers (MSVC C4100, C4204).
+  set_property(
+    SOURCE build/obs-scripting.python+.h.c build/obs-scripting.python-frontend+.h.c
+    APPEND
+    PROPERTY COMPILE_OPTIONS "$<$<C_COMPILER_ID:MSVC>:/wd4100;/wd4204>"
+  )
 
   target_link_libraries(obs-scripting PRIVATE $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:Python::Python>)
 
