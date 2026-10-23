@@ -59,6 +59,11 @@ LATER = {
         ("ccache -s\n", "zccache status || true\n"
          "zccache stop || true # flush the cache index before the workflow saves it\n"),
     ],
+    # #1881: the update information follows the certified release, like
+    # Windows and macOS, not the daily continuous build.
+    "appimage": [
+        ("|continuous|OBS-Studio-Rust-", "|latest|OBS-Studio-Rust-"),
+    ],
 }
 
 TAGLESS_COMMENT = (
