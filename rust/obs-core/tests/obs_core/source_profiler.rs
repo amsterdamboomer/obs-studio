@@ -356,9 +356,15 @@ fn async_source_reports_fps() {
     }
     let r = found(p.fill_result(ASYNC, &host));
     assert_eq!(r.async_input, 1.0e9 / 35_000_000.0);
-    assert_eq!((r.async_input_best, r.async_input_worst), (30_000_000, 40_000_000));
+    assert_eq!(
+        (r.async_input_best, r.async_input_worst),
+        (30_000_000, 40_000_000)
+    );
     // rendered: one timestamp so far (500), so no fps
-    assert_eq!(p.entry(ASYNC).expect("entry").async_rendered_ts.values(), &[500]);
+    assert_eq!(
+        p.entry(ASYNC).expect("entry").async_rendered_ts.values(),
+        &[500]
+    );
     assert_eq!(r.async_rendered, 0.0);
     assert_eq!((r.async_rendered_best, r.async_rendered_worst), (0, 0));
     assert_gpu_zero(&r);
@@ -505,7 +511,12 @@ fn render_cpu_and_gpu() {
     assert_eq!((r.render_avg, r.render_max, r.render_sum), (20, 30, 30));
     assert_gpu_zero(&r);
 
-    calculate_render(&[10, 30], &[15, 45], Some((&[3, 9, 6], &[4, 10, 7])), &mut r);
+    calculate_render(
+        &[10, 30],
+        &[15, 45],
+        Some((&[3, 9, 6], &[4, 10, 7])),
+        &mut r,
+    );
     assert_eq!(
         (r.render_gpu_avg, r.render_gpu_max, r.render_gpu_sum),
         (6, 9, 7)
@@ -668,7 +679,10 @@ fn render_with_null_timer_keeps_only_cpu_time() {
     host.take_calls();
     assert_eq!(render(&p, &host, SYNC, 1000, 3), 0);
     // gs_timer_begin(NULL) is still called, gs_timer_end(NULL) is not
-    assert_eq!(host.take_calls(), vec![Call::TimerCreate(0), Call::TimerBegin(0)]);
+    assert_eq!(
+        host.take_calls(),
+        vec![Call::TimerCreate(0), Call::TimerBegin(0)]
+    );
     let s = p.samples(SYNC).expect("samples");
     assert_eq!(s.frames[0].render_cpu, vec![3]);
     assert!(s.frames[0].render_timers.is_empty());
