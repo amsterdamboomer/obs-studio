@@ -8,12 +8,25 @@ fn native_test_graph_rejects_colliding_qt_ui_outputs() {
     let graph = serde_json::json!({"schema": 1, "targets": {
         "first": {"sources": ["first.cpp"], "requires": false, "qt": {"uic": ["first/answer.ui"]}},
         "second": {"sources": ["second.cpp"], "requires": false, "qt": {"uic": ["second/answer.ui"]}}
-    }, "tests": {}});
-    assert!(obs_build::validation::graph::Graph::parse(&graph.to_string()).unwrap_err().contains("Qt UI output"));
+    }, "tests": {"first": {"target": "first"}}});
+    assert!(
+        obs_build::validation::graph::Graph::parse(&graph.to_string())
+            .unwrap_err()
+            .contains("Qt UI output")
+    );
     fs::write(root.path().join("graph.json"), graph.to_string()).unwrap();
-    let consumer = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test/cmocka/native-test-graph.cmake");
+    let consumer =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test/cmocka/native-test-graph.cmake");
     fs::write(root.path().join("CMakeLists.txt"), format!("cmake_minimum_required(VERSION 3.28)\nproject(collision NONE)\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\n", consumer.to_string_lossy().replace('\\', "/"))).unwrap();
-    let result = std::process::Command::new("cmake").args(["-S", root.path().to_str().unwrap(), "-B", root.path().join("output").to_str().unwrap()]).output().unwrap();
+    let result = std::process::Command::new("cmake")
+        .args([
+            "-S",
+            root.path().to_str().unwrap(),
+            "-B",
+            root.path().join("output").to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
     assert!(!result.status.success());
     assert!(String::from_utf8_lossy(&result.stderr).contains("Qt UI output"));
 }
@@ -1200,7 +1213,13 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
         ("HAVE_OBS_PULSEAUDIO".into(), false),
         ("HAVE_QT6_WIDGETS".into(), false),
     ]);
-    for (suite, count) in [("core", 138), ("graphics", 12), ("vlc", 6), ("webrtc", 2), ("qt", 1)] {
+    for (suite, count) in [
+        ("core", 138),
+        ("graphics", 12),
+        ("vlc", 6),
+        ("webrtc", 2),
+        ("qt", 1),
+    ] {
         let mut partition = obs_build::validation::graph::Graph::load(
             &root.join("test/cmocka/build/test-graph.json"),
         )
