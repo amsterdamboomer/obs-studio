@@ -99,12 +99,16 @@ impl Source {
     }
 }
 
-/// Explicit headers requiring Qt metaobject generation, separate from compiler inputs.
+/// Explicit Qt generator inputs, separate from compiler inputs.
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Qt {
     #[serde(default)]
     pub moc: Vec<String>,
+    #[serde(default)]
+    pub uic: Vec<String>,
+    #[serde(default)]
+    pub rcc: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -627,6 +631,29 @@ impl Graph {
                         .join(name)
                         .join("generated")
                         .join(format!("moc_{index}.cpp")),
+                )?;
+            }
+            let generated = build
+                .output
+                .join("native-tests")
+                .join(name)
+                .join("generated");
+            for form in &spec.qt.uic {
+                let stem = Path::new(form)
+                    .file_stem()
+                    .and_then(|name| name.to_str())
+                    .ok_or_else(|| format!("invalid Qt UI input {form:?}"))?;
+                crate::qt::uic(
+                    &mut target,
+                    &root.join(form),
+                    &generated.join(format!("ui_{stem}.h")),
+                )?;
+            }
+            for (index, resources) in spec.qt.rcc.iter().enumerate() {
+                crate::qt::rcc(
+                    &mut target,
+                    &root.join(resources),
+                    &generated.join(format!("qrc_{index}.cpp")),
                 )?;
             }
             artifacts.insert(name.into(), build.executable(&target)?);
