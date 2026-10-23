@@ -317,6 +317,12 @@ void profile_vaapi_diagnose(const struct profile_vaapi_host *host, struct profil
 	}
 }
 
+void profile_qsv_diagnose(const struct profile_vaapi_host *host, struct profile_qsv_diagnosis *out)
+{
+	(void)host;
+	memset(out, 0, sizeof(*out));
+}
+
 #undef PROFILE_PCI_VENDOR_INTEL
 #undef PROFILE_PCI_VENDOR_AMD
 #undef PROFILE_PCI_VENDOR_NVIDIA
