@@ -581,6 +581,22 @@ if [ "$SCENARIO" = first-start ]; then
             >/run/opengl-driver/share/egl/egl_external_platform.d/10_nvidia_wayland.json
         DRIVER_ENV_CASE=nixos
     fi
+    # The NVIDIA driver's NVML on an FHS host: a bare libnvidia-ml.so.1 in the
+    # host library directory, found through the loader cache. A stand-in
+    # (fake-nvml.c, built with the testkit) records the path OBS's GPU usage
+    # sampler loads it from (#1970; the NixOS lane checks /run/opengl-driver,
+    # #1028). Its directory above stays without one, so only this copy can match.
+    NVML_STANDIN="$(dirname "$TESTKIT")/obs-appimage-fake-nvml.so"
+    [ -f "$NVML_STANDIN" ] || fail "the NVML stand-in $NVML_STANDIN is missing (the build job builds it with the testkit)"
+    case "$FAMILY" in
+    debian) HOST_NVML_DIR=/usr/lib/x86_64-linux-gnu ;;
+    fedora) HOST_NVML_DIR=/usr/lib64 ;;
+    *) HOST_NVML_DIR=/usr/lib ;;
+    esac
+    install -m755 "$NVML_STANDIN" "$HOST_NVML_DIR/libnvidia-ml.so.1"
+    ldconfig
+    export OBS_TEST_NVML_MARKER="$(realpath "$OUT")/nvml-loaded"
+    rm -f "$OBS_TEST_NVML_MARKER"
     unset GBM_BACKENDS_PATH LIBVA_DRIVERS_PATH __EGL_VENDOR_LIBRARY_DIRS __EGL_VENDOR_LIBRARY_FILENAMES \
         __EGL_EXTERNAL_PLATFORM_CONFIG_DIRS __EGL_EXTERNAL_PLATFORM_CONFIG_FILENAMES VK_DRIVER_FILES VK_ICD_FILENAMES
     LD_LIBRARY_PATH="$HOSTILE_LD" dbus-run-session -- "$APPDIR/AppRun" --disable-shutdown-check --verbose >"$OUT/obs-stdout.log" 2>&1 &
@@ -688,6 +704,12 @@ if [ "$SCENARIO" = first-start ]; then
     echo "::endgroup::"
     [ "$WINDOW_FOUND" -eq 1 ] || fail "no OBS window ever appeared"
     [ "$RENDERED" -eq 1 ] || fail "OBS window exists but the screen stayed blank"
+    NVML_LOADED="$(head -1 "$OBS_TEST_NVML_MARKER" 2>/dev/null || true)"
+    if [ -n "$NVML_LOADED" ] && [ "$(realpath "$NVML_LOADED")" = "$(realpath "$HOST_NVML_DIR/libnvidia-ml.so.1")" ]; then
+        echo "NVML: loaded the host's $NVML_LOADED"
+    else
+        fail "OBS's GPU usage sampler did not load the host's NVML from $HOST_NVML_DIR (${NVML_LOADED:-not loaded})"
+    fi
     if [ -n "$LOG" ] && grep -qiE 'Failed to initialize video|Failed to load.*libobs-opengl|eglGetDisplay failed|Failed to create (OpenGL|EGL)' "$LOG" "$OUT/obs-stdout.log"; then
         grep -iE 'Failed to|eglGetDisplay' "$LOG" "$OUT/obs-stdout.log"
         fail "OBS reported a fatal initialisation failure"
