@@ -1995,7 +1995,7 @@ fn swift_bridge_preserves_native_linkage_header_flags_and_source_rebuilds() {
     let bridge = root.join("bridge.h");
     fs::write(&bridge, "#include \"value.h\"\nstatic const int bridge_value = HEADER_VALUE;\nstatic const int build_flag = BUILD_FLAG;\nint base_value(void);\n").unwrap();
     let source = root.join("fixture.swift");
-    let text = "@_cdecl(\"obs_fixture_swift\")\npublic func obs_fixture_swift() -> Int32 { return base_value() + bridge_value + build_flag }\n";
+    let text = "@_cdecl(\"obs_fixture_swift\")\npublic func obs_fixture_swift() -> Int32 { return base_value() + bridge_value + build_flag }\n@_cdecl(\"obs_fixture_swift_assertions\")\npublic func obs_fixture_swift_assertions() -> Int32 { return _isDebugAssertConfiguration() ? 1 : 0 }\n";
     fs::write(&source, text).unwrap();
     let mut library = obs_build::SwiftLibrary {
         name: "fixture-swift".into(),
@@ -2042,6 +2042,16 @@ fn swift_bridge_preserves_native_linkage_header_flags_and_source_rebuilds() {
         .unwrap();
     // The unchanged Swift dylib must observe the rebuilt shared dependency.
     assert_native_answer_fresh(&artifact, "obs_fixture_swift", 58, &selector);
+    for (optimization, assertions, expected) in [("3", "1", 1), ("0", "0", 0)] {
+        let profile = obs_build::NativeProfile::from_cargo_lookup(|key| match key {
+            "OPT_LEVEL" => Some(optimization.into()),
+            "DEBUG" => Some("true".into()),
+            "OBS_SYS_NATIVE_ASSERTIONS" => Some(assertions.into()),
+            _ => None,
+        }).unwrap();
+        let artifact = build.with_profile(profile).swift_shared_library(&library).unwrap();
+        assert_native_answer_fresh(&artifact, "obs_fixture_swift_assertions", expected, &selector);
+    }
 }
 
 #[test]
