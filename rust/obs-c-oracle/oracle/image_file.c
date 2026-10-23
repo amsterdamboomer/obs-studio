@@ -20,6 +20,9 @@
 #if defined(__clang__) || defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
+/* The private C adapters the Rust shim calls for the allocator, log and
+ * file helpers, copied verbatim by build.rs. */
+#include "obs-graphics-adapter.inc"
 
 size_t oracle_image_file_layout(size_t *out);
 

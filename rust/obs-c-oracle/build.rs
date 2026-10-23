@@ -437,7 +437,11 @@ fn main() {
     ] {
         std::fs::write(extract_dir.join(name), extract_c(src, start, end)).expect("write extract");
     }
-    for stem in ["effect-parser-lifecycle", "effect-parser-lifecycle-adapter"] {
+    for stem in [
+        "effect-parser-lifecycle",
+        "effect-parser-lifecycle-adapter",
+        "obs-graphics-adapter",
+    ] {
         let src = libobs.join("graphics").join(format!("{stem}.c.h"));
         std::fs::write(
             extract_dir.join(format!("{stem}.inc")),

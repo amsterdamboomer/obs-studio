@@ -84,15 +84,21 @@ unsafe extern "C" {
     fn gs_texture_destroy(tex: *mut c_void);
     fn gs_texture_set_image(tex: *mut c_void, data: *const u8, linesize: u32, flip: bool);
 
-    fn blog(log_level: c_int, format: *const c_char, ...);
-
-    // libobs exports, declared rather than called through obs-util's Rust
-    // paths: an executable that links the staticlib next to libobs (as
-    // test_effect_parser_lifecycle_rust does) then takes them from libobs
-    // instead of pulling obs-util objects that clash with it.
+    // libobs's allocator, log and file helpers, through the C adapters in
+    // libobs/graphics/obs-graphics-adapter.c.h. Nothing here may name a symbol
+    // obs-util also defines: an executable that links the staticlib next to
+    // libobs (test_effect_parser_lifecycle_rust) would then pull obs-util
+    // objects from the staticlib, which clash with libobs's exports on
+    // Windows.
+    #[link_name = "obs_graphics_log"]
+    fn log_line(level: c_int, line: *const c_char);
+    #[link_name = "obs_graphics_bmalloc"]
     fn bmalloc(size: usize) -> *mut c_void;
+    #[link_name = "obs_graphics_bfree"]
     fn bfree(ptr: *mut c_void);
-    fn os_fopen(path: *const c_char, mode: *const c_char) -> *mut c_void;
+    #[link_name = "obs_graphics_fopen_rb"]
+    fn fopen_rb(path: *const c_char) -> *mut c_void;
+    #[link_name = "obs_graphics_ftelli64"]
     fn os_ftelli64(file: *mut c_void) -> i64;
 }
 
@@ -187,7 +193,7 @@ impl Host for GsHost {
     }
     fn read_file(path: &CStr) -> FileRead<Self::Data> {
         // SAFETY: a NUL-terminated path and mode.
-        let file = unsafe { os_fopen(path.as_ptr(), c"rb".as_ptr()) };
+        let file = unsafe { fopen_rb(path.as_ptr()) };
         if file.is_null() {
             return FileRead::OpenFailed;
         }
@@ -350,8 +356,8 @@ impl Host for GsHost {
                 len += 1;
             }
         }
-        // SAFETY: "%s" and one NUL-terminated string.
-        unsafe { blog(level, c"%s".as_ptr(), line.as_ptr()) }
+        // SAFETY: one NUL-terminated string.
+        unsafe { log_line(level, line.as_ptr().cast()) }
     }
 }
 
