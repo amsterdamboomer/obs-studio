@@ -124,8 +124,8 @@ static void test_qsv_intel_second_node(void **state)
 static void test_qsv_skylake_needs_media_sdk_ubuntu(void **state)
 {
 	(void)state;
-	const struct fake_file files[] = {{"/etc/os-release", ubuntu}, NODE_128, INTEL_128, DEVICE_128("0x1912"),
-					  IHD_DEB, {NULL, NULL}};
+	const struct fake_file files[] = {{"/etc/os-release", ubuntu}, NODE_128, INTEL_128,
+					  DEVICE_128("0x1912"),        IHD_DEB,  {NULL, NULL}};
 	struct profile_qsv_diagnosis d;
 
 	diagnose(files, rw_128, &d);
@@ -141,8 +141,13 @@ static void test_qsv_skylake_needs_media_sdk_ubuntu(void **state)
 static void test_qsv_skylake_with_only_onevpl(void **state)
 {
 	(void)state;
-	const struct fake_file files[] = {{"/etc/os-release", ubuntu}, NODE_128, INTEL_128, DEVICE_128("0x1912"),
-					  ONEVPL_DEB, IHD_DEB, {NULL, NULL}};
+	const struct fake_file files[] = {{"/etc/os-release", ubuntu},
+					  NODE_128,
+					  INTEL_128,
+					  DEVICE_128("0x1912"),
+					  ONEVPL_DEB,
+					  IHD_DEB,
+					  {NULL, NULL}};
 	struct profile_qsv_diagnosis d;
 
 	diagnose(files, rw_128, &d);
@@ -153,8 +158,13 @@ static void test_qsv_skylake_with_only_onevpl(void **state)
 static void test_qsv_skylake_available(void **state)
 {
 	(void)state;
-	const struct fake_file files[] = {{"/etc/os-release", ubuntu}, NODE_128, INTEL_128, DEVICE_128("0x1912"),
-					  MEDIA_SDK_DEB, IHD_DEB, {NULL, NULL}};
+	const struct fake_file files[] = {{"/etc/os-release", ubuntu},
+					  NODE_128,
+					  INTEL_128,
+					  DEVICE_128("0x1912"),
+					  MEDIA_SDK_DEB,
+					  IHD_DEB,
+					  {NULL, NULL}};
 	struct profile_qsv_diagnosis d;
 
 	diagnose(files, rw_128, &d);
@@ -177,9 +187,12 @@ static void test_qsv_arc_needs_onevpl_per_distro(void **state)
 		{arch, "vpl-gpu-rt", "sudo pacman -S vpl-gpu-rt"},
 	};
 	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-		const struct fake_file files[] = {
-			{"/etc/os-release", cases[i].os_release}, NODE_128, INTEL_128, DEVICE_128("0x56a0"), MEDIA_SDK_DEB,
-			{NULL, NULL}};
+		const struct fake_file files[] = {{"/etc/os-release", cases[i].os_release},
+						  NODE_128,
+						  INTEL_128,
+						  DEVICE_128("0x56a0"),
+						  MEDIA_SDK_DEB,
+						  {NULL, NULL}};
 		struct profile_qsv_diagnosis d;
 
 		diagnose(files, rw_128, &d);
@@ -193,12 +206,21 @@ static void test_qsv_arc_needs_onevpl_per_distro(void **state)
 static void test_qsv_media_sdk_per_distro(void **state)
 {
 	(void)state;
-	const struct fake_file fed[] = {{"/etc/os-release", fedora}, NODE_128, INTEL_128, DEVICE_128("0x1912"),
+	const struct fake_file fed[] = {{"/etc/os-release", fedora},
+					NODE_128,
+					INTEL_128,
+					DEVICE_128("0x1912"),
 					{NULL, NULL}};
-	const struct fake_file arc[] = {{"/etc/os-release", arch}, NODE_128, INTEL_128, DEVICE_128("0x1912"),
+	const struct fake_file arc[] = {{"/etc/os-release", arch},
+					NODE_128,
+					INTEL_128,
+					DEVICE_128("0x1912"),
 					{NULL, NULL}};
-	const struct fake_file unknown[] = {{"/etc/os-release", "ID=gentoo\n"}, NODE_128, INTEL_128,
-					    DEVICE_128("0x1912"), {NULL, NULL}};
+	const struct fake_file unknown[] = {{"/etc/os-release", "ID=gentoo\n"},
+					    NODE_128,
+					    INTEL_128,
+					    DEVICE_128("0x1912"),
+					    {NULL, NULL}};
 	struct profile_qsv_diagnosis d;
 
 	diagnose(fed, rw_128, &d);
@@ -215,10 +237,15 @@ static void test_qsv_media_sdk_per_distro(void **state)
 static void test_qsv_tiger_lake_either_runtime(void **state)
 {
 	(void)state;
-	const struct fake_file legacy[] = {{"/etc/os-release", ubuntu}, NODE_128, INTEL_128, DEVICE_128("0x9a49"),
-					   MEDIA_SDK_DEB, IHD_DEB, {NULL, NULL}};
-	const struct fake_file none[] = {{"/etc/os-release", ubuntu}, NODE_128, INTEL_128, DEVICE_128("0x9a49"),
-					 IHD_DEB, {NULL, NULL}};
+	const struct fake_file legacy[] = {{"/etc/os-release", ubuntu},
+					   NODE_128,
+					   INTEL_128,
+					   DEVICE_128("0x9a49"),
+					   MEDIA_SDK_DEB,
+					   IHD_DEB,
+					   {NULL, NULL}};
+	const struct fake_file none[] = {{"/etc/os-release", ubuntu}, NODE_128, INTEL_128,
+					 DEVICE_128("0x9a49"),        IHD_DEB,  {NULL, NULL}};
 	struct profile_qsv_diagnosis d;
 
 	diagnose(legacy, rw_128, &d);
@@ -233,7 +260,10 @@ static void test_qsv_tiger_lake_either_runtime(void **state)
 static void test_qsv_unknown_intel_id_is_onevpl(void **state)
 {
 	(void)state;
-	const struct fake_file files[] = {{"/etc/os-release", ubuntu}, NODE_128, INTEL_128, DEVICE_128("0xfff0"),
+	const struct fake_file files[] = {{"/etc/os-release", ubuntu},
+					  NODE_128,
+					  INTEL_128,
+					  DEVICE_128("0xfff0"),
 					  {NULL, NULL}};
 	struct profile_qsv_diagnosis d;
 
@@ -267,8 +297,13 @@ static void test_qsv_unsupported_gpu(void **state)
 static void test_qsv_no_access(void **state)
 {
 	(void)state;
-	const struct fake_file files[] = {{"/etc/os-release", ubuntu}, NODE_128, INTEL_128, DEVICE_128("0x1912"),
-					  MEDIA_SDK_DEB, IHD_DEB, {NULL, NULL}};
+	const struct fake_file files[] = {{"/etc/os-release", ubuntu},
+					  NODE_128,
+					  INTEL_128,
+					  DEVICE_128("0x1912"),
+					  MEDIA_SDK_DEB,
+					  IHD_DEB,
+					  {NULL, NULL}};
 	struct profile_qsv_diagnosis d;
 
 	diagnose(files, NULL, &d);
@@ -281,8 +316,8 @@ static void test_qsv_no_access(void **state)
 static void test_qsv_no_driver(void **state)
 {
 	(void)state;
-	const struct fake_file files[] = {{"/etc/os-release", ubuntu}, NODE_128, INTEL_128, DEVICE_128("0x1912"),
-					  MEDIA_SDK_DEB, {NULL, NULL}};
+	const struct fake_file files[] = {{"/etc/os-release", ubuntu}, NODE_128,      INTEL_128,
+					  DEVICE_128("0x1912"),        MEDIA_SDK_DEB, {NULL, NULL}};
 	struct profile_qsv_diagnosis d;
 
 	diagnose(files, rw_128, &d);
