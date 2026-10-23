@@ -244,54 +244,505 @@ impl<H: Host> Default for ImageFileEx<H> {
 }
 
 /// `gs_get_format_bpp`.
-pub fn format_bpp(_format: ColorFormat) -> u32 {
-    todo!()
+pub fn format_bpp(format: ColorFormat) -> u32 {
+    match format.0 {
+        15 => 4,                                           // DXT1
+        1 | 2 | 16 | 17 => 8,                              // A8 R8 DXT3 DXT5
+        8 | 13 | 18 => 16,                                 // R16 R16F R8G8
+        3 | 4 | 5 | 6 | 11 | 14 | 19 | 20 | 21 | 22 => 32, // RGBA .. RG16
+        7 | 9 | 12 => 64,                                  // RGBA16 RGBA16F RG32F
+        10 => 128,                                         // RGBA32F
+        _ => 0,
+    }
+}
+
+fn srgb_nonlinear_to_linear(u: f32) -> f32 {
+    if u <= 0.04045 {
+        u / 12.92
+    } else {
+        ((u + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+fn srgb_linear_to_nonlinear(u: f32) -> f32 {
+    if u <= 0.003_130_8 {
+        12.92 * u
+    } else {
+        (1.055 * u.powf(1.0 / 2.4)) - 0.055
+    }
+}
+
+fn float_to_u8(f: f32) -> u8 {
+    // The C `(uint8_t)(f * 255.0f + 0.5f)`; the value is in 0..=255.5.
+    (f * 255.0 + 0.5) as u8
 }
 
 /// `gs_premultiply_xyza_loop` (`srgb` false) and
 /// `gs_premultiply_xyza_srgb_loop` (`srgb` true) over whole texels.
-pub fn premultiply(_data: &mut [u8], _srgb: bool) {
-    todo!()
+pub fn premultiply(data: &mut [u8], srgb: bool) {
+    for texel in data.as_chunks_mut::<4>().0 {
+        let mut f = [0f32; 4];
+        for (f, u) in f.iter_mut().zip(texel.iter()) {
+            *f = f32::from(*u) / 255.0;
+        }
+        if srgb {
+            for c in &mut f[..3] {
+                *c = srgb_nonlinear_to_linear(*c);
+            }
+        }
+        let a = f[3];
+        for c in &mut f[..3] {
+            *c *= a;
+        }
+        if srgb {
+            for c in &mut f[..3] {
+                *c = srgb_linear_to_nonlinear(*c);
+            }
+        }
+        for (u, f) in texel.iter_mut().zip(&f[..3]) {
+            *u = float_to_u8(*f);
+        }
+    }
+}
+
+fn premultiply_for<H: Host>(bitmap: Option<H::Bitmap>, texels: usize, alpha_mode: ImageAlphaMode) {
+    let srgb = match alpha_mode {
+        ImageAlphaMode::PREMULTIPLY_SRGB => true,
+        ImageAlphaMode::PREMULTIPLY => false,
+        _ => return,
+    };
+    if let Some(bitmap) = bitmap {
+        H::with_bitmap(bitmap, texels * 4, &mut |bytes| premultiply(bytes, srgb));
+    }
 }
 
 /// Whether the path ends in `.gif`, any case, with something before it.
-pub fn is_gif_path(_path: &[u8]) -> bool {
-    todo!()
+pub fn is_gif_path(path: &[u8]) -> bool {
+    path.len() > 4 && path[path.len() - 4..].eq_ignore_ascii_case(b".gif")
 }
 
 /// `get_time`: a frame delay in centiseconds as nanoseconds, 0 as 100 ms.
-pub fn frame_time_ns(_delay: u32) -> u64 {
-    todo!()
+pub fn frame_time_ns(delay: u32) -> u64 {
+    match u64::from(delay) * 10_000_000 {
+        0 => 100_000_000,
+        val => val,
+    }
+}
+
+/// The C `int get_full_decoded_gif_size`: the `uint32_t` product, converted
+/// to `int`.
+fn full_decoded_gif_size(info: &GifInfo) -> i32 {
+    info.width
+        .wrapping_mul(info.height)
+        .wrapping_mul(4)
+        .wrapping_mul(info.frame_count) as i32
+}
+
+fn message(parts: &[&[u8]]) -> Vec<u8> {
+    parts.concat()
+}
+
+fn log_path<H: Host>(function: &str, before: &str, path: &CStr, after: &str) {
+    H::log(
+        LOG_WARNING,
+        &message(&[
+            function.as_bytes(),
+            b": ",
+            before.as_bytes(),
+            path.to_bytes(),
+            after.as_bytes(),
+        ]),
+    );
+}
+
+/// The animation timing of `calculate_new_frame`, over the public fields.
+/// `delay` is `get_time` of a frame. Returns the new frame.
+pub fn calculate_new_frame(
+    cur_time: &mut u64,
+    cur_loop: &mut i32,
+    cur_frame: i32,
+    elapsed_time_ns: u64,
+    loops: i32,
+    frame_count: u32,
+    mut delay: impl FnMut(i32) -> u64,
+) -> i32 {
+    let mut new_frame = cur_frame;
+
+    *cur_time = cur_time.wrapping_add(elapsed_time_ns);
+    loop {
+        let t = delay(new_frame);
+        if *cur_time <= t {
+            break;
+        }
+
+        *cur_time -= t;
+        new_frame = new_frame.wrapping_add(1);
+        if new_frame as u32 == frame_count {
+            if loops == 0 || {
+                *cur_loop = cur_loop.wrapping_add(1);
+                *cur_loop < loops
+            } {
+                new_frame = 0;
+            } else if *cur_loop == loops {
+                new_frame = new_frame.wrapping_sub(1);
+                break;
+            }
+        }
+    }
+
+    new_frame
 }
 
 /// The loop limit tick uses: libnsgif's `loop_max`, 0 (forever) from 0xFFFF.
-pub fn effective_loops(_loop_max: i32) -> i32 {
-    todo!()
+pub fn effective_loops(loop_max: i32) -> i32 {
+    if loop_max >= 0xFFFF { 0 } else { loop_max }
 }
 
 impl<H: Host> ImageFileEx<H> {
     /// `gs_image_file_ex_init`.
-    pub fn init(&mut self, _file: Option<&CStr>, _alpha_mode: ImageAlphaMode) {
-        todo!()
+    pub fn init(&mut self, file: Option<&CStr>, alpha_mode: ImageAlphaMode) {
+        let mut unused = ColorSpace(0);
+        self.init_internal(file, None, &mut unused, alpha_mode);
+    }
+
+    /// `gs_image_file_ex_init_internal`.
+    pub fn init_internal(
+        &mut self,
+        file: Option<&CStr>,
+        mut mem_usage: Option<&mut u64>,
+        space: &mut ColorSpace,
+        alpha_mode: ImageAlphaMode,
+    ) {
+        *self = Self::default();
+
+        let Some(file) = file else {
+            return;
+        };
+
+        self.internal = Some(H::internal_new());
+
+        if is_gif_path(file.to_bytes())
+            && self.init_animated_gif(file, mem_usage.as_deref_mut(), alpha_mode)
+        {
+            return;
+        }
+
+        self.texture_data = H::decode_file(
+            file,
+            alpha_mode,
+            &mut self.format,
+            &mut self.cx,
+            &mut self.cy,
+            space,
+        );
+
+        if let Some(mem_usage) = mem_usage {
+            let size = self
+                .cx
+                .wrapping_mul(self.cy)
+                .wrapping_mul(format_bpp(self.format))
+                / 8;
+            *mem_usage = mem_usage.wrapping_add(u64::from(size));
+        }
+
+        self.loaded = self.texture_data.is_some();
+        if !self.loaded {
+            log_path::<H>(
+                "gs_image_file_ex_init_internal",
+                "Failed to load file '",
+                file,
+                "'",
+            );
+            self.free();
+        }
+    }
+
+    fn init_animated_gif(
+        &mut self,
+        path: &CStr,
+        mut mem_usage: Option<&mut u64>,
+        alpha_mode: ImageAlphaMode,
+    ) -> bool {
+        const FUNCTION: &str = "init_animated_gif";
+        let internal = H::internal(self.internal.as_mut().expect("allocated by init"));
+        internal.gif = H::gif_create();
+        let gif = internal.gif;
+
+        let (size, complete) = match H::read_file(path) {
+            FileRead::OpenFailed => {
+                log_path::<H>(FUNCTION, "Failed to open file '", path, "'");
+                return self.fail_gif();
+            }
+            FileRead::Read {
+                data,
+                size,
+                complete,
+            } => {
+                internal.gif_data = Some(data);
+                (size, complete)
+            }
+        };
+        if !complete {
+            log_path::<H>(FUNCTION, "Failed to fully read gif file '", path, "'.");
+            return self.fail_gif();
+        }
+
+        loop {
+            let result = H::gif_scan(gif, size, internal.gif_data);
+            if result == NSGIF_OK {
+                break;
+            }
+        }
+
+        H::gif_complete(gif);
+
+        let info = H::gif_info(gif);
+        internal.gif_info = info;
+
+        if info.width > 4096 || info.height > 4096 {
+            log_path::<H>(
+                FUNCTION,
+                &format!(
+                    "Bad texture dimensions ({}x{}) in '",
+                    info.width as i32, info.height as i32
+                ),
+                path,
+                "'",
+            );
+            return self.fail_gif();
+        }
+
+        let max_size = u64::from(info.width)
+            .wrapping_mul(u64::from(info.height))
+            .wrapping_mul(u64::from(info.frame_count))
+            .wrapping_mul(4);
+
+        if full_decoded_gif_size(&info) as u64 != max_size {
+            log_path::<H>(FUNCTION, "Gif '", path, "' overflowed maximum pointer size");
+            return self.fail_gif();
+        }
+
+        self.is_animated_gif = info.frame_count > 1;
+        if !self.is_animated_gif {
+            H::gif_destroy(gif);
+            H::free_data(internal.gif_data.take());
+            return false;
+        }
+
+        let mut bitmap = None;
+        let decode = |frame: u32, bitmap: &mut Option<H::Bitmap>| {
+            let (result, decoded) = H::gif_decode(gif, frame);
+            if result == NSGIF_OK {
+                *bitmap = decoded;
+            }
+            result
+        };
+        decode(0, &mut bitmap);
+
+        let cache_size = info.frame_count as usize * size_of::<usize>();
+        if let Some(mem_usage) = mem_usage.as_deref_mut() {
+            *mem_usage = mem_usage.wrapping_add(cache_size as u64);
+        }
+        internal.animation_frame_cache = Some(H::alloc_cache(info.frame_count));
+        let data_size = full_decoded_gif_size(&info) as usize;
+        if let Some(mem_usage) = mem_usage.as_deref_mut() {
+            *mem_usage = mem_usage.wrapping_add(data_size as u64);
+        }
+        internal.animation_frame_data = Some(H::alloc_data(data_size));
+
+        for i in 0..info.frame_count {
+            if decode(i, &mut bitmap) != NSGIF_OK {
+                H::log(
+                    LOG_WARNING,
+                    &message(&[
+                        FUNCTION.as_bytes(),
+                        b": Couldn't decode frame ",
+                        i.to_string().as_bytes(),
+                        b" of '",
+                        path.to_bytes(),
+                        b"'",
+                    ]),
+                );
+            }
+        }
+
+        decode(0, &mut bitmap);
+
+        internal.gif_frame_image = bitmap;
+
+        self.cx = info.width;
+        self.cy = info.height;
+        self.format = GS_RGBA;
+
+        if let Some(mem_usage) = mem_usage {
+            let texels = 4 * self.cx as usize * self.cy as usize;
+            *mem_usage = mem_usage
+                .wrapping_add(texels as u64)
+                .wrapping_add(size as u64);
+        }
+
+        premultiply_for::<H>(bitmap, self.cx as usize * self.cy as usize, alpha_mode);
+
+        self.loaded = true;
+        true
+    }
+
+    /// The `fail:` label of `init_animated_gif`: free, and report the file
+    /// as a GIF so FFmpeg is not tried.
+    fn fail_gif(&mut self) -> bool {
+        if !self.loaded {
+            self.free();
+        }
+        true
     }
 
     /// `gs_image_file_ex_free`.
     pub fn free(&mut self) {
-        todo!()
+        if self.loaded {
+            if self.is_animated_gif
+                && let Some(handle) = self.internal.as_mut()
+            {
+                let internal = H::internal(handle);
+                H::gif_destroy(internal.gif);
+                H::free_cache(internal.animation_frame_cache);
+                H::free_data(internal.animation_frame_data);
+            }
+
+            H::texture_destroy(self.texture);
+        }
+
+        H::free_data(self.texture_data);
+        if let Some(mut handle) = self.internal.take() {
+            H::free_data(H::internal(&mut handle).gif_data);
+            H::internal_free(handle);
+        }
+        *self = Self::default();
     }
 
     /// `gs_image_file_ex_init_texture`.
     pub fn init_texture(&mut self) {
-        todo!()
+        if !self.loaded {
+            return;
+        }
+
+        if self.internal.is_none() {
+            self.internal = Some(H::internal_new());
+        }
+
+        if self.is_animated_gif {
+            let internal = H::internal(self.internal.as_mut().expect("set above"));
+            self.texture =
+                H::texture_create_bitmap(self.cx, self.cy, self.format, internal.gif_frame_image);
+        } else {
+            self.texture = H::texture_create_data(self.cx, self.cy, self.format, self.texture_data);
+            H::free_data(self.texture_data.take());
+        }
+    }
+
+    fn decode_new_frame(&mut self, new_frame: i32, alpha_mode: ImageAlphaMode) {
+        let internal = H::internal(self.internal.as_mut().expect("checked by the caller"));
+        if !H::cache_has(internal.animation_frame_cache, new_frame) {
+            // If looped, decode from frame 0.
+            let last_frame = if new_frame < internal.last_decoded_frame {
+                0
+            } else {
+                internal.last_decoded_frame.wrapping_add(1)
+            };
+
+            // Decode the missed frames.
+            for i in last_frame..new_frame {
+                if H::gif_decode(internal.gif, i as u32).0 != NSGIF_OK {
+                    return;
+                }
+            }
+
+            // Decode the frame itself.
+            let (result, bitmap) = H::gif_decode(internal.gif, new_frame as u32);
+            if result == NSGIF_OK {
+                let area = internal.gif_info.width as usize * internal.gif_info.height as usize;
+                let pos = (new_frame as usize).wrapping_mul(area).wrapping_mul(4);
+
+                premultiply_for::<H>(bitmap, area, alpha_mode);
+
+                internal.gif_frame_image = bitmap;
+
+                H::cache_store(
+                    internal.animation_frame_cache,
+                    new_frame,
+                    internal.animation_frame_data,
+                    pos,
+                    bitmap,
+                    area * 4,
+                );
+
+                internal.last_decoded_frame = new_frame;
+            }
+        }
+
+        self.cur_frame = new_frame;
     }
 
     /// `gs_image_file_ex_tick`.
-    pub fn tick(&mut self, _elapsed_time_ns: u64) -> bool {
-        todo!()
+    pub fn tick(&mut self, elapsed_time_ns: u64) -> bool {
+        self.tick_internal(elapsed_time_ns, ImageAlphaMode::STRAIGHT)
+    }
+
+    fn tick_internal(&mut self, elapsed_time_ns: u64, alpha_mode: ImageAlphaMode) -> bool {
+        if !self.is_animated_gif || !self.loaded {
+            return false;
+        }
+        let Some(handle) = self.internal.as_mut() else {
+            return false;
+        };
+        let internal = H::internal(handle);
+        let gif = internal.gif;
+        let info = internal.gif_info;
+
+        let loops = effective_loops(info.loop_max);
+
+        if loops == 0 || self.cur_loop < loops {
+            let new_frame = calculate_new_frame(
+                &mut self.cur_time,
+                &mut self.cur_loop,
+                self.cur_frame,
+                elapsed_time_ns,
+                loops,
+                info.frame_count,
+                |frame| frame_time_ns(H::gif_frame_delay(gif, frame)),
+            );
+
+            if new_frame != self.cur_frame {
+                self.decode_new_frame(new_frame, alpha_mode);
+                return true;
+            }
+        }
+
+        false
     }
 
     /// `gs_image_file_ex_update_texture`.
     pub fn update_texture(&mut self) {
-        todo!()
+        self.update_texture_internal(ImageAlphaMode::STRAIGHT);
+    }
+
+    fn update_texture_internal(&mut self, alpha_mode: ImageAlphaMode) {
+        if !self.is_animated_gif || !self.loaded {
+            return;
+        }
+        let Some(handle) = self.internal.as_mut() else {
+            return;
+        };
+
+        if !H::cache_has(H::internal(handle).animation_frame_cache, self.cur_frame) {
+            self.decode_new_frame(self.cur_frame, alpha_mode);
+        }
+
+        let internal = H::internal(self.internal.as_mut().expect("checked above"));
+        H::texture_set_image(
+            self.texture,
+            internal.animation_frame_cache,
+            self.cur_frame,
+            internal.gif_info.width.wrapping_mul(4),
+        );
     }
 }

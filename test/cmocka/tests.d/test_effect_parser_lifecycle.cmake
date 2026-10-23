@@ -21,8 +21,22 @@ if(TARGET libobs_rust-static)
     test_effect_parser_lifecycle_rust
     test_effect_parser_lifecycle.c
     "${CMAKE_SOURCE_DIR}/libobs/graphics/effect-parser-lifecycle-adapter.c.h"
+    # The staticlib's obs-graphics also holds gs_image_file_ex_*, which call
+    # the vendored libnsgif. libobs links it but does not export it, so this
+    # executable compiles its own copy, as libobs does.
+    "${CMAKE_SOURCE_DIR}/libobs/build/libobs.nsgif+.h.c"
   )
-  target_include_directories(test_effect_parser_lifecycle_rust PRIVATE ${CMOCKA_INCLUDE_DIR})
+  target_include_directories(
+    test_effect_parser_lifecycle_rust
+    PRIVATE ${CMOCKA_INCLUDE_DIR} "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/libobs"
+  )
+  if(MSVC)
+    set_source_files_properties(
+      "${CMAKE_SOURCE_DIR}/libobs/build/libobs.nsgif+.h.c"
+      TARGET_DIRECTORY test_effect_parser_lifecycle_rust
+      PROPERTIES COMPILE_OPTIONS "/wd4244;/wd4267"
+    )
+  endif()
   target_link_libraries(
     test_effect_parser_lifecycle_rust
     PRIVATE OBS::libobs OBS::caption ${CMOCKA_LIBRARIES} libobs_rust-static
