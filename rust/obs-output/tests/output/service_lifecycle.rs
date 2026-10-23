@@ -570,8 +570,5 @@ fn module_lookup_prefers_loaded_then_disabled() {
         loaded: vec![],
         disabled: vec![],
     };
-    assert_eq!(
-        service::load_state(&empty, "a"),
-        service::MODULE_MISSING
-    );
+    assert_eq!(service::load_state(&empty, "a"), service::MODULE_MISSING);
 }
