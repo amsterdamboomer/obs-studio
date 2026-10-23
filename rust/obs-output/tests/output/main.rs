@@ -12,6 +12,7 @@ mod protocols_parity;
 mod service;
 mod service_parity;
 mod service_settings;
+mod service_settings_parity;
 
 use std::process::Command;
 
