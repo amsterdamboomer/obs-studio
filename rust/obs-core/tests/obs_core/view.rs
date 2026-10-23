@@ -8,8 +8,8 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 
 use obs_core::view::{
-    AUX_VIEW, Handle, Host, MAIN_VIEW, MAX_CHANNELS, add, add2, create, destroy,
-    enum_video_info, free, get_source, init, remove, render, set_source,
+    AUX_VIEW, Handle, Host, MAIN_VIEW, MAX_CHANNELS, add, add2, create, destroy, enum_video_info,
+    free, get_source, init, remove, render, set_source,
 };
 
 #[derive(Default)]
@@ -178,7 +178,12 @@ fn view_create_frees_when_the_mutex_fails() {
     assert_eq!(create(&h), 0);
     assert_eq!(
         h.take(),
-        ["alloc 0x1000", "mutex_init 0x1000", "log mutex", "free 0x1000"]
+        [
+            "alloc 0x1000",
+            "mutex_init 0x1000",
+            "log mutex",
+            "free 0x1000"
+        ]
     );
 }
 
@@ -198,7 +203,13 @@ fn view_set_source_order() {
     set_source(&h, v, 3, 0xa0);
     assert_eq!(
         h.take(),
-        ["lock", "get_ref 0xa0", "set 3 0xa0", "unlock", "activate 0xa0 2"]
+        [
+            "lock",
+            "get_ref 0xa0",
+            "set 3 0xa0",
+            "unlock",
+            "activate 0xa0 2"
+        ]
     );
     set_source(&h, v, 3, 0xb0);
     assert_eq!(
@@ -328,7 +339,12 @@ fn view_free_uses_the_view_type() {
     free(&h, 0x77);
     assert_eq!(
         h.take(),
-        ["deactivate 0xa0 1", "release 0xa0", "clear", "mutex_destroy 0x77"]
+        [
+            "deactivate 0xa0 1",
+            "release 0xa0",
+            "clear",
+            "mutex_destroy 0x77"
+        ]
     );
 }
 
