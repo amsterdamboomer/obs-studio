@@ -269,8 +269,10 @@ static void test_properties_on_service(void **state)
 	assert_non_null(props);
 	assert_non_null(last_data);
 	assert_int_equal(calls, 1);
-	/* The service's settings (defaults from create) are applied. */
-	assert_int_equal(modified_bitrate, 2500);
+	/* The service's own settings are applied. Characterized, not endorsed:
+	 * unlike sources, a service never gets its type's defaults on create,
+	 * so "bitrate" reads 0 here, not 2500. */
+	assert_int_equal(modified_bitrate, 0);
 	obs_properties_destroy(props);
 
 	assert_null(obs_service_properties(bare));
@@ -298,7 +300,9 @@ static void test_update_and_settings(void **state)
 	assert_non_null(a);
 	assert_ptr_equal(a, b);
 	assert_int_equal(obs_data_get_int(a, "bitrate"), 4000);
-	assert_string_equal(obs_data_get_string(a, "server"), "auto");
+	/* No defaults on create (see test_properties_on_service). */
+	assert_string_equal(obs_data_get_string(a, "server"), "");
+	assert_false(obs_data_has_default_value(a, "server"));
 	obs_data_release(a);
 	obs_data_release(b);
 
