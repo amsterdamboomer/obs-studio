@@ -454,10 +454,17 @@ pub trait Lifecycle {
     fn log_no_output(&self, service: Self::Svc);
 }
 
+/// `obs_service_valid(service, func)` for a handle.
+fn valid_handle<S: Copy>(service: Option<S>, log: &impl NullLog, func: &'static CStr) -> Option<S> {
+    if service.is_none() {
+        log.null_param(func, c"service");
+    }
+    service
+}
+
 /// `obs_service_create_internal`: a type that is not registered logs and
 /// gives None; a `create()` that returns NULL logs and still gives the
 /// service.
-#[allow(unused_variables)]
 pub fn create<L: Lifecycle>(
     o: &L,
     id: L::Str,
@@ -466,85 +473,160 @@ pub fn create<L: Lifecycle>(
     hotkey_data: L::Data,
     private: bool,
 ) -> Option<L::Svc> {
-    todo!("#1920")
+    let Some(info) = o.find(id) else {
+        o.log_not_found(id);
+        return None;
+    };
+    let service = o.context_new(name, settings, hotkey_data, private)?;
+    o.set_info(service, info);
+    let data = o.call_create(service);
+    o.set_plugin_data(service, data);
+    if data.is_none() {
+        o.log_create_failed(name);
+    }
+    o.context_insert(service);
+    o.log_created(name, id);
+    Some(service)
+}
+
+/// `actually_destroy_service`.
+fn actually_destroy<L: Lifecycle>(o: &L, service: L::Svc) {
+    if let Some(data) = o.plugin_data(service) {
+        o.call_destroy(service, data);
+    }
+    if o.has_output(service) {
+        o.detach_from_output(service);
+    }
+    o.log_destroyed(service);
+    o.context_free(service);
 }
 
 /// `obs_service_destroy`: unlisted at once, freed only once inactive.
-#[allow(unused_variables)]
 pub fn destroy<L: Lifecycle>(o: &L, service: Option<L::Svc>) {
-    todo!("#1920")
+    let Some(service) = service else {
+        return;
+    };
+    o.context_remove(service);
+    o.set_destroy(service);
+    if !o.active(service) {
+        actually_destroy(o, service);
+    }
 }
 
 /// `obs_service_activate`.
-#[allow(unused_variables)]
 pub fn activate<L: Lifecycle>(o: &L, log: &impl NullLog, service: Option<L::Svc>) {
-    todo!("#1920")
+    let Some(service) = valid_handle(service, log, c"obs_service_activate") else {
+        return;
+    };
+    if !o.has_output(service) {
+        o.log_no_output(service);
+        return;
+    }
+    if o.active(service) {
+        return;
+    }
+    o.call_activate(service);
+    o.set_active(service, true);
 }
 
 /// `obs_service_deactivate`: a destroyed service is freed here; otherwise
 /// `remove` detaches it from its output.
-#[allow(unused_variables)]
 pub fn deactivate<L: Lifecycle>(o: &L, log: &impl NullLog, service: Option<L::Svc>, remove: bool) {
-    todo!("#1920")
+    let Some(service) = valid_handle(service, log, c"obs_service_deactivate") else {
+        return;
+    };
+    if !o.has_output(service) {
+        o.log_no_output(service);
+        return;
+    }
+    if !o.active(service) {
+        return;
+    }
+    o.call_deactivate(service);
+    o.set_active(service, false);
+    if o.destroying(service) {
+        actually_destroy(o, service);
+    } else if remove {
+        o.clear_output(service);
+    }
 }
 
 /// `obs_service_initialize`: no callback is success.
-#[allow(unused_variables)]
 pub fn initialize<L: Lifecycle>(
     o: &L,
     log: &impl NullLog,
     service: Option<L::Svc>,
     output: Option<L::Output>,
 ) -> bool {
-    todo!("#1920")
+    const FUNC: &CStr = c"obs_service_initialize";
+    let Some(service) = valid_handle(service, log, FUNC) else {
+        return false;
+    };
+    let Some(output) = output else {
+        log.null_param(FUNC, c"output");
+        return false;
+    };
+    o.call_initialize(service, output).unwrap_or(true)
 }
 
 /// `obs_service_release`: the last strong ref destroys the service, then
 /// drops the control's own weak ref (in that order: the context list relies
 /// on the weak ref while the service is listed).
-#[allow(unused_variables)]
 pub fn release<L: Lifecycle>(o: &L, service: Option<L::Svc>) {
-    todo!("#1920")
+    let Some(service) = service else {
+        return;
+    };
+    let control = o.control(service);
+    if o.ref_release(control) {
+        destroy(o, Some(service));
+        weak_release(o, Some(control));
+    }
 }
 
 /// `obs_weak_service_addref`.
-#[allow(unused_variables)]
 pub fn weak_addref<L: Lifecycle>(o: &L, weak: Option<L::Weak>) {
-    todo!("#1920")
+    if let Some(weak) = weak {
+        o.weak_addref(weak);
+    }
 }
 
 /// `obs_weak_service_release`: the last weak ref frees the control.
-#[allow(unused_variables)]
 pub fn weak_release<L: Lifecycle>(o: &L, weak: Option<L::Weak>) {
-    todo!("#1920")
+    if let Some(weak) = weak
+        && o.weak_release(weak)
+    {
+        o.weak_free(weak);
+    }
 }
 
 /// `obs_service_get_ref`.
-#[allow(unused_variables)]
 pub fn get_ref<L: Lifecycle>(o: &L, service: Option<L::Svc>) -> Option<L::Svc> {
-    todo!("#1920")
+    weak_get_service(o, Some(o.control(service?)))
 }
 
 /// `obs_service_get_weak_service`: the control, with a new weak ref.
-#[allow(unused_variables)]
 pub fn get_weak_service<L: Lifecycle>(o: &L, service: Option<L::Svc>) -> Option<L::Weak> {
-    todo!("#1920")
+    let weak = o.control(service?);
+    weak_addref(o, Some(weak));
+    Some(weak)
 }
 
 /// `obs_weak_service_get_service`: a new strong ref, or None once gone.
-#[allow(unused_variables)]
 pub fn weak_get_service<L: Lifecycle>(o: &L, weak: Option<L::Weak>) -> Option<L::Svc> {
-    todo!("#1920")
+    let weak = weak?;
+    o.weak_get_ref(weak).then(|| o.weak_target(weak))
 }
 
 /// `obs_weak_service_references_service`.
-#[allow(unused_variables)]
 pub fn weak_references<L: Lifecycle>(
     o: &L,
     weak: Option<L::Weak>,
     service: Option<L::Svc>,
 ) -> bool {
-    todo!("#1920")
+    match (weak, service) {
+        (Some(weak), Some(service)) => o.weak_target(weak) == service,
+        _ => false,
+    }
 }
 
 /// The loaded and the disabled module lists, for the by-id lookups.
@@ -569,13 +651,20 @@ pub const MODULE_MISSING: i32 = 2;
 
 /// `obs_service_get_module`: the first loaded, then the first disabled
 /// module that registered `id`.
-#[allow(unused_variables)]
 pub fn module<M: Modules>(m: &M, id: M::Str) -> Option<M::Module> {
-    todo!("#1920")
+    for disabled in [false, true] {
+        let mut cur = m.first(disabled);
+        while let Some(module) = cur {
+            if (0..m.service_count(module)).any(|i| m.service_is(module, i, id)) {
+                return Some(module);
+            }
+            cur = m.next(module);
+        }
+    }
+    None
 }
 
 /// `obs_service_load_state`.
-#[allow(unused_variables)]
 pub fn load_state<M: Modules>(m: &M, id: M::Str) -> i32 {
-    todo!("#1920")
+    module(m, id).map_or(MODULE_MISSING, |module| m.load_state(module))
 }
