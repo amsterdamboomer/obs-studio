@@ -475,6 +475,135 @@ static void test_vaapi_unknown_vendor(void **state)
 	assert_null(d.package);
 }
 
+/* obs-rust/obs-studio#1720: QSV needs an Intel GPU runtime, whereas the
+ * VA-API probe above needs a driver.  Keep the filesystem entirely fake so
+ * these cases remain reproducible on non-Intel CI hosts. */
+static void qsv_diagnose(struct fake_host *h, struct profile_qsv_diagnosis *out)
+{
+	const struct profile_vaapi_host host = {h, fake_read_file, fake_exists, fake_can_open_rw};
+	memset(out, 0x5a, sizeof(*out));
+	profile_qsv_diagnose(&host, out);
+}
+
+static void test_qsv_hd530_runtime_missing_on_debian(void **state)
+{
+	(void)state;
+	const struct fake_file files[] = {
+		{"/etc/os-release", ubuntu},
+		{"/dev/dri/renderD128", ""},
+		{"/sys/class/drm/renderD128/device/vendor", "0x8086\n"},
+		{"/sys/class/drm/renderD128/device/device", "0x1912\n"},
+		{NULL, NULL},
+	};
+	struct fake_host h = {files, rw_128};
+	struct profile_qsv_diagnosis d;
+	qsv_diagnose(&h, &d);
+	assert_int_equal(d.cause, PROFILE_QSV_RUNTIME_MISSING);
+	assert_int_equal(d.family, PROFILE_QSV_MEDIA_SDK);
+	assert_string_equal(d.package, "libmfx1");
+	assert_string_equal(d.install_command, "sudo apt install libmfx1");
+}
+
+static void test_qsv_hd530_operational(void **state)
+{
+	(void)state;
+	const struct fake_file files[] = {
+		{"/dev/dri/renderD128", ""},
+		{"/sys/class/drm/renderD128/device/vendor", "0x8086\n"},
+		{"/sys/class/drm/renderD128/device/device", "0x1912\n"},
+		{"/usr/lib/x86_64-linux-gnu/libmfx.so.1", ""},
+		{NULL, NULL},
+	};
+	struct fake_host h = {files, rw_128};
+	struct profile_qsv_diagnosis d;
+	qsv_diagnose(&h, &d);
+	assert_int_equal(d.cause, PROFILE_QSV_OPERATIONAL);
+	assert_null(d.package);
+	assert_null(d.install_command);
+}
+
+static void test_qsv_no_intel_gpu(void **state)
+{
+	(void)state;
+	const struct fake_file files[] = {
+		{"/dev/dri/renderD128", ""},
+		{"/sys/class/drm/renderD128/device/vendor", "0x1002\n"},
+		{NULL, NULL},
+	};
+	struct fake_host h = {files, rw_128};
+	struct profile_qsv_diagnosis d;
+	qsv_diagnose(&h, &d);
+	assert_int_equal(d.cause, PROFILE_QSV_NO_INTEL_GPU);
+	assert_null(d.package);
+	assert_null(d.install_command);
+}
+
+static void test_qsv_onevpl_arc_family(void **state)
+{
+	(void)state;
+	assert_int_equal(profile_qsv_family_for_device(0x56a0), PROFILE_QSV_ONEVPL);
+}
+
+static void test_qsv_unsupported_intel_generation(void **state)
+{
+	(void)state;
+	const struct fake_file files[] = {
+		{"/dev/dri/renderD128", ""},
+		{"/sys/class/drm/renderD128/device/vendor", "0x8086\n"},
+		/* GMA 950: Intel but predates Quick Sync. */
+		{"/sys/class/drm/renderD128/device/device", "0x27a2\n"},
+		{NULL, NULL},
+	};
+	struct fake_host h = {files, rw_128};
+	struct profile_qsv_diagnosis d;
+	qsv_diagnose(&h, &d);
+	assert_int_equal(d.cause, PROFILE_QSV_UNSUPPORTED);
+	assert_null(d.install_command);
+}
+
+static void test_qsv_no_access_has_no_install_command(void **state)
+{
+	(void)state;
+	const struct fake_file files[] = {
+		{"/dev/dri/renderD128", ""},
+		{"/sys/class/drm/renderD128/device/vendor", "0x8086\n"},
+		{"/sys/class/drm/renderD128/device/device", "0x1912\n"},
+		{"/usr/lib/x86_64-linux-gnu/libmfx.so.1", ""},
+		{NULL, NULL},
+	};
+	struct fake_host h = {files, NULL};
+	struct profile_qsv_diagnosis d;
+	qsv_diagnose(&h, &d);
+	assert_int_equal(d.cause, PROFILE_QSV_NO_ACCESS);
+	assert_null(d.install_command);
+}
+
+static void test_qsv_unknown_distro_has_no_command(void **state)
+{
+	(void)state;
+	const struct fake_file files[] = {
+		{"/dev/dri/renderD128", ""},
+		{"/sys/class/drm/renderD128/device/vendor", "0x8086\n"},
+		{"/sys/class/drm/renderD128/device/device", "0x1912\n"},
+		{NULL, NULL},
+	};
+	struct fake_host h = {files, rw_128};
+	struct profile_qsv_diagnosis d;
+	qsv_diagnose(&h, &d);
+	assert_int_equal(d.cause, PROFILE_QSV_RUNTIME_MISSING);
+	assert_string_equal(d.package, "libmfx1");
+	assert_null(d.install_command);
+}
+
+static void test_qsv_generation_classifier(void **state)
+{
+	(void)state;
+	assert_int_equal(profile_qsv_family_for_device(0x1912), PROFILE_QSV_MEDIA_SDK); /* HD 530 */
+	assert_int_equal(profile_qsv_family_for_device(0x56a0), PROFILE_QSV_ONEVPL);     /* Arc A-series */
+	/* Unknown IDs are unsupported: do not recommend a potentially wrong runtime. */
+	assert_int_equal(profile_qsv_family_for_device(0xffff), PROFILE_QSV_UNSUPPORTED_FAMILY);
+}
+
 int main(void)
 {
 	const struct CMUnitTest tests[] = {
@@ -492,6 +621,14 @@ int main(void)
 		cmocka_unit_test(test_vaapi_amd_no_driver_per_distro),
 		cmocka_unit_test(test_vaapi_driver_present),
 		cmocka_unit_test(test_vaapi_unknown_vendor),
+		cmocka_unit_test(test_qsv_hd530_runtime_missing_on_debian),
+		cmocka_unit_test(test_qsv_hd530_operational),
+		cmocka_unit_test(test_qsv_no_intel_gpu),
+		cmocka_unit_test(test_qsv_onevpl_arc_family),
+		cmocka_unit_test(test_qsv_unsupported_intel_generation),
+		cmocka_unit_test(test_qsv_no_access_has_no_install_command),
+		cmocka_unit_test(test_qsv_unknown_distro_has_no_command),
+		cmocka_unit_test(test_qsv_generation_classifier),
 	};
 
 	return cmocka_run_group_tests(tests, NULL, NULL);
