@@ -19,6 +19,7 @@ pub mod module_paths;
 mod platform;
 pub mod source_profiler;
 pub mod video_plan;
+pub mod view;
 
 #[allow(unsafe_code)]
 pub mod ffi;
