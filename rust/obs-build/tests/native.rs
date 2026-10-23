@@ -3,6 +3,63 @@ use obs_build::{NativeBuild, SharedLibrary};
 use std::{fs, path::Path};
 
 #[test]
+fn native_test_graph_prepends_runtime_paths_in_order() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    fs::write(root.join("answer.c"), "int main(void) { return 0; }\n").unwrap();
+    let graph = serde_json::json!({
+        "schema": 1, "targets": {"answer": {"sources": ["answer.c"]}},
+        "tests": {"paths": {"target": "answer", "command": ["cmake", "-E", "environment"],
+            "environment": {"OBS_GRAPH_PATHS": "retained"},
+            "environment_path_prepend": {"OBS_GRAPH_PATHS": ["first directory", "second directory"]}}}
+    });
+    let parsed = obs_build::validation::graph::Graph::parse(&graph.to_string()).unwrap();
+    let expected =
+        std::env::join_paths(["first directory", "second directory", "retained"]).unwrap();
+    let mut command = parsed.tests["paths"]
+        .command(root, root, &root.join("answer"))
+        .unwrap();
+    let result = command.output().unwrap();
+    assert!(result.status.success());
+    let assignment = format!("OBS_GRAPH_PATHS={}", expected.to_str().unwrap());
+    assert!(
+        String::from_utf8_lossy(&result.stdout)
+            .lines()
+            .any(|line| line == assignment)
+    );
+    fs::write(root.join("graph.json"), graph.to_string()).unwrap();
+    let consumer =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test/cmocka/native-test-graph.cmake");
+    fs::write(root.join("CMakeLists.txt"), format!(
+        "cmake_minimum_required(VERSION 3.28)\nproject(paths C)\nenable_testing()\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\n", consumer.to_string_lossy().replace('\\', "/")
+    )).unwrap();
+    let output = root.join("cmake-output");
+    let result = std::process::Command::new("cmake")
+        .args(["-S", root.to_str().unwrap(), "-B", output.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let result = std::process::Command::new("ctest")
+        .args(["--test-dir", output.to_str().unwrap(), "-V"])
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stdout)
+    );
+    assert!(
+        String::from_utf8_lossy(&result.stdout)
+            .lines()
+            .any(|line| line.ends_with(&format!("1: {assignment}")))
+    );
+}
+
+#[test]
 #[cfg(feature = "libobs-integration")]
 fn native_test_graph_generates_qt_metaobjects() {
     let directory = tempfile::tempdir().unwrap();
