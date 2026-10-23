@@ -232,7 +232,11 @@ fn native_test_graph_generates_qt_metaobjects() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
     fs::write(root.join("answer.hpp"), "#pragma once\n#include <QObject>\nclass Answer : public QObject { Q_OBJECT public: using QObject::QObject; Q_INVOKABLE int value() const { return 42; } };\n").unwrap();
-    fs::write(root.join("twin.cpp"), "#include \"answer.hpp\"\nint main() { Answer answer; return answer.value() != 42; }\n").unwrap();
+    fs::write(
+        root.join("twin.cpp"),
+        "#include \"answer.hpp\"\nint main() { Answer answer; return answer.value() != 42; }\n",
+    )
+    .unwrap();
     fs::write(root.join("answer.ui"), r#"<?xml version="1.0"?><ui version="4.0"><class>AnswerForm</class><widget class="QWidget" name="AnswerForm"><property name="windowTitle"><string>Generated answer</string></property></widget><resources/><connections/></ui>"#).unwrap();
     fs::write(
         root.join("ui_answer.h"),
