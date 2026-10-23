@@ -508,16 +508,14 @@ fn qt_sdk_resolves_macos_frameworks_for_each_universal_slice() {
         assert_eq!(link[iokit - 1], "-framework");
         // Repeated frameworks in Qt's export collapse to one link input.
         assert_eq!(link.iter().filter(|option| *option == "Metal").count(), 1);
-        assert!(
-            link.contains(&format!(
+        assert!(link.contains(&format!(
                 "-Wl,-rpath,{}",
                 universal
                     .join("lib")
                     .components()
                     .collect::<PathBuf>()
                     .display()
-            ))
-        );
+            )));
     }
     let intel = directory.path().join("intel");
     macos_sdk(&intel, &[X86_64_MACHO]);
