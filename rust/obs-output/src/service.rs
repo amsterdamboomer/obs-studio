@@ -356,3 +356,226 @@ pub fn apply_encoder_settings<H: Host, S: Service<H>>(
             .apply_encoder_settings(service.data(), video, audio);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Lifecycle, references, module lookup and activation (#1920):
+// `obs_service_create()`, `_create_private()`, `obs_service_destroy()`,
+// `_release()`, `_get_ref()`, `_get_weak_service()`,
+// `obs_weak_service_get_service()`, `_addref()`, `_release()`,
+// `_references_service()`, `obs_service_get_module()`, `_load_state()` and
+// the output-side `obs_service_activate()`, `_deactivate()` and
+// `_initialize()`. `struct obs_service`, its context (`obs_context_data_*`)
+// and the reference counts (`obs_ref_*`, `obs_weak_ref_*`) stay C; these
+// functions keep the C's order of those calls, its log lines and its
+// "destroy only once inactive" rule.
+
+/// The libobs objects the lifecycle functions drive, as opaque handles.
+pub trait Lifecycle {
+    /// `obs_service_t *`, never NULL.
+    type Svc: Copy + PartialEq;
+    /// `obs_weak_service_t *`, never NULL.
+    type Weak: Copy;
+    /// `obs_output_t *`, never NULL.
+    type Output: Copy;
+    /// A registered `struct obs_service_info *`.
+    type Info: Copy;
+    /// `const char *`, passed through.
+    type Str: Copy;
+    /// `obs_data_t *`, NULL included, passed through.
+    type Data: Copy;
+    /// The plugin's data, never NULL.
+    type Ptr: Copy;
+
+    /// `find_service(id)`.
+    fn find(&self, id: Self::Str) -> Option<Self::Info>;
+    /// A zeroed service with `obs_context_data_init()` done; None when that
+    /// fails (the C frees it).
+    fn context_new(
+        &self,
+        name: Self::Str,
+        settings: Self::Data,
+        hotkey_data: Self::Data,
+        private: bool,
+    ) -> Option<Self::Svc>;
+    /// Copies `info` into the service.
+    fn set_info(&self, service: Self::Svc, info: Self::Info);
+    /// The type's `create(settings, service)`, required at registration.
+    fn call_create(&self, service: Self::Svc) -> Option<Self::Ptr>;
+    fn set_plugin_data(&self, service: Self::Svc, data: Option<Self::Ptr>);
+    fn plugin_data(&self, service: Self::Svc) -> Option<Self::Ptr>;
+    /// `obs_context_init_control()` and `obs_context_data_insert()`.
+    fn context_insert(&self, service: Self::Svc);
+    fn context_remove(&self, service: Self::Svc);
+    /// `obs_context_data_free()`, the owned id and the service itself.
+    fn context_free(&self, service: Self::Svc);
+
+    fn set_destroy(&self, service: Self::Svc);
+    fn destroying(&self, service: Self::Svc) -> bool;
+    fn active(&self, service: Self::Svc) -> bool;
+    fn set_active(&self, service: Self::Svc, active: bool);
+    fn has_output(&self, service: Self::Svc) -> bool;
+    /// `service->output = NULL`.
+    fn clear_output(&self, service: Self::Svc);
+    /// `service->output->service = NULL`; only called with an output.
+    fn detach_from_output(&self, service: Self::Svc);
+
+    /// The type's `destroy(data)`, required at registration.
+    fn call_destroy(&self, service: Self::Svc, data: Self::Ptr);
+    /// Calls `activate(data, settings)`; false when it is NULL.
+    fn call_activate(&self, service: Self::Svc) -> bool;
+    /// Calls `deactivate(data)`; false when it is NULL.
+    fn call_deactivate(&self, service: Self::Svc) -> bool;
+    /// `initialize(data, output)`; None when it is NULL.
+    fn call_initialize(&self, service: Self::Svc, output: Self::Output) -> Option<bool>;
+
+    /// The service's weak control object.
+    fn control(&self, service: Self::Svc) -> Self::Weak;
+    /// `obs_ref_release(&control->ref)`: true for the last strong ref.
+    fn ref_release(&self, weak: Self::Weak) -> bool;
+    fn weak_addref(&self, weak: Self::Weak);
+    /// `obs_weak_ref_release()`: true for the last weak ref.
+    fn weak_release(&self, weak: Self::Weak) -> bool;
+    /// `obs_weak_ref_get_ref()`: a new strong ref unless the service is gone.
+    fn weak_get_ref(&self, weak: Self::Weak) -> bool;
+    fn weak_target(&self, weak: Self::Weak) -> Self::Svc;
+    fn weak_free(&self, weak: Self::Weak);
+
+    /// `"Service '%s' not found"`, LOG_ERROR.
+    fn log_not_found(&self, id: Self::Str);
+    /// `"Failed to create service '%s'!"`, LOG_ERROR.
+    fn log_create_failed(&self, name: Self::Str);
+    /// `"service '%s' (%s) created"`, LOG_DEBUG.
+    fn log_created(&self, name: Self::Str, id: Self::Str);
+    /// `"service '%s' destroyed"` with the context name, LOG_DEBUG.
+    fn log_destroyed(&self, service: Self::Svc);
+    /// `"obs_service_deactivate: service '%s' is not assigned to an
+    /// output"` with the service's name, LOG_WARNING; activation logs it
+    /// under the same name (characterized, not endorsed).
+    fn log_no_output(&self, service: Self::Svc);
+}
+
+/// `obs_service_create_internal`: a type that is not registered logs and
+/// gives None; a `create()` that returns NULL logs and still gives the
+/// service.
+#[allow(unused_variables)]
+pub fn create<L: Lifecycle>(
+    o: &L,
+    id: L::Str,
+    name: L::Str,
+    settings: L::Data,
+    hotkey_data: L::Data,
+    private: bool,
+) -> Option<L::Svc> {
+    todo!("#1920")
+}
+
+/// `obs_service_destroy`: unlisted at once, freed only once inactive.
+#[allow(unused_variables)]
+pub fn destroy<L: Lifecycle>(o: &L, service: Option<L::Svc>) {
+    todo!("#1920")
+}
+
+/// `obs_service_activate`.
+#[allow(unused_variables)]
+pub fn activate<L: Lifecycle>(o: &L, log: &impl NullLog, service: Option<L::Svc>) {
+    todo!("#1920")
+}
+
+/// `obs_service_deactivate`: a destroyed service is freed here; otherwise
+/// `remove` detaches it from its output.
+#[allow(unused_variables)]
+pub fn deactivate<L: Lifecycle>(o: &L, log: &impl NullLog, service: Option<L::Svc>, remove: bool) {
+    todo!("#1920")
+}
+
+/// `obs_service_initialize`: no callback is success.
+#[allow(unused_variables)]
+pub fn initialize<L: Lifecycle>(
+    o: &L,
+    log: &impl NullLog,
+    service: Option<L::Svc>,
+    output: Option<L::Output>,
+) -> bool {
+    todo!("#1920")
+}
+
+/// `obs_service_release`: the last strong ref destroys the service, then
+/// drops the control's own weak ref (in that order: the context list relies
+/// on the weak ref while the service is listed).
+#[allow(unused_variables)]
+pub fn release<L: Lifecycle>(o: &L, service: Option<L::Svc>) {
+    todo!("#1920")
+}
+
+/// `obs_weak_service_addref`.
+#[allow(unused_variables)]
+pub fn weak_addref<L: Lifecycle>(o: &L, weak: Option<L::Weak>) {
+    todo!("#1920")
+}
+
+/// `obs_weak_service_release`: the last weak ref frees the control.
+#[allow(unused_variables)]
+pub fn weak_release<L: Lifecycle>(o: &L, weak: Option<L::Weak>) {
+    todo!("#1920")
+}
+
+/// `obs_service_get_ref`.
+#[allow(unused_variables)]
+pub fn get_ref<L: Lifecycle>(o: &L, service: Option<L::Svc>) -> Option<L::Svc> {
+    todo!("#1920")
+}
+
+/// `obs_service_get_weak_service`: the control, with a new weak ref.
+#[allow(unused_variables)]
+pub fn get_weak_service<L: Lifecycle>(o: &L, service: Option<L::Svc>) -> Option<L::Weak> {
+    todo!("#1920")
+}
+
+/// `obs_weak_service_get_service`: a new strong ref, or None once gone.
+#[allow(unused_variables)]
+pub fn weak_get_service<L: Lifecycle>(o: &L, weak: Option<L::Weak>) -> Option<L::Svc> {
+    todo!("#1920")
+}
+
+/// `obs_weak_service_references_service`.
+#[allow(unused_variables)]
+pub fn weak_references<L: Lifecycle>(
+    o: &L,
+    weak: Option<L::Weak>,
+    service: Option<L::Svc>,
+) -> bool {
+    todo!("#1920")
+}
+
+/// The loaded and the disabled module lists, for the by-id lookups.
+pub trait Modules {
+    /// `obs_module_t *`, never NULL.
+    type Module: Copy;
+    /// `const char *`, passed through.
+    type Str: Copy;
+
+    /// `obs->first_module`, or `obs->first_disabled_module`.
+    fn first(&self, disabled: bool) -> Option<Self::Module>;
+    fn next(&self, module: Self::Module) -> Option<Self::Module>;
+    fn service_count(&self, module: Self::Module) -> usize;
+    /// `strcmp(module->services.array[i], id) == 0`.
+    fn service_is(&self, module: Self::Module, i: usize, id: Self::Str) -> bool;
+    /// `module->load_state`, an `enum obs_module_load_state`.
+    fn load_state(&self, module: Self::Module) -> i32;
+}
+
+/// `OBS_MODULE_MISSING` (`obs.h`).
+pub const MODULE_MISSING: i32 = 2;
+
+/// `obs_service_get_module`: the first loaded, then the first disabled
+/// module that registered `id`.
+#[allow(unused_variables)]
+pub fn module<M: Modules>(m: &M, id: M::Str) -> Option<M::Module> {
+    todo!("#1920")
+}
+
+/// `obs_service_load_state`.
+#[allow(unused_variables)]
+pub fn load_state<M: Modules>(m: &M, id: M::Str) -> i32 {
+    todo!("#1920")
+}
