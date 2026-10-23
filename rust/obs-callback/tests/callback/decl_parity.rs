@@ -133,8 +133,12 @@ fn excluded(text: &[u8]) -> bool {
             .rev()
             .find(|t| t.kind != CfTokenType::None);
         if let Some(last) = last {
-            let comment =
-                last.kind == CfTokenType::SpaceTab && text.get(last.unmerged_start) == Some(&b'/');
+            // The lexer merges leading spaces and tabs into the comment token.
+            let comment = last.kind == CfTokenType::SpaceTab
+                && text[last.unmerged_start..]
+                    .iter()
+                    .find(|b| !matches!(b, b' ' | b'\t'))
+                    == Some(&b'/');
             // Only an unterminated token consumes the trailing splice.
             // A closed comment or string followed by a splice stays covered.
             if (comment || last.kind == CfTokenType::String)
