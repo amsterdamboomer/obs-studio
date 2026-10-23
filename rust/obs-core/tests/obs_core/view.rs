@@ -370,6 +370,7 @@ fn view_remove_and_enum() {
         false
     });
     assert_eq!(seen, [0x1]);
+    h.take();
 
     remove(&h, a);
     assert_eq!(
