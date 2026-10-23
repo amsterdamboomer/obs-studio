@@ -231,7 +231,7 @@ fn native_test_graph_prepends_runtime_paths_in_order() {
 fn native_test_graph_generates_qt_metaobjects() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
-    fs::write(root.join("answer.hpp"), "#pragma once\n#include <QObject>\nclass Answer : public QObject { Q_OBJECT public: using QObject::QObject; Q_INVOKABLE int value() const { return 42; } };\n").unwrap();
+    fs::write(root.join("answer.hpp"), "#pragma once\n#include <QObject>\nclass Answer : public QObject {\n Q_OBJECT\n public: using QObject::QObject; Q_INVOKABLE int value() const { return 42; } };\n").unwrap();
     fs::write(
         root.join("twin.cpp"),
         "#include \"answer.hpp\"\nint main() { Answer answer; return answer.value() != 42; }\n",
@@ -254,11 +254,11 @@ fn native_test_graph_generates_qt_metaobjects() {
         "schema": 1,
         "targets": {"twin": {
             "sources": ["twin.cpp"], "cpp_standard": "17", "definitions": ["TWIN_METAOBJECT=1"],
-            "qt": {"moc": ["answer.hpp"]}, "packages": ["Qt6Core"]
+            "qt": {"moc": ["answer.hpp"]}, "libraries": ["Qt6::Core"]
         }, "answer": {
             "sources": ["answer.cpp"], "cpp_standard": "17",
             "qt": {"moc": ["answer.hpp"], "uic": ["answer.ui"], "rcc": ["answer.qrc"]},
-            "packages": ["Qt6Widgets"]
+            "libraries": ["Qt6::Widgets"]
         }},
         "tests": {"answer": {"target": "answer", "environment": {"QT_QPA_PLATFORM": "offscreen"}}, "twin": {"target": "twin"}}
     });
@@ -269,8 +269,19 @@ fn native_test_graph_generates_qt_metaobjects() {
         output: root.join("cargo-output"),
         profile: Default::default(),
     };
+    let interfaces = [
+        (
+            "Qt6::Core".into(),
+            obs_build::validation::graph::Dependency::package(&build.target, "Qt6Core").unwrap(),
+        ),
+        (
+            "Qt6::Widgets".into(),
+            obs_build::validation::graph::Dependency::package(&build.target, "Qt6Widgets").unwrap(),
+        ),
+    ]
+    .into();
     let artifacts = parsed
-        .compile(&build, root, &Default::default(), &Default::default())
+        .compile(&build, root, &Default::default(), &interfaces)
         .unwrap();
     assert!(
         std::process::Command::new(&artifacts["answer"])
@@ -283,7 +294,7 @@ fn native_test_graph_generates_qt_metaobjects() {
     let consumer =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test/cmocka/native-test-graph.cmake");
     fs::write(root.join("CMakeLists.txt"), format!(
-        "cmake_minimum_required(VERSION 3.28)\nproject(metaobjects CXX)\nenable_testing()\nfind_package(Qt6 REQUIRED COMPONENTS Widgets)\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\n", consumer.to_string_lossy().replace('\\', "/")
+        "cmake_minimum_required(VERSION 3.28)\nproject(metaobjects CXX)\nenable_testing()\nfind_package(Qt6 REQUIRED COMPONENTS Widgets)\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\nget_target_property(metaobjects answer AUTOMOC)\nif(NOT metaobjects)\nmessage(FATAL_ERROR \"Original per-target AUTOMOC must be preserved\")\nendif()\n", consumer.to_string_lossy().replace('\\', "/")
     )).unwrap();
     let output = root.join("cmake-output");
     for (program, arguments) in [
