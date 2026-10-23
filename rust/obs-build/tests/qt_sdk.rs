@@ -330,7 +330,9 @@ fn qt_sdk_resolves_linux_widgets_closure_from_exported_targets() {
         "mkspecs/linux-g++",
     ] {
         assert!(
-            widgets.include_dirs.contains(&prefix.join(include)),
+            widgets
+                .include_dirs
+                .contains(&prefix.join(include).components().collect::<PathBuf>()),
             "{include} missing from {:?}",
             widgets.include_dirs
         );
@@ -342,6 +344,8 @@ fn qt_sdk_resolves_linux_widgets_closure_from_exported_targets() {
     let library = |module: &str| {
         prefix
             .join(format!("lib/libQt6{module}.so.6.11.1"))
+            .components()
+            .collect::<PathBuf>()
             .display()
             .to_string()
     };
@@ -349,7 +353,9 @@ fn qt_sdk_resolves_linux_widgets_closure_from_exported_targets() {
     assert!(position(link, &library("Widgets")) < position(link, &library("Gui")));
     assert!(position(link, &library("Gui")) < position(link, &library("Core")));
     assert!(link.contains(&"-pthread".into()));
-    assert!(link.contains(&format!("-Wl,-rpath,{}", prefix.join("lib").display())));
+    assert!(link.contains(
+        &format!("-Wl,-rpath,{}", prefix.join("lib").components().collect::<PathBuf>().display())
+    ));
     // Each library appears once even though Gui and Widgets both need Core.
     assert_eq!(
         link.iter()
@@ -415,6 +421,8 @@ fn qt_sdk_resolves_windows_import_libraries_and_runtime() {
     let implib = |module: &str| {
         prefix
             .join(format!("lib/Qt6{module}.lib"))
+            .components()
+            .collect::<PathBuf>()
             .display()
             .to_string()
     };
@@ -431,7 +439,12 @@ fn qt_sdk_resolves_windows_import_libraries_and_runtime() {
     );
     assert_eq!(
         widgets.runtime_path_prepend["PATH"],
-        [prefix.join("bin").display().to_string()]
+        [prefix
+            .join("bin")
+            .components()
+            .collect::<PathBuf>()
+            .display()
+            .to_string()]
     );
     let error = Sdk::open(WINDOWS, prefix, true).unwrap_err();
     assert!(error.contains("crt-static"), "{error}");
@@ -456,8 +469,14 @@ fn qt_sdk_rejects_debug_crt_only_windows_sdks() {
     assert_eq!(sdk.configuration(), "RELEASE");
     let core = sdk.interface("Core").unwrap();
     assert!(
-        core.link_options
-            .contains(&both.join("lib/Qt6Core.lib").display().to_string())
+        core.link_options.contains(
+            &both
+                .join("lib/Qt6Core.lib")
+                .components()
+                .collect::<PathBuf>()
+                .display()
+                .to_string()
+        )
     );
 }
 
@@ -470,13 +489,18 @@ fn qt_sdk_resolves_macos_frameworks_for_each_universal_slice() {
         let sdk = Sdk::open(target, &universal, false).unwrap();
         let widgets = sdk.interface("Widgets").unwrap();
         assert!(
-            widgets
-                .include_dirs
-                .contains(&universal.join("lib/QtWidgets.framework/Headers"))
+            widgets.include_dirs.contains(
+                &universal
+                    .join("lib/QtWidgets.framework/Headers")
+                    .components()
+                    .collect::<PathBuf>()
+            )
         );
         let link = &widgets.link_options;
         let framework = universal
             .join("lib/QtCore.framework/Versions/A/QtCore")
+            .components()
+            .collect::<PathBuf>()
             .display()
             .to_string();
         assert!(link.contains(&framework), "{link:?}");
@@ -484,7 +508,16 @@ fn qt_sdk_resolves_macos_frameworks_for_each_universal_slice() {
         assert_eq!(link[iokit - 1], "-framework");
         // Repeated frameworks in Qt's export collapse to one link input.
         assert_eq!(link.iter().filter(|option| *option == "Metal").count(), 1);
-        assert!(link.contains(&format!("-Wl,-rpath,{}", universal.join("lib").display())));
+        assert!(
+            link.contains(&format!(
+                "-Wl,-rpath,{}",
+                universal
+                    .join("lib")
+                    .components()
+                    .collect::<PathBuf>()
+                    .display()
+            ))
+        );
     }
     let intel = directory.path().join("intel");
     macos_sdk(&intel, &[X86_64_MACHO]);

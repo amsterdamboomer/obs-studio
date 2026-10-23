@@ -102,7 +102,7 @@ impl Sdk {
             let properties = self.module(name)?;
             let cxx = self.context("CXX");
             for directory in list(property(&properties, "INTERFACE_INCLUDE_DIRECTORIES"), &cxx)? {
-                let directory = PathBuf::from(directory);
+                let directory = native(&directory);
                 if !directory.is_dir() {
                     return Err(format!(
                         "Qt6::{name} include directory {} is missing",
@@ -256,7 +256,7 @@ impl Sdk {
         let file = |key: &str| {
             properties
                 .get(&format!("{key}_{}", self.configuration))
-                .map(PathBuf::from)
+                .map(|path| native(path))
         };
         let location = file("IMPORTED_LOCATION")
             .ok_or_else(|| format!("{} has no IMPORTED_LOCATION", path.display()))?;
@@ -512,4 +512,10 @@ fn expression(body: &str, context: &Context<'_>) -> Result<String, String> {
         }
         _ => Err(format!("unsupported Qt generator expression $<{head}>")),
     }
+}
+
+/// `${_IMPORT_PREFIX}/lib/...` mixes separators on Windows; rebuild the path
+/// so linker arguments and runtime paths use the host's own form.
+fn native(path: &str) -> PathBuf {
+    Path::new(path).components().collect()
 }
