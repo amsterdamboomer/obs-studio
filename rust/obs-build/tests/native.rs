@@ -3,6 +3,77 @@ use obs_build::{NativeBuild, SharedLibrary};
 use std::{fs, path::Path};
 
 #[test]
+#[cfg(feature = "libobs-integration")]
+fn native_test_graph_generates_qt_metaobjects() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    fs::write(root.join("answer.hpp"), "#pragma once\n#include <QObject>\nclass Answer : public QObject { Q_OBJECT public: using QObject::QObject; Q_INVOKABLE int value() const { return 42; } };\n").unwrap();
+    fs::write(root.join("answer.cpp"), "#include \"answer.hpp\"\n#include <QMetaObject>\n#include <cstring>\nint main() { Answer answer; int value = 0; if (!QMetaObject::invokeMethod(&answer, \"value\", Qt::DirectConnection, Q_RETURN_ARG(int, value))) return 1; return value != 42 || std::strcmp(answer.metaObject()->className(), \"Answer\"); }\n").unwrap();
+    let graph = serde_json::json!({
+        "schema": 1,
+        "targets": {"answer": {
+            "sources": ["answer.cpp"], "cpp_standard": "17",
+            "qt": {"moc": ["answer.hpp"]}, "packages": ["Qt6Core"]
+        }},
+        "tests": {"answer": {"target": "answer"}}
+    });
+    let parsed = obs_build::validation::graph::Graph::parse(&graph.to_string()).unwrap();
+    let build = NativeBuild {
+        host: obs_build::BUILD_HOST.into(),
+        target: obs_build::BUILD_TARGET.into(),
+        output: root.join("cargo-output"),
+        profile: Default::default(),
+    };
+    let artifacts = parsed
+        .compile(&build, root, &Default::default(), &Default::default())
+        .unwrap();
+    assert!(
+        std::process::Command::new(&artifacts["answer"])
+            .status()
+            .unwrap()
+            .success()
+    );
+    fs::write(root.join("graph.json"), graph.to_string()).unwrap();
+    let consumer =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test/cmocka/native-test-graph.cmake");
+    fs::write(root.join("CMakeLists.txt"), format!(
+        "cmake_minimum_required(VERSION 3.28)\nproject(metaobjects CXX)\nenable_testing()\nfind_package(Qt6 REQUIRED COMPONENTS Core)\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\n", consumer.to_string_lossy().replace('\\', "/")
+    )).unwrap();
+    let output = root.join("cmake-output");
+    for (program, arguments) in [
+        (
+            "cmake",
+            vec!["-S", root.to_str().unwrap(), "-B", output.to_str().unwrap()],
+        ),
+        (
+            "cmake",
+            vec!["--build", output.to_str().unwrap(), "--config", "Release"],
+        ),
+        (
+            "ctest",
+            vec![
+                "--test-dir",
+                output.to_str().unwrap(),
+                "-C",
+                "Release",
+                "--output-on-failure",
+            ],
+        ),
+    ] {
+        let result = std::process::Command::new(program)
+            .args(arguments)
+            .output()
+            .unwrap();
+        assert!(
+            result.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&result.stdout),
+            String::from_utf8_lossy(&result.stderr)
+        );
+    }
+}
+
+#[test]
 fn native_test_graph_preserves_include_precedence() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
