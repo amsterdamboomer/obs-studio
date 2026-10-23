@@ -1337,7 +1337,11 @@ fn native_test_graph_replaces_legacy_utility_definitions() {
             );
         }
     }
-    assert_eq!(covered_tests, graph.tests.len(), "tests outside every suite");
+    assert_eq!(
+        covered_tests,
+        graph.tests.len(),
+        "tests outside every suite"
+    );
     assert_eq!(
         covered_targets,
         graph.targets.len(),
