@@ -402,7 +402,17 @@ impl Graph {
         if graph.targets.is_empty() || graph.tests.is_empty() {
             return Err("native test graph has no targets or tests".into());
         }
+        let mut ui_outputs = BTreeSet::new();
         for (name, target) in &graph.targets {
+            for form in &target.qt.uic {
+                let stem = Path::new(form)
+                    .file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .ok_or_else(|| format!("invalid Qt UI output for {form:?}"))?;
+                if !ui_outputs.insert(stem.to_ascii_lowercase()) {
+                    return Err(format!("duplicate Qt UI output ui_{stem}.h"));
+                }
+            }
             validate_name(name)?;
             for input in &target.watch_inputs {
                 if input.is_empty()

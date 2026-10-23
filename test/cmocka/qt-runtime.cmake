@@ -33,4 +33,3 @@ function(cmocka_qt_runtime test qt_target)
     endif()
   endif()
 endfunction()
-
