@@ -368,9 +368,9 @@ static void test_apply_encoder_settings(void **state)
 int main(void)
 {
 	const struct CMUnitTest tests[] = {
-		CASE(test_display_name),          CASE(test_defaults_by_id),
-		CASE(test_properties_by_id),      CASE(test_identity),
-		CASE(test_properties_on_service), CASE(test_update_and_settings),
+		CASE(test_display_name),           CASE(test_defaults_by_id),
+		CASE(test_properties_by_id),       CASE(test_identity),
+		CASE(test_properties_on_service),  CASE(test_update_and_settings),
 		CASE(test_apply_encoder_settings),
 	};
 	return cmocka_run_group_tests(tests, group_setup, group_teardown);
