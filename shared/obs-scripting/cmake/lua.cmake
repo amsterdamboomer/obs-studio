@@ -21,7 +21,11 @@ if(ENABLE_SCRIPTING_LUA)
     PRIVATE
       $<$<BOOL:${ENABLE_FRONTEND}>:build/obs-scripting.lua-frontend+.h.c>
       build/obs-scripting.lua+.h.c
+      $<$<PLATFORM_ID:Darwin>:build/obs-scripting.lua-host-macos+.h.c>
+      $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:build/obs-scripting.lua-host-posix+.h.c>
+      $<$<PLATFORM_ID:Windows>:build/obs-scripting.lua-host-windows+.h.c>
       obs-scripting-lua.h
+      obs-scripting-lua-host.h
       swig/swigluarun.h
   )
 
