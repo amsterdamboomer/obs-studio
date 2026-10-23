@@ -106,9 +106,9 @@ pub fn build(build: &NativeBuild, library: &SwiftLibrary) -> Result<PathBuf, Str
             "-Xcc",
             "-fobjc-arc",
         ]);
-    command.arg(match build.profile {
-        crate::NativeProfile::Debug => "-Onone",
-        crate::NativeProfile::MinSizeRel => "-Osize",
+    command.arg(match build.profile.optimization() {
+        "0" => "-Onone",
+        "s" | "z" => "-Osize",
         _ => "-O",
     });
     if build.profile.debug_info() {

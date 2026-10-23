@@ -36,6 +36,37 @@ fn cargo_native_profile_uses_effective_optimization_and_symbols() {
         .unwrap_err();
         assert!(error.contains(key), "{error}");
     }
+    for (optimization, expected_level) in [
+        ("0", obs_build::NativeOptimization::None),
+        ("1", obs_build::NativeOptimization::One),
+        ("2", obs_build::NativeOptimization::Two),
+        ("3", obs_build::NativeOptimization::Three),
+        ("s", obs_build::NativeOptimization::Size),
+        ("z", obs_build::NativeOptimization::MinSize),
+    ] {
+        let actual = NativeProfile::from_cargo_lookup(|key| match key {
+            "OPT_LEVEL" => Some(optimization.into()),
+            "DEBUG" => Some("false".into()),
+            "OBS_SYS_NATIVE_ASSERTIONS" => Some("1".into()),
+            _ => None,
+        })
+        .unwrap();
+        assert_eq!(
+            actual,
+            NativeProfile::Custom {
+                optimization: expected_level,
+                debug_info: false,
+                assertions: true,
+            }
+        );
+    }
+    assert_eq!(
+        NativeProfile::from_cargo_lookup(
+            |key| (key == "OBS_SYS_NATIVE_PROFILE").then(|| "debug".into())
+        )
+        .unwrap(),
+        NativeProfile::Debug
+    );
 }
 
 #[test]
@@ -1574,6 +1605,26 @@ fn native_profile_switch_rebuilds_assertion_policy() {
         (Release, 1),
         (RelWithDebInfo, 1),
         (MinSizeRel, 1),
+        (
+            obs_build::NativeProfile::from_cargo_lookup(|key| match key {
+                "OPT_LEVEL" => Some("3".into()),
+                "DEBUG" => Some("true".into()),
+                "OBS_SYS_NATIVE_ASSERTIONS" => Some("1".into()),
+                _ => None,
+            })
+            .unwrap(),
+            0,
+        ),
+        (
+            obs_build::NativeProfile::from_cargo_lookup(|key| match key {
+                "OPT_LEVEL" => Some("0".into()),
+                "DEBUG" => Some("false".into()),
+                "OBS_SYS_NATIVE_ASSERTIONS" => Some("0".into()),
+                _ => None,
+            })
+            .unwrap(),
+            1,
+        ),
         (Debug, 0),
     ] {
         let artifact = build
