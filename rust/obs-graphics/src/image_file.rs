@@ -318,7 +318,10 @@ fn premultiply_for<H: Host>(bitmap: Option<H::Bitmap>, texels: usize, alpha_mode
 
 /// Whether the path ends in `.gif`, any case, with something before it.
 pub fn is_gif_path(path: &[u8]) -> bool {
-    path.len() > 4 && path[path.len() - 4..].eq_ignore_ascii_case(b".gif")
+    path.len() > 4
+        && path
+            .get(path.len() - 4..)
+            .is_some_and(|ext| ext.eq_ignore_ascii_case(b".gif"))
 }
 
 /// `get_time`: a frame delay in centiseconds as nanoseconds, 0 as 100 ms.
@@ -338,21 +341,67 @@ fn full_decoded_gif_size(info: &GifInfo) -> i32 {
         .wrapping_mul(info.frame_count) as i32
 }
 
-fn message(parts: &[&[u8]]) -> Vec<u8> {
-    parts.concat()
+/// One log line, built on the stack and cut at `blog`'s 4096 bytes. The
+/// file allocates nothing on the Rust heap and has no panic path: an
+/// executable that links the Rust staticlib next to libobs (as
+/// test_effect_parser_lifecycle_rust does) would otherwise pull in Rust's
+/// allocator and std, which clash with libobs on Windows.
+struct Line {
+    buf: [u8; 4096],
+    len: usize,
+}
+
+impl Line {
+    fn new() -> Self {
+        Self {
+            buf: [0; 4096],
+            len: 0,
+        }
+    }
+    fn push(&mut self, bytes: &[u8]) -> &mut Self {
+        for &b in bytes {
+            if let Some(slot) = self.buf.get_mut(self.len) {
+                *slot = b;
+                self.len += 1;
+            }
+        }
+        self
+    }
+    fn push_u32(&mut self, value: u32) -> &mut Self {
+        let mut digits = [0u8; 10];
+        let mut n = value;
+        let mut start = digits.len();
+        loop {
+            start -= 1;
+            if let Some(d) = digits.get_mut(start) {
+                *d = b'0' + (n % 10) as u8;
+            }
+            n /= 10;
+            if n == 0 {
+                break;
+            }
+        }
+        self.push(digits.get(start..).unwrap_or_default())
+    }
+    fn push_i32(&mut self, value: i32) -> &mut Self {
+        if value < 0 {
+            self.push(b"-");
+        }
+        self.push_u32(value.unsigned_abs())
+    }
+    fn send<H: Host>(&self) {
+        H::log(LOG_WARNING, self.buf.get(..self.len).unwrap_or_default());
+    }
 }
 
 fn log_path<H: Host>(function: &str, before: &str, path: &CStr, after: &str) {
-    H::log(
-        LOG_WARNING,
-        &message(&[
-            function.as_bytes(),
-            b": ",
-            before.as_bytes(),
-            path.to_bytes(),
-            after.as_bytes(),
-        ]),
-    );
+    Line::new()
+        .push(function.as_bytes())
+        .push(b": ")
+        .push(before.as_bytes())
+        .push(path.to_bytes())
+        .push(after.as_bytes())
+        .send::<H>();
 }
 
 /// The animation timing of `calculate_new_frame`, over the public fields.
@@ -464,7 +513,11 @@ impl<H: Host> ImageFileEx<H> {
         alpha_mode: ImageAlphaMode,
     ) -> bool {
         const FUNCTION: &str = "init_animated_gif";
-        let internal = H::internal(self.internal.as_mut().expect("allocated by init"));
+        // Allocated by init_internal just before.
+        let Some(handle) = self.internal.as_mut() else {
+            return false;
+        };
+        let internal = H::internal(handle);
         internal.gif = H::gif_create();
         let gif = internal.gif;
 
@@ -500,15 +553,16 @@ impl<H: Host> ImageFileEx<H> {
         internal.gif_info = info;
 
         if info.width > 4096 || info.height > 4096 {
-            log_path::<H>(
-                FUNCTION,
-                &format!(
-                    "Bad texture dimensions ({}x{}) in '",
-                    info.width as i32, info.height as i32
-                ),
-                path,
-                "'",
-            );
+            Line::new()
+                .push(FUNCTION.as_bytes())
+                .push(b": Bad texture dimensions (")
+                .push_i32(info.width as i32)
+                .push(b"x")
+                .push_i32(info.height as i32)
+                .push(b") in '")
+                .push(path.to_bytes())
+                .push(b"'")
+                .send::<H>();
             return self.fail_gif();
         }
 
@@ -552,17 +606,14 @@ impl<H: Host> ImageFileEx<H> {
 
         for i in 0..info.frame_count {
             if decode(i, &mut bitmap) != NSGIF_OK {
-                H::log(
-                    LOG_WARNING,
-                    &message(&[
-                        FUNCTION.as_bytes(),
-                        b": Couldn't decode frame ",
-                        i.to_string().as_bytes(),
-                        b" of '",
-                        path.to_bytes(),
-                        b"'",
-                    ]),
-                );
+                Line::new()
+                    .push(FUNCTION.as_bytes())
+                    .push(b": Couldn't decode frame ")
+                    .push_u32(i)
+                    .push(b" of '")
+                    .push(path.to_bytes())
+                    .push(b"'")
+                    .send::<H>();
             }
         }
 
@@ -630,7 +681,10 @@ impl<H: Host> ImageFileEx<H> {
         }
 
         if self.is_animated_gif {
-            let internal = H::internal(self.internal.as_mut().expect("set above"));
+            let Some(handle) = self.internal.as_mut() else {
+                return;
+            };
+            let internal = H::internal(handle);
             self.texture =
                 H::texture_create_bitmap(self.cx, self.cy, self.format, internal.gif_frame_image);
         } else {
@@ -640,7 +694,11 @@ impl<H: Host> ImageFileEx<H> {
     }
 
     fn decode_new_frame(&mut self, new_frame: i32, alpha_mode: ImageAlphaMode) {
-        let internal = H::internal(self.internal.as_mut().expect("checked by the caller"));
+        // The callers checked for it.
+        let Some(handle) = self.internal.as_mut() else {
+            return;
+        };
+        let internal = H::internal(handle);
         if !H::cache_has(internal.animation_frame_cache, new_frame) {
             // If looped, decode from frame 0.
             let last_frame = if new_frame < internal.last_decoded_frame {
@@ -737,7 +795,10 @@ impl<H: Host> ImageFileEx<H> {
             self.decode_new_frame(self.cur_frame, alpha_mode);
         }
 
-        let internal = H::internal(self.internal.as_mut().expect("checked above"));
+        let Some(handle) = self.internal.as_mut() else {
+            return;
+        };
+        let internal = H::internal(handle);
         H::texture_set_image(
             self.texture,
             internal.animation_frame_cache,

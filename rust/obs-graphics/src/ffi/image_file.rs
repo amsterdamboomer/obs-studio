@@ -11,6 +11,9 @@
 use core::ffi::{CStr, c_char, c_int, c_void};
 use core::ptr::{self, NonNull};
 
+// bmalloc and bzalloc abort instead of returning null, so the dangling
+// fallbacks below are never taken; they keep this file free of panics.
+
 use crate::image_file::{FileRead, GifInfo, Host, ImageAlphaMode, ImageFileEx, Internal};
 use crate::texture_render::{ColorFormat, ColorSpace};
 
@@ -163,7 +166,7 @@ impl Host for GsHost {
         let block = unsafe { bzalloc(size_of::<Internal<GsHost>>()) }.cast::<Internal<GsHost>>();
         // SAFETY: the block is fresh, writable and large enough.
         unsafe { block.write(Internal::default()) };
-        NonNull::new(block).expect("bzalloc does not return null")
+        NonNull::new(block).unwrap_or(NonNull::dangling())
     }
     fn internal(handle: &mut Self::Internal) -> &mut Internal<GsHost> {
         // SAFETY: a live block from internal_new, borrowed as long as the
@@ -199,7 +202,7 @@ impl Host for GsHost {
             let read = libc::fread(data.cast(), 1, size, stream);
             libc::fclose(stream);
             FileRead::Read {
-                data: NonNull::new(data).expect("bmalloc does not return null"),
+                data: NonNull::new(data).unwrap_or(NonNull::dangling()),
                 size,
                 complete: read == size,
             }
@@ -247,12 +250,12 @@ impl Host for GsHost {
 
     fn alloc_data(size: usize) -> Self::Data {
         // SAFETY: a plain allocation.
-        NonNull::new(unsafe { bzalloc(size) }.cast()).expect("bzalloc does not return null")
+        NonNull::new(unsafe { bzalloc(size) }.cast()).unwrap_or(NonNull::dangling())
     }
     fn alloc_cache(count: u32) -> Self::Cache {
         // SAFETY: a plain allocation, zeroed: every pointer null.
         NonNull::new(unsafe { bzalloc(count as usize * size_of::<*mut u8>()) }.cast())
-            .expect("bzalloc does not return null")
+            .unwrap_or(NonNull::dangling())
     }
     fn free_data(data: Option<Self::Data>) {
         // SAFETY: null or a live block, freed once.
@@ -338,9 +341,15 @@ impl Host for GsHost {
     }
 
     fn log(level: i32, message: &[u8]) {
-        let mut line = Vec::with_capacity(message.len() + 1);
-        line.extend(message.iter().copied().filter(|&b| b != 0));
-        line.push(0);
+        // On the stack, NULs dropped: no Rust heap here (see image_file.rs).
+        let mut line = [0u8; 4097];
+        let mut len = 0;
+        for &b in message.iter().filter(|&&b| b != 0) {
+            if let Some(slot) = line.get_mut(len).filter(|_| len < 4096) {
+                *slot = b;
+                len += 1;
+            }
+        }
         // SAFETY: "%s" and one NUL-terminated string.
         unsafe { blog(level, c"%s".as_ptr(), line.as_ptr()) }
     }
