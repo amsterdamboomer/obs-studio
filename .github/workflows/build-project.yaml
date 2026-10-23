@@ -1910,6 +1910,8 @@ jobs:
       # over ci.toml's libs-qt budget.
       - name: Check Published Qt SDK 🧩
         if: needs.check-event.outputs.qt_sdk == 'true'
+        # A Qt test app that cannot start can wait on a dialog; bound it.
+        timeout-minutes: 15
         env:
           QT_TAG: qt6-6.11.1
         run: |
