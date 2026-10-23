@@ -9,6 +9,8 @@ mod protocol;
 mod bundled_libobs;
 #[path = "../../../obs-build/tests/native.rs"]
 mod native_build;
+#[path = "../../../obs-build/tests/qt_sdk.rs"]
+mod qt_sdk;
 #[cfg(feature = "libobs-integration")]
 #[path = "../../../obs-build/tests/libobs.rs"]
 mod native_libobs;

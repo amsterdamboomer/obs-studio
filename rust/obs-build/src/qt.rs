@@ -152,3 +152,67 @@ pub fn combine_moc(
     library.sources.push(output.into());
     Ok(())
 }
+
+/// Explicit Qt SDK inputs. A target prefix selects the libraries Cargo links;
+/// a host prefix (or per-tool override) selects the generators that run.
+#[derive(Clone, Debug, Default)]
+pub struct Inputs {
+    pub target_prefix: Option<PathBuf>,
+    pub host_prefix: Option<PathBuf>,
+    pub moc: Option<PathBuf>,
+    pub uic: Option<PathBuf>,
+    pub rcc: Option<PathBuf>,
+}
+
+impl Inputs {
+    pub fn from_lookup(_lookup: impl Fn(&str) -> Option<std::ffi::OsString>) -> Self {
+        todo!()
+    }
+}
+
+/// Host executables bound to one Qt SDK.
+#[derive(Clone, Debug)]
+pub struct Tools {
+    pub moc: PathBuf,
+    pub uic: PathBuf,
+    pub rcc: PathBuf,
+}
+
+impl Tools {
+    pub fn resolve(_host: &str, _target: &str, _inputs: &Inputs) -> Result<Self, String> {
+        todo!()
+    }
+}
+
+/// A validated target Qt SDK.
+#[derive(Clone, Debug)]
+pub struct Sdk;
+
+impl Sdk {
+    pub fn open(_target: &str, _prefix: &Path, _crt_static: bool) -> Result<Self, String> {
+        todo!()
+    }
+
+    pub fn version(&self) -> &str {
+        todo!()
+    }
+
+    pub fn configuration(&self) -> &str {
+        todo!()
+    }
+
+    pub fn interface(&self, _module: &str) -> Result<crate::validation::graph::Dependency, String> {
+        todo!()
+    }
+}
+
+/// Resolve a Qt6 package from explicit inputs; `None` leaves a native build on
+/// its system package path.
+pub fn package(
+    _host: &str,
+    _target: &str,
+    _package: &str,
+    _inputs: &Inputs,
+) -> Result<Option<crate::validation::graph::Dependency>, String> {
+    todo!()
+}
