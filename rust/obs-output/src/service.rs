@@ -233,43 +233,50 @@ type PtrOf<H, S> = <<S as Service<H>>::Type as Type<H>>::Ptr;
 
 /// `obs_service_get_display_name`.
 pub fn display_name<H: Host, T: Type<H>>(info: Option<&T>) -> Option<T::Str> {
-    todo!("#1913")
+    info.map(Type::display_name)
 }
 
 /// `service_get_defaults`: a new object, filled by `get_defaults` if set.
 fn get_defaults<H: Host, T: Type<H>>(host: &H, info: &T) -> H::Data {
-    todo!("#1913")
+    let settings = host.data_create();
+    info.defaults(settings);
+    settings
 }
 
 /// `obs_service_defaults`.
 pub fn defaults<H: Host, T: Type<H>>(host: &H, info: Option<&T>) -> Option<H::Data> {
-    todo!("#1913")
+    info.map(|info| get_defaults(host, info))
 }
 
 /// `obs_get_service_properties`: defaults first, then `get_properties`
 /// with NULL data, then the defaults applied and released.
 pub fn type_properties<H: Host, T: Type<H>>(host: &H, info: Option<&T>) -> Option<H::Props> {
-    todo!("#1913")
+    let info = info.filter(|info| info.has_properties())?;
+    let defaults = get_defaults(host, info);
+    let props = info.properties(T::Ptr::default());
+    host.properties_apply_settings(props, defaults);
+    host.data_release(defaults);
+    Some(props)
 }
 
 /// `obs_service_get_name`.
 pub fn name<H: Host, S: Service<H>>(service: Option<&S>, log: &impl NullLog) -> Option<StrOf<H, S>> {
-    todo!("#1913")
+    valid(service, log, c"obs_service_get_name").map(Service::name)
 }
 
 /// `obs_service_get_type`: the type's id.
 pub fn type_id<H: Host, S: Service<H>>(service: Option<&S>, log: &impl NullLog) -> Option<StrOf<H, S>> {
-    todo!("#1913")
+    valid(service, log, c"obs_service_get_type").map(|s| s.info().id())
 }
 
 /// `obs_service_get_id`: the same id, under its own log name.
 pub fn id<H: Host, S: Service<H>>(service: Option<&S>, log: &impl NullLog) -> Option<StrOf<H, S>> {
-    todo!("#1913")
+    valid(service, log, c"obs_service_get_id").map(|s| s.info().id())
 }
 
 /// `obs_service_get_type_data`.
 pub fn type_data<H: Host, S: Service<H>>(service: Option<&S>, log: &impl NullLog) -> Option<PtrOf<H, S>> {
-    todo!("#1913")
+    valid(service, log, c"obs_service_get_type_data").map(|s| s.info().type_data())
 }
 
 /// `obs_service_properties`: `get_properties` with the plugin data, then the
@@ -279,7 +286,14 @@ pub fn properties<H: Host, S: Service<H>>(
     service: Option<&S>,
     log: &impl NullLog,
 ) -> Option<H::Props> {
-    todo!("#1913")
+    let service = valid(service, log, c"obs_service_properties")?;
+    let info = service.info();
+    if !info.has_properties() {
+        return None;
+    }
+    let props = info.properties(service.data());
+    host.properties_apply_settings(props, service.settings());
+    Some(props)
 }
 
 /// `obs_service_update`: merges `settings` into the service's, then calls
@@ -290,7 +304,11 @@ pub fn update<H: Host, S: Service<H>>(
     log: &impl NullLog,
     settings: Option<H::Data>,
 ) {
-    todo!("#1913")
+    let Some(service) = valid(service, log, c"obs_service_update") else {
+        return;
+    };
+    host.data_apply(service.settings(), settings);
+    service.info().update(service.data(), service.settings());
 }
 
 /// `obs_service_get_settings`: the service's own object with a new ref.
@@ -299,7 +317,9 @@ pub fn settings<H: Host, S: Service<H>>(
     service: Option<&S>,
     log: &impl NullLog,
 ) -> Option<H::Data> {
-    todo!("#1913")
+    let service = valid(service, log, c"obs_service_get_settings")?;
+    host.data_addref(service.settings());
+    Some(service.settings())
 }
 
 /// `obs_service_apply_encoder_settings`: not called when the callback is
@@ -310,5 +330,13 @@ pub fn apply_encoder_settings<H: Host, S: Service<H>>(
     video: Option<H::Data>,
     audio: Option<H::Data>,
 ) {
-    todo!("#1913")
+    let Some(service) = valid(service, log, c"obs_service_apply_encoder_settings") else {
+        return;
+    };
+    if !service.info().has_apply_encoder_settings() {
+        return;
+    }
+    if video.is_some() || audio.is_some() {
+        service.info().apply_encoder_settings(service.data(), video, audio);
+    }
 }
