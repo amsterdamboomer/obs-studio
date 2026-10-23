@@ -168,6 +168,21 @@ class BosnTaskTest(unittest.TestCase):
         stack = bosn["stack"][task["stack"]]
         self.assertEqual(stack["dockerfile"], "build-aux/appimage/manylinux/Dockerfile")
 
+    def test_the_ubuntu_base_is_retired(self):
+        # #1999: no workflow built on the Ubuntu 26.04 base, and it no longer
+        # built (Ubuntu 26.04 has no libdatachannel-dev). Only the glibc 2.28
+        # image remains.
+        args = build.parse_args(["--sha", "0" * 40])
+        self.assertEqual(args.base, "manylinux")
+        self.assertNotEqual(run_script("--dry-run", "--base", "ubuntu").returncode, 0)
+        self.assertNotIn("deps", build.STEP_NAMES)
+        self.assertNotIn("libavutil", build.STEP_NAMES)
+        self.assertFalse((ROOT / "build-aux/appimage/Dockerfile").exists())
+        import tomllib
+
+        stacks = tomllib.loads((ROOT / "bosn.toml").read_text())["stack"]
+        self.assertNotIn("build-aux/appimage/Dockerfile", [s["dockerfile"] for s in stacks.values()])
+
 
 class BuildScriptTest(unittest.TestCase):
     def test_scripts_are_the_former_inline_workflow_steps(self):
