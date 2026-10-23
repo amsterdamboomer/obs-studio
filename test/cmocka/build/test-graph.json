@@ -2742,6 +2742,15 @@
         "OBS::libobs",
         "OBS::native-test-cmocka"
       ]
+    },
+    "test_view": {
+      "sources": [
+        "test/cmocka/test_view.c"
+      ],
+      "libraries": [
+        "OBS::libobs",
+        "OBS::native-test-cmocka"
+      ]
     }
   },
   "tests": {
@@ -3682,6 +3691,20 @@
     },
     "test_service_lifecycle": {
       "target": "test_service_lifecycle",
+      "command": [
+        "${target}"
+      ],
+      "optional_prefixes": [
+        [
+          "xvfb-run",
+          "-a",
+          "-s",
+          "-screen 0 1280x1024x24 -noreset"
+        ]
+      ]
+    },
+    "test_view": {
+      "target": "test_view",
       "command": [
         "${target}"
       ],
