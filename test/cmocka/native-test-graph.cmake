@@ -1,6 +1,7 @@
 # Consumer of the native test graph shared with obs-build. Paths in the graph
 # are repository-relative; runtime substitutions are deliberately limited.
 include_guard(GLOBAL)
+include("${CMAKE_CURRENT_LIST_DIR}/qt-runtime.cmake")
 
 function(_obs_test_graph_fields json path allowed)
   string(JSON kind TYPE "${json}" ${path})
@@ -472,7 +473,7 @@ function(obs_native_test_graph path root)
       _obs_test_graph_fields(
         "${graph}"
         "tests;${name}"
-        "target;suite;requires;command;optional_prefixes;timeout_seconds;skip_return_code;environment;environment_path_prepend;working_directory;resource_locks;run_serial"
+        "target;suite;requires;command;optional_prefixes;timeout_seconds;skip_return_code;environment;environment_path_prepend;qt_runtime;working_directory;resource_locks;run_serial"
       )
       string(JSON suite ERROR_VARIABLE suite_error GET "${graph}" tests "${name}" suite)
       if(suite_error)
@@ -563,6 +564,13 @@ function(obs_native_test_graph path root)
         endif()
       endif()
       add_test(NAME "${name}" COMMAND ${arguments})
+      string(JSON qt_runtime ERROR_VARIABLE qt_runtime_error GET "${graph}" tests "${name}" qt_runtime)
+      if(NOT qt_runtime_error)
+        if(NOT TARGET "${qt_runtime}")
+          message(FATAL_ERROR "Unresolved native test Qt runtime ${qt_runtime}")
+        endif()
+        cmocka_qt_runtime("${name}" "${qt_runtime}")
+      endif()
       foreach(
         pair
         IN

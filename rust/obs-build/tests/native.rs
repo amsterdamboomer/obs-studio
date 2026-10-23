@@ -3,6 +3,101 @@ use obs_build::{NativeBuild, SharedLibrary};
 use std::{fs, path::Path};
 
 #[test]
+#[cfg(feature = "libobs-integration")]
+fn canonical_remux_queue_runs_unchanged() {
+    use obs_build::validation::{self, graph::Dependency};
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let directory = tempfile::tempdir().unwrap();
+    let build = NativeBuild {
+        host: obs_build::BUILD_HOST.into(),
+        target: obs_build::BUILD_TARGET.into(),
+        output: directory.path().join("cargo-output"),
+        profile: Default::default(),
+    };
+    let interfaces = [
+        (
+            "Qt6::Widgets".into(),
+            Dependency::package(&build.target, "Qt6Widgets").unwrap(),
+        ),
+        (
+            "Qt6::Core".into(),
+            Dependency::package(&build.target, "Qt6Core").unwrap(),
+        ),
+        (
+            "OBS::native-test-cmocka".into(),
+            Dependency::package(&build.target, "cmocka").unwrap(),
+        ),
+    ]
+    .into();
+    let tests = validation::build_qt_tests(&build, &root, &interfaces).unwrap();
+    assert_eq!(tests.len(), 1);
+    for test in tests {
+        let result = test
+            .command(&root, &build.output)
+            .unwrap()
+            .output()
+            .unwrap();
+        assert!(
+            result.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&result.stdout),
+            String::from_utf8_lossy(&result.stderr)
+        );
+    }
+    let graph: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("test/cmocka/build/test-graph.json")).unwrap())
+            .unwrap();
+    let selected = serde_json::json!({"schema": 1,
+        "targets": {"test_remux_queue_model": graph["targets"]["test_remux_queue_model"]},
+        "tests": {"test_remux_queue_model": graph["tests"]["test_remux_queue_model"]}});
+    fs::write(directory.path().join("graph.json"), selected.to_string()).unwrap();
+    let root = dunce::canonicalize(root)
+        .unwrap()
+        .to_string_lossy()
+        .replace('\\', "/");
+    fs::write(directory.path().join("CMakeLists.txt"), format!(
+        "cmake_minimum_required(VERSION 3.28)\nproject(remux CXX)\nenable_testing()\nfind_package(Qt6 REQUIRED COMPONENTS Widgets)\nfind_package(PkgConfig REQUIRED)\npkg_check_modules(CMOCKA REQUIRED IMPORTED_TARGET cmocka)\nadd_library(OBS::native-test-cmocka ALIAS PkgConfig::CMOCKA)\nset(HAVE_QT6_WIDGETS TRUE)\ninclude(\"{root}/test/cmocka/native-test-graph.cmake\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"{root}\")\n"
+    )).unwrap();
+    let output = directory.path().join("cmake-output");
+    for (program, arguments) in [
+        (
+            "cmake",
+            vec![
+                "-S",
+                directory.path().to_str().unwrap(),
+                "-B",
+                output.to_str().unwrap(),
+            ],
+        ),
+        (
+            "cmake",
+            vec!["--build", output.to_str().unwrap(), "--config", "Release"],
+        ),
+        (
+            "ctest",
+            vec![
+                "--test-dir",
+                output.to_str().unwrap(),
+                "-C",
+                "Release",
+                "--output-on-failure",
+            ],
+        ),
+    ] {
+        let result = std::process::Command::new(program)
+            .args(arguments)
+            .output()
+            .unwrap();
+        assert!(
+            result.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&result.stdout),
+            String::from_utf8_lossy(&result.stderr)
+        );
+    }
+}
+
+#[test]
 fn native_test_graph_preserves_remux_queue_requirements() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let graph: serde_json::Value =

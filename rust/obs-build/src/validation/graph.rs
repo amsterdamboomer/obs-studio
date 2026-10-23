@@ -214,6 +214,9 @@ pub struct Test {
     /// Ordered paths prepended to an explicit value or the inherited environment.
     #[serde(default)]
     pub environment_path_prepend: BTreeMap<String, Vec<String>>,
+    /// Imported Qt runtime interface, resolved before preparing the command.
+    #[serde(default)]
+    pub qt_runtime: Option<String>,
     #[serde(default)]
     pub working_directory: Option<String>,
     #[serde(default)]
@@ -223,6 +226,26 @@ pub struct Test {
 }
 
 impl Test {
+    pub fn resolve_runtime(
+        &self,
+        libraries: &BTreeMap<String, Dependency>,
+    ) -> Result<Self, String> {
+        let mut resolved = self.clone();
+        if let Some(name) = resolved.qt_runtime.take() {
+            let dependency = libraries
+                .get(&name)
+                .ok_or_else(|| format!("unresolved native test Qt runtime {name}"))?;
+            for (key, paths) in &dependency.runtime_path_prepend {
+                resolved
+                    .environment_path_prepend
+                    .entry(key.clone())
+                    .or_default()
+                    .extend(paths.iter().cloned());
+            }
+        }
+        Ok(resolved)
+    }
+
     /// Prepare the declared argv/environment without a shell. The runner still
     /// owns timeout, skip and scheduling policy; preparing a command is not a
     /// test result and does not apply those execution policies.
@@ -237,6 +260,9 @@ impl Test {
         target: &Path,
         runtime: &Path,
     ) -> Result<Command, String> {
+        if let Some(name) = &self.qt_runtime {
+            return Err(format!("unresolved native test Qt runtime {name}"));
+        }
         let mut arguments = self
             .command
             .iter()
@@ -323,6 +349,7 @@ pub struct Selection<'a> {
 /// have no artifacts; they still carry required headers and definitions.
 #[derive(Clone, Debug, Default)]
 pub struct Dependency {
+    pub runtime_path_prepend: BTreeMap<String, Vec<String>>,
     pub artifacts: Vec<PathBuf>,
     pub include_dirs: Vec<PathBuf>,
     pub definitions: Vec<(String, Option<String>)>,
@@ -335,6 +362,7 @@ pub struct Dependency {
 impl From<SharedLibrary> for Dependency {
     fn from(library: SharedLibrary) -> Self {
         Self {
+            runtime_path_prepend: BTreeMap::new(),
             artifacts: library.dependencies,
             include_dirs: library.include_dirs,
             definitions: library.definitions,
@@ -343,6 +371,16 @@ impl From<SharedLibrary> for Dependency {
             cpp_compile_options: library.cpp_compile_options,
             link_options: library.link_options,
         }
+    }
+}
+
+impl Dependency {
+    /// Resolve a native SDK package into its compile and link interface.
+    /// Callers also supply runtime paths when the SDK is outside the system loader.
+    pub fn package(target: &str, package: &str) -> Result<Self, String> {
+        let mut library = SharedLibrary::default();
+        crate::libobs::add_package(&mut library, target, package)?;
+        Ok(library.into())
     }
 }
 
