@@ -60,6 +60,7 @@ class SortedSharedListsTest(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         self.assert_sorted("PORTED_ON_EVERY_HOST", module.PORTED_ON_EVERY_HOST)
+        self.assert_sorted("PORTED_ON_LINUX", module.PORTED_ON_LINUX)
         self.assert_sorted("NOT_PORTED", module.NOT_PORTED)
 
 
