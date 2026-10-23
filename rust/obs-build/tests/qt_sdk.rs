@@ -111,7 +111,8 @@ fn linux_sdk(prefix: &Path, machine: u16, version: &str) {
     );
     for (module, links) in MODULES {
         let upper = module.to_ascii_uppercase();
-        let includes = format!("${{_IMPORT_PREFIX}}/include/Qt{module};${{_IMPORT_PREFIX}}/include");
+        let includes =
+            format!("${{_IMPORT_PREFIX}}/include/Qt{module};${{_IMPORT_PREFIX}}/include");
         let definition = format!("QT_{upper}_LIB");
         targets(
             prefix,
@@ -129,7 +130,10 @@ fn linux_sdk(prefix: &Path, machine: u16, version: &str) {
             module,
             "release",
             &[
-                ("IMPORTED_LOCATION", &format!("${{_IMPORT_PREFIX}}/{library}")),
+                (
+                    "IMPORTED_LOCATION",
+                    &format!("${{_IMPORT_PREFIX}}/{library}"),
+                ),
                 ("IMPORTED_SONAME", &format!("libQt6{module}.so.6")),
             ],
         );
@@ -172,7 +176,8 @@ fn windows_sdk(prefix: &Path, configurations: &[&str]) {
             links
         };
         let upper = module.to_ascii_uppercase();
-        let includes = format!("${{_IMPORT_PREFIX}}/include/Qt{module};${{_IMPORT_PREFIX}}/include");
+        let includes =
+            format!("${{_IMPORT_PREFIX}}/include/Qt{module};${{_IMPORT_PREFIX}}/include");
         let definition = format!("QT_{upper}_LIB");
         targets(
             prefix,
@@ -209,7 +214,20 @@ fn windows_sdk(prefix: &Path, configurations: &[&str]) {
                 &prefix.join(format!("bin/Qt6{module}{suffix}.dll")),
                 pe(0x8664),
             );
+            crlf(&prefix.join(format!(
+                "lib/cmake/Qt6{module}/Qt6{module}Targets-{config}.cmake"
+            )));
         }
+        // Qt aliases other configurations to the built one in a separate file;
+        // only Targets-<configuration> files carry artifacts.
+        write(
+            &prefix.join(format!(
+                "lib/cmake/Qt6{module}/Qt6{module}AdditionalTargetInfo.cmake"
+            )),
+            format!(
+                "set_property(TARGET Qt6::{module} APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)\r\nset_property(TARGET Qt6::{module} APPEND PROPERTY IMPORTED_CONFIGURATIONS MINSIZEREL)\r\n"
+            ),
+        );
         fs::create_dir_all(prefix.join(format!("include/Qt{module}"))).unwrap();
     }
     fs::create_dir_all(prefix.join("mkspecs/win32-msvc")).unwrap();
@@ -217,6 +235,12 @@ fn windows_sdk(prefix: &Path, configurations: &[&str]) {
 }
 
 /// Framework layout and exports from the obs-studio-libs macOS universal2 SDK.
+/// Windows SDK exports use CRLF line endings.
+fn crlf(path: &Path) {
+    let text = fs::read_to_string(path).unwrap();
+    fs::write(path, text.replace('\n', "\r\n")).unwrap();
+}
+
 fn macos_sdk(prefix: &Path, cpus: &[u32]) {
     targets(
         prefix,
@@ -233,8 +257,12 @@ fn macos_sdk(prefix: &Path, cpus: &[u32]) {
     );
     for (module, links) in MODULES {
         let links = match module {
-            "Core" => "Qt6::Platform;-framework IOKit;-framework DiskArbitration;-framework UniformTypeIdentifiers;WrapAtomic::WrapAtomic",
-            "Gui" => "Qt6::Core;WrapOpenGL::WrapOpenGL;-framework AppKit;-framework OpenGL;-framework ImageIO;-framework Metal;-framework Metal",
+            "Core" => {
+                "Qt6::Platform;-framework IOKit;-framework DiskArbitration;-framework UniformTypeIdentifiers;WrapAtomic::WrapAtomic"
+            }
+            "Gui" => {
+                "Qt6::Core;WrapOpenGL::WrapOpenGL;-framework AppKit;-framework OpenGL;-framework ImageIO;-framework Metal;-framework Metal"
+            }
             _ => links,
         };
         let upper = module.to_ascii_uppercase();
@@ -257,7 +285,10 @@ fn macos_sdk(prefix: &Path, cpus: &[u32]) {
             module,
             "release",
             &[
-                ("IMPORTED_LOCATION", &format!("${{_IMPORT_PREFIX}}/{binary}")),
+                (
+                    "IMPORTED_LOCATION",
+                    &format!("${{_IMPORT_PREFIX}}/{binary}"),
+                ),
                 (
                     "IMPORTED_SONAME",
                     &format!("@rpath/Qt{module}.framework/Versions/A/Qt{module}"),
@@ -268,6 +299,7 @@ fn macos_sdk(prefix: &Path, cpus: &[u32]) {
         fs::create_dir_all(prefix.join(format!("lib/Qt{module}.framework/Headers"))).unwrap();
     }
     fs::create_dir_all(prefix.join("mkspecs/macx-clang")).unwrap();
+    fs::create_dir_all(prefix.join("include")).unwrap();
     qconfig(
         &prefix.join("lib/QtCore.framework/Headers/qconfig.h"),
         "6.11.1",
@@ -320,7 +352,9 @@ fn qt_sdk_resolves_linux_widgets_closure_from_exported_targets() {
     assert!(link.contains(&format!("-Wl,-rpath,{}", prefix.join("lib").display())));
     // Each library appears once even though Gui and Widgets both need Core.
     assert_eq!(
-        link.iter().filter(|option| **option == library("Core")).count(),
+        link.iter()
+            .filter(|option| **option == library("Core"))
+            .count(),
         1
     );
     let core = sdk.interface("Core").unwrap();
@@ -334,12 +368,18 @@ fn qt_sdk_rejects_wrong_architecture_and_major_version() {
     let arm = directory.path().join("arm");
     linux_sdk(&arm, 183, "6.11.1");
     let error = Sdk::open(LINUX, &arm, false).unwrap_err();
-    assert!(error.contains("aarch64") && error.contains("x86_64"), "{error}");
+    assert!(
+        error.contains("aarch64") && error.contains("x86_64"),
+        "{error}"
+    );
     assert!(Sdk::open("aarch64-unknown-linux-gnu", &arm, false).is_ok());
     let old = directory.path().join("old");
     linux_sdk(&old, 62, "5.15.2");
     let error = Sdk::open(LINUX, &old, false).unwrap_err();
-    assert!(error.contains("5.15.2") && error.contains("Qt 6"), "{error}");
+    assert!(
+        error.contains("5.15.2") && error.contains("Qt 6"),
+        "{error}"
+    );
     let error = Sdk::open(LINUX, &directory.path().join("missing"), false).unwrap_err();
     assert!(error.contains("Qt6Targets.cmake"), "{error}");
 }
@@ -352,7 +392,14 @@ fn qt_sdk_resolves_windows_import_libraries_and_runtime() {
     let sdk = Sdk::open(WINDOWS, prefix, false).unwrap();
     assert_eq!(sdk.configuration(), "RELWITHDEBINFO");
     let widgets = sdk.interface("Widgets").unwrap();
-    for definition in ["WIN32", "WIN64", "_WIN64", "UNICODE", "_UNICODE", "QT_CORE_LIB"] {
+    for definition in [
+        "WIN32",
+        "WIN64",
+        "_WIN64",
+        "UNICODE",
+        "_UNICODE",
+        "QT_CORE_LIB",
+    ] {
         assert!(
             widgets.definitions.contains(&(definition.into(), None)),
             "{definition} missing from {:?}",
@@ -365,10 +412,18 @@ fn qt_sdk_resolves_windows_import_libraries_and_runtime() {
     );
     assert_eq!(widgets.compile_options, ["-utf-8"]);
     let link = &widgets.link_options;
-    let implib = |module: &str| prefix.join(format!("lib/Qt6{module}.lib")).display().to_string();
+    let implib = |module: &str| {
+        prefix
+            .join(format!("lib/Qt6{module}.lib"))
+            .display()
+            .to_string()
+    };
     assert!(position(link, &implib("Widgets")) < position(link, &implib("Core")));
     for system in ["mpr.lib", "userenv.lib", "d3d11.lib"] {
-        assert!(link.contains(&system.into()), "{system} missing from {link:?}");
+        assert!(
+            link.contains(&system.into()),
+            "{system} missing from {link:?}"
+        );
     }
     assert!(
         !link.iter().any(|option| option.contains("EntryPoint")),
@@ -381,7 +436,10 @@ fn qt_sdk_resolves_windows_import_libraries_and_runtime() {
     let error = Sdk::open(WINDOWS, prefix, true).unwrap_err();
     assert!(error.contains("crt-static"), "{error}");
     let error = Sdk::open("aarch64-pc-windows-msvc", prefix, false).unwrap_err();
-    assert!(error.contains("aarch64") && error.contains("x86_64"), "{error}");
+    assert!(
+        error.contains("aarch64") && error.contains("x86_64"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -431,7 +489,10 @@ fn qt_sdk_resolves_macos_frameworks_for_each_universal_slice() {
     let intel = directory.path().join("intel");
     macos_sdk(&intel, &[X86_64_MACHO]);
     let error = Sdk::open(MACOS, &intel, false).unwrap_err();
-    assert!(error.contains("aarch64") && error.contains("x86_64"), "{error}");
+    assert!(
+        error.contains("aarch64") && error.contains("x86_64"),
+        "{error}"
+    );
 }
 
 fn inputs(pairs: &[(&str, &Path)]) -> Inputs {
@@ -464,8 +525,7 @@ fn qt_inputs_keep_cross_builds_off_ambient_pkg_config() {
             .unwrap()
             .is_none()
     );
-    let error =
-        obs_build::qt::package(LINUX, cross, "Qt6Widgets", &Inputs::default()).unwrap_err();
+    let error = obs_build::qt::package(LINUX, cross, "Qt6Widgets", &Inputs::default()).unwrap_err();
     assert!(error.contains("OBS_QT_TARGET_PREFIX"), "{error}");
     // Non-Qt packages are outside this resolver.
     assert!(
@@ -479,7 +539,11 @@ fn qt_inputs_keep_cross_builds_off_ambient_pkg_config() {
     let widgets = obs_build::qt::package(LINUX, cross, "Qt6Widgets", &explicit)
         .unwrap()
         .unwrap();
-    assert!(widgets.include_dirs.contains(&target.join("include/QtWidgets")));
+    assert!(
+        widgets
+            .include_dirs
+            .contains(&target.join("include/QtWidgets"))
+    );
 
     let error = Tools::resolve(LINUX, cross, &explicit).unwrap_err();
     assert!(error.contains("OBS_QT_HOST_PREFIX"), "{error}");
@@ -494,10 +558,7 @@ fn qt_inputs_keep_cross_builds_off_ambient_pkg_config() {
     // A single-tool override still wins over the host SDK.
     let custom = directory.path().join("custom-moc");
     write(&custom, b"");
-    let explicit = inputs(&[
-        ("OBS_QT_HOST_PREFIX", &host),
-        ("OBS_QT_MOC", &custom),
-    ]);
+    let explicit = inputs(&[("OBS_QT_HOST_PREFIX", &host), ("OBS_QT_MOC", &custom)]);
     assert_eq!(Tools::resolve(LINUX, cross, &explicit).unwrap().moc, custom);
 
     let windows = directory.path().join("windows-host");
@@ -511,7 +572,52 @@ fn qt_inputs_keep_cross_builds_off_ambient_pkg_config() {
         Tools::resolve(WINDOWS, WINDOWS, &explicit).unwrap().uic,
         expected[1]
     );
-    let error = Tools::resolve(LINUX, cross, &inputs(&[("OBS_QT_HOST_PREFIX", &target)]))
-        .unwrap_err();
+    let error =
+        Tools::resolve(LINUX, cross, &inputs(&[("OBS_QT_HOST_PREFIX", &target)])).unwrap_err();
     assert!(error.contains("libexec"), "{error}");
+}
+
+/// The published obs-studio-libs SDKs, extracted. Supplying a prefix makes a
+/// broken SDK a failure; unset prefixes are reported and skipped.
+#[test]
+fn qt_sdk_resolves_published_sdks() {
+    for (variable, targets) in [
+        ("OBS_QT_TEST_LINUX_PREFIX", &[LINUX][..]),
+        ("OBS_QT_TEST_WINDOWS_PREFIX", &[WINDOWS][..]),
+        (
+            "OBS_QT_TEST_MACOS_PREFIX",
+            &[MACOS, "x86_64-apple-darwin"][..],
+        ),
+    ] {
+        let Some(prefix) = std::env::var_os(variable) else {
+            eprintln!("{variable} unset: published Qt SDK not checked");
+            continue;
+        };
+        let prefix = PathBuf::from(prefix);
+        for target in targets {
+            let sdk = Sdk::open(target, &prefix, false).unwrap();
+            assert!(sdk.version().starts_with("6."));
+            for module in ["Core", "Gui", "Widgets"] {
+                let interface = sdk.interface(module).unwrap();
+                assert!(
+                    interface
+                        .definitions
+                        .contains(&(format!("QT_{}_LIB", module.to_ascii_uppercase()), None))
+                );
+                assert!(interface.link_options.iter().any(|option| {
+                    option.contains(&format!("Qt6{module}"))
+                        || option.contains(&format!("Qt{module}"))
+                }));
+                for directory in &interface.include_dirs {
+                    assert!(directory.is_dir(), "{}", directory.display());
+                }
+            }
+            eprintln!(
+                "{target}: Qt {} {} from {}",
+                sdk.version(),
+                sdk.configuration(),
+                prefix.display()
+            );
+        }
+    }
 }
