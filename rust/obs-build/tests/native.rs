@@ -356,7 +356,7 @@ fn native_test_graph_preserves_include_precedence() {
     let consumer =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test/cmocka/native-test-graph.cmake");
     fs::write(root.join("CMakeLists.txt"), format!(
-        "cmake_minimum_required(VERSION 3.28)\nproject(precedence C)\nenable_testing()\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\n",
+        "cmake_minimum_required(VERSION 3.28)\nproject(precedence C)\ninclude_directories(\"${{CMAKE_CURRENT_SOURCE_DIR}}\")\nenable_testing()\ninclude(\"{}\")\nobs_native_test_graph(\"${{CMAKE_CURRENT_SOURCE_DIR}}/graph.json\" \"${{CMAKE_CURRENT_SOURCE_DIR}}\")\n",
         consumer.to_string_lossy().replace('\\', "/")
     )).unwrap();
     let output = root.join("cmake-output");
