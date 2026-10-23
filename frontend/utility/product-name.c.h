@@ -7,3 +7,13 @@ int obs_product_string(char *out, size_t size, const char *obs_version, const ch
 	}
 	return snprintf(out, size, "OBS %s", obs_version);
 }
+
+int obs_product_title(char *out, size_t size, const char *release_version, const char *git_describe)
+{
+	(void)release_version;
+	(void)git_describe;
+	if (size > 0) {
+		out[0] = '\0';
+	}
+	return -1;
+}
