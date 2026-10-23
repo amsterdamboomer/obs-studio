@@ -211,6 +211,9 @@ pub struct Test {
     pub skip_return_code: Option<i32>,
     #[serde(default)]
     pub environment: BTreeMap<String, String>,
+    /// Ordered paths prepended to an explicit value or the inherited environment.
+    #[serde(default)]
+    pub environment_path_prepend: BTreeMap<String, Vec<String>>,
     #[serde(default)]
     pub working_directory: Option<String>,
     #[serde(default)]
@@ -265,6 +268,24 @@ impl Test {
         command.args(arguments);
         for (key, value) in &self.environment {
             command.env(key, expand(value, root, output, target, runtime)?);
+        }
+        for (key, values) in &self.environment_path_prepend {
+            let mut paths = values
+                .iter()
+                .map(|value| expand(value, root, output, target, runtime).map(PathBuf::from))
+                .collect::<Result<Vec<_>, _>>()?;
+            let inherited = match self.environment.get(key) {
+                Some(value) => Some(expand(value, root, output, target, runtime)?.into()),
+                None => std::env::var_os(key),
+            };
+            if let Some(value) = inherited {
+                paths.extend(std::env::split_paths(&value));
+            }
+            command.env(
+                key,
+                std::env::join_paths(paths)
+                    .map_err(|error| format!("native test path {key}: {error}"))?,
+            );
         }
         let directory = match &self.working_directory {
             Some(value) => PathBuf::from(expand(value, root, output, target, runtime)?),
@@ -405,6 +426,7 @@ impl Graph {
                 .iter()
                 .chain(test.environment.values())
                 .chain(test.working_directory.iter())
+                .chain(test.environment_path_prepend.values().flatten())
             {
                 validate_template(value)?;
             }
