@@ -13,7 +13,8 @@
  * getter passes the service's own data.
  *
  * obs_startup() needs a display on Linux, so the test runs under xvfb-run
- * there and the cases skip without a display. */
+ * there. It skips only when no display is set at all; with one set, a failed
+ * obs_startup() fails the test. */
 
 #include <stdarg.h>
 #include <stddef.h>
@@ -22,6 +23,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <obs.h>
@@ -140,11 +142,19 @@ static bool obs_up;
 static obs_service_t *full;
 static obs_service_t *bare;
 
-static int setup(void **state)
+/* One libobs for the whole group: each case only resets the counters. A
+ * display that is set but refuses obs_startup() fails the group instead of
+ * skipping it, so a CI run under xvfb-run cannot pass with every case
+ * skipped. */
+static int group_setup(void **state)
 {
 	(void)state;
 	obs_up = obs_startup("en-US", NULL, NULL);
 	if (!obs_up) {
+		if (getenv("DISPLAY") || getenv("WAYLAND_DISPLAY")) {
+			fprintf(stderr, "obs_startup failed with a display set\n");
+			return -1;
+		}
 		fprintf(stderr, "skipped: obs_startup failed (no display?)\n");
 		return 0;
 	}
@@ -177,14 +187,14 @@ static int setup(void **state)
 
 	full = obs_service_create_private(FULL_ID, "full", NULL);
 	bare = obs_service_create_private(BARE_ID, "bare", NULL);
-	last_data = NULL;
-	last_type = 0;
-	calls = 0;
-	can_connect_result = true;
+	if (!full || !bare) {
+		fprintf(stderr, "obs_service_create_private failed\n");
+		return -1;
+	}
 	return 0;
 }
 
-static int teardown(void **state)
+static int group_teardown(void **state)
 {
 	(void)state;
 	if (obs_up) {
@@ -194,6 +204,16 @@ static int teardown(void **state)
 	}
 	full = bare = NULL;
 	obs_up = false;
+	return 0;
+}
+
+static int setup(void **state)
+{
+	(void)state;
+	last_data = NULL;
+	last_type = 0;
+	calls = 0;
+	can_connect_result = true;
 	return 0;
 }
 
@@ -356,7 +376,7 @@ static void test_supported_codecs(void **state)
 	assert_int_equal(calls, 2);
 }
 
-#define CASE(fn) cmocka_unit_test_setup_teardown(fn, setup, teardown)
+#define CASE(fn) cmocka_unit_test_setup(fn, setup)
 
 int main(void)
 {
@@ -370,5 +390,5 @@ int main(void)
 		CASE(test_supported_resolutions),
 		CASE(test_supported_codecs),
 	};
-	return cmocka_run_group_tests(tests, NULL, NULL);
+	return cmocka_run_group_tests(tests, group_setup, group_teardown);
 }
