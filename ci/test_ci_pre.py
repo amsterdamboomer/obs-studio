@@ -89,8 +89,9 @@ class CiPreTest(unittest.TestCase):
         text = PULL.read_text()
         all_jobs = jobs(text)
         self.assertNotRegex(all_jobs["ci-pre"], r"if:.*github\.event_name")
+        # The end-of-queue janitor runs after everything, ci-pre included.
         for name, block in all_jobs.items():
-            if name != "ci-pre":
+            if name not in ("ci-pre", "cache-janitor"):
                 with self.subTest(job=name):
                     self.assertNotIn("ci-pre", needs(block))
 
@@ -138,8 +139,8 @@ class EndOfQueueJanitorTest(unittest.TestCase):
         self.assertRegex(self.janitor, r"if: always\(\) && github\.event_name == 'merge_group'")
         self.assertRegex(self.janitor, r"concurrency:\n\s+group: cache-janitor\n\s+cancel-in-progress: false")
         self.assertRegex(self.janitor, r"permissions:\n(\s+\w+: \w+\n)*\s+actions: write")
-        self.assertIn(f"ref: {PIN}", self.janitor)
-        self.assertRegex(self.janitor, r"run: py[a-z]+3 -P -m ci_lint cache janitor --repo \. ")
+        self.assertIn(f"run: uvx --from git+https://github.com/zackees/ci.yml@{PIN} ci-lint cache janitor --repo . ",
+                      self.janitor)
         self.assertNotIn("--no-enforce-budget", self.janitor)
 
     def test_gate_never_waits_on_the_sweep(self):
