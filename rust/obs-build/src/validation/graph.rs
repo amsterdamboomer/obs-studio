@@ -109,6 +109,9 @@ pub struct Target {
     pub requires: Requirement,
     #[serde(default)]
     pub includes: Vec<String>,
+    /// Include directories searched before the implicit repository root.
+    #[serde(default)]
+    pub includes_before: Vec<String>,
     #[serde(default)]
     pub definitions: Vec<String>,
     /// Quoted C string definitions referring to separately built artifacts.
@@ -443,7 +446,12 @@ impl Graph {
             let mut target = SharedLibrary {
                 name: name.into(),
                 cpp_standard: spec.cpp_standard,
-                include_dirs: vec![root.clone()],
+                include_dirs: spec
+                    .includes_before
+                    .iter()
+                    .map(|directory| root.join(directory))
+                    .chain(std::iter::once(root.clone()))
+                    .collect(),
                 dependencies: spec.dependency_artifacts(facts, libraries)?,
                 compile_options: spec
                     .compile_options

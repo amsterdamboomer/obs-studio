@@ -234,7 +234,7 @@ function(obs_native_test_graph path root)
       _obs_test_graph_fields(
         "${graph}"
         "targets;${name}"
-        "sources;cpp_standard;requires;includes;definitions;artifact_definitions;watch_inputs;packages;header_packages;header_libraries;archives;libraries;compile_options;compile_options_if_supported;link_options;sanitizers"
+        "sources;cpp_standard;requires;includes;includes_before;definitions;artifact_definitions;watch_inputs;packages;header_packages;header_libraries;archives;libraries;compile_options;compile_options_if_supported;link_options;sanitizers"
       )
       string(JSON cpp_kind ERROR_VARIABLE cpp_error TYPE "${graph}" targets "${name}" cpp_standard)
       set(cpp_standard "")
@@ -297,6 +297,10 @@ function(obs_native_test_graph path root)
           PROPERTIES CXX_STANDARD ${cpp_standard} CXX_STANDARD_REQUIRED TRUE CXX_EXTENSIONS FALSE
         )
       endif()
+      _obs_test_graph_array(includes_before "${graph}" targets "${name}" includes_before)
+      foreach(directory IN LISTS includes_before)
+        target_include_directories(${name} PRIVATE "${root}/${directory}")
+      endforeach()
       target_include_directories(${name} PRIVATE "${root}")
       list(APPEND selected_targets "${name}")
       if(TARGET cmocka-tests)
