@@ -99,10 +99,20 @@ impl Source {
     }
 }
 
+/// Explicit headers requiring Qt metaobject generation, separate from compiler inputs.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Qt {
+    #[serde(default)]
+    pub moc: Vec<String>,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Target {
     pub sources: Vec<Source>,
+    #[serde(default)]
+    pub qt: Qt,
     #[serde(default)]
     pub cpp_standard: Option<crate::CppStandard>,
     #[serde(default)]
@@ -607,6 +617,18 @@ impl Graph {
                 &mut target,
                 spec.sanitizers.as_deref(),
             )?;
+            for (index, header) in spec.qt.moc.iter().enumerate() {
+                crate::qt::moc(
+                    &mut target,
+                    &root.join(header),
+                    &build
+                        .output
+                        .join("native-tests")
+                        .join(name)
+                        .join("generated")
+                        .join(format!("moc_{index}.cpp")),
+                )?;
+            }
             artifacts.insert(name.into(), build.executable(&target)?);
         }
         for directory in watched_inputs {

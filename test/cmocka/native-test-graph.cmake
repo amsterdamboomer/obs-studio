@@ -234,7 +234,7 @@ function(obs_native_test_graph path root)
       _obs_test_graph_fields(
         "${graph}"
         "targets;${name}"
-        "sources;cpp_standard;requires;includes;includes_before;definitions;artifact_definitions;watch_inputs;packages;header_packages;header_libraries;archives;libraries;compile_options;compile_options_if_supported;link_options;sanitizers"
+        "sources;qt;cpp_standard;requires;includes;includes_before;definitions;artifact_definitions;watch_inputs;packages;header_packages;header_libraries;archives;libraries;compile_options;compile_options_if_supported;link_options;sanitizers"
       )
       string(JSON cpp_kind ERROR_VARIABLE cpp_error TYPE "${graph}" targets "${name}" cpp_standard)
       set(cpp_standard "")
@@ -291,6 +291,19 @@ function(obs_native_test_graph path root)
         endif()
       endforeach()
       add_executable(${name} ${inputs})
+      string(JSON qt_kind ERROR_VARIABLE qt_error TYPE "${graph}" targets "${name}" qt)
+      if(NOT qt_error)
+        _obs_test_graph_fields("${graph}" "targets;${name};qt" "moc")
+        _obs_test_graph_array(moc_headers "${graph}" targets "${name}" qt moc)
+        set(moc_inputs)
+        foreach(header IN LISTS moc_headers)
+          list(APPEND moc_inputs "${root}/${header}")
+        endforeach()
+        if(moc_inputs)
+          qt6_wrap_cpp(moc_sources ${moc_inputs} TARGET ${name})
+          target_sources(${name} PRIVATE ${moc_sources})
+        endif()
+      endif()
       if(NOT cpp_standard STREQUAL "")
         set_target_properties(
           ${name}
