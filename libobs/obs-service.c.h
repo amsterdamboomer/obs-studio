@@ -293,6 +293,5 @@ obs_data_t *obs_service_get_context_settings(const obs_service_t *service)
 	return service->context.settings;
 }
 
-
 /* File-local macros: keep them out of the next source of a unity build. */
 #undef get_weak

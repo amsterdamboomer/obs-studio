@@ -215,7 +215,12 @@ pub trait Type<H: Host> {
     fn has_apply_encoder_settings(&self) -> bool;
     /// `apply_encoder_settings(data, video, audio)`; only called when
     /// [`Type::has_apply_encoder_settings`].
-    fn apply_encoder_settings(&self, data: Self::Ptr, video: Option<H::Data>, audio: Option<H::Data>);
+    fn apply_encoder_settings(
+        &self,
+        data: Self::Ptr,
+        video: Option<H::Data>,
+        audio: Option<H::Data>,
+    );
 }
 
 /// A live service: its type, plugin data and context fields.
@@ -260,12 +265,18 @@ pub fn type_properties<H: Host, T: Type<H>>(host: &H, info: Option<&T>) -> Optio
 }
 
 /// `obs_service_get_name`.
-pub fn name<H: Host, S: Service<H>>(service: Option<&S>, log: &impl NullLog) -> Option<StrOf<H, S>> {
+pub fn name<H: Host, S: Service<H>>(
+    service: Option<&S>,
+    log: &impl NullLog,
+) -> Option<StrOf<H, S>> {
     valid(service, log, c"obs_service_get_name").map(Service::name)
 }
 
 /// `obs_service_get_type`: the type's id.
-pub fn type_id<H: Host, S: Service<H>>(service: Option<&S>, log: &impl NullLog) -> Option<StrOf<H, S>> {
+pub fn type_id<H: Host, S: Service<H>>(
+    service: Option<&S>,
+    log: &impl NullLog,
+) -> Option<StrOf<H, S>> {
     valid(service, log, c"obs_service_get_type").map(|s| s.info().id())
 }
 
@@ -275,7 +286,10 @@ pub fn id<H: Host, S: Service<H>>(service: Option<&S>, log: &impl NullLog) -> Op
 }
 
 /// `obs_service_get_type_data`.
-pub fn type_data<H: Host, S: Service<H>>(service: Option<&S>, log: &impl NullLog) -> Option<PtrOf<H, S>> {
+pub fn type_data<H: Host, S: Service<H>>(
+    service: Option<&S>,
+    log: &impl NullLog,
+) -> Option<PtrOf<H, S>> {
     valid(service, log, c"obs_service_get_type_data").map(|s| s.info().type_data())
 }
 
@@ -337,6 +351,8 @@ pub fn apply_encoder_settings<H: Host, S: Service<H>>(
         return;
     }
     if video.is_some() || audio.is_some() {
-        service.info().apply_encoder_settings(service.data(), video, audio);
+        service
+            .info()
+            .apply_encoder_settings(service.data(), video, audio);
     }
 }

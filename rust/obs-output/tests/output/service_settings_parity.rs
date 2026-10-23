@@ -90,14 +90,7 @@ unsafe extern "C" fn get_properties(data: *mut c_void) -> *mut c_void {
     // SAFETY: libobs properties calls on a new object.
     unsafe {
         let props = obs_properties_create();
-        let p = obs_properties_add_int(
-            props,
-            BITRATE.as_ptr(),
-            c"Bitrate".as_ptr(),
-            0,
-            100_000,
-            1,
-        );
+        let p = obs_properties_add_int(props, BITRATE.as_ptr(), c"Bitrate".as_ptr(), 0, 100_000, 1);
         obs_property_set_modified_callback(p, modified);
         props
     }
@@ -188,7 +181,10 @@ fn data_contents(data: *mut c_void) -> Option<(i64, bool)> {
     }
     // SAFETY: a live object the function returned with a ref.
     unsafe {
-        let out = (bitrate(data), obs_data_has_user_value(data, BITRATE.as_ptr()));
+        let out = (
+            bitrate(data),
+            obs_data_has_user_value(data, BITRATE.as_ptr()),
+        );
         obs_data_release(data);
         Some(out)
     }
@@ -242,9 +238,18 @@ fn service_functions_match_the_c() {
         unsafe {
             take_trace();
             for (cp, rp) in [(cs.ptr, rs.ptr), (ptr::null_mut(), ptr::null_mut())] {
-                assert_eq!(c::oracle_obs_service_get_name(cp), rust::obs_service_get_name(rp));
-                assert_eq!(c::oracle_obs_service_get_type(cp), rust::obs_service_get_type(rp));
-                assert_eq!(c::oracle_obs_service_get_id(cp), rust::obs_service_get_id(rp));
+                assert_eq!(
+                    c::oracle_obs_service_get_name(cp),
+                    rust::obs_service_get_name(rp)
+                );
+                assert_eq!(
+                    c::oracle_obs_service_get_type(cp),
+                    rust::obs_service_get_type(rp)
+                );
+                assert_eq!(
+                    c::oracle_obs_service_get_id(cp),
+                    rust::obs_service_get_id(rp)
+                );
                 assert_eq!(
                     c::oracle_obs_service_get_type_data(cp),
                     rust::obs_service_get_type_data(rp)

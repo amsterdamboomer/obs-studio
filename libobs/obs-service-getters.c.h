@@ -219,7 +219,7 @@ void obs_service_apply_encoder_settings(obs_service_t *service, obs_data_t *vide
 
 	if (video_encoder_settings || audio_encoder_settings)
 		service_info(service)->apply_encoder_settings(service_data(service), video_encoder_settings,
-						     audio_encoder_settings);
+							      audio_encoder_settings);
 }
 
 void *obs_service_get_type_data(obs_service_t *service)

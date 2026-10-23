@@ -107,7 +107,9 @@ pub fn benchmarks(criterion: &mut Criterion) {
     );
 
     // SAFETY: a static name; the settings stay NULL (not read below).
-    unsafe { c::oracle_service_set_context(service, c"bench".as_ptr().cast_mut(), ptr::null_mut()) };
+    unsafe {
+        c::oracle_service_set_context(service, c"bench".as_ptr().cast_mut(), ptr::null_mut())
+    };
     // SAFETY: the table outlives the lookups; reset below.
     unsafe { c::oracle_service_set_types((&raw const info).cast(), 1) };
     let id = c"bench_service".as_ptr();

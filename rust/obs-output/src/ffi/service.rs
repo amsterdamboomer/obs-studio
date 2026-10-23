@@ -363,9 +363,28 @@ impl Host for CHost {
     }
 }
 
+/// A registered table, as the type of the functions of #1913 (private, so
+/// its callers stay behind the `unsafe` shims).
+#[repr(transparent)]
+struct CType(ObsServiceInfo);
+
+impl CType {
+    fn of(info: &ObsServiceInfo) -> &CType {
+        // SAFETY: repr(transparent) over ObsServiceInfo.
+        unsafe { &*ptr::from_ref(info).cast::<CType>() }
+    }
+}
+
+impl core::ops::Deref for CType {
+    type Target = ObsServiceInfo;
+    fn deref(&self) -> &ObsServiceInfo {
+        &self.0
+    }
+}
+
 // SAFETY, every call below: a plugin callback of this registered table, as
 // the C calls it.
-impl Type<CHost> for ObsServiceInfo {
+impl Type<CHost> for CType {
     type Str = *const c_char;
     type Ptr = *mut c_void;
 
@@ -436,10 +455,10 @@ impl CContext {
 
 // SAFETY, every call below: a hidden accessor of a live service.
 impl Service<CHost> for CContext {
-    type Type = ObsServiceInfo;
+    type Type = CType;
 
-    fn info(&self) -> &ObsServiceInfo {
-        self.inner.info()
+    fn info(&self) -> &CType {
+        CType::of(self.inner.info())
     }
     fn data(&self) -> *mut c_void {
         self.inner.data
@@ -457,9 +476,9 @@ impl Service<CHost> for CContext {
 /// # Safety
 ///
 /// `id` is a C string; libobs is started.
-unsafe fn find(id: *const c_char) -> Option<&'static ObsServiceInfo> {
+unsafe fn find(id: *const c_char) -> Option<&'static CType> {
     // SAFETY: the registered table lives until obs_shutdown.
-    unsafe { find_service(id).as_ref() }
+    unsafe { find_service(id).as_ref() }.map(CType::of)
 }
 
 fn nullable(data: *mut c_void) -> Option<*mut c_void> {

@@ -98,7 +98,11 @@ impl Type<Fake> for Ty<'_> {
         if self.full { 77 } else { 0 }
     }
     fn display_name(&self) -> &'static str {
-        if self.full { "Settings full" } else { "Settings bare" }
+        if self.full {
+            "Settings full"
+        } else {
+            "Settings bare"
+        }
     }
     fn defaults(&self, settings: usize) -> bool {
         if !self.full {
@@ -172,8 +176,14 @@ fn svc(host: &Fake, full: bool) -> Svc<'_> {
 #[test]
 fn display_name_by_id() {
     let h = Fake::default();
-    let full = Ty { host: &h, full: true };
-    let bare = Ty { host: &h, full: false };
+    let full = Ty {
+        host: &h,
+        full: true,
+    };
+    let bare = Ty {
+        host: &h,
+        full: false,
+    };
     assert_eq!(service::display_name(Some(&full)), Some("Settings full"));
     assert_eq!(service::display_name(Some(&bare)), Some("Settings bare"));
     assert_eq!(service::display_name::<Fake, Ty>(None), None);
@@ -182,12 +192,26 @@ fn display_name_by_id() {
 #[test]
 fn defaults_by_id() {
     let h = Fake::default();
-    let d = service::defaults(&h, Some(&Ty { host: &h, full: true })).unwrap();
+    let d = service::defaults(
+        &h,
+        Some(&Ty {
+            host: &h,
+            full: true,
+        }),
+    )
+    .unwrap();
     assert_eq!(h.get(d, "bitrate"), Some(2500));
     assert_eq!(h.take(), [format!("create {d}"), format!("defaults {d}")]);
 
     // No get_defaults: an empty object, not NULL.
-    let d = service::defaults(&h, Some(&Ty { host: &h, full: false })).unwrap();
+    let d = service::defaults(
+        &h,
+        Some(&Ty {
+            host: &h,
+            full: false,
+        }),
+    )
+    .unwrap();
     assert!(h.objects.borrow()[d].is_empty());
     assert_eq!(service::defaults::<Fake, Ty>(&h, None), None);
 }
@@ -195,7 +219,13 @@ fn defaults_by_id() {
 #[test]
 fn properties_by_id() {
     let h = Fake::default();
-    let p = service::type_properties(&h, Some(&Ty { host: &h, full: true }));
+    let p = service::type_properties(
+        &h,
+        Some(&Ty {
+            host: &h,
+            full: true,
+        }),
+    );
     assert_eq!(p, Some(Some("props")));
     // Defaults first, then get_properties(NULL), apply, release.
     assert_eq!(
@@ -208,7 +238,16 @@ fn properties_by_id() {
             "release 0"
         ]
     );
-    assert_eq!(service::type_properties(&h, Some(&Ty { host: &h, full: false })), None);
+    assert_eq!(
+        service::type_properties(
+            &h,
+            Some(&Ty {
+                host: &h,
+                full: false
+            })
+        ),
+        None
+    );
     assert!(h.take().is_empty());
     assert_eq!(service::type_properties::<Fake, Ty>(&h, None), None);
 }
@@ -247,10 +286,16 @@ fn properties_on_service() {
     let h = Fake::default();
     let log = Log::default();
     let full = svc(&h, true);
-    assert_eq!(service::properties(&h, Some(&full), &log), Some(Some("props")));
+    assert_eq!(
+        service::properties(&h, Some(&full), &log),
+        Some(Some("props"))
+    );
     assert_eq!(
         h.take(),
-        ["get_properties 42", "props_apply Some(\"props\") bitrate=Some(2500)"]
+        [
+            "get_properties 42",
+            "props_apply Some(\"props\") bitrate=Some(2500)"
+        ]
     );
     assert_eq!(service::properties(&h, Some(&svc(&h, false)), &log), None);
     assert_eq!(service::properties::<Fake, Svc>(&h, None, &log), None);
@@ -272,7 +317,10 @@ fn update_and_settings() {
         ]
     );
 
-    assert_eq!(service::settings(&h, Some(&full), &log), Some(full.settings));
+    assert_eq!(
+        service::settings(&h, Some(&full), &log),
+        Some(full.settings)
+    );
     assert_eq!(h.take(), [format!("addref {}", full.settings)]);
 
     // No update callback: the settings still change. NULL settings: applied
@@ -286,7 +334,10 @@ fn update_and_settings() {
     assert!(h.take().is_empty());
     assert_eq!(
         *log.0.borrow(),
-        ["obs_service_update:service", "obs_service_get_settings:service"]
+        [
+            "obs_service_update:service",
+            "obs_service_get_settings:service"
+        ]
     );
 }
 
@@ -311,5 +362,8 @@ fn apply_encoder_settings() {
     service::apply_encoder_settings(Some(&svc(&h, false)), &log, Some(5), Some(6));
     service::apply_encoder_settings::<Fake, Svc>(None, &log, Some(5), Some(6));
     assert!(h.take().is_empty());
-    assert_eq!(*log.0.borrow(), ["obs_service_apply_encoder_settings:service"]);
+    assert_eq!(
+        *log.0.borrow(),
+        ["obs_service_apply_encoder_settings:service"]
+    );
 }
