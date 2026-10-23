@@ -11,9 +11,6 @@
 use core::ffi::{CStr, c_char, c_int, c_void};
 use core::ptr::{self, NonNull};
 
-use obs_util::ffi::bmem::{bfree, bmalloc};
-use obs_util::ffi::platform_file::{os_fopen, os_ftelli64};
-
 use crate::image_file::{FileRead, GifInfo, Host, ImageAlphaMode, ImageFileEx, Internal};
 use crate::texture_render::{ColorFormat, ColorSpace};
 
@@ -85,6 +82,15 @@ unsafe extern "C" {
     fn gs_texture_set_image(tex: *mut c_void, data: *const u8, linesize: u32, flip: bool);
 
     fn blog(log_level: c_int, format: *const c_char, ...);
+
+    // libobs exports, declared rather than called through obs-util's Rust
+    // paths: an executable that links the staticlib next to libobs (as
+    // test_effect_parser_lifecycle_rust does) then takes them from libobs
+    // instead of pulling obs-util objects that clash with it.
+    fn bmalloc(size: usize) -> *mut c_void;
+    fn bfree(ptr: *mut c_void);
+    fn os_fopen(path: *const c_char, mode: *const c_char) -> *mut c_void;
+    fn os_ftelli64(file: *mut c_void) -> i64;
 }
 
 unsafe extern "C" fn bi_def_bitmap_create(width: c_int, height: c_int) -> *mut c_void {
@@ -356,13 +362,24 @@ pub unsafe extern "C" fn gs_image_file_ex_init(
     if image.is_null() {
         return;
     }
-    // SAFETY: writable; written whole before it is borrowed, as the C
-    // memsets it first.
-    unsafe { image.write(ImageFileEx::default()) };
+    // SAFETY: writable; zeroed (padding included, as the C memset does)
+    // and written whole before it is borrowed.
+    unsafe {
+        ptr::write_bytes(image, 0, 1);
+        image.write(ImageFileEx::default());
+    }
     // SAFETY: null or a NUL-terminated path.
     let file = (!file.is_null()).then(|| unsafe { CStr::from_ptr(file) });
     // SAFETY: initialized above.
-    unsafe { &mut *image }.init(file, alpha_mode);
+    let loaded = unsafe {
+        (*image).init(file, alpha_mode);
+        (*image).loaded
+    };
+    if !loaded {
+        // SAFETY: the same image, all default after a failed init; zeroes
+        // its padding too, as the C memset in free does.
+        unsafe { ptr::write_bytes(image, 0, 1) };
+    }
 }
 
 /// # Safety
@@ -370,8 +387,10 @@ pub unsafe extern "C" fn gs_image_file_ex_init(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn gs_image_file_ex_free(image: *mut gs_image_file_ex_t) {
     // SAFETY: null or a live image, borrowed for this call.
-    if let Some(image) = unsafe { image.as_mut() } {
-        image.free();
+    if let Some(live) = unsafe { image.as_mut() } {
+        live.free();
+        // SAFETY: the same image; the C memset also zeroes its padding.
+        unsafe { ptr::write_bytes(image, 0, 1) };
     }
 }
 
