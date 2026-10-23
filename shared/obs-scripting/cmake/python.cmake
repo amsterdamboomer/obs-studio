@@ -29,6 +29,9 @@ if(ENABLE_SCRIPTING_PYTHON)
     PRIVATE
       $<$<BOOL:${ENABLE_FRONTEND}>:build/obs-scripting.python-frontend+.h.c>
       $<$<PLATFORM_ID:Windows,Darwin>:build/obs-scripting.python-import+.h.c>
+      $<$<PLATFORM_ID:Darwin>:build/obs-scripting.python-import-host-macos+.h.c>
+      $<$<PLATFORM_ID:Windows>:build/obs-scripting.python-import-host-windows+.h.c>
+      obs-scripting-python-import-host.h
       obs-scripting-python-import.h
       obs-scripting-python-startup.h
       build/obs-scripting.python+.h.c
