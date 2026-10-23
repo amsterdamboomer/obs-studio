@@ -320,8 +320,10 @@ class LaneTableTest(unittest.TestCase):
                 'set(_ws_src "${CMAKE_SOURCE_DIR}/plugins/obs-websocket/src")\n',
                 'add_executable(t "${CMAKE_SOURCE_DIR}/frontend/utility/Foo.cpp")\n',
                 "list(APPEND s ${CMAKE_SOURCE_DIR}/plugins/linux-v4l2/${f})\n",
+                'target_include_directories(t PRIVATE "${CMAKE_SOURCE_DIR}/frontend")\n',
             ]
         )
+        self.assertNotIn("frontend", refs)
         sc = lambda f: scope([f], read=lambda p: CARGO.get(p, ""), cmocka_paths=refs)  # noqa: E731
         for f in (
             "plugins/obs-websocket",  # gitlink
