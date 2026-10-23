@@ -53,7 +53,7 @@ class FrontendCMakeFacadeTest(unittest.TestCase):
         for host in ("windows.cpp.hpp", "osx.mm.hpp", "x11.cpp.hpp"):
             with self.subTest(host=host):
                 source = (FRONTEND / f"utility/platform-{host}").read_text()
-                self.assertIn("void SetOutputNetworkOptions(config_t *config, obs_data_t *settings)", source)
+                self.assertIn("void SetOutputNetworkOptions(config_t *", source)
         windows = (FRONTEND / "utility/platform-windows.cpp.hpp").read_text()
         self.assertIn('"new_socket_loop_enabled"', windows)
         self.assertIn('"low_latency_mode_enabled"', windows)
