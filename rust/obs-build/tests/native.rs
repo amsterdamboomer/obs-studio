@@ -2048,9 +2048,18 @@ fn swift_bridge_preserves_native_linkage_header_flags_and_source_rebuilds() {
             "DEBUG" => Some("true".into()),
             "OBS_SYS_NATIVE_ASSERTIONS" => Some(assertions.into()),
             _ => None,
-        }).unwrap();
-        let artifact = build.with_profile(profile).swift_shared_library(&library).unwrap();
-        assert_native_answer_fresh(&artifact, "obs_fixture_swift_assertions", expected, &selector);
+        })
+        .unwrap();
+        let artifact = build
+            .with_profile(profile)
+            .swift_shared_library(&library)
+            .unwrap();
+        assert_native_answer_fresh(
+            &artifact,
+            "obs_fixture_swift_assertions",
+            expected,
+            &selector,
+        );
     }
 }
 

@@ -111,6 +111,14 @@ pub fn build(build: &NativeBuild, library: &SwiftLibrary) -> Result<PathBuf, Str
         "s" | "z" => "-Osize",
         _ => "-O",
     });
+    command.args([
+        "-assert-config",
+        if build.profile.assertions() {
+            "Debug"
+        } else {
+            "Release"
+        },
+    ]);
     if build.profile.debug_info() {
         command.arg("-g");
     }
