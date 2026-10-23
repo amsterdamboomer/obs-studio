@@ -118,6 +118,37 @@ extern const struct profile_vaapi_host profile_vaapi_system_host;
 
 void profile_vaapi_diagnose(const struct profile_vaapi_host *host, struct profile_vaapi_diagnosis *out);
 
+/* Why obs-qsv11 found no Intel Quick Sync device, for the same missing-profile
+ * path as VA-API (obs-rust/obs-studio#1720; AppImage QSV work #1863). */
+enum profile_qsv_cause {
+	PROFILE_QSV_NO_INTEL_GPU,
+	PROFILE_QSV_UNSUPPORTED,
+	PROFILE_QSV_RUNTIME_MISSING,
+	PROFILE_QSV_NO_ACCESS,
+	PROFILE_QSV_OPERATIONAL,
+};
+
+enum profile_qsv_family {
+	PROFILE_QSV_UNSUPPORTED_FAMILY,
+	PROFILE_QSV_MEDIA_SDK,
+	PROFILE_QSV_ONEVPL,
+};
+
+struct profile_qsv_diagnosis {
+	enum profile_qsv_cause cause;
+	enum profile_qsv_family family;
+	char device[32];
+	unsigned int vendor;
+	unsigned int device_id;
+	const char *package;
+	const char *install_command;
+};
+
+/* Pure so the PCI generation policy is covered without host I/O. Unknown
+ * Intel IDs deliberately remain unsupported: never guess a runtime package. */
+enum profile_qsv_family profile_qsv_family_for_device(unsigned int device_id);
+void profile_qsv_diagnose(const struct profile_vaapi_host *host, struct profile_qsv_diagnosis *out);
+
 #ifdef __cplusplus
 }
 #endif

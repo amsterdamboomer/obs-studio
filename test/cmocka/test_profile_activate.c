@@ -541,7 +541,19 @@ static void test_qsv_no_intel_gpu(void **state)
 static void test_qsv_onevpl_arc_family(void **state)
 {
 	(void)state;
-	assert_int_equal(profile_qsv_family_for_device(0x56a0), PROFILE_QSV_ONEVPL);
+	const struct fake_file files[] = {
+		{"/etc/os-release", ubuntu},
+		{"/dev/dri/renderD128", ""},
+		{"/sys/class/drm/renderD128/device/vendor", "0x8086\n"},
+		{"/sys/class/drm/renderD128/device/device", "0x56a0\n"},
+		{NULL, NULL},
+	};
+	struct fake_host h = {files, rw_128};
+	struct profile_qsv_diagnosis d;
+	qsv_diagnose(&h, &d);
+	assert_int_equal(d.cause, PROFILE_QSV_RUNTIME_MISSING);
+	assert_int_equal(d.family, PROFILE_QSV_ONEVPL);
+	assert_string_equal(d.package, "libmfx-gen1.2 libvpl2");
 }
 
 static void test_qsv_unsupported_intel_generation(void **state)
@@ -599,7 +611,7 @@ static void test_qsv_generation_classifier(void **state)
 {
 	(void)state;
 	assert_int_equal(profile_qsv_family_for_device(0x1912), PROFILE_QSV_MEDIA_SDK); /* HD 530 */
-	assert_int_equal(profile_qsv_family_for_device(0x56a0), PROFILE_QSV_ONEVPL);     /* Arc A-series */
+	assert_int_equal(profile_qsv_family_for_device(0x56a0), PROFILE_QSV_ONEVPL);    /* Arc A-series */
 	/* Unknown IDs are unsupported: do not recommend a potentially wrong runtime. */
 	assert_int_equal(profile_qsv_family_for_device(0xffff), PROFILE_QSV_UNSUPPORTED_FAMILY);
 }

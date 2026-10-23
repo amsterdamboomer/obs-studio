@@ -1141,6 +1141,47 @@ ErrorDetails VaapiMissingDetails(const char *encoder)
 	return ErrorDetails{"vaapi_not_supported", QTStr("EncoderMissing.VAAPI.NotSupported")};
 }
 
+ErrorDetails QsvMissingDetails(const char *encoder)
+{
+	/* The shared frontend asks the platform facade rather than introducing a
+	 * host preprocessor conditional here. Sysfs render-node diagnosis is Linux
+	 * only; macOS and Windows retain the generic QSV explanation. */
+	if (GetPlatformVersionName() != "linux") {
+		return ErrorDetails{"qsv_no_device", QTStr("EncoderMissing.QSV.NoDevice")};
+	}
+	struct profile_qsv_diagnosis d;
+	profile_qsv_diagnose(&profile_vaapi_system_host, &d);
+	static const char *const causes[] = {"no Intel GPU", "unsupported Intel GPU", "runtime missing",
+					     "no access to the render device", "QSV operational"};
+	blog(LOG_WARNING, "QSV: encoder '%s' missing: %s (device '%s', vendor 0x%04x, device 0x%04x%s%s)", encoder,
+	     causes[d.cause], d.device, d.vendor, d.device_id, d.package ? ", package " : "",
+	     d.package ? d.package : "");
+
+	switch (d.cause) {
+	case PROFILE_QSV_NO_INTEL_GPU:
+		return ErrorDetails{"qsv_no_intel_gpu", QTStr("EncoderMissing.QSV.NoIntelGPU")};
+	case PROFILE_QSV_UNSUPPORTED:
+		return ErrorDetails{"qsv_unsupported", QTStr("EncoderMissing.QSV.Unsupported")};
+	case PROFILE_QSV_RUNTIME_MISSING:
+		if (d.install_command) {
+			return ErrorDetails{"qsv_runtime_missing", QTStr("EncoderMissing.QSV.RuntimeMissing")
+									   .arg(d.device_id, 4, 16, QChar('0'))
+									   .arg(d.install_command)};
+		}
+		if (d.package) {
+			return ErrorDetails{"qsv_runtime_missing", QTStr("EncoderMissing.QSV.RuntimeMissingPackage")
+									   .arg(d.device_id, 4, 16, QChar('0'))
+									   .arg(d.package)};
+		}
+		break;
+	case PROFILE_QSV_NO_ACCESS:
+		return ErrorDetails{"qsv_no_access", QTStr("EncoderMissing.VAAPI.NoAccess").arg(d.device)};
+	case PROFILE_QSV_OPERATIONAL:
+		return std::nullopt;
+	}
+	return ErrorDetails{"qsv_no_device", QTStr("EncoderMissing.QSV.NoDevice")};
+}
+
 CheckResult CheckHardwareEncoder(std::string_view encoder)
 {
 	const std::string id(encoder);
@@ -1155,7 +1196,7 @@ CheckResult CheckHardwareEncoder(std::string_view encoder)
 	case PROFILE_MISSING_ENCODER_NO_VAAPI_DEVICE:
 		return VaapiMissingDetails(id.c_str());
 	case PROFILE_MISSING_ENCODER_NO_QSV_DEVICE:
-		return ErrorDetails{"qsv_no_device", QTStr("EncoderMissing.QSV.NoDevice")};
+		return QsvMissingDetails(id.c_str());
 	case PROFILE_MISSING_ENCODER_UNKNOWN:
 		break;
 	}

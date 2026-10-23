@@ -190,6 +190,11 @@ not get a line.
   [#1862](https://github.com/obs-rust/obs-studio/issues/1862), PRs
   [#1841](https://github.com/obs-rust/obs-studio/pull/1841),
   [#1872](https://github.com/obs-rust/obs-studio/pull/1872).
+
+  On Linux, when the selected missing encoder is QSV, OBS also checks the
+  Intel render device and its Media SDK or oneVPL runtime. It names a missing
+  runtime and verified distribution command, reuses the render-group access
+  guidance, and otherwise recommends another encoder without an install prompt.
 - **QSV probe log.** On Linux, the OBS log has one `QSV probe:` line per GPU
   render device, with whether VA-API opened it, its driver and whether it
   encodes HEVC and AV1. That is what decides which Quick Sync encoders
