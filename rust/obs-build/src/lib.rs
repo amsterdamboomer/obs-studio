@@ -110,6 +110,13 @@ pub enum NativeProfile {
 }
 
 impl NativeProfile {
+    /// Select bundled native policy from effective Cargo settings and explicit overrides.
+    pub fn from_cargo_lookup(
+        _lookup: impl FnMut(&str) -> Option<std::ffi::OsString>,
+    ) -> Result<Self, String> {
+        Err("Cargo native configuration selection is not implemented".into())
+    }
+
     pub(crate) fn optimization(self) -> &'static str {
         match self {
             Self::Debug => "0",

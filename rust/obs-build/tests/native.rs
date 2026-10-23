@@ -3,6 +3,42 @@ use obs_build::{NativeBuild, SharedLibrary};
 use std::{fs, path::Path};
 
 #[test]
+fn cargo_native_profile_uses_effective_optimization_and_symbols() {
+    use obs_build::NativeProfile;
+    for (optimization, symbols, expected) in [
+        ("0", "true", NativeProfile::Debug),
+        ("3", "false", NativeProfile::Release),
+        ("2", "true", NativeProfile::RelWithDebInfo),
+        ("s", "false", NativeProfile::MinSizeRel),
+    ] {
+        let actual = NativeProfile::from_cargo_lookup(|key| match key {
+            "OPT_LEVEL" => Some(optimization.into()),
+            "DEBUG" => Some(symbols.into()),
+            // Deliberately misleading: effective settings must win.
+            "PROFILE" => Some("debug".into()),
+            _ => None,
+        })
+        .unwrap();
+        assert_eq!(actual, expected);
+    }
+    for (key, value) in [
+        ("OPT_LEVEL", "fast"),
+        ("DEBUG", "yes"),
+        ("OBS_SYS_NATIVE_PROFILE", "fast"),
+        ("OBS_SYS_NATIVE_ASSERTIONS", "yes"),
+    ] {
+        let error = NativeProfile::from_cargo_lookup(|name| match name {
+            name if name == key => Some(value.into()),
+            "OPT_LEVEL" => Some("2".into()),
+            "DEBUG" => Some("true".into()),
+            _ => None,
+        })
+        .unwrap_err();
+        assert!(error.contains(key), "{error}");
+    }
+}
+
+#[test]
 fn native_test_graph_rejects_colliding_qt_ui_outputs() {
     let root = tempfile::tempdir().unwrap();
     let graph = serde_json::json!({"schema": 1, "targets": {
