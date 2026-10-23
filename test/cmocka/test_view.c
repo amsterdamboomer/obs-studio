@@ -50,6 +50,12 @@ static void src_destroy(void *data)
 	bfree(data);
 }
 
+static uint32_t src_size(void *data)
+{
+	(void)data;
+	return 0;
+}
+
 static bool obs_up;
 
 static int group_setup(void **state)
@@ -72,8 +78,16 @@ static int group_setup(void **state)
 		.get_name = src_name,
 		.create = src_create,
 		.destroy = src_destroy,
+		.get_width = src_size,
+		.get_height = src_size,
 	};
 	obs_register_source(&info);
+	/* A rejected registration would leave a "missing" placeholder source
+	 * that never calls destroy. */
+	if (!obs_source_get_display_name(SRC_ID)) {
+		fprintf(stderr, "obs_register_source failed\n");
+		return -1;
+	}
 	return 0;
 }
 
