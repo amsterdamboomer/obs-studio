@@ -1932,7 +1932,7 @@ jobs:
           soldr cargo test -p obs-studio-rust --locked --test obs-tests-app -- --exact qt_sdk::qt_sdk_resolves_published_sdks --nocapture 2>&1 | tee "${RUNNER_TEMP}/qt-sdk.log"
           grep -q ": Qt 6\." "${RUNNER_TEMP}/qt-sdk.log"
           # The Qt native test graph (moc, uic, rcc, link, run) against the
-          # same SDK; Windows loads the Qt DLLs and the offscreen plugin
+          # same SDK; Windows loads the Qt DLLs and the minimal platform plugin
           # from the SDK.
           export OBS_QT_TARGET_PREFIX="${RUNNER_TEMP}/qt" CMAKE_PREFIX_PATH="${RUNNER_TEMP}/qt" QT_PLUGIN_PATH="${RUNNER_TEMP}/qt/plugins"
           if [[ "${RUNNER_OS}" == Windows ]]; then

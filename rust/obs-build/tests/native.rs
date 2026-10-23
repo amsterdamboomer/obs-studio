@@ -327,7 +327,7 @@ fn native_test_graph_generates_qt_metaobjects() {
             "qt": {"moc": ["answer.hpp"], "uic": ["answer.ui"], "rcc": ["answer.qrc"]},
             "libraries": ["Qt6::Widgets"]
         }},
-        "tests": {"answer": {"target": "answer", "environment": {"QT_QPA_PLATFORM": "offscreen"}}, "twin": {"target": "twin"}}
+        "tests": {"answer": {"target": "answer", "environment": {"QT_QPA_PLATFORM": "minimal"}}, "twin": {"target": "twin"}}
     });
     let parsed = obs_build::validation::graph::Graph::parse(&graph.to_string()).unwrap();
     let build = NativeBuild {
@@ -351,7 +351,8 @@ fn native_test_graph_generates_qt_metaobjects() {
         .compile(&build, root, &Default::default(), &interfaces)
         .unwrap();
     let mut answer = std::process::Command::new(&artifacts["answer"]);
-    answer.env("QT_QPA_PLATFORM", "offscreen");
+    // minimal, not offscreen: the published Windows SDK ships no qoffscreen.
+    answer.env("QT_QPA_PLATFORM", "minimal");
     let output = bounded(answer);
     assert!(
         output.status.success(),
