@@ -12,17 +12,11 @@ if(TARGET Qt6::Widgets)
     "${CMAKE_SOURCE_DIR}/frontend/utility/undo_stack.cpp.hpp"
     ${_undo_stack_moc}
   )
-  set_source_files_properties(
-    "${CMAKE_SOURCE_DIR}/frontend/utility/undo_stack.cpp.hpp"
-    PROPERTIES LANGUAGE CXX
-  )
+  set_source_files_properties("${CMAKE_SOURCE_DIR}/frontend/utility/undo_stack.cpp.hpp" PROPERTIES LANGUAGE CXX)
   target_include_directories(
     test_undo_stack_enable
     BEFORE
-    PRIVATE
-      "${CMAKE_CURRENT_SOURCE_DIR}/undo-stack-stubs"
-      "${CMAKE_SOURCE_DIR}/frontend/utility"
-      ${CMOCKA_INCLUDE_DIR}
+    PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/undo-stack-stubs" "${CMAKE_SOURCE_DIR}/frontend/utility" ${CMOCKA_INCLUDE_DIR}
   )
   target_link_libraries(test_undo_stack_enable PRIVATE Qt6::Widgets ${CMOCKA_LIBRARIES})
   add_dependencies(cmocka-tests test_undo_stack_enable)

@@ -27,9 +27,7 @@ extern "C" {
 #include <cmocka.h>
 }
 
-static void noop(const std::string &)
-{
-}
+static void noop(const std::string &) {}
 
 static void enable_keeps_empty_undo_disabled(void **)
 {
