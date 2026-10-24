@@ -209,11 +209,16 @@ void obs_canvas_destroy(obs_canvas_t *canvas)
 
 	obs_source_t *source = canvas->sources;
 	while (source) {
+		/* The release can free the source; take the next one first. A
+		 * freed source stays in the list: with the canvas at zero refs,
+		 * obs_canvas_remove_source() cannot find it (#2049). */
+		obs_source_t *next = source->context.hh.next;
+
 		/* Canvases can hold strong refs to scene sources, release them here. */
 		if (canvas->flags & SCENE_REF && obs_source_is_scene(source))
 			obs_source_release(source);
 
-		source = source->context.hh.next;
+		source = next;
 	}
 
 	/* Sources still in it are destroyed later by obs_free_data(), which
