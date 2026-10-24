@@ -46,8 +46,9 @@ static int setup(void **state)
 		dock->setWidget(new QLabel(QStringLiteral("contents")));
 		dock->widget()->setMinimumWidth(dock_min_width);
 		f->window->addDockWidget(Qt::BottomDockWidgetArea, dock);
-		if (i)
+		if (i) {
 			f->window->splitDockWidget(f->docks.last(), dock, Qt::Horizontal);
+		}
 		f->docks.append(dock);
 	}
 	f->window->resize(1600, 900);
@@ -70,16 +71,18 @@ static int teardown(void **state)
 static QList<int> widths(const Fixture *f)
 {
 	QList<int> result;
-	for (QDockWidget *dock : f->docks)
+	for (QDockWidget *dock : f->docks) {
 		result.append(dock->width());
+	}
 	return result;
 }
 
 static void print_widths(const char *when, const QList<int> &w)
 {
 	printf("%s:", when);
-	for (int width : w)
+	for (int width : w) {
 		printf(" %d", width);
+	}
 	printf("\n");
 }
 
@@ -96,7 +99,7 @@ static void assert_same_shares(const QList<int> &before, const QList<int> &after
 		int share_after = after[i] * 1000 / total_after;
 		if (abs(share_before - share_after) > 20) {
 			print_error("dock %d: %d.%d%% of the row before, %d.%d%% after\n", i, share_before / 10,
-			    share_before % 10, share_after / 10, share_after % 10);
+				    share_before % 10, share_after / 10, share_after % 10);
 			fail();
 		}
 	}
@@ -112,8 +115,9 @@ static void narrow_then_wide_keeps_shares(void **state)
 	QTest::qWait(50);
 	print_widths("narrow", widths(f));
 	/* The narrow window really clamps the docks to their minimum. */
-	for (int width : widths(f))
+	for (int width : widths(f)) {
 		assert_true(width <= dock_min_width + 10);
+	}
 
 	f->window->resize(1600, 900);
 	QTest::qWait(50);
