@@ -387,20 +387,28 @@ fn steps_quad_texture_size() {
     assert!(!quad_texture_size(f32::from_bits(0xffc0_0000)));
 }
 
-/// Each axis follows its own bit (#2124, changed for maintainer sign-off:
-/// upstream picked the v-flipped buffer for any bit, so `GS_FLIP_U` drew a
-/// texture upside down).
+/// The static buffer: none for 0, the v-flipped one for any other flip,
+/// except that a flip with `GS_FLIP_U` set picks the buffer flipped on each
+/// axis whose bit is set (#2124, changed for maintainer sign-off, the U and
+/// U|V rows only: upstream picked the v-flipped buffer for them, so
+/// `GS_FLIP_U` drew a texture upside down).
+fn want_quad_buffer(flip: u32) -> u32 {
+    match flip {
+        0 => 0,
+        f if f & FLIP_U != 0 => f & (FLIP_U | FLIP_V),
+        _ => FLIP_V,
+    }
+}
+
 #[test]
 fn steps_quad_buffer() {
-    for flip in FLIPS {
-        assert_eq!(quad_buffer(flip), flip & (FLIP_U | FLIP_V), "{flip:#x}");
-    }
     assert_eq!(quad_buffer(0), 0);
+    for flip in &FLIPS[1..] {
+        assert_eq!(quad_buffer(*flip), want_quad_buffer(*flip), "{flip:#x}");
+    }
+    // #2124: was the v-flipped buffer
     assert_eq!(quad_buffer(FLIP_U), FLIP_U);
-    assert_eq!(quad_buffer(FLIP_V), FLIP_V);
-    assert_eq!(quad_buffer(FLIP_U | FLIP_V), FLIP_U | FLIP_V);
-    assert_eq!(quad_buffer(1 << 2), 0);
-    assert_eq!(quad_buffer(u32::MAX), FLIP_U | FLIP_V);
+    assert_eq!(quad_buffer(1 << 2), FLIP_V);
 }
 
 #[track_caller]
@@ -842,7 +850,7 @@ proptest! {
         };
         prop_assert_eq!(refusal, want);
         prop_assert_eq!(quad_texture_size(w), w.to_bits() & 0x7fff_ffff == 0);
-        prop_assert_eq!(quad_buffer(flip), flip & (FLIP_U | FLIP_V));
+        prop_assert_eq!(quad_buffer(flip), want_quad_buffer(flip));
     }
 
     #[test]

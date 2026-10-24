@@ -27,8 +27,12 @@
 //!   `f32` range), full-range line sizes and heights, and any flags and
 //!   levels.
 //!
-//! Intentional difference (not compared): a null `points` or `uvs` is not
-//! written through by the shim; the C writes through it.
+//! Intentional differences (not compared): a null `points` or `uvs` is not
+//! written through by the shim; the C writes through it. And #2124, a fixed
+//! upstream bug: for a flip with `GS_FLIP_U` set, `gs_sprite_quad_buffer`
+//! picks the buffer flipped on each axis whose bit is set, where upstream
+//! (the oracle's `oracle_gs_sprite_quad_flipped_buffer`, kept as upstream
+//! wrote it) drew the buffer flipped on v; every other flip matches it.
 
 use core::ffi::c_int;
 use core::mem::{offset_of, size_of};
@@ -103,11 +107,28 @@ fn check_subregion(region: [u32; 6], flip: u32) {
     );
 }
 
+/// The static buffer against upstream's choice (the oracle: any bit draws
+/// the buffer flipped on v), except the intended divergence of #2124: a
+/// flip with `GS_FLIP_U` set picks the buffer flipped on each axis whose bit
+/// is set (`GS_FLIP_U` mirrors instead of turning upside down). Exactly
+/// those inputs are excluded from the comparison and checked on the shim
+/// alone, and they are the only inputs where the two differ.
 #[track_caller]
 fn check_quad_buffer(flip: u32) {
     // SAFETY: plain values in and out.
-    let want = unsafe { c::oracle_gs_sprite_quad_buffer(flip) };
-    assert_eq!(r::gs_sprite_quad_buffer(flip), want, "{flip:#x}");
+    let upstream = if unsafe { c::oracle_gs_sprite_quad_flipped_buffer(flip) } {
+        FLIP_V
+    } else {
+        0
+    };
+    let got = r::gs_sprite_quad_buffer(flip);
+    if flip & FLIP_U == 0 {
+        assert_eq!(got, upstream, "{flip:#x}");
+    } else {
+        // #2124: intended divergence from upstream
+        assert_eq!(upstream, FLIP_V, "{flip:#x}");
+        assert_eq!(got, flip & (FLIP_U | FLIP_V), "{flip:#x}");
+    }
 }
 
 #[track_caller]

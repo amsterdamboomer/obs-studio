@@ -107,7 +107,9 @@ bool gs_sprite_quad_texture_size(float size);
 /* Which static sprite buffer gs_draw_quadf() draws a texture that is not a
  * rectangle texture with: the flip bits of the buffer's normalized
  * coordinates, GS_SPRITE_FLIP_U and GS_SPRITE_FLIP_V, each axis by its own
- * bit of flip; other bits are ignored. 0 to 3, an index into
+ * bit of flip. A flip of only other bits picks GS_SPRITE_FLIP_V, the buffer
+ * upstream drew for any flip (obs-rust/obs-studio#2124 changed only the
+ * GS_FLIP_U and GS_FLIP_U | GS_FLIP_V choices). 0 to 3, an index into
  * graphics_subsystem.sprite_buffers. */
 uint32_t gs_sprite_quad_buffer(uint32_t flip);
 

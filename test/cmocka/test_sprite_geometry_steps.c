@@ -409,22 +409,24 @@ static void quad_texture_size(void **state)
 }
 
 /* The static buffer gs_draw_quadf() draws for a texture that is not a
- * rectangle texture: the one flipped on each axis whose bit is set, as a
- * subregion or a rectangle texture does; other bits are ignored. Changed for
- * obs-rust/obs-studio#2124 (maintainer sign-off): since upstream 7b8b51b29
- * ("Improve sprite drawing perf") any bit picked the buffer flipped on v, so
- * GS_FLIP_U drew the texture upside down instead of mirrored. */
+ * rectangle texture: none for 0, and the one flipped on v for any other
+ * flip, except that a flip with GS_FLIP_U set picks the buffer flipped on
+ * each axis whose bit is set. Changed for obs-rust/obs-studio#2124
+ * (maintainer sign-off), the GS_FLIP_U and GS_FLIP_U | GS_FLIP_V rows only:
+ * since upstream 7b8b51b29 ("Improve sprite drawing perf") those picked the
+ * buffer flipped on v, so GS_FLIP_U drew the texture upside down instead of
+ * mirrored. */
 static void quad_buffer(void **state)
 {
 	(void)state;
-	for (size_t i = 0; i < FLIP_COUNT; i++)
-		assert_int_equal(gs_sprite_quad_buffer(flips[i]), flips[i] & (FLIP_U | FLIP_V));
 	assert_int_equal(gs_sprite_quad_buffer(0), 0);
+	for (size_t i = 1; i < FLIP_COUNT; i++) {
+		const uint32_t want = (flips[i] & FLIP_U) ? flips[i] & (FLIP_U | FLIP_V) : FLIP_V;
+		assert_int_equal(gs_sprite_quad_buffer(flips[i]), want);
+	}
+	/* #2124: was the v-flipped buffer */
 	assert_int_equal(gs_sprite_quad_buffer(FLIP_U), FLIP_U);
-	assert_int_equal(gs_sprite_quad_buffer(FLIP_V), FLIP_V);
-	assert_int_equal(gs_sprite_quad_buffer(FLIP_U | FLIP_V), FLIP_U | FLIP_V);
-	assert_int_equal(gs_sprite_quad_buffer(1u << 2), 0);
-	assert_int_equal(gs_sprite_quad_buffer(UINT32_MAX), FLIP_U | FLIP_V);
+	assert_int_equal(gs_sprite_quad_buffer(1u << 2), FLIP_V);
 }
 
 static void check_plan(struct gs_texture_upload_plan plan, enum gs_texture_upload_mode mode, size_t row_copy,

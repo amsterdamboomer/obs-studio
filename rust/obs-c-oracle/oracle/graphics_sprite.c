@@ -1,6 +1,7 @@
 /* Test-only oracle: the original libobs/graphics/graphics-sprite.c.h,
  * unmodified, with its functions renamed to oracle_* so they can link next
- * to the Rust shims. */
+ * to the Rust shims, plus upstream's static sprite buffer choice below
+ * (obs-rust/obs-studio#2124 fixed it in the tree). */
 #include <stddef.h>
 
 #define gs_sprite_build oracle_gs_sprite_build
@@ -50,6 +51,23 @@
 #undef gs_sprite_uv_rect
 #undef gs_sprite_uv_norm
 #undef gs_sprite_build
+
+/* Upstream's static sprite buffer choice, kept here as upstream wrote it
+ * (gs_sprite_quad_flipped_buffer() before obs-rust/obs-studio#2124, from
+ * gs_draw_quadf()'s "flip ? flipped_sprite_buffer : sprite_buffer" since
+ * upstream 7b8b51b29): any flip bit draws the buffer flipped on v. The
+ * tree's gs_sprite_quad_buffer() fixes GS_FLIP_U, so the oracle keeps this
+ * copy and the differential test records the U and U|V choices as an
+ * intended divergence (rust/obs-graphics/tests/render/sprite_parity.rs). */
+#include <stdbool.h>
+#include <stdint.h>
+
+bool oracle_gs_sprite_quad_flipped_buffer(uint32_t flip);
+
+bool oracle_gs_sprite_quad_flipped_buffer(uint32_t flip)
+{
+	return flip != 0;
+}
 
 /* The constants of the header, in the order of
  * rust/obs-c-oracle/src/graphics_sprite.rs. */

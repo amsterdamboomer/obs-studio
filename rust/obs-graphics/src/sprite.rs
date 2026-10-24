@@ -237,11 +237,14 @@ pub fn quad_texture_size(size: f32) -> bool {
 
 /// The static buffer `gs_draw_quadf` draws a texture that is not a
 /// rectangle texture with: the flip bits of its coordinates, each axis by
-/// its own bit; other bits ignored (#2124: upstream drew the buffer flipped
-/// on v for any bit, so `GS_FLIP_U` turned the texture upside down).
+/// its own bit, and the v-flipped one for a flip of only other bits (#2124:
+/// upstream drew the buffer flipped on v for any bit, so `GS_FLIP_U` turned
+/// the texture upside down; only the U and U|V choices changed).
 #[must_use]
 pub const fn quad_buffer(flip: u32) -> u32 {
-    flip & (FLIP_U | FLIP_V)
+    let axes = flip & (FLIP_U | FLIP_V);
+    // Only unknown bits: the v-flipped buffer, as upstream drew any flip.
+    if axes == 0 && flip != 0 { FLIP_V } else { axes }
 }
 
 /// How `gs_texture_set_image` copies (`enum gs_texture_upload_mode`).
