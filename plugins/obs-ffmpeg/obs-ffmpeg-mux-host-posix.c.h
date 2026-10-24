@@ -2,10 +2,10 @@
 
 const char *ffmpeg_mux_host_exe_name(void)
 {
-	return "";
+	return "obs-ffmpeg-mux";
 }
 
 bool ffmpeg_mux_host_warn_defender(void)
 {
-	return true;
+	return false;
 }

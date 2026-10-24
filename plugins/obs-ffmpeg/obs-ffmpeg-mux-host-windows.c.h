@@ -2,10 +2,13 @@
 
 const char *ffmpeg_mux_host_exe_name(void)
 {
-	return "";
+	return "obs-ffmpeg-mux.exe";
 }
 
+/* Windows 10 and later, whose Defender can block the write. */
 bool ffmpeg_mux_host_warn_defender(void)
 {
-	return true;
+	struct win_version_info ver;
+	get_win_ver(&ver);
+	return ver.major >= 10;
 }
