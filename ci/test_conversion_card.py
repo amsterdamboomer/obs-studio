@@ -29,7 +29,7 @@ class ConversionCard(unittest.TestCase):
             self.assertIn(token, board)
             self.assertIn(token, page)
         self.assertIn("conversion.json", page)
-        self.assertIn("data-ready", page)
+        self.assertIn("dataset.ready", page)
 
     def test_render_takes_a_page_and_an_output(self):
         render = RENDER.read_text()
