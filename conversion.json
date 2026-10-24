@@ -2,15 +2,15 @@
   "app": {
     "by_dir": {
       "frontend": 81880,
-      "libobs": 79312,
+      "libobs": 79471,
       "plugins": 142953,
       "shared": 15915
     },
-    "percent": 9.7,
-    "ported_lines": 31038,
-    "total_lines": 320060
+    "percent": 9.75,
+    "ported_lines": 31222,
+    "total_lines": 320219
   },
-  "commit": "7b09975",
+  "commit": "5b2b652",
   "date": "2026-10-24",
   "excluded": [
     "rust/obs-c-oracle/legacy/ (Tier 3 oracle copy of the original C)",
@@ -29,9 +29,9 @@
     "all": {
       "areas": {
         "core": {
-          "percent": 28.97,
-          "ported_lines": 14716,
-          "total_lines": 50799
+          "percent": 29.24,
+          "ported_lines": 14900,
+          "total_lines": 50958
         },
         "graphics": {
           "percent": 21.26,
@@ -49,19 +49,19 @@
           "total_lines": 12981
         }
       },
-      "files": 187,
-      "hybrid_lines": 48274,
-      "percent": 39.13,
-      "ported_lines": 31038,
-      "total_lines": 79312
+      "files": 188,
+      "hybrid_lines": 48249,
+      "percent": 39.29,
+      "ported_lines": 31222,
+      "total_lines": 79471
     },
     "hosts": {
       "linux": {
         "areas": {
           "core": {
-            "percent": 31.51,
-            "ported_lines": 14716,
-            "total_lines": 46698
+            "percent": 31.8,
+            "ported_lines": 14900,
+            "total_lines": 46857
           },
           "graphics": {
             "percent": 21.56,
@@ -79,9 +79,9 @@
             "total_lines": 9948
           }
         },
-        "files": 167,
-        "hybrid_lines": 43370,
-        "percent": 39.77,
+        "files": 168,
+        "hybrid_lines": 43345,
+        "percent": 39.94,
         "ported_files": [
           "audio-monitoring/pulse/pulseaudio-monitor-format.c.h",
           "audio-monitoring/pulse/pulseaudio-stream-flags.c.h",
@@ -163,6 +163,7 @@
           "obs-source-deinterlace-draw.c.h",
           "obs-source-deinterlace-pacing.c.h",
           "obs-source-draw-plan.c.h",
+          "obs-source-frame-copy.c.h",
           "obs-source-load.c.h",
           "obs-source-ptm-gate.c.h",
           "obs-source-render-route.c.h",
@@ -209,15 +210,15 @@
           "util/threading-posix.c.h",
           "util/utf8.c.h"
         ],
-        "ported_lines": 28638,
-        "total_lines": 72008
+        "ported_lines": 28822,
+        "total_lines": 72167
       },
       "macos": {
         "areas": {
           "core": {
-            "percent": 33.69,
-            "ported_lines": 14003,
-            "total_lines": 41570
+            "percent": 34.0,
+            "ported_lines": 14187,
+            "total_lines": 41729
           },
           "graphics": {
             "percent": 21.56,
@@ -235,9 +236,9 @@
             "total_lines": 9872
           }
         },
-        "files": 155,
-        "hybrid_lines": 38955,
-        "percent": 41.69,
+        "files": 156,
+        "hybrid_lines": 38930,
+        "percent": 41.86,
         "ported_files": [
           "callback/calldata.c.h",
           "callback/decl.c.h",
@@ -314,6 +315,7 @@
           "obs-source-deinterlace-draw.c.h",
           "obs-source-deinterlace-pacing.c.h",
           "obs-source-draw-plan.c.h",
+          "obs-source-frame-copy.c.h",
           "obs-source-load.c.h",
           "obs-source-ptm-gate.c.h",
           "obs-source-render-route.c.h",
@@ -358,15 +360,15 @@
           "util/threading-posix.c.h",
           "util/utf8.c.h"
         ],
-        "ported_lines": 27849,
-        "total_lines": 66804
+        "ported_lines": 28033,
+        "total_lines": 66963
       },
       "windows": {
         "areas": {
           "core": {
-            "percent": 32.77,
-            "ported_lines": 14003,
-            "total_lines": 42729
+            "percent": 33.08,
+            "ported_lines": 14187,
+            "total_lines": 42888
           },
           "graphics": {
             "percent": 21.29,
@@ -384,9 +386,9 @@
             "total_lines": 10512
           }
         },
-        "files": 159,
-        "hybrid_lines": 40902,
-        "percent": 40.51,
+        "files": 160,
+        "hybrid_lines": 40877,
+        "percent": 40.69,
         "ported_files": [
           "callback/calldata.c.h",
           "callback/decl.c.h",
@@ -463,6 +465,7 @@
           "obs-source-deinterlace-draw.c.h",
           "obs-source-deinterlace-pacing.c.h",
           "obs-source-draw-plan.c.h",
+          "obs-source-frame-copy.c.h",
           "obs-source-load.c.h",
           "obs-source-ptm-gate.c.h",
           "obs-source-render-route.c.h",
@@ -507,12 +510,12 @@
           "util/utf8-host-windows.c.h",
           "util/utf8.c.h"
         ],
-        "ported_lines": 27856,
-        "total_lines": 68758
+        "ported_lines": 28040,
+        "total_lines": 68917
       }
     }
   },
   "rust": {
-    "lines": 108334
+    "lines": 109372
   }
 }
