@@ -32,7 +32,7 @@ class FrontendTitleDefineScope(unittest.TestCase):
                 self.assertNotRegex(text, rf"target_compile_definitions\([^)]*{define}")
                 self.assertRegex(
                     text,
-                    rf"set_property\(\s*SOURCE build/frontend\.widgets\+\.hpp\.cpp\s+APPEND PROPERTY COMPILE_DEFINITIONS\s+{define}=",
+                    rf"set_property\(\s*SOURCE build/frontend\.widgets\+\.hpp\.cpp\s+APPEND\s+PROPERTY COMPILE_DEFINITIONS\s+{define}=",
                 )
 
     def test_the_group_still_contains_the_reader(self) -> None:
