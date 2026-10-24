@@ -6,6 +6,7 @@
 
 /* rtmp-stream-host-posix.c */
 #include <errno.h>
+#include <netdb.h>
 #include <sys/ioctl.h>
 #include <obs-module.h>
 #include "plugins/obs-outputs/rtmp-stream-host.h"

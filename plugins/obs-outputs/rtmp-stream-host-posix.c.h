@@ -62,7 +62,7 @@ const char *rtmp_host_root_cert_error(void)
 #ifdef __linux__
 	       " Check you have an up to date root certificate bundle in /etc/ssl/certs."
 #endif
-	;
+		;
 }
 
 void rtmp_host_log_sndbuf_size(struct rtmp_stream *stream)
