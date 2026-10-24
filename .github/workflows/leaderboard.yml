@@ -1,6 +1,7 @@
 name: Contributor leaderboard
 
-# Regenerates leaderboard.json + leaderboard.jpg and commits them to the
+# Regenerates leaderboard.json + leaderboard.jpg, and conversion.json +
+# conversion.svg (how much of OBS is converted to Rust, #2242), and commits them to the
 # `leaderboard` branch only (served by GitHub Pages). Nothing here touches
 # master, so the OBS build workflows are not triggered.
 #
@@ -24,9 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # The whole tree: tools/conversion/measure.py reads libobs, frontend,
+      # plugins, shared and rust (#2242).
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          sparse-checkout: tools/leaderboard
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: leaderboard
@@ -41,6 +42,11 @@ jobs:
           cp tools/leaderboard/site/* data/
           touch data/.nojekyll
           uv run --python 3.12 tools/leaderboard/generate.py --repo "${{ github.repository }}" --out data/leaderboard.json
+      - name: Measure the Rust conversion
+        run: |
+          # obs-websocket stays C++ by policy; count it as kept by design.
+          git submodule update --init --depth 1 plugins/obs-websocket
+          uv run --python 3.12 tools/conversion/measure.py --json data/conversion.json --svg data/conversion.svg
       - name: Render JPEG
         run: |
           uv run --python 3.12 --with playwright==1.49.1 playwright install --with-deps chromium

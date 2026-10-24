@@ -11,6 +11,7 @@
 [![Discussions: got an idea?](docs/images/discussions.svg)](https://github.com/obs-rust/obs-studio/discussions)
 [![Contributor leaderboard workflow status](https://github.com/obs-rust/obs-studio/actions/workflows/leaderboard.yml/badge.svg?branch=master)](https://github.com/obs-rust/obs-studio/actions/workflows/leaderboard.yml)
 [![Merge queue for master](docs/images/merge-queue.svg)](https://github.com/obs-rust/obs-studio/queue/master)
+[![Share of OBS converted to Rust: libobs and the whole app](https://raw.githubusercontent.com/obs-rust/obs-studio/leaderboard/conversion.svg)](https://obs-rust.github.io/obs-studio/conversion.json)
 
 <p align="center"><img src="docs/images/obs-rust-logo.png" alt="obs-rust logo" width="128"></p>
 

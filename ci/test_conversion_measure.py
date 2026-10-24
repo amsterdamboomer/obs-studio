@@ -153,6 +153,12 @@ class FixtureCountsTest(unittest.TestCase):
 
 
 class RealTreeTest(unittest.TestCase):
+    def test_readme_and_leaderboard_publish_the_badge(self):
+        readme = (ROOT / "README.md").read_text()
+        self.assertIn("raw.githubusercontent.com/obs-rust/obs-studio/leaderboard/conversion.svg", readme)
+        workflow = (ROOT / ".github/workflows/leaderboard.yml").read_text()
+        self.assertIn("tools/conversion/measure.py --json data/conversion.json --svg data/conversion.svg", workflow)
+
     def test_libobs_ported_set_matches_tier2_list(self):
         measure = load(MEASURE, "conversion_measure")
         ported_sources = load(PORTED_SOURCES, "ported_sources")
