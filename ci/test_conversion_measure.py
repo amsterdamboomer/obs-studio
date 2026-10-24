@@ -168,6 +168,14 @@ class RealTree(unittest.TestCase):
             expected = sorted(o.removesuffix(".o") for o in ported_sources.ported_objects(ROOT, host))
             self.assertEqual(data["libobs"]["hosts"][host]["ported_files"], expected, host)
 
+    def test_every_libobs_group_is_counted(self):
+        groups = {p.name for p in (ROOT / "libobs/build").glob("libobs.*+.h.*")}
+        sets = ported_sources.source_sets(ROOT)
+        listed = {Path(e).name for v in sets.values() for e in v if "+." in e}
+        listed |= {Path(e).name for v in measure.REFERENCE_SETS.values() for e in v if e.startswith("build/")}
+        # Hybrid-only glue and the pulse-off alternative are not in the reference.
+        self.assertEqual(groups - listed, {"libobs.null-audio+.h.c"} - listed)
+
 
 if __name__ == "__main__":
     unittest.main()
