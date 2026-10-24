@@ -13,7 +13,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-#include "libobs/build/libobs-ported-windows-platform.pch.h"
+#include "build/libobs-util.pch.h"
 
 static inline bool has_utf8_bom(const char *in_char)
 {

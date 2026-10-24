@@ -3,4 +3,3 @@
 #include "libobs/build/libobs-ported-windows-platform.pch.h"
 
 #include "libobs/util/platform-windows.c.h"
-#include "libobs/util/utf8-host-windows.c.h"
