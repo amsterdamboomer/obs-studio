@@ -13,7 +13,7 @@ static inline uint32_t ctz32(unsigned long val)
 	return __builtin_ctz(val);
 }
 #else
-static uint32_t popcnt(uint32_t x)
+static inline uint32_t popcnt(uint32_t x)
 {
 	x -= ((x >> 1) & 0x55555555);
 	x = (((x >> 2) & 0x33333333) + (x & 0x33333333));
@@ -23,7 +23,7 @@ static uint32_t popcnt(uint32_t x)
 	return x & 0x0000003f;
 }
 
-static uint32_t clz32(uint32_t x)
+static inline uint32_t clz32(uint32_t x)
 {
 	x |= (x >> 1);
 	x |= (x >> 2);
@@ -33,7 +33,7 @@ static uint32_t clz32(uint32_t x)
 	return 32 - popcnt(x);
 }
 
-static uint32_t ctz32(uint32_t x)
+static inline uint32_t ctz32(uint32_t x)
 {
 	return popcnt((x & -x) - 1);
 }
