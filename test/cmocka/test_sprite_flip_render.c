@@ -26,6 +26,7 @@
 #include <string.h>
 
 #include <obs.h>
+#include <util/platform.h>
 
 #define SIZE 4
 
@@ -224,11 +225,29 @@ static int group_setup(void **state)
 		obs_shutdown();
 		return 0;
 	}
-	/* The first draw after obs_reset_video() can come back empty (the
-	 * target all 0) before the video thread has rendered a frame; draw once
-	 * and discard it so every case reads a settled device. */
-	uint8_t discard[SIZE][SIZE][4];
-	render(DRAW_SPRITE, 0, discard);
+	/* Right after obs_reset_video() a draw can read back an empty target
+	 * (every byte 0, no GL error logged), for a few draws and some tens of
+	 * milliseconds; after that every draw reads back (Mesa llvmpipe under
+	 * Xvfb, the CI device). Not root-caused: the graphics thread starts
+	 * rendering frames on the same device then. Probe until three plain
+	 * draws in a row read back, for up to 3 s, so every case reads a settled
+	 * device. */
+	int settled = 0;
+	for (int i = 0; i < 300 && settled < 3; i++) {
+		uint8_t probe[SIZE][SIZE][4];
+		render(DRAW_SPRITE, 0, probe);
+		if (probe[0][0][3] == 255) {
+			settled++;
+		} else {
+			settled = 0;
+			os_sleep_ms(10);
+		}
+	}
+	if (settled < 3) {
+		fprintf(stderr, "a plain draw never read back\n");
+		obs_shutdown();
+		return -1;
+	}
 	obs_up = true;
 	return 0;
 }
