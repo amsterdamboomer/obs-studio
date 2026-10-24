@@ -134,9 +134,9 @@ bool gs_sprite_quad_texture_size(float size)
 	return size == 0.0f;
 }
 
-bool gs_sprite_quad_flipped_buffer(uint32_t flip)
+uint32_t gs_sprite_quad_buffer(uint32_t flip)
 {
-	return flip != 0;
+	return flip != 0 ? GS_SPRITE_FLIP_V : 0;
 }
 
 struct gs_texture_upload_plan gs_texture_upload_plan(uint32_t linesize, uint32_t linesize_out, size_t height, bool flip)

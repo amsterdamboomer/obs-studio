@@ -113,7 +113,7 @@ unsafe extern "C" {
         height: f32,
     ) -> c_int;
     pub fn oracle_gs_sprite_quad_texture_size(size: f32) -> bool;
-    pub fn oracle_gs_sprite_quad_flipped_buffer(flip: u32) -> bool;
+    pub fn oracle_gs_sprite_quad_buffer(flip: u32) -> u32;
     pub fn oracle_gs_texture_upload_plan(
         linesize: u32,
         linesize_out: u32,

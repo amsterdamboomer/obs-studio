@@ -1008,8 +1008,8 @@ void gs_draw_quadf(gs_texture_t *tex, uint32_t flip, float width, float height)
 		gs_load_vertexbuffer(graphics->subregion_buffer);
 		gs_draw(GS_TRISTRIP, 0, 0);
 	} else {
-		gs_load_vertexbuffer(gs_sprite_quad_flipped_buffer(flip) ? graphics->flipped_sprite_buffer
-									 : graphics->sprite_buffer);
+		gs_load_vertexbuffer(gs_sprite_quad_buffer(flip) ? graphics->flipped_sprite_buffer
+								 : graphics->sprite_buffer);
 		gs_draw(GS_TRISTRIP, 0, 0);
 	}
 

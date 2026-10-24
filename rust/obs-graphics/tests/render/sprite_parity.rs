@@ -104,10 +104,10 @@ fn check_subregion(region: [u32; 6], flip: u32) {
 }
 
 #[track_caller]
-fn check_flipped_buffer(flip: u32) {
+fn check_quad_buffer(flip: u32) {
     // SAFETY: plain values in and out.
-    let want = unsafe { c::oracle_gs_sprite_quad_flipped_buffer(flip) };
-    assert_eq!(r::gs_sprite_quad_flipped_buffer(flip), want, "{flip:#x}");
+    let want = unsafe { c::oracle_gs_sprite_quad_buffer(flip) };
+    assert_eq!(r::gs_sprite_quad_buffer(flip), want, "{flip:#x}");
 }
 
 #[track_caller]
@@ -330,7 +330,7 @@ fn every_flip() {
         for low in 0..=0xffffu32 {
             let flip = high | low;
             check_norm(flip);
-            check_flipped_buffer(flip);
+            check_quad_buffer(flip);
             check_rect(1920, 1080, flip);
             check_rect(u32::MAX, 16_777_217, flip);
             if low < 0x100 {
@@ -526,7 +526,7 @@ proptest! {
         check_rect(tex_cx, tex_cy, flip);
         check_subregion([x, y, cx, cy, tex_cx, tex_cy], flip);
         check_subregion([0, 0, cx, cy, cx, cy], flip);
-        check_flipped_buffer(flip);
+        check_quad_buffer(flip);
     }
 
     #[test]

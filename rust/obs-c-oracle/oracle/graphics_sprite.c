@@ -10,7 +10,7 @@
 #define gs_sprite_subregion_is_whole oracle_gs_sprite_subregion_is_whole
 #define gs_sprite_quad_refusal oracle_gs_sprite_quad_refusal
 #define gs_sprite_quad_texture_size oracle_gs_sprite_quad_texture_size
-#define gs_sprite_quad_flipped_buffer oracle_gs_sprite_quad_flipped_buffer
+#define gs_sprite_quad_buffer oracle_gs_sprite_quad_buffer
 #define gs_texture_upload_plan oracle_gs_texture_upload_plan
 #define gs_texture_is_pow2 oracle_gs_texture_is_pow2
 #define gs_texture_mip_plan oracle_gs_texture_mip_plan
@@ -42,7 +42,7 @@
 #undef gs_texture_mip_plan
 #undef gs_texture_is_pow2
 #undef gs_texture_upload_plan
-#undef gs_sprite_quad_flipped_buffer
+#undef gs_sprite_quad_buffer
 #undef gs_sprite_quad_texture_size
 #undef gs_sprite_quad_refusal
 #undef gs_sprite_subregion_is_whole

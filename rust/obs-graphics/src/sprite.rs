@@ -13,7 +13,7 @@
 //!   `f32` sum and each coordinate one `f32` division.
 //! - [`subregion_is_whole`] (`gs_draw_sprite_subregion`): the shortcut to
 //!   a plain sprite for `(0, 0)` and the texture's size.
-//! - [`quad_refusal`], [`quad_texture_size`] and [`quad_flipped_buffer`]
+//! - [`quad_refusal`], [`quad_texture_size`] and [`quad_buffer`]
 //!   (`gs_draw_quadf`): a texture must be 2D; without one neither size may
 //!   be 0; an axis of size 0 (or -0.0) takes the texture's; any flip bit
 //!   draws the static buffer flipped on v.
@@ -234,8 +234,8 @@ pub fn quad_texture_size(size: f32) -> bool {
 /// `gs_draw_quadf` draws a texture that is not a rectangle texture with the
 /// static buffer flipped on v: any bit set.
 #[must_use]
-pub const fn quad_flipped_buffer(flip: u32) -> bool {
-    flip != 0
+pub const fn quad_buffer(flip: u32) -> u32 {
+    if flip != 0 { FLIP_V } else { 0 }
 }
 
 /// How `gs_texture_set_image` copies (`enum gs_texture_upload_mode`).
