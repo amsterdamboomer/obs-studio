@@ -6,6 +6,7 @@
 
 /* ffmpeg-mux-host-windows.c */
 #include <io.h>
+#include <stdio.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <windows.h>
