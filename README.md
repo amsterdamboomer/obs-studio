@@ -145,7 +145,7 @@ away anyway. Six of them were closed as stale on a single afternoon.
 **In their own words:**
 
 > **“No amount of "I don't like your answer" will change it.”**
-> — [#9285](https://github.com/obsproject/obs-studio/issues/9285#issuecomment-1677822114), to users reporting dropped frames that a downgrade fixed
+> — [#9285](https://github.com/obsproject/obs-studio/issues/9285#issuecomment-1677822114), to a user who said a downgrade fixed their dropped frames
 
 > **“However, if you refuse to follow the process, there is nothing we can do, and this report is not actionable.”**
 > — [#13685](https://github.com/obsproject/obs-studio/issues/13685#issuecomment-5052743359), in the same comment that admitted 32.2 had raised the driver minimum
