@@ -745,7 +745,8 @@ area.
   upside down: `GS_FLIP_U` on a 2D texture (`gs_draw_sprite()`, and a
   full-size `gs_draw_sprite_subregion()`) flips it on u, not on v, as it did
   before upstream 7b8b51b29. *All*, 2026-10-24. Issue
-  [#2124](https://github.com/obs-rust/obs-studio/issues/2124).
+  [#2124](https://github.com/obs-rust/obs-studio/issues/2124), PR
+  [#2135](https://github.com/obs-rust/obs-studio/pull/2135).
 
 ### Audio
 
