@@ -118,8 +118,8 @@ static void *wic_image_init_internal(const char *file, IWICBitmapFrameDecode *pF
 	return bytes;
 }
 
-uint8_t *gs_image_host_fallback_load(const char *file, enum gs_color_format *format, uint32_t *cx_out,
-				      uint32_t *cy_out, enum gs_color_space *space)
+uint8_t *gs_image_host_fallback_load(const char *file, enum gs_color_format *format, uint32_t *cx_out, uint32_t *cy_out,
+				     enum gs_color_space *space)
 {
 	const size_t len = strlen(file);
 	if (len <= 4 && astrcmpi(file + len - 4, ".jxr") != 0) {
