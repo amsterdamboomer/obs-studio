@@ -35,7 +35,7 @@ static inline uint32_t clz32(uint32_t x)
 
 static inline uint32_t ctz32(uint32_t x)
 {
-	return popcnt((x & -x) - 1);
+	return popcnt((x & (~x + 1)) - 1);
 }
 #endif
 
