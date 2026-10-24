@@ -216,6 +216,10 @@ void obs_canvas_destroy(obs_canvas_t *canvas)
 		source = source->context.hh.next;
 	}
 
+	/* Sources still in it are destroyed later by obs_free_data(), which
+	 * cannot remove them from a freed canvas (#2038). */
+	HASH_CLEAR(hh, *(struct obs_context_data **)&canvas->sources);
+
 	obs_context_data_remove_uuid(&canvas->context, &obs->data.canvases_mutex, &obs->data.canvases);
 	if (!canvas->context.private) {
 		obs_context_data_remove_name(&canvas->context, &obs->data.canvases_mutex, &obs->data.named_canvases);
