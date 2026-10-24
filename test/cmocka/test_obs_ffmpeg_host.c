@@ -7,9 +7,9 @@
 #include OBS_FFMPEG_HOST_SOURCE
 
 /*
- * obs-ffmpeg's Linux and POSIX hosts (obs-rust/obs-studio#853). Without the
- * NVIDIA encode library NVENC is unavailable, and the blacklist predicate
- * the shared module passes is never asked about a device; module load and
+ * NVIDIA encode library NVENC is unavailable, whatever devices the machine
+ * has; module load and unload have no host work. OBS_FFMPEG_HOST_SOURCE
+ * picks the host. The
  * unload have no host work. OBS_FFMPEG_HOST_SOURCE picks the host. The
  * Windows host (DXGI, AMF) is compiled by the cross check.
  */
