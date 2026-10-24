@@ -40,7 +40,6 @@ ALLOWED = {
     "https://obsproject.com/help": "Help menu link",
     "https://obsproject.com": "website link",
     "https://obsproject.com/": "website link",
-    "https://obsproject.com/discord": "Help menu link",
     "https://obsproject.com/kb/encoder-missing#%1": "encoder help link",
     "https://obsproject.com/assets/images/OBSDemoApp301Flathub.png": "metainfo screenshot",
     "https://auth.obsproject.com/": "OAuth base URL default",
