@@ -64,6 +64,7 @@ static void test_socket_calls(void **state)
 static void test_no_socket_loop(void **state)
 {
 	(void)state;
+	assert_false(rtmp_host_has_socket_loop());
 	assert_false(rtmp_host_start_socket_loop(NULL));
 	rtmp_host_log_sndbuf_size(NULL);
 	rtmp_host_log_interface_type(NULL);
