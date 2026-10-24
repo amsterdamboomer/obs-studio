@@ -31,9 +31,12 @@ static void test_no_macos_keypad_here(void **state)
 	(void)state;
 	include_macos_keypad();
 	assert_int_equal(added, 0);
+
+	int host_numpad = 0;
 #ifdef OBS_HOTKEY_NUMPAD_HOST
-	fail_msg("OBS_HOTKEY_NUMPAD_HOST is defined off macOS");
+	host_numpad = 1;
 #endif
+	assert_int_equal(host_numpad, 0);
 }
 
 int main(void)
