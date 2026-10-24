@@ -1987,7 +1987,8 @@ bool obs_output_can_begin_data_capture(const obs_output_t *output, uint32_t flag
 	if (active(output))
 		return false;
 
-	join_end_data_capture_thread(output);
+	/* The public signature is const; joining was always a write. */
+	join_end_data_capture_thread((struct obs_output *)output);
 
 	return can_begin_data_capture(output);
 }
