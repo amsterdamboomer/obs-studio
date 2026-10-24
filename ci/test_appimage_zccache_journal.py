@@ -13,6 +13,7 @@ inputs that differed, per source, without arguments or values.
 
 from __future__ import annotations
 
+import importlib.util
 import re
 import sys
 import unittest
@@ -22,8 +23,10 @@ ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = ROOT / ".github" / "workflows" / "appimage.yaml"
 JOURNAL = "${RUNNER_TEMP:-/tmp}/appimage-zccache.jsonl"
 
-sys.path.insert(0, str(ROOT / "build-aux" / "appimage"))
-import build  # noqa: E402
+spec = importlib.util.spec_from_file_location("appimage_build", ROOT / "build-aux" / "appimage" / "build.py")
+build = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = build
+spec.loader.exec_module(build)
 
 
 def steps() -> list[str]:
