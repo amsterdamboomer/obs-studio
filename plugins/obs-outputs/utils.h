@@ -1,5 +1,7 @@
 #pragma once
 
+/* Compiler builtins where GCC or Clang (clang-cl too) provide them, a portable
+ * bit count otherwise (#851). */
 #if defined(__GNUC__) || defined(__clang__)
 static inline uint32_t clz32(unsigned long val)
 {
@@ -9,24 +11,6 @@ static inline uint32_t clz32(unsigned long val)
 static inline uint32_t ctz32(unsigned long val)
 {
 	return __builtin_ctz(val);
-}
-#elif defined(_MSC_VER) && _MSC_VER >= 1400
-static inline uint32_t clz32(unsigned long val)
-{
-	/* __lzcnt() / _lzcnt_u32() do not work correctly on older Intel CPUs,
-	 * so use BSR instead for better compatibility. */
-	uint32_t zeros = 0;
-	_BitScanReverse(&zeros, val);
-	return 31 - zeros;
-}
-
-static inline uint32_t ctz32(unsigned long val)
-{
-#if defined(_M_ARM64)
-	return _CountTrailingZeros(val);
-#else
-	return _tzcnt_u32(val);
-#endif
 }
 #else
 static uint32_t popcnt(uint32_t x)
