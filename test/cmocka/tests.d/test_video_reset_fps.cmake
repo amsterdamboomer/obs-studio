@@ -18,11 +18,7 @@ if(OS_LINUX AND TARGET OBS::libobs-opengl)
       WORKING_DIRECTORY "${OBS_OUTPUT_DIR}/$<CONFIG>"
     )
   else()
-    add_test(
-      NAME test_video_reset_fps
-      COMMAND test_video_reset_fps
-      WORKING_DIRECTORY "${OBS_OUTPUT_DIR}/$<CONFIG>"
-    )
+    add_test(NAME test_video_reset_fps COMMAND test_video_reset_fps WORKING_DIRECTORY "${OBS_OUTPUT_DIR}/$<CONFIG>")
   endif()
   set_tests_properties(test_video_reset_fps PROPERTIES TIMEOUT 60)
 endif()
