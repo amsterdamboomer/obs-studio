@@ -1,3 +1,5 @@
+#include "plugins/obs-ffmpeg/ffmpeg-mux/build/ffmpeg-mux-windows.pch.h"
+
 /* The ffmpeg-mux helper's Windows entry point (#853): no error dialogs, a
  * safe DLL search path, UTF-16 arguments converted to UTF-8 and a binary
  * stdin before the shared muxer runs. */
