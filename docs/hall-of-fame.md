@@ -32,6 +32,46 @@ Threads where users showed up in numbers, then got locked out.**
 > **October 14, 2024:** 6 of these were closed as stale
 > on the same afternoon, including bugs the maintainers had reproduced themselves.
 
+## In their own words
+
+Verbatim, from maintainers' comments on the threads. Each one links to the comment.
+
+> **“No amount of "I don't like your answer" will change it.”**
+>
+> — an OBS maintainer, to users reporting dropped frames that a downgrade fixed · [#9285, 2023-08-14](https://github.com/obsproject/obs-studio/issues/9285#issuecomment-1677822114)
+
+> **“However, if you refuse to follow the process, there is nothing we can do, and this report is not actionable.”**
+>
+> — an OBS maintainer, in the same comment that admitted 32.2 had raised the driver minimum · [#13685, 2026-07-22](https://github.com/obsproject/obs-studio/issues/13685#issuecomment-5052743359)
+
+> **“I'd prefer to not have this just be an argument back and forth about if or if not we should return the flag to disable the check; that decision has already been made.”**
+>
+> — an OBS maintainer, on removing a flag users' setups depended on · [#12650, 2025-10-04](https://github.com/obsproject/obs-studio/issues/12650#issuecomment-3368592277)
+
+> **“OBS is not designed as, and is not supported to be, a headless application.”**
+>
+> — an OBS maintainer, to users running OBS unattended · [#12650, 2025-10-12](https://github.com/obsproject/obs-studio/issues/12650#issuecomment-3395057172)
+
+> **“This is just an overly dramatic warning in a package manager.”**
+>
+> — an OBS maintainer, on shipping Flatpak on an end-of-life runtime · [#11478, 2024-12-23](https://github.com/obsproject/obs-studio/issues/11478#issuecomment-2560434526)
+
+> **“I will repeat them for you since you appear not to have read them the first time”**
+>
+> — an OBS maintainer, to a user whose game would not launch · [#9792, 2023-11-03](https://github.com/obsproject/obs-studio/issues/9792#issuecomment-1791839734)
+
+> **“This goes both ways, as you were unnecessarily combative and kept pushing the wrong approach […]”**
+>
+> — an OBS maintainer, to a user who had posted logs in the 184-comment stutter thread · [#4191, 2021-09-09](https://github.com/obsproject/obs-studio/issues/4191#issuecomment-916203636)
+
+> **“"I don't like it" isn't a valid bug report, and isn't actionable on our end.”**
+>
+> — an OBS maintainer, closing complaints about the V28 interface · [#7260, 2022-09-12](https://github.com/obsproject/obs-studio/issues/7260#issuecomment-1244047700)
+
+> **“You can't have a bug in nonexistent code :) Thank you!”**
+>
+> — an OBS maintainer, on global hotkeys not working under Wayland · [#10538, 2026-04-27](https://github.com/obsproject/obs-studio/issues/10538#issuecomment-4330186180)
+
 ## The inductees
 
 ### 🥇 [#4191 · Preview Stutter that appears in Streams/Recordings](https://github.com/obsproject/obs-studio/issues/4191)
