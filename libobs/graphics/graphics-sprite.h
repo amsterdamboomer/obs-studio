@@ -111,6 +111,9 @@ bool gs_sprite_quad_texture_size(float size);
  * graphics_subsystem.sprite_buffers. */
 uint32_t gs_sprite_quad_buffer(uint32_t flip);
 
+/* The number of static sprite buffers gs_sprite_quad_buffer() picks from. */
+#define GS_SPRITE_BUFFER_COUNT 4
+
 /* How gs_texture_set_image() copies height rows of linesize bytes into the
  * mapped texture's rows of linesize_out bytes. */
 enum gs_texture_upload_mode {
