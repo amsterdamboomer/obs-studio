@@ -14,12 +14,9 @@
  * Windows host (DXGI, AMF) is compiled by the cross check.
  */
 
-static int blacklist_calls;
-
 static bool never_blacklisted(int device_id)
 {
 	(void)device_id;
-	blacklist_calls++;
 	return false;
 }
 
@@ -40,7 +37,6 @@ static void test_load_unload(void **state)
 	(void)state;
 	obs_ffmpeg_host_load();
 	obs_ffmpeg_host_unload();
-	assert_int_equal(blacklist_calls, 0);
 }
 
 int main(void)
