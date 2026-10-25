@@ -85,16 +85,63 @@ static BOOL CALLBACK obs_windows_add(HWND window, LPARAM param)
 /* Add OBS's own windows to a window list, in ms_fill_window_list's format. */
 static void obs_windows_fill(obs_property_t *p)
 {
-	UNUSED_PARAMETER(p);
+	EnumWindows(obs_windows_add, (LPARAM)p);
+}
+
+static int obs_windows_rating(struct obs_windows_find *find, HWND window)
+{
+	struct dstr title = {0}, window_class = {0};
+	ms_get_window_title(&title, window);
+	ms_get_window_class(&window_class, window);
+
+	const bool class_matches = window_class.array && find->window_class &&
+				   strcmp(window_class.array, find->window_class) == 0;
+	const bool title_matches = title.array && find->title && strcmp(title.array, find->title) == 0;
+	int rating = 0;
+
+	if (find->priority == WINDOW_PRIORITY_TITLE)
+		rating = title_matches ? (class_matches ? 3 : 2) : (class_matches ? 1 : 0);
+	else
+		rating = class_matches ? (title_matches ? 3 : 2) : (title_matches ? 1 : 0);
+
+	dstr_free(&window_class);
+	dstr_free(&title);
+	return rating;
+}
+
+static BOOL CALLBACK obs_windows_match(HWND window, LPARAM param)
+{
+	struct obs_windows_find *find = (struct obs_windows_find *)param;
+
+	if (!obs_windows_valid(window, INCLUDE_MINIMIZED))
+		return TRUE;
+
+	int rating = obs_windows_rating(find, window);
+	if (rating > find->best_rating) {
+		find->best = window;
+		find->best_rating = rating;
+	}
+	return TRUE;
 }
 
 /* The OBS window that matches a saved window, or NULL when exe is not OBS's. */
 static HWND obs_windows_find(enum window_priority priority, const char *window_class, const char *title,
 			     const char *exe)
 {
-	UNUSED_PARAMETER(priority);
-	UNUSED_PARAMETER(window_class);
-	UNUSED_PARAMETER(title);
-	UNUSED_PARAMETER(exe);
-	return NULL;
+	struct dstr own_exe = {0};
+	obs_windows_exe(&own_exe);
+	const bool own = exe && own_exe.array && astrcmpi(exe, own_exe.array) == 0;
+	dstr_free(&own_exe);
+	if (!own)
+		return NULL;
+
+	struct obs_windows_find find = {
+		.window_class = window_class,
+		.title = title,
+		.exe = exe,
+		.priority = priority,
+	};
+	EnumWindows(obs_windows_match, (LPARAM)&find);
+	/* A window that matches neither its class nor its title is another OBS window. */
+	return find.best_rating > 0 ? find.best : NULL;
 }
