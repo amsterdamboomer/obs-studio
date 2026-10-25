@@ -2,9 +2,9 @@
 
 use crate::common;
 
+mod bounded_free_space;
 #[path = "../../build/gio.rs"]
 mod build_gio;
-mod bounded_free_space;
 #[cfg(all(unix, not(target_os = "macos")))]
 mod dbus_inhibit;
 #[cfg(all(feature = "gio", any(target_os = "linux", target_os = "freebsd")))]
