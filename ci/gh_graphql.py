@@ -28,8 +28,8 @@ import shutil
 import subprocess
 import sys
 
-# forge-ci/ghd commit with `ghd api graphql` (forge-ci/ghd#1). Bump it to adopt a newer ghd.
-GHD_REF = "b4bce550c5aab0fd5b9be470928b6ac04e3497cf"
+# forge-ci/ghd commit with `ghd api graphql` (forge-ci/ghd#1, merged). Bump it to adopt a newer ghd.
+GHD_REF = "3680ef44515db4645c4f190d4b3075ee1f7656df"
 GHD_SOURCE = f"git+https://github.com/forge-ci/ghd@{GHD_REF}"
 
 
