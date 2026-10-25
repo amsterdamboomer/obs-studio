@@ -51,6 +51,8 @@
 #include "obs-audio-controls.h"
 
 /* obs-audio.c */
+#include "obs-audio-discard.h"
+#include "obs-audio-min-ts.h"
 #include "obs-audio-mix.h"
 #include "util/util_uint64.h"
 
@@ -62,6 +64,9 @@
 
 /* obs-encoder-size.c */
 #include "obs-encoder-size.h"
+
+/* obs-output-stop-stats.c */
+#include "obs-output-stop-stats.h"
 
 /* obs-output-video-checks.c */
 #include "obs-output-video-checks.h"
@@ -127,6 +132,10 @@
 /* obs-scene-item-names.c */
 
 #include "obs-scene-item-names.h"
+
+/* obs-scene-item-transform.c */
+
+#include "obs-scene-item-transform.h"
 
 /* obs-scene-render-plan.c */
 

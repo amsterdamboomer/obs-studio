@@ -255,6 +255,20 @@ not get a line.
   so browser sources and panels play H.264/AAC media. *Linux*, 2026-10-23.
   Issue [#1864](https://github.com/obs-rust/obs-studio/issues/1864), PR
   [#1948](https://github.com/obs-rust/obs-studio/pull/1948).
+- **Chromium sandbox for browser sources on Linux and macOS.** Browser
+  sources and panels run in Chromium's sandbox where it can work. On Linux:
+  with unprivileged user namespaces, or with a `chrome-sandbox` helper that
+  is setuid root. On macOS: each helper app sandboxes itself (Seatbelt) with
+  `libcef_sandbox.dylib` from the CEF framework in the app. Where it can't
+  (on Linux, OBS runs as root or neither is available; on macOS, the library
+  is missing), they run without it as before, and OBS shows the fallback
+  warning with the cause and what to change. *Linux*, 2026-10-25; *macOS*,
+  pending merge. Windows: [#2379](https://github.com/obs-rust/obs-studio/issues/2379).
+  Issue [#1092](https://github.com/obs-rust/obs-studio/issues/1092), PRs
+  [#2378](https://github.com/obs-rust/obs-studio/pull/2378),
+  [obs-rust/obs-browser#3](https://github.com/obs-rust/obs-browser/pull/3),
+  [obs-rust/obs-browser#8](https://github.com/obs-rust/obs-browser/pull/8),
+  [obs-rust/obs-browser#12](https://github.com/obs-rust/obs-browser/pull/12).
 
 ### Scenes and UI
 
@@ -285,6 +299,16 @@ not get a line.
   item opens the OBS Rust Discord, where this build's bugs and questions
   belong, instead of upstream OBS Studio's server. *All*, 2026-10-24.
   Issue [#2097](https://github.com/obs-rust/obs-studio/issues/2097).
+- **Fallback warning.** When a feature falls back to a less safe mode so
+  that it keeps working (for example a browser source without the Chromium
+  sandbox), OBS logs it at error level and shows a warning with a 3-second
+  countdown that accepts the fallback, once per session. Plugins call
+  `obs_frontend_warn_fallback()` ([fallback-warning.md](fallback-warning.md));
+  the browser source uses it when the Chromium sandbox can't work. *All*,
+  2026-10-25. Issue
+  [#2218](https://github.com/obs-rust/obs-studio/issues/2218), PRs
+  [#2238](https://github.com/obs-rust/obs-studio/pull/2238),
+  [obs-rust/obs-browser#8](https://github.com/obs-rust/obs-browser/pull/8).
 - **No upstream release notes or donor list downloads.** The What's New
   dialog, which showed upstream OBS Studio's release notes from
   obsproject.com, is off by default (`ENABLE_WHATSNEW=OFF`); a build that
@@ -364,6 +388,29 @@ not get a line.
   session, with one log line. *All*, 2026-10-17. Issue
   [#1022](https://github.com/obs-rust/obs-studio/issues/1022), PR
   [#1287](https://github.com/obs-rust/obs-studio/pull/1287).
+- **Recordings no longer hold the stream's connection or the QSV device.**
+  A recording started while streaming no longer keeps a copy of the RTMP
+  connection in its muxer, nor of the QSV encoder's GPU device on Linux,
+  and a VA-API or QSV device that has no driver is closed again.
+  *Linux, macOS*, pending merge. Issue
+  [#2305](https://github.com/obs-rust/obs-studio/issues/2305).
+- **Profiles with the same name are all listed.** Importing a profile
+  named like an existing one gives it a name of its own (for example
+  "Name2"), and two profile folders with the same name both show up in
+  the Profile menu, the second under a unique name with a warning in the
+  log; before, one of them was hidden and could not be selected, renamed
+  or removed. *All*, pending merge. Issue
+  [#2382](https://github.com/obs-rust/obs-studio/issues/2382).
+- **QSV encoders release the GPU when they stop.** Each QSV encoder
+  start on Linux, including a failed one, no longer leaks the Intel VPL
+  loader and session; a start that fails no longer keeps the VA display
+  and the GPU device open. *Linux*, pending merge. Issue
+  [#2393](https://github.com/obs-rust/obs-studio/issues/2393).
+- **Failed QSV starts release what they took.** A QSV encoder start
+  whose Intel VPL session can't be created no longer leaks the VPL
+  loader, and on Linux a failed frame allocation no longer keeps its VA
+  surfaces and textures. *All*, pending merge. Issue
+  [#2396](https://github.com/obs-rust/obs-studio/issues/2396).
 
 ### Platforms and packages
 
@@ -380,18 +427,22 @@ not get a line.
   version it is based on, in the window title, log, About dialog,
   `--version` and package metadata. On first run it copies the upstream OBS
   settings without changing them. Plugins still see a valid OBS version.
-  *All*, 2026-10-10. Issues
+  On macOS the browser source's helper apps take the app's name too, so
+  adding a browser source no longer crashes OBS. *All*, 2026-10-10. Issues
   [#111](https://github.com/obs-rust/obs-studio/issues/111),
   [#631](https://github.com/obs-rust/obs-studio/issues/631),
   [#632](https://github.com/obs-rust/obs-studio/issues/632),
-  [#1087](https://github.com/obs-rust/obs-studio/issues/1087), PRs
+  [#1087](https://github.com/obs-rust/obs-studio/issues/1087),
+  [#2386](https://github.com/obs-rust/obs-studio/issues/2386), PRs
   [#67](https://github.com/obs-rust/obs-studio/pull/67),
   [#112](https://github.com/obs-rust/obs-studio/pull/112),
   [#510](https://github.com/obs-rust/obs-studio/pull/510),
   [#515](https://github.com/obs-rust/obs-studio/pull/515),
   [#657](https://github.com/obs-rust/obs-studio/pull/657),
   [#706](https://github.com/obs-rust/obs-studio/pull/706),
-  [#1088](https://github.com/obs-rust/obs-studio/pull/1088).
+  [#1088](https://github.com/obs-rust/obs-studio/pull/1088),
+  [#2390](https://github.com/obs-rust/obs-studio/pull/2390),
+  [obs-rust/obs-browser#9](https://github.com/obs-rust/obs-browser/pull/9).
 - **Daily beta packages.** A beta is published every day as the latest
   release: an AppImage for Linux, zips for Windows x64 (with the Visual C++
   runtime) and ARM64, and DMGs for Apple silicon and Intel Macs. *All*,
@@ -986,6 +1037,20 @@ area.
   [#2271](https://github.com/obs-rust/obs-studio/pull/2271), upstream
   [obsproject/obs-studio#4828](https://github.com/obsproject/obs-studio/issues/4828),
   [obsproject/obs-studio#3211](https://github.com/obsproject/obs-studio/issues/3211).
+- A browser source playing sound through WebAudio (alert boxes and the like)
+  no longer goes silent for good when Chromium's audio service process dies;
+  its sound comes back about 3 s later, without a page refresh or toggling
+  "Control audio via OBS". A page that paused its own audio stays paused.
+  *All*, pending merge. Issue
+  [#2328](https://github.com/obs-rust/obs-studio/issues/2328), upstream
+  [obsproject/obs-studio#10586](https://github.com/obsproject/obs-studio/issues/10586).
+- A browser source with "Control audio via OBS" no longer raises the audio
+  buffering of every source for good (up to 960 ms of added latency) when
+  its audio arrives late under load. Audio that arrives too late to mix is
+  dropped and logged instead: during such a stall the browser source is
+  silent for about the stall's length (up to about a second), and other
+  sources keep their latency. *All*, pending merge. Issue
+  [#2335](https://github.com/obs-rust/obs-studio/issues/2335).
 
 ### Encoding, streaming and recording
 
@@ -1512,6 +1577,17 @@ area.
   own goes away. *Linux*, 2026-10-25. Issue
   [#2261](https://github.com/obs-rust/obs-studio/issues/2261), upstream
   [obsproject/obs-studio#5502](https://github.com/obsproject/obs-studio/issues/5502).
+- On macOS, a first browser source created by obs-websocket (`CreateInput`)
+  renders. Before, CEF started on obs-websocket's thread, and no browser
+  source rendered for the rest of the session, also ones added in the UI
+  later. If that first source arrives while OBS quits, after Qt's main loop
+  has stopped, OBS leaves CEF uninitialized and quits, instead of hanging.
+  *macOS*, 2026-10-25 (the quit part pending merge). Issues
+  [#2387](https://github.com/obs-rust/obs-studio/issues/2387),
+  [#2391](https://github.com/obs-rust/obs-studio/issues/2391), PRs
+  [#2390](https://github.com/obs-rust/obs-studio/pull/2390),
+  [obs-rust/obs-browser#10](https://github.com/obs-rust/obs-browser/pull/10),
+  [obs-rust/obs-browser#11](https://github.com/obs-rust/obs-browser/pull/11).
 
 ### Scenes and UI
 

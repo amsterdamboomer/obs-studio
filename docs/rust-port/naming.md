@@ -56,14 +56,14 @@ One name per thing, so releases, crates and tags can't be confused (#320).
 | `libobs/obs-hotkey-name-map.c`, `obs-hotkey-bindings.c.h`, `obs-hotkey-translations.c.h`, `obs-hotkey-press.c.h`, `obs-hotkey-pair.c.h`, `obs-nix-hotkey-state.c.h`, `obs-nix-portal-shortcut-ids.c.h`, `obs-nix-portal-shortcut-sets.c.h` | `rust/obs-hotkey` |
 | `libobs/callback/` | `rust/obs-callback` |
 | `libobs/obs-missing-files.c.h` | `rust/obs-missing-files` |
-| `libobs/obs-output-delay.c.h`, `obs-output-interleave.c.h`, `obs-output-caption-text.c.h`, `obs-output-protocols.c.h`, `obs-service-getters.c.h`, `obs-encoder-roi.c.h`, `obs-output-video-checks.c.h`, `obs-encoder-size.c.h`, `obs-encoder-audio-start.c.h` | `rust/obs-output` |
+| `libobs/obs-output-delay.c.h`, `obs-output-interleave.c.h`, `obs-output-caption-text.c.h`, `obs-output-protocols.c.h`, `obs-service-getters.c.h`, `obs-encoder-roi.c.h`, `obs-output-video-checks.c.h`, `obs-encoder-size.c.h`, `obs-encoder-audio-start.c.h`, `obs-output-stop-stats.c.h` | `rust/obs-output` |
 | `libobs/obs-scene*.c.h` | `rust/obs-scene` |
 | `libobs/obs-source*.c.h` | `rust/obs-source` |
 | `libobs/audio-monitoring/` | `rust/obs-audio-monitoring` |
 | `libobs/obs-audio-controls.c.h` | `rust/obs-audio-controls` |
 | `libobs/obs.c.h` and the units extracted from it (`obs-video-plan.c.h`, `obs-context-names.c.h`, `obs-source-load.c.h`), and those extracted from `libobs/obs-module.c.h` (`obs-module-paths.c.h`, `obs-module-names.c.h`, `obs-module-locale.c.h`, `obs-module-source-rules.c.h`, `obs-module-type-rules.c.h`), `libobs/obs-view-api.c.h`, and `obs-video-copy-plan.c.h` and `obs-video-output-step.c.h`, extracted from `libobs/obs-video.c.h`, and `obs-canvas-draw.c.h`, extracted from `libobs/obs.c.h` and `libobs/obs-display.c.h` | `rust/obs-core` |
 | `plugins/obs-nvenc/` (CUDA/NVENC loader) | `rust/obs-nvenc`, linked through `rust/obs-nvenc-plugin` |
-| GPU acceleration status (frontend, #846) | `rust/obs-gpu-status`, linked through `rust/obs-gpu-status-frontend` |
+| GPU acceleration status (frontend, #846) | `rust/obs-gpu-status`, linked through `rust/obs-frontend` |
 | all libobs ports, as one C ABI drop-in | `rust/libobs-rust` |
 
 A new libobs area gets a new `obs-<area>` row here in the PR that starts it.
@@ -75,6 +75,7 @@ A new libobs area gets a new `obs-<area>` row here in the PR that starts it.
 | libobs port | `obs-<area>`, named after the libobs directory | `obs-util`, `obs-graphics`, `obs-media-io`, `obs-codec` |
 | libobs staticlib (C ABI drop-in) | `libobs-rust` | |
 | Plugin staticlib | `obs-<plugin>-plugin` | `obs-nvenc-plugin` |
+| Frontend staticlib (the C ABI of the frontend's Rust crates) | `obs-frontend` | |
 | Test oracle (dev-only) | `obs-c-oracle` | |
 | Product binary | `obs-studio-rust` | |
 

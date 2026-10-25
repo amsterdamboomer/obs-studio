@@ -128,6 +128,12 @@
     obs_scene_item_transform_keys;
     obs_scene_item_bounds_keys;
     obs_scene_item_save_relative;
+    /* obs-scene-item-transform.c. obs-scene.c calls them inside libobs.
+     * Not EXPORT. */
+    obs_scene_item_transform_prepare;
+    obs_scene_item_transform_bounded;
+    obs_scene_item_transform_matrix;
+    obs_scene_item_transform_box_scale;
     /* obs-scene-audio-actions.c. obs-scene-item-audio-actions.c calls them
      * inside libobs. Not EXPORT. */
     obs_scene_audio_actions_apply;
@@ -314,6 +320,14 @@
     obs_source_volume_action_due;
     obs_source_volume_step;
     obs_source_volume_mixes;
+    /* obs-audio-discard.c. obs-audio.c calls them inside libobs. Not EXPORT. */
+    obs_audio_discard_ignore;
+    obs_audio_discard_if_stopped;
+    obs_audio_discard_tick;
+    /* obs-audio-min-ts.c. obs-audio.c calls them inside libobs. Not EXPORT. */
+    obs_audio_min_ts_earlier;
+    obs_audio_min_ts_insufficient;
+    obs_audio_min_ts_buffering;
     /* obs-audio-mix.c. obs-audio.c calls them inside libobs. Not EXPORT. */
     obs_audio_mix_time_to_frames;
     obs_audio_mix_add;
@@ -334,6 +348,9 @@
     obs_output_begin_gate;
     obs_output_conversion_plan;
     obs_output_congestion_clamp;
+    /* obs-output-stop-stats.c. obs-output.c calls it inside libobs. Not
+     * EXPORT. */
+    obs_output_stop_stats;
     /* obs-encoder-roi.c. obs-encoder.c calls them inside libobs. Not
      * EXPORT. */
     obs_encoder_roi_admit;

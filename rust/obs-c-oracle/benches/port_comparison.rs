@@ -6,6 +6,10 @@ use std::{fmt::Debug, hint::black_box};
 
 #[path = "port_comparison/audio.rs"]
 mod audio;
+#[path = "port_comparison/audio_discard.rs"]
+mod audio_discard;
+#[path = "port_comparison/audio_min_ts.rs"]
+mod audio_min_ts;
 #[path = "port_comparison/callback.rs"]
 mod callback;
 #[path = "port_comparison/canvas_draw.rs"]
@@ -32,6 +36,8 @@ mod media_remux;
 mod module_source_rules;
 #[path = "port_comparison/module_type_rules.rs"]
 mod module_type_rules;
+#[path = "port_comparison/output_stop_stats.rs"]
+mod output_stop_stats;
 #[path = "port_comparison/output_video_checks.rs"]
 mod output_video_checks;
 #[path = "port_comparison/scene.rs"]
@@ -42,6 +48,8 @@ mod scene_audio_window;
 mod scene_crop;
 #[path = "port_comparison/scene_item_names.rs"]
 mod scene_item_names;
+#[path = "port_comparison/scene_item_transform.rs"]
+mod scene_item_transform;
 #[path = "port_comparison/scene_render_plan.rs"]
 mod scene_render_plan;
 #[path = "port_comparison/service.rs"]
@@ -152,6 +160,8 @@ fn comparisons(criterion: &mut Criterion) {
     }
     modules![
         audio,
+        audio_discard,
+        audio_min_ts,
         callback,
         canvas_draw,
         codecs,
@@ -165,11 +175,13 @@ fn comparisons(criterion: &mut Criterion) {
         media_remux,
         module_source_rules,
         module_type_rules,
+        output_stop_stats,
         output_video_checks,
         scene,
         scene_audio_window,
         scene_crop,
         scene_item_names,
+        scene_item_transform,
         scene_render_plan,
         service,
         source_async_pacing,

@@ -124,6 +124,13 @@ obs_scene_item_blend_type_name
 obs_scene_item_transform_keys
 obs_scene_item_bounds_keys
 obs_scene_item_save_relative
+# obs-scene-item-transform.c: compute_item_transform() in obs-scene.c calls
+# them inside libobs. Declared in obs-scene-item-transform.h without EXPORT,
+# so the shims stay hidden the same way.
+obs_scene_item_transform_prepare
+obs_scene_item_transform_bounded
+obs_scene_item_transform_matrix
+obs_scene_item_transform_box_scale
 # obs-scene-audio-actions.c: obs-scene-item-audio-actions.c calls them inside
 # libobs. Declared in obs-scene-audio-actions.h without EXPORT, so the shims
 # stay hidden the same way.
@@ -352,6 +359,16 @@ obs_source_volume_snap
 obs_source_volume_action_due
 obs_source_volume_step
 obs_source_volume_mixes
+# obs-audio-discard.c: obs-audio.c calls them inside libobs. Declared in
+# obs-audio-discard.h without EXPORT, so the shims stay hidden the same way.
+obs_audio_discard_ignore
+obs_audio_discard_if_stopped
+obs_audio_discard_tick
+# obs-audio-min-ts.c: obs-audio.c calls them inside libobs. Declared in
+# obs-audio-min-ts.h without EXPORT, so the shims stay hidden the same way.
+obs_audio_min_ts_earlier
+obs_audio_min_ts_insufficient
+obs_audio_min_ts_buffering
 # obs-audio-mix.c: obs-audio.c calls them inside libobs. Declared in
 # obs-audio-mix.h without EXPORT, so the shims stay hidden the same way.
 obs_audio_mix_time_to_frames
@@ -378,6 +395,10 @@ obs_output_capture_ready
 obs_output_begin_gate
 obs_output_conversion_plan
 obs_output_congestion_clamp
+# obs-output-stop-stats.c: log_frame_info() in obs-output.c calls it inside
+# libobs. Declared in obs-output-stop-stats.h without EXPORT, so the shim stays
+# hidden the same way.
+obs_output_stop_stats
 # obs-encoder-roi.c: obs_encoder_add_roi() and obs_encoder_enum_roi() in
 # obs-encoder.c call them inside libobs. Declared in obs-encoder-roi.h without
 # EXPORT, so the shims stay hidden the same way.

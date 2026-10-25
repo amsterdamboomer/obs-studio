@@ -141,7 +141,7 @@ secrets = [
   "RESTREAM_HASH", "SPARKLE_PRIVATE_KEY", "STEAM_PASSWORD", "STEAM_SHARED_SECRET", "STEAM_USER", "TWITCH_CLIENT_ID",
   "TWITCH_HASH", "YOUTUBE_CLIENTID", "YOUTUBE_CLIENTID_HASH", "YOUTUBE_SECRET", "YOUTUBE_SECRET_HASH",
 ]
-permissions = { "actions: write" = ["cache-janitor", "ci-pre"] }
+permissions = { "actions: write" = ["cache-janitor", "ci-pre"], "security-events: write" = ["windows", "macos"] }
 # setup-soldr is called from the workflows directly; there is no wrapper.
 setup-soldr = { only-in = ".github/workflows", require = {} }
 # Host-specific Rust code lives in each crate's src/platform/ (one cfg_select!
@@ -801,14 +801,6 @@ reason = "Upstream OBS build/packaging scripts (zsh, PowerShell, shell); porting
 issue = "https://github.com/obs-rust/obs-studio/issues/962"
 expires = "2027-04-15"
 
-# PY-004: No ruff configuration yet; Python CI scripts are tested by ci/test_*.py.
-[[exceptions]]
-rule = "PY-004"
-path = "pyproject.toml"
-reason = "No ruff configuration yet; Python CI scripts are tested by ci/test_*.py."
-issue = "https://github.com/obs-rust/obs-studio/issues/962"
-expires = "2027-04-15"
-
 # RUN-001: ubuntu-26.04, windows-2025-vs2026 and macos-26 are GitHub-hosted labels outside ci.yml's fleet list.
 [[exceptions]]
 rule = "RUN-001"
@@ -898,14 +890,6 @@ expires = "2027-04-15"
 rule = "RUN-001"
 path = ".github/workflows/sign-windows.yaml"
 reason = "ubuntu-26.04, windows-2025-vs2026 and macos-26 are GitHub-hosted labels outside ci.yml's fleet list."
-issue = "https://github.com/obs-rust/obs-studio/issues/962"
-expires = "2027-04-15"
-
-# RUST-001: release-rust.yaml adds rustup targets for the release build.
-[[exceptions]]
-rule = "RUST-001"
-path = ".github/workflows/release-rust.yaml"
-reason = "release-rust.yaml adds rustup targets for the release build."
 issue = "https://github.com/obs-rust/obs-studio/issues/962"
 expires = "2027-04-15"
 
@@ -1024,7 +1008,7 @@ issue = "https://github.com/obs-rust/obs-studio/issues/962"
 expires = "2027-04-15"
 [[exceptions]]
 rule = "RUST-018"
-path = "rust/obs-gpu-status-frontend/Cargo.toml"
+path = "rust/obs-frontend/Cargo.toml"
 reason = "No workspace complexity lint configured yet."
 issue = "https://github.com/obs-rust/obs-studio/issues/962"
 expires = "2027-04-15"
@@ -1118,12 +1102,6 @@ expires = "2027-04-15"
 # SEC-002: Upstream workflows without a top-level permissions block; tracked in #962.
 [[exceptions]]
 rule = "SEC-002"
-path = ".github/workflows/analyze-project.yaml"
-reason = "Upstream workflows without a top-level permissions block; tracked in #962."
-issue = "https://github.com/obs-rust/obs-studio/issues/962"
-expires = "2027-04-15"
-[[exceptions]]
-rule = "SEC-002"
 path = ".github/workflows/appimage.yaml"
 reason = "Upstream workflows without a top-level permissions block; tracked in #962."
 issue = "https://github.com/obs-rust/obs-studio/issues/962"
@@ -1131,12 +1109,6 @@ expires = "2027-04-15"
 [[exceptions]]
 rule = "SEC-002"
 path = ".github/workflows/build-project.yaml"
-reason = "Upstream workflows without a top-level permissions block; tracked in #962."
-issue = "https://github.com/obs-rust/obs-studio/issues/962"
-expires = "2027-04-15"
-[[exceptions]]
-rule = "SEC-002"
-path = ".github/workflows/check-format.yaml"
 reason = "Upstream workflows without a top-level permissions block; tracked in #962."
 issue = "https://github.com/obs-rust/obs-studio/issues/962"
 expires = "2027-04-15"
@@ -1194,14 +1166,6 @@ expires = "2027-04-15"
 rule = "TAG-003"
 path = ".github/workflows/ci.yml"
 reason = "PR runs do not read title tags, so a title edit need not re-trigger them."
-issue = "https://github.com/obs-rust/obs-studio/issues/962"
-expires = "2027-04-15"
-
-# TOOL-001: release-rust.yaml adds rustup targets for the release build.
-[[exceptions]]
-rule = "TOOL-001"
-path = ".github/workflows/release-rust.yaml"
-reason = "release-rust.yaml adds rustup targets for the release build."
 issue = "https://github.com/obs-rust/obs-studio/issues/962"
 expires = "2027-04-15"
 

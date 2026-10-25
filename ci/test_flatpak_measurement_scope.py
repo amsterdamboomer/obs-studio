@@ -19,7 +19,7 @@ def job(name, workflow=WORKFLOW):
     return match.group()
 
 
-def selected(expression, measurement, full, targets='', native=False, input_values=None,
+def selected(expression, measurement, full, targets='', native=False, input_values=None,  # noqa: C901
              event='workflow_dispatch', build_result='success'):
     expression = expression.strip().removeprefix('${{').removesuffix('}}').strip()
     for before, after in [

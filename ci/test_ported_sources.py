@@ -17,6 +17,8 @@ SPEC.loader.exec_module(PORTED)
 # Ported on Linux, Windows and macOS.
 PORTED_ON_EVERY_HOST = (
     "graphics/graphics-sprite.c.h.o",
+    "obs-audio-discard.c.h.o",
+    "obs-audio-min-ts.c.h.o",
     "obs-audio-mix.c.h.o",
     "obs-canvas-draw.c.h.o",
     "obs-context-names.c.h.o",
@@ -31,12 +33,14 @@ PORTED_ON_EVERY_HOST = (
     "obs-module-source-rules.c.h.o",
     "obs-module-type-rules.c.h.o",
     "obs-output-protocols.c.h.o",
+    "obs-output-stop-stats.c.h.o",
     "obs-output-video-checks.c.h.o",
     "obs-scene-audio-actions.c.h.o",
     "obs-scene-audio-window.c.h.o",
     "obs-scene-crop.c.h.o",
     "obs-scene-extent.c.h.o",
     "obs-scene-item-names.c.h.o",
+    "obs-scene-item-transform.c.h.o",
     "obs-scene-render-plan.c.h.o",
     "obs-service-getters.c.h.o",
     "obs-source-async-pacing.c.h.o",

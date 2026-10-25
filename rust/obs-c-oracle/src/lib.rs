@@ -29,10 +29,12 @@ const _: &str = env!("OBS_ORACLE_INPUT_HASH");
 
 pub mod array_serializer;
 pub mod audio_controls;
+pub mod audio_discard;
 #[cfg(any(unix, windows))]
 pub mod audio_io;
 pub mod audio_io_inlines;
 pub mod audio_math;
+pub mod audio_min_ts;
 pub mod audio_mix;
 pub mod av1;
 pub mod avc;
@@ -89,6 +91,7 @@ pub mod output_caption_text;
 pub mod output_delay;
 pub mod output_interleave;
 pub mod output_protocols;
+pub mod output_stop_stats;
 pub mod output_video_checks;
 pub mod path_extension;
 pub mod pipe;
@@ -124,6 +127,7 @@ pub mod scene_crop;
 pub mod scene_extent;
 pub mod scene_group_transform;
 pub mod scene_item_names;
+pub mod scene_item_transform;
 pub mod scene_render_plan;
 pub mod service_getters;
 pub mod shader_param_names;
