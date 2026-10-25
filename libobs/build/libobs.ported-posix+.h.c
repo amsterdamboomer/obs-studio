@@ -4,3 +4,5 @@
 
 #include "libobs/util/pipe-posix.c.h"
 #include "libobs/util/platform-nix.c.h"
+#include "libobs/util/platform-file-host-posix.c.h"
+#include "libobs/util/profiler-io-host-posix.c.h"
