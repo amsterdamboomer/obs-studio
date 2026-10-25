@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "build/libobs-ported-windows-platform.pch.h"
+
 /* The Windows bodies of platform-file.c.h's file functions (#874): UTF-8
  * paths become wide paths for the MSVC CRT's wide calls. MinGW's CRT has the
  * same calls. */

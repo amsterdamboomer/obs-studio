@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "build/libobs-ported-posix.pch.h"
+
 /* The POSIX bodies of platform-file.c.h's file functions (#874): paths are
  * already UTF-8, and off_t is 64-bit (_FILE_OFFSET_BITS). os_stat is stat
  * itself here (util/platform.h). */

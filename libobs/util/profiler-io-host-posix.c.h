@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "build/libobs-ported-posix.pch.h"
+
 /* POSIX: the UTF-8 name is the path. */
 
 gzFile profiler_gzopen(const char *filename)

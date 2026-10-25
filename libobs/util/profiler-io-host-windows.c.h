@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "build/libobs-ported-windows-platform.pch.h"
+
 /* Windows: zlib's gzopen takes an ANSI path, so open the UTF-8 name wide. */
 
 gzFile profiler_gzopen(const char *filename)
