@@ -235,6 +235,25 @@ def native_key_variants(value: str, lines: list[str], index: int) -> list[str]:
     return [value.replace(axis[0], variant) for variant in variants]
 
 
+def step_cache_values(step: list[str]) -> list[str]:
+    """The key and restore-key values of one actions/cache step, plus any
+    flatpak-builder cache_key it builds."""
+    values = []
+    if any(re.search(r"uses: actions/cache(/restore|/save)?@", line) for line in step):
+        for k, line in enumerate(step):
+            m = re.match(r"\s+(key|restore-keys): *(.*)", line)
+            if not m:
+                continue
+            if m.group(2) in ("|", ">"):
+                for s in step[k + 1 :]:
+                    if not s.strip() or s.strip().startswith("#") or re.match(r"\s+[a-z-]+:", s):
+                        break
+                    values.append(s.strip())
+            else:
+                values.append(m.group(2))
+    return values + [m.group(1) for line in step for m in [re.search(r"cache_key='([^']*)'", line)] if m]
+
+
 def cache_keys() -> list[tuple[str, str]]:
     """(file, literal key prefix) of every actions/cache key and restore key,
     and of every flatpak-builder cache key the workflows build."""
@@ -244,22 +263,7 @@ def cache_keys() -> list[tuple[str, str]]:
         lines = path.read_text().splitlines()
         starts = [i for i, line in enumerate(lines) if re.match(r"\s+- ", line)] + [len(lines)]
         for start, end in zip(starts, starts[1:]):
-            step = lines[start:end]
-            values = []
-            if any(re.search(r"uses: actions/cache(/restore|/save)?@", line) for line in step):
-                for k, line in enumerate(step):
-                    m = re.match(r"\s+(key|restore-keys): *(.*)", line)
-                    if not m:
-                        continue
-                    if m.group(2) in ("|", ">"):
-                        for s in step[k + 1 :]:
-                            if not s.strip() or s.strip().startswith("#") or re.match(r"\s+[a-z-]+:", s):
-                                break
-                            values.append(s.strip())
-                    else:
-                        values.append(m.group(2))
-            values += [m.group(1) for line in step for m in [re.search(r"cache_key='([^']*)'", line)] if m]
-            for value in values:
+            for value in step_cache_values(lines[start:end]):
                 value = value.replace("${{ runner.os }}", runner_os(lines, start))
                 for variant in native_key_variants(value, lines, start):
                     out.append((path.relative_to(ROOT).as_posix(), variant.split("${{")[0]))
