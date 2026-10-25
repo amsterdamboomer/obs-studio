@@ -16,7 +16,7 @@
 
 /* POSIX: the UTF-8 name is the path. */
 
-struct gzFile_s *profiler_gzopen(const char *filename)
+gzFile profiler_gzopen(const char *filename)
 {
 	return gzopen(filename, "wb");
 }

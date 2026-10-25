@@ -16,7 +16,7 @@
 
 /* Windows: zlib's gzopen takes an ANSI path, so open the UTF-8 name wide. */
 
-struct gzFile_s *profiler_gzopen(const char *filename)
+gzFile profiler_gzopen(const char *filename)
 {
 	wchar_t *filename_w = NULL;
 	gzFile gz;
