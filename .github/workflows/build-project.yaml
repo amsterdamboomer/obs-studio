@@ -1793,6 +1793,10 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      # win-dshow's groups include libdshowcapture; no other submodule is compiled.
+      - name: Check Out libdshowcapture 📥
+        run: git submodule update --init --depth 1 deps/libdshowcapture/src
+
       - name: Set Up soldr 🦀
         uses: zackees/setup-soldr@71e6b565d05e546781eb9b0668bee02e574de7c9 # v0.9.88
         with:
