@@ -37,20 +37,20 @@ class CrossScopeTest(unittest.TestCase):
 
     def test_windows_host_files_select_win_x64(self):
         for path in (
-            "plugins/win-capture/window-capture.c",
-            "libobs/util/platform-windows.c",
+            "plugins/win-capture/window-capture.c.h",
+            "libobs/util/platform-windows.c.h",
             "plugins/frontend-tools/frontend-tools-host-windows.c.h",
             "plugins/frontend-tools/build/frontend-tools.host-windows+.h.c",
-            "frontend/updater/updater.cpp",
+            "frontend/updater/updater.cpp.hpp",
         ):
             self.assertEqual(self.targets(path), "win-x64", path)
 
     def test_macos_host_files_select_mac_arm64(self):
         for path in (
-            "plugins/mac-capture/mac-sck-video-capture.m",
-            "libobs/obs-cocoa.m",
+            "plugins/mac-capture/mac-sck-video-capture.m.h",
+            "libobs/obs-cocoa.m.h",
             "plugins/frontend-tools/frontend-tools-host-macos.c.h",
-            "libobs/util/platform-nix.c",
+            "libobs/util/platform-cocoa.m.h",
         ):
             self.assertEqual(self.targets(path), "mac-arm64", path)
 
@@ -77,7 +77,7 @@ class CrossScopeTest(unittest.TestCase):
             self.assertEqual(self.targets(path), "", path)
 
     def test_scope_reports_the_targets(self):
-        got = scope(["plugins/win-capture/window-capture.c"], read=read)
+        got = scope(["plugins/win-capture/window-capture.c.h"], read=read)
         self.assertEqual(got.cross_targets, "win-x64")
         self.assertEqual(scope(["libobs/obs.c"], read=read).cross_targets, "")
 
