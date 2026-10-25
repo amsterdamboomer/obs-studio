@@ -21,7 +21,7 @@ spec.loader.exec_module(check)
 
 def cpack_field(name: str) -> str:
     cpack = (ROOT / "cmake/linux/cpackconfig.cmake").read_text()
-    found = re.search(rf'set\(CPACK_DEBIAN_PACKAGE_{name} "([^"]*)"\)', cpack)
+    found = re.search(rf'set\(\s*CPACK_DEBIAN_PACKAGE_{name}\s+"([^"]*)"\s*\)', cpack)
     return found.group(1) if found else ""
 
 
