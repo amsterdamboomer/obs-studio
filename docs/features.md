@@ -493,6 +493,10 @@ not get a line.
   instead of the dynamic loader's "error while loading shared libraries".
   *Linux (AppImage)*, pending merge. Issue
   [#2337](https://github.com/obs-rust/obs-studio/issues/2337).
+- **Starts on macOS 27.2.** macOS and Windows builds use the obs-deps
+  2026-10-25 Qt6, which carries the QTBUG-147602 backport, so OBS no
+  longer crashes at launch on macOS 27.2. *macOS, Windows*, pending merge.
+  Issue [#2290](https://github.com/obs-rust/obs-studio/issues/2290).
 - **Builds with Qt 6.8.** The frontend builds against distribution Qt 6.8,
   for example on Debian 13. *Linux*, 2026-10-16. Issue
   [#1015](https://github.com/obs-rust/obs-studio/issues/1015), PR
