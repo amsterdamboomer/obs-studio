@@ -186,8 +186,7 @@ static void cursor_follows_monitor_move(void **state)
 	assert_true(set_monitor(320));
 	const int ms = wait_area_x(data, 320, 2000);
 	os_sleep_ms(100);
-	fprintf(stderr, "moved: area x %d after %d ms, cursor x %d\n", (int)data->adj_x_org, ms,
-		data->cursor->x_org);
+	fprintf(stderr, "moved: area x %d after %d ms, cursor x %d\n", (int)data->adj_x_org, ms, data->cursor->x_org);
 	const int area_x = (int)data->adj_x_org;
 	const int cursor_x = data->cursor->x_org;
 
