@@ -358,8 +358,9 @@ static void after_shutdown_answers_inside_warn(void **)
 	assert_true(again.answers.empty());
 	settle();
 #ifdef OBS_FRONTEND_RUST
-	for (OBSFallbackWarning *d : dialogs())
+	for (OBSFallbackWarning *d : dialogs()) {
 		click(d, "acceptButton");
+	}
 #endif
 	assert_int_equal(again.answers.size(), 1);
 }
