@@ -290,6 +290,11 @@ Marker MarkerFor(const Input &input, const obs_key_combination_t &combo)
 	return Marker::Background;
 }
 
+std::optional<obs_key_combination_t> DesktopCombo(const Input &, const obs_key_combination_t &)
+{
+	return std::nullopt;
+}
+
 std::string DesktopTrigger(const Input &input, const obs_key_combination_t &combo)
 {
 	const Combo *c = FindCombo(input, combo);
