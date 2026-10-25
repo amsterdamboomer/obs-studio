@@ -567,7 +567,12 @@ elseif(_host STREQUAL MACOS)
       build/frontend.crypto-macos-mm+.hpp.mm
       build/frontend.sparkle+.hpp.cpp
   )
-  target_compile_options(frontend-macos-cross PRIVATE -Wno-quoted-include-in-framework-header -Wno-comma)
+  target_compile_options(
+    frontend-macos-cross
+    PRIVATE
+      $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wno-quoted-include-in-framework-header>
+      $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wno-comma>
+  )
   set_source_files_properties(
     "${OBS_SOURCE_ROOT}/frontend/build/frontend.macos-arc-mm+.hpp.mm"
     TARGET_DIRECTORY frontend-macos-cross
