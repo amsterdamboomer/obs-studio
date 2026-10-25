@@ -11,5 +11,5 @@ text{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif}
 <text class="t" x="40" y="118" font-size="14">Whole app</text><text class="t" x="600" y="118" font-size="20" font-weight="700" text-anchor="end">9.9%</text>
 <rect class="track" x="40" y="126" width="560" height="10" rx="5"/><rect class="fill" x="40" y="126" width="55.4" height="10" rx="5"/>
 <text class="m" x="40" y="160" font-size="11">libobs per host: linux 40.5%  windows 41.2%  macos 42.4%</text>
-<text class="m" x="40" y="176" font-size="11">Rust: 112,626 lines · obs-websocket kept in C++ by design (14,066 lines) · 2026-10-25 · bd029c8</text>
+<text class="m" x="40" y="176" font-size="11">Rust: 112,626 lines · obs-websocket kept in C++ by design (14,066 lines) · 2026-10-25 · beec03f</text>
 </svg>
