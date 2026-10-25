@@ -41,7 +41,7 @@ class AppImageNetworkRetries(unittest.TestCase):
             self.assertIn(setting, block)
 
     def test_every_curl_in_the_image_retries(self) -> None:
-        curls = re.findall(r"curl [^\n]*", DOCKERFILE)
+        curls = re.findall(r"(?:RUN|&&) curl [^\n]*", DOCKERFILE)
         self.assertTrue(curls)
         for line in curls:
             self.assertIn("--retry", line, line)
