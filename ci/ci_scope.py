@@ -89,6 +89,12 @@ OS_CMAKE = re.compile(r"^libobs/cmake/os-[a-z]+\.cmake$")
 SHARED_TEST = re.compile(r"^test/cmocka/(CMakeLists\.txt|[^/]+\.(cpp|hpp))$")
 # A tests.d registration is shared when it registers a C++ test.
 TESTS_D = re.compile(r"^test/cmocka/tests\.d/([^/]+)\.cmake$")
+# One hidden-symbol inventory, written once per linker (#2288).
+HIDDEN_LISTS = ("libobs/cmake/rust-hidden.txt", "libobs/cmake/rust-exports.map", "libobs/cmake/rust-unexports-macos.txt")
+
+
+def hidden_lists_mirrored(old: Callable[[str], str | None], new: Callable[[str], str | None]) -> bool:
+    return False
 
 
 # Files no build or Rust lint reads (#2079). ci/test_*.py read some of them,
@@ -308,6 +314,7 @@ def scope(
     read: Callable[[str], str] = lambda path: "",
     submodules: frozenset[str] = frozenset(),
     cmocka_paths: tuple[str, ...] = (),
+    hidden_mirrored: bool = False,
 ) -> Scope:
     """`exists(path)` says whether a file exists in the checkout, `read(path)`
     returns its text ("" when missing). `submodules` is accepted for callers
