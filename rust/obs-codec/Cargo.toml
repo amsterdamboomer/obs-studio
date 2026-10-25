@@ -8,12 +8,15 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 obs-util = { path = "../obs-util" }
 
 [dev-dependencies]
 obs-c-oracle = { path = "../obs-c-oracle" }
-proptest = "1"
+proptest = { workspace = true, default-features = true }
 
 [lib]
 test = false

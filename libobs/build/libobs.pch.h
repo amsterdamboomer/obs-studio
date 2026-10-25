@@ -4,6 +4,9 @@
 
 #pragma once
 
+/* obs-canvas-draw.c */
+#include "obs-canvas-draw.h"
+
 /* obs-hotkey.c */
 #include <inttypes.h>
 
@@ -20,9 +23,13 @@
 #include "obs-core-modules.h"
 #include "obs-defs.h"
 #include "obs-module.h"
+#include "obs-module-type-rules.h"
 #include "obs-host/module-paths.h"
 #include "obs-host/module-symbols.h"
 #include "util/platform.h"
+
+/* obs-source-load.c */
+#include "obs-source-load.h"
 
 /* obs.c */
 
@@ -44,7 +51,20 @@
 #include "obs-audio-controls.h"
 
 /* obs-audio.c */
+#include "obs-audio-mix.h"
 #include "util/util_uint64.h"
+
+/* obs-encoder-audio-start.c */
+#include "obs-encoder-audio-start.h"
+
+/* obs-encoder-roi.c */
+#include "obs-encoder-roi.h"
+
+/* obs-encoder-size.c */
+#include "obs-encoder-size.h"
+
+/* obs-output-video-checks.c */
+#include "obs-output-video-checks.h"
 
 /* obs-output.c */
 #include "util/array-serializer.h"
@@ -53,6 +73,12 @@
 
 #include <caption/caption.h>
 #include <caption/mpeg.h>
+
+/* obs-video-copy-plan.c */
+#include "obs-video-copy-plan.h"
+
+/* obs-video-output-step.c */
+#include "obs-video-output-step.h"
 
 /* obs-video.c */
 #include <time.h>
@@ -70,9 +96,13 @@
 #include "obs-host/display-clear-workaround.h"
 #include "obs-host/display-srgb-clear.h"
 
-/* obs-scene-audio-actions.c */
+/* obs-scene-item-audio-actions.c */
 
 #include "obs-scene-audio-actions.h"
+
+/* obs-scene-audio-window.c */
+
+#include "obs-scene-audio-window.h"
 
 /* obs-scene-bounds.c */
 
@@ -86,11 +116,53 @@
 
 #include "obs-scene-group-transform.h"
 
+/* obs-scene-extent.c */
+
+#include "obs-scene-extent.h"
+
+/* obs-scene-crop.c */
+
+#include "obs-scene-crop.h"
+
+/* obs-scene-item-names.c */
+
+#include "obs-scene-item-names.h"
+
+/* obs-scene-render-plan.c */
+
+#include "obs-scene-render-plan.h"
+
 /* obs-scene.c */
 #include "graphics/math-defs.h"
 #include "obs-scene-blend.h"
 
+/* obs-source-deinterlace.c */
+
+#include "obs-source-deinterlace-draw.h"
+#include "obs-source-deinterlace-pacing.h"
+#include "obs-source-deinterlace-select.h"
+
+/* obs-source-transition.c */
+
+#include "obs-source-transition-clock.h"
+#include "obs-source-transition-render.h"
+
 /* obs-source.c */
+
+#include "obs-source-async-pacing.h"
+#include "obs-source-async-upload.h"
+#include "obs-source-audio-input.h"
+#include "obs-source-audio-render.h"
+#include "obs-source-audio-timing.h"
+#include "obs-source-color-space.h"
+#include "obs-source-conversion-plan.h"
+#include "obs-source-draw-plan.h"
+#include "obs-source-frame-copy.h"
+#include "obs-source-media-admission.h"
+#include "obs-source-ptm-gate.h"
+#include "obs-source-render-route.h"
+#include "obs-source-size.h"
+#include "obs-source-volume.h"
 
 #include "media-io/audio-io.h"
 #include "obs-host/default-monitoring-device.h"
@@ -120,18 +192,6 @@
 #include <stdio.h>
 #include "util/cf-lexer.h"
 
-/* util/profiler-io.c */
-
-#include "util/profiler.h"
-#include "util/profiler-snapshot.h"
-
-#include <zlib.h>
-
-/* util/source-profiler.c */
-#include "util/source-profiler.h"
-
-#include "util/uthash.h"
-
 /* graphics/effect-parser.c */
 #include <assert.h>
 #include <limits.h>
@@ -144,11 +204,9 @@
 
 /* graphics/graphics.c */
 
+#include "graphics/graphics-sprite.h"
 #include "graphics/quat.h"
 #include "graphics/axisang.h"
 
 /* graphics/shader-parser.c */
 #include "graphics/shader-parser.h"
-
-/* graphics/texture-render.c */
-#include "graphics/graphics.h"

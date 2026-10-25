@@ -245,6 +245,12 @@ static int obs_init_graphics(struct obs_video_info *ovi)
 		}
 	}
 
+	/* The levels obs_get_video_sdr_white_level() and
+	 * obs_get_video_hdr_nominal_peak_level() report until
+	 * obs_set_video_levels() is called (#2209). */
+	video->sdr_white_level = 300.f;
+	video->hdr_nominal_peak_level = 1000.f;
+
 	profile_start(shader_comp_name);
 	gs_enter_context(video->graphics);
 
@@ -1201,6 +1207,31 @@ void obs_shutdown(void)
 	while (obs_wait_for_destroy_queue())
 		;
 
+	stop_video();
+	stop_audio();
+	stop_hotkeys();
+
+	module = obs->first_module;
+	while (module) {
+		struct obs_module *next = module->next;
+		free_module(module);
+		module = next;
+	}
+	obs->first_module = NULL;
+
+	module = obs->first_disabled_module;
+	while (module) {
+		struct obs_module *next = module->next;
+		free_module(module);
+		module = next;
+	}
+	obs->first_disabled_module = NULL;
+
+	obs_free_data();
+
+	/* Sources still alive at shutdown are destroyed in obs_free_data() and
+	 * read their type's registration (info.id, type_data), so free the
+	 * registered types after it (#2017). */
 	for (size_t i = 0; i < obs->source_types.num; i++) {
 		struct obs_source_info *item = &obs->source_types.array[i];
 		if (item->type_data && item->free_type_data)
@@ -1230,27 +1261,6 @@ void obs_shutdown(void)
 	da_free(obs->filter_types);
 	da_free(obs->transition_types);
 
-	stop_video();
-	stop_audio();
-	stop_hotkeys();
-
-	module = obs->first_module;
-	while (module) {
-		struct obs_module *next = module->next;
-		free_module(module);
-		module = next;
-	}
-	obs->first_module = NULL;
-
-	module = obs->first_disabled_module;
-	while (module) {
-		struct obs_module *next = module->next;
-		free_module(module);
-		module = next;
-	}
-	obs->first_disabled_module = NULL;
-
-	obs_free_data();
 	obs_free_audio();
 	obs_free_video();
 	obs_video_stats_destroy(&obs->video.stats);
@@ -1504,6 +1514,10 @@ int obs_reset_video(struct obs_video_info *ovi)
 	    !obs_video_size_valid(ovi->base_width, ovi->base_height))
 		return OBS_VIDEO_INVALID_PARAM;
 
+	/* the frame interval is fps_den / fps_num */
+	if (!ovi->fps_num || !ovi->fps_den)
+		return OBS_VIDEO_INVALID_PARAM;
+
 	struct freed_video *freed;
 	size_t num_freed;
 	collect_mix_videos(&freed, &num_freed);
@@ -1650,8 +1664,19 @@ void obs_set_video_levels(float sdr_white_level, float hdr_nominal_peak_level)
 	struct obs_core_video *video = &obs->video;
 	assert(video->graphics);
 
-	video->sdr_white_level = sdr_white_level;
-	video->hdr_nominal_peak_level = hdr_nominal_peak_level;
+	/* The draw paths divide by these, so a level that is not finite and
+	 * greater than 0 is ignored and the previous one stays (#2209). */
+	if (isfinite(sdr_white_level) && sdr_white_level > 0.f)
+		video->sdr_white_level = sdr_white_level;
+	else
+		blog(LOG_WARNING, "obs_set_video_levels: ignoring SDR white level %g, keeping %g",
+		     (double)sdr_white_level, (double)video->sdr_white_level);
+
+	if (isfinite(hdr_nominal_peak_level) && hdr_nominal_peak_level > 0.f)
+		video->hdr_nominal_peak_level = hdr_nominal_peak_level;
+	else
+		blog(LOG_WARNING, "obs_set_video_levels: ignoring HDR nominal peak level %g, keeping %g",
+		     (double)hdr_nominal_peak_level, (double)video->hdr_nominal_peak_level);
 }
 
 bool obs_get_audio_info(struct obs_audio_info *oai)
@@ -1795,7 +1820,10 @@ audio_t *obs_get_audio(void)
 
 video_t *obs_get_video(void)
 {
-	return obs->data.main_canvas->mix->video;
+	/* The main canvas has no mix until the first obs_reset_video(): no
+	 * video yet, as obs_canvas_get_video() answers for any canvas (#2237). */
+	const obs_canvas_t *canvas = obs->data.main_canvas;
+	return canvas && canvas->mix ? canvas->mix->video : NULL;
 }
 
 obs_source_t *obs_get_output_source(uint32_t channel)
@@ -2210,26 +2238,15 @@ static void obs_render_canvas_texture_internal(obs_canvas_t *canvas, enum gs_ble
 	gs_eparam_t *param;
 
 	video = canvas->mix;
-	if (!video || !video->texture_rendered)
+	if (obs_canvas_draw_skip(video != NULL, video && video->texture_rendered))
 		return;
 
 	const enum gs_color_space source_space = video->render_space;
 	const enum gs_color_space current_space = gs_get_color_space();
-	const char *tech_name = "Draw";
+	const char *tech_name = obs_source_draw_technique_name(obs_canvas_draw_technique(source_space, current_space));
 	float multiplier = 1.f;
-	switch (current_space) {
-	case GS_CS_SRGB:
-	case GS_CS_SRGB_16F:
-		if (source_space == GS_CS_709_EXTENDED)
-			tech_name = "DrawTonemap";
-		break;
-	case GS_CS_709_SCRGB:
-		tech_name = "DrawMultiply";
-		multiplier = obs_get_video_sdr_white_level() / 80.f;
-		break;
-	case GS_CS_709_EXTENDED:
-		break;
-	}
+	if (obs_canvas_draw_reads_white_level(current_space))
+		multiplier = obs_canvas_draw_multiplier(obs_get_video_sdr_white_level());
 
 	const bool previous = gs_framebuffer_srgb_enabled();
 	gs_enable_framebuffer_srgb(true);
@@ -2277,14 +2294,25 @@ void obs_render_canvas_texture_src_color_only(obs_canvas_t *canvas)
 
 gs_texture_t *obs_get_main_texture(void)
 {
-	struct obs_core_video_mix *video;
+	/* The main canvas has no mix until the first obs_reset_video() (#2253). */
+	const obs_canvas_t *canvas = obs->data.main_canvas;
+	struct obs_core_video_mix *video = canvas ? canvas->mix : NULL;
 
-	video = obs->data.main_canvas->mix;
-	if (!video->texture_rendered)
+	if (!video || !video->texture_rendered)
 		return NULL;
 
 	return video->render_texture;
 }
+
+/* obs-source-load.h copies these */
+_Static_assert(OBS_SOURCE_LOAD_MONITOR_ONLY_BEFORE == MAKE_SEMANTIC_VERSION(23, 2, 2), "23.2.2");
+_Static_assert(OBS_SOURCE_LOAD_MONITORING_ENABLED_BEFORE == MAKE_SEMANTIC_VERSION(33, 0, 0), "33.0.0");
+_Static_assert(OBS_SOURCE_LOAD_MONITOR_BY_DEFAULT == OBS_SOURCE_MONITOR_BY_DEFAULT, "OBS_SOURCE_MONITOR_BY_DEFAULT");
+_Static_assert(OBS_SOURCE_LOAD_MONITORING_NONE == OBS_MONITORING_TYPE_NONE, "OBS_MONITORING_TYPE_NONE");
+_Static_assert(OBS_SOURCE_LOAD_MONITORING_MONITOR_ONLY == OBS_MONITORING_TYPE_MONITOR_ONLY,
+	       "OBS_MONITORING_TYPE_MONITOR_ONLY");
+_Static_assert(OBS_SOURCE_LOAD_ALL_MIXERS == (1 << MAX_AUDIO_MIXES) - 1, "MAX_AUDIO_MIXES");
+_Static_assert(OBS_SOURCE_LOAD_DEINTERLACE_DISABLE == OBS_DEINTERLACE_MODE_DISABLE, "OBS_DEINTERLACE_MODE_DISABLE");
 
 static obs_source_t *obs_load_source_type(obs_data_t *source_data, bool is_private)
 {
@@ -2300,15 +2328,18 @@ static obs_source_t *obs_load_source_type(obs_data_t *source_data, bool is_priva
 	double volume;
 	double balance;
 	int64_t sync;
+	int64_t ptm_delay;
+	int64_t ptt_delay;
 	uint32_t prev_ver;
 	uint32_t caps;
 	uint32_t flags;
 	uint32_t mixers;
 	int di_order;
-	int di_mode;
-	int monitoring_type;
+	int64_t di_mode;
+	int64_t monitoring_type;
+	struct obs_source_load_monitoring monitoring;
 
-	prev_ver = (uint32_t)obs_data_get_int(source_data, "prev_ver");
+	prev_ver = obs_source_load_prev_ver(obs_data_get_int(source_data, "prev_ver"));
 
 	if (!*v_id)
 		v_id = id;
@@ -2334,13 +2365,15 @@ static obs_source_t *obs_load_source_type(obs_data_t *source_data, bool is_priva
 
 	caps = obs_source_get_output_flags(source);
 
+	/* the value rules and the monitoring migration are in
+	 * obs-source-load.c */
 	obs_data_set_default_double(source_data, "volume", 1.0);
 	volume = obs_data_get_double(source_data, "volume");
-	obs_source_set_volume(source, (float)volume);
+	obs_source_set_volume(source, obs_source_load_volume(volume));
 
 	obs_data_set_default_double(source_data, "balance", 0.5);
 	balance = obs_data_get_double(source_data, "balance");
-	obs_source_set_balance_value(source, (float)balance);
+	obs_source_set_balance_value(source, obs_source_load_balance(balance));
 
 	sync = obs_data_get_int(source_data, "sync");
 	obs_source_set_sync_offset(source, sync);
@@ -2363,35 +2396,30 @@ static obs_source_t *obs_load_source_type(obs_data_t *source_data, bool is_priva
 	obs_source_enable_push_to_mute(source, obs_data_get_bool(source_data, "push-to-mute"));
 
 	obs_data_set_default_int(source_data, "push-to-mute-delay", 0);
-	obs_source_set_push_to_mute_delay(source, obs_data_get_int(source_data, "push-to-mute-delay"));
+	ptm_delay = obs_data_get_int(source_data, "push-to-mute-delay");
+	obs_source_set_push_to_mute_delay(source, obs_source_load_delay(ptm_delay));
 
 	obs_data_set_default_bool(source_data, "push-to-talk", false);
 	obs_source_enable_push_to_talk(source, obs_data_get_bool(source_data, "push-to-talk"));
 
 	obs_data_set_default_int(source_data, "push-to-talk-delay", 0);
-	obs_source_set_push_to_talk_delay(source, obs_data_get_int(source_data, "push-to-talk-delay"));
+	ptt_delay = obs_data_get_int(source_data, "push-to-talk-delay");
+	obs_source_set_push_to_talk_delay(source, obs_source_load_delay(ptt_delay));
 
-	di_mode = (int)obs_data_get_int(source_data, "deinterlace_mode");
-	obs_source_set_deinterlace_mode(source, (enum obs_deinterlace_mode)di_mode);
+	di_mode = obs_data_get_int(source_data, "deinterlace_mode");
+	obs_source_set_deinterlace_mode(source, (enum obs_deinterlace_mode)obs_source_load_deinterlace_mode(di_mode));
 
 	di_order = (int)obs_data_get_int(source_data, "deinterlace_field_order");
 	obs_source_set_deinterlace_field_order(source, (enum obs_deinterlace_field_order)di_order);
 
-	monitoring_type = (int)obs_data_get_int(source_data, "monitoring_type");
-	if (prev_ver < MAKE_SEMANTIC_VERSION(23, 2, 2)) {
-		if ((caps & OBS_SOURCE_MONITOR_BY_DEFAULT) != 0) {
-			/* updates older sources to enable monitoring
-			 * automatically if they added monitoring by default in
-			 * version 24 */
-			monitoring_type = OBS_MONITORING_TYPE_MONITOR_ONLY;
-			obs_source_set_audio_mixers(source, 0x3F);
-		}
-	}
+	monitoring_type = obs_data_get_int(source_data, "monitoring_type");
+	monitoring = obs_source_load_monitoring_migration(prev_ver, caps, monitoring_type);
+	if (monitoring.set_mixers)
+		obs_source_set_audio_mixers(source, monitoring.mixers);
 
 	obs_data_set_default_bool(source_data, "monitoring_enabled", false);
-	if (prev_ver < MAKE_SEMANTIC_VERSION(33, 0, 0)) {
-		obs_data_set_bool(source_data, "monitoring_enabled", monitoring_type != OBS_MONITORING_TYPE_NONE);
-	}
+	if (monitoring.store_enabled)
+		obs_data_set_bool(source_data, "monitoring_enabled", monitoring.enabled);
 	obs_source_set_monitoring_enabled(source, obs_data_get_bool(source_data, "monitoring_enabled"));
 
 	obs_data_release(source->private_settings);
@@ -2658,7 +2686,7 @@ static inline bool obs_context_data_init_wrap(struct obs_context_data *context, 
 	context->type = type;
 
 	pthread_mutex_init_value(&context->rename_cache_mutex);
-	if (pthread_mutex_init(&context->rename_cache_mutex, NULL) < 0)
+	if (pthread_mutex_init(&context->rename_cache_mutex, NULL) != 0)
 		return false;
 
 	context->signals = signal_handler_create();
@@ -2831,7 +2859,10 @@ void obs_context_data_remove_name(struct obs_context_data *context, pthread_mute
 
 	assert(head);
 
-	if (!context)
+	/* A context whose object failed to initialize was never added (its
+	 * hash handle is still zeroed), and deleting it would corrupt or
+	 * dereference the table. */
+	if (!context || !context->hh.tbl)
 		return;
 
 	pthread_mutex_lock(mutex);
@@ -2855,6 +2886,10 @@ void obs_context_data_remove_uuid(struct obs_context_data *context, pthread_mute
 
 void obs_context_wait(struct obs_context_data *context)
 {
+	/* Not in any list: its object failed to initialize. */
+	if (!context->mutex)
+		return;
+
 	pthread_mutex_lock(context->mutex);
 	pthread_mutex_unlock(context->mutex);
 }
@@ -3190,13 +3225,26 @@ void obs_add_raw_video_callback(const struct video_scale_info *conversion,
 void obs_add_raw_video_callback2(const struct video_scale_info *conversion, uint32_t frame_rate_divisor,
 				 void (*callback)(void *param, struct video_data *frame), void *param)
 {
-	struct obs_core_video_mix *video = obs->data.main_canvas->mix;
+	/* The main canvas has no mix until the first obs_reset_video() (#2253):
+	 * there is no video to connect to, and the callback is not kept for
+	 * later. */
+	const obs_canvas_t *canvas = obs->data.main_canvas;
+	struct obs_core_video_mix *video = canvas ? canvas->mix : NULL;
+	if (!video) {
+		blog(LOG_WARNING, "obs_add_raw_video_callback2: video is not set up yet, "
+				  "the raw video callback was not added");
+		return;
+	}
 	start_raw_video(video->video, conversion, frame_rate_divisor, callback, param);
 }
 
 void obs_remove_raw_video_callback(void (*callback)(void *param, struct video_data *frame), void *param)
 {
-	struct obs_core_video_mix *video = obs->data.main_canvas->mix;
+	/* Before the first obs_reset_video() no callback can have been added. */
+	const obs_canvas_t *canvas = obs->data.main_canvas;
+	struct obs_core_video_mix *video = canvas ? canvas->mix : NULL;
+	if (!video)
+		return;
 	stop_raw_video(video->video, callback, param);
 }
 
@@ -3349,16 +3397,20 @@ bool obs_video_active(void)
 	return result;
 }
 
+/* The main canvas has no mix until the first obs_reset_video() (#2253): no
+ * video, so no texture conversion either. */
 bool obs_nv12_tex_active(void)
 {
-	struct obs_core_video_mix *video = obs->data.main_canvas->mix;
-	return video->using_nv12_tex;
+	const obs_canvas_t *canvas = obs->data.main_canvas;
+	const struct obs_core_video_mix *video = canvas ? canvas->mix : NULL;
+	return video && video->using_nv12_tex;
 }
 
 bool obs_p010_tex_active(void)
 {
-	struct obs_core_video_mix *video = obs->data.main_canvas->mix;
-	return video->using_p010_tex;
+	const obs_canvas_t *canvas = obs->data.main_canvas;
+	const struct obs_core_video_mix *video = canvas ? canvas->mix : NULL;
+	return video && video->using_p010_tex;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -3368,6 +3420,8 @@ struct task_wait_info {
 	obs_task_t task;
 	void *param;
 	os_event_t *event;
+	/* Set instead of the event when it could not be created. */
+	volatile bool done;
 };
 
 static void task_wait_callback(void *param)
@@ -3375,7 +3429,25 @@ static void task_wait_callback(void *param)
 	struct task_wait_info *info = param;
 	if (info->task)
 		info->task(info->param);
-	os_event_signal(info->event);
+	if (info->event)
+		os_event_signal(info->event);
+	else
+		os_atomic_set_bool(&info->done, true);
+}
+
+/* Waits for task_wait_callback(). Without an event (its init failed), it
+ * polls: the task still runs once, on its own thread, and the caller still
+ * waits for it, which a caller whose param lives on its stack relies on. */
+static void task_wait_for_callback(struct task_wait_info *info)
+{
+	if (info->event) {
+		os_event_wait(info->event);
+		return;
+	}
+
+	while (!os_atomic_load_bool(&info->done))
+		os_sleep_ms(1);
+	os_atomic_set_bool(&info->done, false);
 }
 
 THREAD_LOCAL bool is_graphics_thread = false;
@@ -3421,9 +3493,11 @@ void obs_queue_task(enum obs_task_type type, obs_task_t task, void *param, bool 
 				.param = param,
 			};
 
-			os_event_init(&info.event, OS_EVENT_TYPE_MANUAL);
+			if (os_event_init(&info.event, OS_EVENT_TYPE_MANUAL) != 0)
+				blog(LOG_WARNING, "obs_queue_task: Failed to create the wait event, "
+						  "polling for the task instead");
 			obs_queue_task(type, task_wait_callback, &info, false);
-			os_event_wait(info.event);
+			task_wait_for_callback(&info);
 			os_event_destroy(info.event);
 
 		} else if (type == OBS_TASK_GRAPHICS) {
@@ -3457,11 +3531,13 @@ bool obs_wait_for_destroy_queue(void)
 	 * (no video reset) sources are still destroyed by the destruction
 	 * thread, so that queue is waited for regardless. */
 	if (obs->video.thread_initialized && obs->audio.audio) {
-		os_event_init(&info.event, OS_EVENT_TYPE_AUTO);
+		if (os_event_init(&info.event, OS_EVENT_TYPE_AUTO) != 0)
+			blog(LOG_WARNING, "obs_wait_for_destroy_queue: Failed to create the wait event, "
+					  "polling instead");
 		obs_queue_task(OBS_TASK_GRAPHICS, task_wait_callback, &info, false);
-		os_event_wait(info.event);
+		task_wait_for_callback(&info);
 		obs_queue_task(OBS_TASK_AUDIO, task_wait_callback, &info, false);
-		os_event_wait(info.event);
+		task_wait_for_callback(&info);
 		os_event_destroy(info.event);
 	}
 
@@ -3557,6 +3633,9 @@ bool obs_weak_object_references_object(obs_weak_object_t *weak, obs_object_t *ob
 
 bool obs_is_output_protocol_registered(const char *protocol)
 {
+	if (!protocol)
+		return false;
+
 	for (size_t i = 0; i < obs->data.protocols.num; i++) {
 		if (strcmp(protocol, obs->data.protocols.array[i]) == 0)
 			return true;
@@ -3567,7 +3646,7 @@ bool obs_is_output_protocol_registered(const char *protocol)
 
 bool obs_enum_output_protocols(size_t idx, char **protocol)
 {
-	if (idx >= obs->data.protocols.num)
+	if (!protocol || idx >= obs->data.protocols.num)
 		return false;
 
 	*protocol = obs->data.protocols.array[idx];

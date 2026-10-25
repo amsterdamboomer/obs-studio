@@ -30,11 +30,14 @@
 #include <qpa/qplatformintegration.h>
 #endif
 
+#include <QIcon>
 #include <QMessageBox>
+#include <QScreen>
 #include <util/platform.h>
 
 #include "json11.hpp"
 
+#include "frontend/dialogs/OBSPermissions.hpp"
 #include "frontend/utility/OBSProxyStyle.hpp"
 
 #include <QWindow>

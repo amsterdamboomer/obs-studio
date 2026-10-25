@@ -8,6 +8,7 @@
 - The workflow calls every step, in order, and passes every input.
 - --dry-run prints the plan; --skip-deps drops only the dependency install.
 - version + configure, run against a stub cmake, pass the flags through.
+- `bosn run --task appimage` builds on the same base as the workflow.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "build-aux/appimage/build.py"
@@ -28,8 +30,6 @@ WORKFLOW = ROOT / ".github/workflows/appimage.yaml"
 # origin/master just before the move: the last appimage.yaml with inline scripts.
 BEFORE = "2c38ec153b622ec6873b90b8ebe5c359ff3d4129"
 OLD_STEPS = {
-    "deps": "Install build dependencies",
-    "libavutil": "Build libavutil with host VA compatibility",
     "version": "Determine version",
     "configure": "Configure",
     "build": "Build 🧱",
@@ -37,18 +37,48 @@ OLD_STEPS = {
     "appimage": "Create AppImage",
 }
 # Deliberate changes to the scripts since the move, as (old, new) edits.
+JOURNAL_START = (
+    "# Journal each compilation's hit or miss and the miss reason; the workflow\n"
+    "# summarizes it (#2182). A failed session start only loses the journal.\n"
+    'if ZCCACHE_SESSION_ID="$(zccache session-start --cwd "$PWD" --stats --journal "${RUNNER_TEMP:-/tmp}/appimage-zccache.jsonl" |\n'
+    "  sed -n 's/.*\"session_id\": *\"\\([^\"]*\\)\".*/\\1/p')\" && [ -n \"$ZCCACHE_SESSION_ID\" ]; then\n"
+    "  export ZCCACHE_SESSION_ID\n"
+    "fi\n"
+)
+STABLE_MTIMES = (
+    "# rcc writes each resource file's mtime into qrc_*.cpp, and a checkout gives\n"
+    "# every file a new one, so the qrc objects missed the cache on every build of\n"
+    "# the same commit (#2182). Not SOURCE_DATE_EPOCH: zccache keys on it.\n"
+    'epoch="$(git log -1 --format=%ct)"\n'
+    "{ git ls-files -z; git submodule foreach --quiet --recursive 'git ls-files -z | sed -z \"s|^|$sm_path/|\"'; } |\n"
+    '  xargs -0 touch -h -c -d "@$epoch"\n'
+)
+JOURNAL_END = 'if [ -n "${ZCCACHE_SESSION_ID:-}" ]; then zccache session-end "$ZCCACHE_SESSION_ID" || true; fi\n'
+
 LATER = {
-    # #957: zccache, installed pinned, replaces ccache as the compiler launcher.
-    "deps": [
-        ("ninja-build ccache pkg-config", "ninja-build pkg-config"),
-        ("# apt ran as root; the cache action must read it\n",
-         "# apt ran as root; the cache action must read it\n"
-         "# The ubuntu-ci preset's compiler launcher, pinned and checksum-verified.\n"
-         "sudo rust/tools/linux-validate/install-zccache.sh /usr/local/bin\n"),
+    # #1744: the AppImage ships obs-webrtc.
+    "configure": [
+        ("-DENABLE_WEBRTC=OFF", "-DENABLE_WEBRTC=ON"),
     ],
     "build": [
         ("ccache -s\n", "zccache status || true\n"
          "zccache stop || true # flush the cache index before the workflow saves it\n"),
+        # #2182: the build runs in a journaled zccache session.
+        ("cmake --build build_ubuntu\n", JOURNAL_START + "cmake --build build_ubuntu\n" + JOURNAL_END),
+        # #2182: tracked files get the commit time, so rcc's output is stable.
+        ("cmake --build build_ubuntu\n", STABLE_MTIMES + "cmake --build build_ubuntu\n"),
+    ],
+    # #1881: the update information follows the certified release, like
+    # Windows and macOS, not the daily continuous build.
+    "appimage": [
+        ('# A build published as the "continuous" pre-release (release job) carries\n'
+         "# update information: AppImageUpdate and friends can then fetch the next\n"
+         "# continuous build as a delta against this one (.zsync).\n",
+         "# A build published by the release job carries update information that\n"
+         '# follows the certified ("latest") release, as the Windows and macOS updaters\n'
+         "# do (#1881): AppImageUpdate and friends fetch the next certified build as a\n"
+         "# delta against this one (.zsync), never an uncertified daily.\n"),
+        ("|continuous|OBS-Studio-Rust-", "|latest|OBS-Studio-Rust-"),
     ],
 }
 
@@ -134,6 +164,34 @@ class ManylinuxLauncherTest(unittest.TestCase):
         self.assertIn(f"{environment['HOME']}/.cargo/registry:/usr/local/cargo/registry", mounts)
 
 
+class BosnTaskTest(unittest.TestCase):
+    def test_local_task_uses_the_workflow_base(self):
+        import tomllib
+
+        bases = set(re.findall(r"build\.py --base (\w+)", WORKFLOW.read_text()))
+        self.assertEqual(bases, {"manylinux"})
+        bosn = tomllib.loads((ROOT / "bosn.toml").read_text())
+        task = bosn["task"]["appimage"]
+        self.assertIn("--base manylinux", task["cmd"])
+        stack = bosn["stack"][task["stack"]]
+        self.assertEqual(stack["dockerfile"], "build-aux/appimage/manylinux/Dockerfile")
+
+    def test_the_ubuntu_base_is_retired(self):
+        # #1999: no workflow built on the Ubuntu 26.04 base, and it no longer
+        # built (Ubuntu 26.04 has no libdatachannel-dev). Only the glibc 2.28
+        # image remains.
+        args = build.parse_args(["--sha", "0" * 40])
+        self.assertEqual(args.base, "manylinux")
+        self.assertNotEqual(run_script("--dry-run", "--base", "ubuntu").returncode, 0)
+        self.assertNotIn("deps", build.STEP_NAMES)
+        self.assertNotIn("libavutil", build.STEP_NAMES)
+        self.assertFalse((ROOT / "build-aux/appimage/Dockerfile").exists())
+        import tomllib
+
+        stacks = tomllib.loads((ROOT / "bosn.toml").read_text())["stack"]
+        self.assertNotIn("build-aux/appimage/Dockerfile", [s["dockerfile"] for s in stacks.values()])
+
+
 class BuildScriptTest(unittest.TestCase):
     def test_scripts_are_the_former_inline_workflow_steps(self):
         old = subprocess.run(["git", "show", f"{BEFORE}:.github/workflows/appimage.yaml"],
@@ -171,7 +229,7 @@ class BuildScriptTest(unittest.TestCase):
                 called += line.split("--steps ", 1)[1].split()[0].split(",")
         # The workflow builds on the glibc 2.28 image, which has the dependencies (#926).
         self.assertIn("--base manylinux --steps", WORKFLOW.read_text())
-        self.assertEqual(called, [s for s in build.STEP_NAMES if s not in build.MANYLINUX_SKIPPED])
+        self.assertEqual(called, list(build.STEP_NAMES))
 
     def test_workflow_passes_every_input(self):
         text = WORKFLOW.read_text()
@@ -190,14 +248,6 @@ class BuildScriptTest(unittest.TestCase):
         self.assertIn("env RUST_LIBOBS=true", result.stdout)
         self.assertIn(f"env APPIMAGETOOL_SHA256={build.APPIMAGETOOL_SHA256}", result.stdout)
 
-    def test_skip_deps_drops_only_the_install(self):
-        result = run_script("--dry-run", "--skip-deps", "--qsv", "true", "--rust-libobs", "false")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn("deps: Install build dependencies", result.stdout)
-        self.assertIn("libavutil: Build libavutil", result.stdout)
-        self.assertIn("env QSV=true", result.stdout)
-        self.assertIn("env RUST_LIBOBS=false", result.stdout)
-
     def test_rejects_unknown_steps_and_values(self):
         self.assertNotEqual(run_script("--dry-run", "--steps", "bogus").returncode, 0)
         self.assertNotEqual(run_script("--dry-run", "--rust-libobs", "yes").returncode, 0)
@@ -209,10 +259,13 @@ class BuildScriptTest(unittest.TestCase):
             stub.write_text(f'#!/bin/sh\nprintf "%s\\n" "$@" > "{log}"\n')
             stub.chmod(0o755)
             output = Path(scratch) / "output"
-            env = {**os.environ, "PATH": f"{scratch}:{os.environ['PATH']}", "GITHUB_OUTPUT": str(output)}
-            result = run_script("--steps", "version,configure", "--rust-libobs", "false", "--qsv", "true",
-                                "--sha", "0123456789abcdef", env=env)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            env = {"PATH": f"{scratch}:{os.environ['PATH']}", "GITHUB_OUTPUT": str(output)}
+            # The build runs only on the glibc 2.28 image (#926); this host is not it.
+            with mock.patch.dict(os.environ, env), \
+                    mock.patch.object(build.os, "confstr", return_value="glibc 2.28"):
+                code = build.main(["--steps", "version,configure", "--rust-libobs", "false", "--qsv", "true",
+                                   "--sha", "0123456789abcdef"])
+            self.assertEqual(code, 0)
             argv = log.read_text().splitlines()
             self.assertEqual(argv[:2], ["--preset", "ubuntu-ci"])
             self.assertIn("-DENABLE_RUST_LIBOBS=FALSE", argv)

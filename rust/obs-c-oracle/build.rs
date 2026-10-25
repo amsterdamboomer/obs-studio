@@ -93,9 +93,15 @@ fn extract_c(src: &Path, start: &str, end: &str) -> String {
 /// supplies the unit's own headers instead of unrelated libobs dependencies
 /// (notably zlib, which the Windows Rust test runners do not install).
 fn extract_after_libobs_pch(src: &Path) -> String {
+    extract_after_pch(src, "#include \"libobs/build/libobs.pch.h\"")
+}
+
+/// [`extract_after_libobs_pch`] for an implementation whose precompiled
+/// header include line is `pch_line`.
+fn extract_after_pch(src: &Path, pch_line: &str) -> String {
     let text = std::fs::read_to_string(src).expect("read lifecycle implementation");
     let (prefix, body) = text
-        .split_once("#include \"libobs/build/libobs.pch.h\"")
+        .split_once(pch_line)
         .expect("lifecycle implementation must include its libobs PCH");
     let body = body
         .strip_prefix("\r\n")
@@ -437,7 +443,11 @@ fn main() {
     ] {
         std::fs::write(extract_dir.join(name), extract_c(src, start, end)).expect("write extract");
     }
-    for stem in ["effect-parser-lifecycle", "effect-parser-lifecycle-adapter"] {
+    for stem in [
+        "effect-parser-lifecycle",
+        "effect-parser-lifecycle-adapter",
+        "obs-graphics-adapter",
+    ] {
         let src = libobs.join("graphics").join(format!("{stem}.c.h"));
         std::fs::write(
             extract_dir.join(format!("{stem}.inc")),
@@ -445,6 +455,16 @@ fn main() {
         )
         .expect("write lifecycle extract");
     }
+    // The media-remux adapter the Rust port calls, built over the FFmpeg
+    // stand-in (oracle/media_remux_adapter.c).
+    std::fs::write(
+        extract_dir.join("media-remux-ffmpeg.inc"),
+        extract_after_pch(
+            &libobs.join("media-io").join("media-remux-ffmpeg.c.h"),
+            "#include \"build/libobs-media.pch.h\"",
+        ),
+    )
+    .expect("write media-remux adapter extract");
     oracle.include(&extract_dir);
 
     oracle
@@ -466,6 +486,16 @@ fn main() {
         // forwards to libpulse's header where one is installed and defines
         // the values the oracle needs where not (oracle/pulse-shim/pulse/def.h).
         .include(manifest.join("oracle/pulse-shim"))
+        // util/profiler-io.c includes <zlib.h>, which the Windows Rust test
+        // runners do not have. The stand-in writes the "gzip" stream
+        // uncompressed (oracle/zlib-shim/zlib.h), so Tier 3 compares it with
+        // the Rust port's decompressed output.
+        .include(manifest.join("oracle/zlib-shim"))
+        // media-io/media-remux.c includes libavformat, which the Rust test
+        // runners do not have. The stand-in declares the parts it uses and
+        // records every call (oracle/media_remux_ffmpeg.c), for the original
+        // C and the Rust port's adapter alike.
+        .include(manifest.join("oracle/ffmpeg-shim"))
         .std("c11");
     // The real build is gnu17, whose glibc headers see _DEFAULT_SOURCE (POSIX
     // 2008: PTHREAD_MUTEX_RECURSIVE for util/threading.h). Strict c11 hides
@@ -601,6 +631,17 @@ fn main() {
         jansson.file(jansson_src.join(name));
     }
     jansson.compile("jansson_vendor");
+
+    // The vendored libnsgif that image-file.c.h calls, for the oracle and
+    // the Rust shim alike (libobs links its own copy). Its own library,
+    // warnings off: third-party code, not part of the ratchet (#516).
+    let mut nsgif = cc::Build::new();
+    nsgif
+        .include(&libobs)
+        .include(libobs.parent().expect("libobs has a parent"))
+        .warnings(false)
+        .file(libobs.join("build").join("libobs.nsgif+.h.c"));
+    nsgif.compile("obs_c_oracle_nsgif");
 
     if macos {
         let mut objc = cc::Build::new();

@@ -15,7 +15,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 
-#include "build/libobs-media.pch.h"
+#include "libobs/build/libobs-ported-media-remux.pch.h"
 
 struct media_remux_job {
 	int64_t in_size;
@@ -27,14 +27,9 @@ struct media_remux_job {
 
 static inline void init_size(media_remux_job_t job, const char *in_filename)
 {
-#ifdef _MSC_VER
-	struct _stat64 st = {0};
-	_stat64(in_filename, &st);
-#else
-	struct stat st = {0};
-	stat(in_filename, &st);
-#endif
-	job->in_size = st.st_size;
+	/* 64-bit on every host (#870); 0 when the file can't be read, as before. */
+	int64_t size = os_get_file_size(in_filename);
+	job->in_size = size > 0 ? size : 0;
 }
 
 static inline bool init_input(media_remux_job_t job, const char *in_filename)

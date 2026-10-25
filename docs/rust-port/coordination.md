@@ -20,15 +20,23 @@ this document covers *who does what, and when*.
 
 ## 2. Claiming
 
+The org-wide rules, commands and the definition of Ready are in
+[WORKFLOW.md](https://github.com/obs-rust/.github/blob/master/WORKFLOW.md); the claim bot is the org's reusable workflow
+(`.github/workflows/claim-bot.yaml` calls it). In short:
+
+- Only an issue labeled `ready` can be claimed for implementation (`P0`
+  issues never wait). An underdefined one is researched first: comment
+  `Claiming: investigation`, then `/ready` once it meets the definition of
+  Ready. Maintainers (and the coordinator) triage new issues with `/ready` or
+  `/investigate`.
 - Comment on the issue: `Claiming: <item>` followed by a short numbered plan
   (one PR per C file or unit) and when you expect to open the first PR.
-- The claim bot (`.github/workflows/claim-bot.yaml`) then adds the `claimed`
-  label and reacts 🚀 to your comment; you don't need label rights. It is
-  silent unless it refuses: a claim on an issue someone else holds, a
-  takeover of a claim that isn't stale, or a `/reassign` from a
-  non-maintainer gets a reply that mentions you. Automated runs skip issues
-  and checklist items that are claimed or have an open PR; a fresh
-  `Claiming:` comment counts even if the label is missing.
+- The claim bot then **assigns you** and reacts 🚀 to your comment; you don't
+  need any rights. It replies only to refuse: an issue that is not Ready, is
+  blocked by an open issue, waits on a decision or is claimed by someone
+  else, a takeover of a claim that isn't stale, or a `/reassign` from a
+  non-maintainer. Automated runs skip issues that are assigned or have an
+  open PR.
 - On a tracking issue, claim one checklist item, not the whole issue.
 - Claim only what you are working on now. There is no per-account limit
   (several agents may share one account); stale claims expire (section 3).
@@ -36,7 +44,24 @@ this document covers *who does what, and when*.
   claim comment under **Decisions:** (the default you will build and why),
   and order the PRs so the first one does not depend on an unresolved
   answer. A question with no safe default is posted as **Decision needed:**
-  on the issue, and the work that depends on it waits for an answer.
+  on the issue, and the work that depends on it waits for an answer. Use it
+  only for that; a question with a safe default goes under **Decisions:**.
+- **Open decisions:** a line that starts with `Decision needed:` (bold or a
+  heading marker before it is fine) makes the claim bot add the
+  `decision-needed` label (🚀, silent), from anyone. From the claimant it
+  also counts as `Blocked:` (section 3). Only a maintainer clears it, with a
+  `Decided:` or `Decision:` comment (first line) or by removing the label;
+  nobody else's progress and no sweep removes it. That answer also clears
+  `human-review-needed`, and on a blocked claim it removes `claim-blocked`
+  and mentions the claimant with the decision quoted, so the work resumes
+  (#2212). The coordinator (obs-coordinator skill
+  §3b) researches each open decision every tick: it answers with `Decided:`
+  when the rules, docs or earlier decisions settle it, and otherwise moves
+  the issue to `human-review-needed`, the list that waits on the human
+  maintainer. The list of open decisions is
+  [issues labeled `decision-needed`](https://github.com/obs-rust/obs-studio/issues?q=is%3Aopen+label%3Adecision-needed+sort%3Acreated-asc),
+  oldest first. Non-public work never posts `Decision needed:` on a public
+  issue; use a general `Blocked:` reason.
 
 ## 3. Keeping or releasing a claim
 
@@ -46,20 +71,34 @@ this document covers *who does what, and when*.
 
   | Issue | Stale after |
   |---|---|
-  | normal | **48 hours** |
-  | labeled `critical` (crash, data loss, broken release or CI-blocking; maintainers set it) | **8 hours** |
+  | normal | **24 hours** |
+  | labeled `P0` or `critical` (crash, data loss, broken release or CI-blocking; maintainers set it) | **8 hours** |
+  | labeled `claim-blocked` (the claimant set it; see below) | **7 days** after the last `Blocked:` comment |
 
-  The hourly sweep then removes the label, without a comment. Anyone may take
+  The hourly sweep then unassigns the claimant, without a comment. Anyone may take
   a stale claim by commenting `Taking over stale claim from @x`; the bot
   accepts it (🚀) only if the claim is stale. Commits on the old draft PR stay
   available: carry them over with `Co-Authored-By` (section 6).
+- When the work waits on something you don't control (a maintainer
+  decision, another PR, coordinated non-public work), comment
+  `Blocked: <reason>` (or `/blocked <reason>`). Only the claimant can; the bot
+  adds `claim-blocked` (🚀) and the claim lasts 7 days from that comment. A
+  new `Blocked:` comment renews it; a takeover in the meantime is refused.
+  A claimant's `Decision needed:` comment (section 2) blocks and renews the
+  same way.
+  Keep the reason general ("waiting on a maintainer", "waiting on #N",
+  "waiting on non-public work"). Any other progress (an issue comment, a
+  commit, comment or review on your PR) removes the label and the normal
+  timer applies again, as do a release, handoff or `/reassign`. When the
+  7 days end without a renewal the sweep removes both labels, silently.
 - Maintainers (owner, member, collaborator) can move any claim with
-  `/reassign @user`. The bot leaves issues labeled `claim-locked` alone.
+  `/reassign @user`. The bot leaves issues labeled `claim-locked` alone;
+  `claim-locked` wins over `claim-blocked`.
 - To stop, comment `Releasing <item>` and link any partial branch; the bot
-  removes the label (🚀). To hand the claim to someone instead of dropping
+  unassigns you (🚀). To hand the claim to someone instead of dropping
   it, name them in the same comment — `Releasing <item> — handing it to
   @user`, `Handing <item> over to @user`, `It's yours, @user` or
-  `/handoff @user` — and the label stays, moved to `@user` (🚀), so nobody
+  `/handoff @user` — and the bot assigns `@user` instead (🚀), so nobody
   else can take the item in between.
 
 ## 4. Pull requests

@@ -150,7 +150,11 @@ fn ver_of(ver: host::WinVer) -> win_version_info {
 
 #[cfg(windows)]
 mod shims {
-    use super::*;
+    use super::{
+        DirHandle, alloc_bytes, c_char, c_int, c_void, copy_out, cstr, host, os_dirent,
+        os_glob_info, os_proc_memory_usage, ptr, reg_dword, store_glob, store_name, ver_of,
+        win_version_info, wstr,
+    };
 
     /// # Safety
     /// `path` is a C string or null.
@@ -678,7 +682,8 @@ mod shims {
     #[unsafe(no_mangle)]
     pub unsafe extern "C" fn os_get_free_disk_space(dir: *const c_char) -> u64 {
         match cstr(dir) {
-            Some(dir) => host::free_disk_space(dir),
+            // Bounded: a hung share must not stall the caller (#1345).
+            Some(dir) => crate::bounded_free_space::shared(host::free_disk_space).get(dir),
             None => 0,
         }
     }

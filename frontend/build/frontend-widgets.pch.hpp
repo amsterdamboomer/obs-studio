@@ -63,6 +63,7 @@
 #include <utility/WhatsNewInfoThread.hpp>
 #endif
 #include <utility/GpuStatus.hpp>
+#include <utility/product-name.h>
 #include <utility/profile-activate.h>
 #include <widgets/AudioMixer.hpp>
 #include <widgets/OBSProjector.hpp>
@@ -134,9 +135,6 @@
 
 #include <QFileInfo>
 #include <QMimeData>
-#ifdef _WIN32
-#include <QSettings>
-#endif
 #include <QUrlQuery>
 
 /* widgets/OBSBasic_Hotkeys.cpp */
@@ -151,13 +149,7 @@
 #include <dialogs/OBSIdianPlayground.hpp>
 #endif
 #include <dialogs/OBSLogViewer.hpp>
-#ifdef __APPLE__
-#include <dialogs/OBSPermissions.hpp>
-#endif
 #include <dialogs/OBSRemux.hpp>
-#ifdef _WIN32
-#include <utility/AutoUpdateThread.hpp>
-#endif
 #include <utility/RemoteTextThread.hpp>
 #if defined(_WIN32) || defined(WHATSNEW_ENABLED)
 #include <utility/WhatsNewInfoThread.hpp>
@@ -181,6 +173,7 @@
 #include <docks/YouTubeAppDock.hpp>
 #endif
 #include <utility/menu-text.h>
+#include <utility/profile-import.hpp>
 #include <utility/profile-remove.h>
 
 #include <util/pipe.h>
@@ -202,6 +195,7 @@
 #include <dialogs/OBSMissingFiles.hpp>
 #include <importer/OBSImporter.hpp>
 #include <utility/missing-files-list.h>
+#include <utility/missing-source-types.h>
 
 #include <filesystem>
 #include <vector>
@@ -241,9 +235,6 @@
 
 #include <dialogs/OBSWhatsNew.hpp>
 
-#ifdef _WIN32
-#include <utility/AutoUpdateThread.hpp>
-#endif
 #ifdef ENABLE_SPARKLE_UPDATER
 #include <utility/MacUpdateThread.hpp>
 #include <utility/OBSSparkle.hpp>

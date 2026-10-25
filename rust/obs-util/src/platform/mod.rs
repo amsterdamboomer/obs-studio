@@ -50,7 +50,8 @@ cfg_select! {
         pub mod unix;
         pub use unix::{Event, Pipe, Sem, close_file, crt, path_from_bytes};
         pub use unix::file::{
-            CFile, SEEK_CUR, SEEK_END, SEEK_SET, WChar, errno, mbs_to_utf8, set_errno, utf8_to_mbs,
+            CFile, SEEK_CUR, SEEK_END, SEEK_SET, WChar, errno, mbs_to_wide, set_errno, utf8_to_wide,
+            wide_to_mbs, wide_to_utf8,
         };
         pub use unix::nix::{gettime_ns, mkdir, safe_replace};
     }
@@ -59,7 +60,8 @@ cfg_select! {
         pub mod windows;
         pub use windows::{Event, Pipe, Sem, close_file, crt, path_from_bytes};
         pub use windows::file::{
-            CFile, SEEK_CUR, SEEK_END, SEEK_SET, WChar, errno, mbs_to_utf8, set_errno, utf8_to_mbs,
+            CFile, SEEK_CUR, SEEK_END, SEEK_SET, WChar, errno, mbs_to_wide, set_errno, utf8_to_wide,
+            wide_to_mbs, wide_to_utf8,
         };
         pub use windows::host::{gettime_ns, mkdir, safe_replace};
     }
@@ -115,7 +117,7 @@ cfg_select! {
 pub const MUL_DIV64_IS_UDIV128: bool = cfg!(all(target_env = "msvc", target_arch = "x86_64"));
 
 mod stdio;
-pub use stdio::{DoubleFormat, snprintf_double};
+pub use stdio::{DoubleFormat, snprintf_double, snprintf_ptr};
 
 /// The `Sleep` argument `os_sleep_ms(ms)` uses on a Windows host whose
 /// version is `winver` (`major << 8 | minor`). Windows 8+ (`0x0602`) sleeps

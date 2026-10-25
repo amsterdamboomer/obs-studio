@@ -38,24 +38,44 @@ you last read them (`git log -1 --format=%cs -- <file>`).
 git fetch origin && git rebase --autostash origin/master
 ```
 
-Work in your own branch or worktree, named `port/<unit>`, `fix/<issue>-<topic>`,
-`test/<unit>` or `infra/<topic>`. Don't touch other people's branches, and
-don't delete local branches you didn't create.
+Work in your own branch, named `port/<unit>`, `fix/<issue>-<topic>`,
+`test/<unit>` or `infra/<topic>`, in the checkout you were started in. Don't
+touch other people's branches, and don't delete local branches you didn't
+create.
+
+**No new clones or worktrees of this repo.** Switch branches in the existing
+checkout (`git switch -c <branch> origin/master`; stash or commit first).
+Every build cache (zccache, the cargo target directory, CMake build trees,
+bosn volumes) is keyed to a checkout's path, so a fresh clone or worktree
+starts cold: it recompiles everything and fills the disk. A clone is allowed
+only for a **different repository** (an external repo such as
+obs-rust/obs-websocket or a private advisory fork), and even then first reuse
+a local checkout of that repo if one exists (look under
+`~/dev/obs-rust/obs-studio2-extern/` and `~/dev/`), fetching and branching in
+it, so its caches stay warm. Clone only when no local copy exists.
 
 ## 2. Choose and claim one issue
 
-1. List candidates: `gh issue list --repo obs-rust/obs-studio --state open`.
-   Skip anything with a fresh claim (labeled `claimed`, or a `Claiming:`
-   comment under 48 hours old, 8 on `critical` issues), and anything with
-   an open PR (`gh pr list --repo obs-rust/obs-studio --search "<topic>"`).
+1. List Ready, unclaimed candidates:
+   `gh issue list --repo obs-rust/obs-studio --state open --label ready --search no:assignee`
+   (or Status **Ready** on the [board](https://github.com/orgs/obs-rust/projects/1)),
+   highest priority (`P0`..`P3`) first. Skip anything with an open PR
+   (`gh pr list --repo obs-rust/obs-studio --search "<topic>"`). Nothing
+   Ready you can do? Take an investigation: `Claiming: investigation` on an
+   unclaimed issue in Triage or `needs-investigation`, then `/ready` it when
+   it meets the [definition of Ready](https://github.com/obs-rust/.github/blob/master/WORKFLOW.md#definition-of-ready).
    For port work, follow the port order in testing-policy.md and the
    trackers on #4.
+   A claim, assignment or authored issue under the account you act as
+   (`gh api user --jq .login`) is already yours, fresh or stale: resume it
+   without asking anyone, and comment that you are continuing it.
 2. Prefer, in order: issues that unblock other contributors, bugs with a
    clear failing-test sketch, then the next unit in the port order.
 3. Claim it: comment `Claiming: <item>` with a short numbered plan (one PR
-   per unit) and when you expect the first PR. The claim bot adds the
-   `claimed` label and reacts 🚀 (it replies only to refuse). Claim only what
-   you are working on now.
+   per unit) and when you expect the first PR. The claim bot assigns you
+   and reacts 🚀 (it replies only to refuse, and says why). Claim only what
+   you are working on now. The claim lapses 24 hours after your last
+   progress (a comment, or a commit or review on your PR).
 4. **Feature issues** (new behavior, not a port or a bug): check that the
    design is agreed before you code. If the issue lists open questions,
    answer each one in the claim comment under a **Decisions:** heading
@@ -63,7 +83,9 @@ don't delete local branches you didn't create.
    PR does not depend on an unresolved answer (for example, a pure Rust core
    with Tier 1 tests first; UI, protocol fields and logging in follow-ups).
    A question you cannot pick a safe default for goes on the issue as
-   **Decision needed:** and that part waits. An idea with no agreed design
+   **Decision needed:** and that part waits: the claim bot labels it
+   `decision-needed` and blocks your claim for 7 days (renewed by each new
+   one) until a maintainer answers `Decided:`. An idea with no agreed design
    belongs in Discussions, not an issue (coordination.md section 5).
    Protocol additions (obs-websocket) are additive fields only.
 5. **Security bug?** Apply the two tiers in
@@ -165,7 +187,30 @@ running, wait and retry.
   Do not ask again for authorization already given in the session.
 - When the issue closes, comment what fixed it, what's left, and the
   follow-up issue for the rest. Tick the tracking-issue checkbox.
+- Waiting on something you don't control (a maintainer decision, another
+  PR, non-public work): comment `Blocked: <reason>`, with a general reason,
+  so the claim lasts 7 days instead of 24 hours (coordination.md section 3).
+  Any progress comment ends it.
 - Stopping early: comment `Releasing <item>` and link the branch; the
-  claim bot removes `claimed`.
+  claim bot unassigns you.
+- **Hand off at the merge queue (the default).** Don't wait on the queue.
+  Hand the PR to the coordinator and take the next issue once all of these
+  are done:
+  1. you rebased onto `origin/master` and ran the full local gate
+     (`./lint`, `./unittest`);
+  2. you stamped HEAD with the local gate and pushed that commit
+     unchanged;
+  3. you marked the PR ready, turned on auto-merge
+     (`gh pr merge <N> --auto`), and commented `Handed off to the
+     coordinator`.
+
+  The coordinator then handles rebases, ledger and list conflicts,
+  mechanical fixups (lint, formatting, counts), flake reruns, and
+  re-queuing after an ejection (obs-coordinator §2). The PR is still
+  yours. You keep the claim. A real failure in the PR's own logic comes
+  back to you as a coordinator comment, and you fix it before taking
+  more work. Don't hand off workflow-graph or release changes, `--admin`
+  landings, or user-facing features that still need checking on a
+  device: watch those through to merge.
 
 Then return to step 1 for the next issue.

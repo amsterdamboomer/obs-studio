@@ -236,6 +236,16 @@ pub(crate) fn add_package(
     target: &str,
     package: &str,
 ) -> Result<(), String> {
+    let (host, _) = crate::qt::build_triples();
+    if let Some(qt) = crate::qt::package(&host, target, package, &crate::qt::Inputs::from_env())? {
+        library.include_dirs.extend(qt.include_dirs);
+        library.definitions.extend(qt.definitions);
+        library.compile_options.extend(qt.compile_options);
+        library.c_compile_options.extend(qt.c_compile_options);
+        library.cpp_compile_options.extend(qt.cpp_compile_options);
+        library.link_options.extend(qt.link_options);
+        return Ok(());
+    }
     let dependency = pkg_config::Config::new()
         .cargo_metadata(false)
         .probe(package)
@@ -246,24 +256,13 @@ pub(crate) fn add_package(
     let mut definitions: Vec<_> = dependency.defines.into_iter().collect();
     definitions.sort();
     library.definitions.extend(definitions);
-    for path in &dependency.link_paths {
-        library.link_options.push(format!("-L{}", path.display()));
-        library
-            .link_options
-            .push(format!("-Wl,-rpath,{}", path.display()));
-    }
-    for name in dependency.libs {
-        // Some pkg-config files list a static archive directory before their
-        // shared directory. Resolve across every directory before allowing the
-        // linker to fall back to -l, which otherwise silently embeds the archive.
-        if let Some(path) =
-            crate::platform::package_shared_library(target, &dependency.link_paths, &name)
-        {
-            library.link_options.push(path.display().to_string());
-        } else {
-            library.link_options.push(format!("-l{name}"));
-        }
-    }
+    library
+        .link_options
+        .extend(crate::platform::package_link_options(
+            target,
+            &dependency.link_paths,
+            &dependency.libs,
+        ));
     Ok(())
 }
 

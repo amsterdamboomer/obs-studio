@@ -40,17 +40,6 @@ static void ApplyEncoderDefaults(OBSData &settings, const obs_encoder_t *encoder
 
 #define ADV_ARCHIVE_NAME "adv_archive_audio"
 
-#ifdef __APPLE__
-static void translate_macvth264_encoder(const char *&encoder)
-{
-	if (strcmp(encoder, "vt_h264_hw") == 0) {
-		encoder = "com.apple.videotoolbox.videoencoder.h264.gva";
-	} else if (strcmp(encoder, "vt_h264_sw") == 0) {
-		encoder = "com.apple.videotoolbox.videoencoder.h264";
-	}
-}
-#endif
-
 AdvancedOutput::AdvancedOutput(OBSBasic *main_) : BasicOutputHandler(main_)
 {
 	const char *recType = config_get_string(main->Config(), "AdvOut", "RecType");
@@ -59,10 +48,8 @@ AdvancedOutput::AdvancedOutput(OBSBasic *main_) : BasicOutputHandler(main_)
 	const char *recordEncoder = config_get_string(main->Config(), "AdvOut", "RecEncoder");
 	const char *recAudioEncoder = config_get_string(main->Config(), "AdvOut", "RecAudioEncoder");
 	const char *recFormat = config_get_string(main->Config(), "AdvOut", "RecFormat2");
-#ifdef __APPLE__
-	translate_macvth264_encoder(streamEncoder);
-	translate_macvth264_encoder(recordEncoder);
-#endif
+	TranslateLegacyEncoderId(streamEncoder);
+	TranslateLegacyEncoderId(recordEncoder);
 
 	ffmpegOutput = astrcmpi(recType, "FFmpeg") == 0;
 	ffmpegRecording = ffmpegOutput && config_get_bool(main->Config(), "AdvOut", "FFOutputToFile");
@@ -705,10 +692,6 @@ bool AdvancedOutput::StartStreaming(obs_service_t *service)
 	bool preserveDelay = config_get_bool(main->Config(), "Output", "DelayPreserve");
 	const char *bindIP = config_get_string(main->Config(), "Output", "BindIP");
 	const char *ipFamily = config_get_string(main->Config(), "Output", "IPFamily");
-#ifdef _WIN32
-	bool enableNewSocketLoop = config_get_bool(main->Config(), "Output", "NewSocketLoopEnable");
-	bool enableLowLatencyMode = config_get_bool(main->Config(), "Output", "LowLatencyEnable");
-#endif
 	bool enableDynBitrate = config_get_bool(main->Config(), "Output", "DynamicBitrate");
 
 	bool is_rtmp = false;
@@ -723,10 +706,7 @@ bool AdvancedOutput::StartStreaming(obs_service_t *service)
 	OBSDataAutoRelease settings = obs_data_create();
 	obs_data_set_string(settings, "bind_ip", bindIP);
 	obs_data_set_string(settings, "ip_family", ipFamily);
-#ifdef _WIN32
-	obs_data_set_bool(settings, "new_socket_loop_enabled", enableNewSocketLoop);
-	obs_data_set_bool(settings, "low_latency_mode_enabled", enableLowLatencyMode);
-#endif
+	SetOutputNetworkOptions(main->Config(), settings);
 	obs_data_set_bool(settings, "dyn_bitrate", enableDynBitrate);
 
 	auto streamOutput = StreamingOutput(); // shadowing is sort of bad, but also convenient

@@ -19,18 +19,7 @@
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
 
-#ifdef _WIN32
-#include <wincodec.h>
-#pragma comment(lib, "windowscodecs.lib")
-#endif
-
-/* graphics/image-file.c */
-#include "graphics/image-file.h"
-#include "util/base.h"
-#include "util/platform.h"
-#include "util/dstr.h"
-#include "graphics/vec4.h"
-#include "graphics/libnsgif/nsgif.h"
+#include "graphics/graphics-ffmpeg-host.h"
 
 /* media-io/audio-resampler-ffmpeg.c */
 #include "util/bmem.h"
@@ -41,7 +30,7 @@
 #include <inttypes.h>
 #include <math.h>
 
-/* media-io/media-remux.c */
+/* media-io/media-remux-ffmpeg.c (the adapter of the Rust media-remux port) */
 #include "media-io/media-remux.h"
 
 #include <libavcodec/version.h>

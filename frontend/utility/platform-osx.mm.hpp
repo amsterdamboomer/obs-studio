@@ -255,14 +255,21 @@ MacPermissionStatus CheckPermissionWithPrompt(MacPermissionType type, bool promp
 		AVAuthorizationStatus audioStatus = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio];
 
 		if (audioStatus == AVAuthorizationStatusNotDetermined && prompt_for_permission) {
-			os_event_t *block_finished;
-			os_event_init(&block_finished, OS_EVENT_TYPE_MANUAL);
+			/* Without the event, prompt anyway, but do not wait for the answer. */
+			os_event_t *block_finished = nullptr;
+			if (os_event_init(&block_finished, OS_EVENT_TYPE_MANUAL) != 0) {
+				blog(LOG_WARNING, "[macOS] Not waiting for the audio device access prompt");
+			}
 			[AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio
 						 completionHandler:^(BOOL granted __attribute((unused))) {
-							 os_event_signal(block_finished);
+							 if (block_finished) {
+								 os_event_signal(block_finished);
+							 }
 						 }];
-			os_event_wait(block_finished);
-			os_event_destroy(block_finished);
+			if (block_finished) {
+				os_event_wait(block_finished);
+				os_event_destroy(block_finished);
+			}
 			audioStatus = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio];
 		}
 
@@ -277,15 +284,22 @@ MacPermissionStatus CheckPermissionWithPrompt(MacPermissionType type, bool promp
 		AVAuthorizationStatus videoStatus = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];
 
 		if (videoStatus == AVAuthorizationStatusNotDetermined && prompt_for_permission) {
-			os_event_t *block_finished;
-			os_event_init(&block_finished, OS_EVENT_TYPE_MANUAL);
+			/* Without the event, prompt anyway, but do not wait for the answer. */
+			os_event_t *block_finished = nullptr;
+			if (os_event_init(&block_finished, OS_EVENT_TYPE_MANUAL) != 0) {
+				blog(LOG_WARNING, "[macOS] Not waiting for the video device access prompt");
+			}
 			[AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo
 						 completionHandler:^(BOOL granted __attribute((unused))) {
-							 os_event_signal(block_finished);
+							 if (block_finished) {
+								 os_event_signal(block_finished);
+							 }
 						 }];
 
-			os_event_wait(block_finished);
-			os_event_destroy(block_finished);
+			if (block_finished) {
+				os_event_wait(block_finished);
+				os_event_destroy(block_finished);
+			}
 			videoStatus = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];
 		}
 
@@ -865,4 +879,142 @@ void HandlePlatformDisplayNativeEvent(OBSQTDisplay *display, void *message)
 {
 	(void)display;
 	(void)message;
+}
+
+void SetOutputNetworkOptions(config_t *, obs_data_t *)
+{
+	/* No host-specific streaming output options. */
+}
+
+void TranslateLegacyEncoderId(const char *&encoder)
+{
+	if (strcmp(encoder, "vt_h264_hw") == 0) {
+		encoder = "com.apple.videotoolbox.videoencoder.h264.gva";
+	} else if (strcmp(encoder, "vt_h264_sw") == 0) {
+		encoder = "com.apple.videotoolbox.videoencoder.h264";
+	}
+}
+
+void RaiseAfterFileDialog(QWidget *window)
+{
+	// TODO: Revisit when QTBUG-42661 is fixed
+	window->raise();
+}
+
+bool UseNativeComboBoxPopup()
+{
+	return true;
+}
+
+enum gs_color_space ScreenshotColorSpace(obs_source_t *)
+{
+	/* Tonemap to SDR if HDR */
+	return GS_CS_SRGB;
+}
+
+bool SaveHdrScreenshot(const char *, uint8_t *, uint32_t, uint32_t)
+{
+	/* No HDR image format here: screenshots are rendered in sRGB. */
+	return false;
+}
+
+bool IsPlatformImageExtension(const char *)
+{
+	return false;
+}
+
+const char *GetPlatformTextSourceId()
+{
+	return "text_ft2_source";
+}
+
+void SetPlatformTextFileSettings(obs_data_t *settings, const char *file, QString &)
+{
+	obs_data_set_bool(settings, "from_file", true);
+	obs_data_set_string(settings, "text_file", file);
+}
+
+bool ResolvePlatformDroppedFile(QString &, QFileInfo &, QString &)
+{
+	return true;
+}
+
+const char *GetPlatformMetaKeyText()
+{
+	return "Hotkeys.Super";
+}
+
+QString GetPlatformScreenName(QScreen *screen)
+{
+	return screen->name();
+}
+
+bool PlatformUsesDesktopAudioDevice()
+{
+	/* On macOS 13 and above, the SCK based audio capture provides a
+	 * better alternative to the device-based audio capture. */
+	if (__builtin_available(macOS 13.0, *)) {
+		return false;
+	}
+	return true;
+}
+
+QIcon GetPlatformTrayIcon(TrayIconState state)
+{
+	const char *file = ":/res/images/obs_macos.svg";
+	switch (state) {
+	case TrayIconState::Active:
+		file = ":/res/images/tray_active_macos.svg";
+		break;
+	case TrayIconState::Paused:
+		file = ":/res/images/obs_paused_macos.svg";
+		break;
+	case TrayIconState::Idle:
+		break;
+	}
+	QIcon icon(file);
+	icon.setIsMask(true);
+	return icon;
+}
+
+bool PlatformTrayActivationTogglesWindow()
+{
+	return false;
+}
+
+void SetPlatformDockIconVisible(bool visible)
+{
+	EnableOSXDockIcon(visible);
+}
+
+const char *GetPlatformNvencTestProgram()
+{
+	return nullptr;
+}
+
+void ShowPlatformPermissionsDialog(QWidget *parent)
+{
+	OBSPermissions check(parent, CheckPermission(kScreenCapture), CheckPermission(kVideoDeviceAccess),
+			     CheckPermission(kAudioDeviceAccess), CheckPermission(kInputMonitoring));
+	check.exec();
+}
+
+bool PlatformRecreatesWindowsOnTopToggle()
+{
+	return true;
+}
+
+bool PlatformSupportsBuiltinUpdater()
+{
+	return false;
+}
+
+QThread *CreatePlatformUpdateThread(bool, bool)
+{
+	return nullptr;
+}
+
+bool IsWhatsNewItemForPlatform(bool, bool macos, bool)
+{
+	return macos;
 }

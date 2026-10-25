@@ -7,7 +7,17 @@ find_package(FFmpeg 8.0 REQUIRED COMPONENTS avcodec avutil avformat)
 add_executable(obs-ffmpeg-mux)
 add_executable(OBS::ffmpeg-mux ALIAS obs-ffmpeg-mux)
 
-target_sources(obs-ffmpeg-mux PRIVATE build/ffmpeg-mux.core+.h.c ffmpeg-mux.h)
+target_sources(
+  obs-ffmpeg-mux
+  PRIVATE
+    build/ffmpeg-mux.core+.h.c
+    $<$<PLATFORM_ID:Windows>:build/ffmpeg-mux.windows+.h.c>
+    $<$<NOT:$<PLATFORM_ID:Windows>>:build/ffmpeg-mux.posix+.h.c>
+    ffmpeg-mux-host.h
+    ffmpeg-mux.h
+)
+
+set_property(SOURCE build/ffmpeg-mux.core+.h.c APPEND PROPERTY COMPILE_OPTIONS "$<$<C_COMPILER_ID:MSVC>:/wd4996>")
 
 target_link_libraries(
   obs-ffmpeg-mux
@@ -15,5 +25,9 @@ target_link_libraries(
 )
 
 target_compile_definitions(obs-ffmpeg-mux PRIVATE $<$<BOOL:${ENABLE_FFMPEG_MUX_DEBUG}>:ENABLE_FFMPEG_MUX_DEBUG>)
+
+if(OBS_FFMPEG_MUX_NAME)
+  set_target_properties(obs-ffmpeg-mux PROPERTIES OUTPUT_NAME "${OBS_FFMPEG_MUX_NAME}")
+endif()
 
 set_target_properties_obs(obs-ffmpeg-mux PROPERTIES FOLDER plugins/obs-ffmpeg)

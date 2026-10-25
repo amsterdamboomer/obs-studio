@@ -51,6 +51,56 @@ bool restart = false;
 bool restart_safe = false;
 static QStringList arguments;
 
+#ifndef OBS_MAIN_HOST_WINDOWS
+/* Portable startup defaults; the host headers in the PCH override them (#865). */
+static inline void obs_main_host_localtime(struct tm *out, const time_t *now)
+{
+	localtime_r(now, out);
+}
+
+static inline void obs_main_host_open_log(fstream &logFile, const char *path)
+{
+	logFile.open(path, ios_base::in | ios_base::out | ios_base::trunc);
+}
+
+static inline int obs_main_host_check_running(bool &already_running)
+{
+	CheckIfAlreadyRunning(already_running);
+	return 0;
+}
+#endif
+#ifndef OBS_MAIN_HOST_EARLY_INIT
+static inline bool obs_main_host_early_init()
+{
+	return true;
+}
+
+static inline void obs_main_host_show_help(const string &help)
+{
+	std::cout << help << "--version, -V: Get current version.\n";
+}
+
+static inline void obs_main_host_shutdown() {}
+#endif
+#ifndef OBS_MAIN_HOST_PRE_APP
+static inline bool obs_main_host_pre_app()
+{
+	return true;
+}
+#endif
+#ifndef OBS_MAIN_HOST_REFUSE_LAUNCH
+static inline bool obs_main_host_refuse_launch()
+{
+	return false;
+}
+#endif
+#ifndef OBS_MAIN_HOST_VERIFY_STARTUP
+static inline void obs_main_host_verify_startup() {}
+#endif
+#ifndef OBS_MAIN_HOST_PERMISSIONS
+static inline void obs_main_host_permissions() {}
+#endif
+
 string CurrentTimeString()
 {
 	using namespace std::chrono;
@@ -60,11 +110,7 @@ string CurrentTimeString()
 
 	auto tp = system_clock::now();
 	auto now = system_clock::to_time_t(tp);
-#ifdef _WIN32
-	localtime_s(&tstruct, &now);
-#else
-	localtime_r(&now, &tstruct);
-#endif
+	obs_main_host_localtime(&tstruct, &now);
 
 	size_t written = strftime(buf, sizeof(buf), "%T", &tstruct);
 	if (ratio_less<system_clock::period, seconds::period>::value && written && (sizeof(buf) - written) > 5) {
@@ -164,59 +210,50 @@ static inline bool too_many_repeated_entries(fstream &logFile, const char *msg, 
 	return false;
 }
 
+#ifndef OBS_MAIN_HOST_WINDOWS
+/* Elsewhere log lines are echoed to the console (#865). */
+#define OBS_MAIN_LOG_ECHO 1
+static inline void obs_main_host_log_debugger(const char *) {}
+static inline void obs_main_host_log_break(int) {}
+#else
+#define OBS_MAIN_LOG_ECHO 0
+#endif
+
+#ifdef _DEBUG
+#define OBS_MAIN_LOG_ECHO_ALL OBS_MAIN_LOG_ECHO
+#else
+#define OBS_MAIN_LOG_ECHO_ALL 0
+#endif
+
 static void do_log(int log_level, const char *msg, va_list args, void *param)
 {
 	fstream &logFile = *static_cast<fstream *>(param);
 	char str[8192];
 
-#ifndef _WIN32
 	va_list args2;
 	va_copy(args2, args);
-#endif
 
 	vsnprintf(str, sizeof(str), msg, args);
 
-#ifdef _WIN32
-	if (IsDebuggerPresent()) {
-		int wNum = MultiByteToWideChar(CP_UTF8, 0, str, -1, NULL, 0);
-		if (wNum > 1) {
-			static wstring wide_buf;
-			static mutex wide_mutex;
+	obs_main_host_log_debugger(str);
 
-			lock_guard<mutex> lock(wide_mutex);
-			wide_buf.reserve(wNum + 1);
-			wide_buf.resize(wNum - 1);
-			MultiByteToWideChar(CP_UTF8, 0, str, -1, &wide_buf[0], wNum);
-			wide_buf.push_back('\n');
-
-			OutputDebugStringW(wide_buf.c_str());
-		}
+	if (OBS_MAIN_LOG_ECHO_ALL) {
+		def_log_handler(log_level, msg, args2, nullptr);
 	}
-#endif
-
-#if !defined(_WIN32) && defined(_DEBUG)
-	def_log_handler(log_level, msg, args2, nullptr);
-#endif
 
 	if (log_level <= LOG_INFO || log_verbose) {
 		GpuStatus::OnLogLine(str);
-#if !defined(_WIN32) && !defined(_DEBUG)
-		def_log_handler(log_level, msg, args2, nullptr);
-#endif
+		if (OBS_MAIN_LOG_ECHO && !OBS_MAIN_LOG_ECHO_ALL) {
+			def_log_handler(log_level, msg, args2, nullptr);
+		}
 		if (!too_many_repeated_entries(logFile, msg, str)) {
 			LogStringChunk(logFile, str, log_level);
 		}
 	}
 
-#if defined(_WIN32) && defined(OBS_DEBUGBREAK_ON_ERROR)
-	if (log_level <= LOG_ERROR && IsDebuggerPresent()) {
-		__debugbreak();
-	}
-#endif
+	obs_main_host_log_break(log_level);
 
-#ifndef _WIN32
 	va_end(args2);
-#endif
 }
 
 static bool get_token(lexer *lex, string &str, base_token_type type)
@@ -296,7 +333,7 @@ static uint64_t convert_log_name(bool has_prefix, const char *name)
 	return std::stoull(timestring.str());
 }
 
-static void delete_oldest_file(bool has_prefix, const char *location)
+void delete_oldest_file(bool has_prefix, const char *location)
 {
 	BPtr<char> logDir(GetAppConfigPathPtr(location));
 	string oldestLog;
@@ -373,13 +410,7 @@ static void create_log_file(fstream &logFile)
 
 	BPtr<char> path(GetAppConfigPathPtr(dst.str().c_str()));
 
-#ifdef _WIN32
-	BPtr<wchar_t> wpath;
-	os_utf8_to_wcs_ptr(path, 0, &wpath);
-	logFile.open(wpath, ios_base::in | ios_base::out | ios_base::trunc);
-#else
-	logFile.open(path, ios_base::in | ios_base::out | ios_base::trunc);
-#endif
+	obs_main_host_open_log(logFile, path);
 
 	if (logFile.is_open()) {
 		delete_oldest_file(false, "obs-studio/logs");
@@ -471,32 +502,11 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 
 	ScopeProfiler prof{run_program_init};
 
-#ifdef _WIN32
-	QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
-#endif
-
 	QCoreApplication::addLibraryPath(".");
 
-#if __APPLE__
-	InstallNSApplicationSubclass();
-	InstallNSThreadLocks();
-
-	if (!isInBundle()) {
-		blog(LOG_ERROR,
-		     "OBS cannot be run as a standalone binary on macOS. Run the Application bundle instead.");
+	if (!obs_main_host_pre_app()) {
 		return ret;
 	}
-#endif
-
-#if !defined(_WIN32) && !defined(__APPLE__)
-	/* NOTE: Users blindly set this, but this theme is incompatible with Qt6 and
-	 * crashes loading saved geometry. Just turn off this theme and let users complain OBS
-	 * looks ugly instead of crashing. */
-	const char *platform_theme = getenv("QT_QPA_PLATFORMTHEME");
-	if (platform_theme && strcmp(platform_theme, "qt5ct") == 0) {
-		unsetenv("QT_QPA_PLATFORMTHEME");
-	}
-#endif
 
 	/* NOTE: This disables an optimisation in Qt that attempts to determine if
 	 * any "siblings" intersect with a widget when determining the approximate
@@ -526,10 +536,7 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 		bool cancel_launch = false;
 		bool already_running = false;
 
-#ifdef _WIN32
-		RunOnceMutex rom =
-#endif
-			CheckIfAlreadyRunning(already_running);
+		[[maybe_unused]] auto rom = obs_main_host_check_running(already_running);
 
 		if (!already_running) {
 			goto run;
@@ -573,35 +580,15 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 		/* --------------------------------------- */
 	run:
 
-#if !defined(_WIN32) && !defined(__APPLE__) && !defined(__FreeBSD__)
-		// Mounted by termina during chromeOS linux container startup
-		// https://chromium.googlesource.com/chromiumos/overlays/board-overlays/+/master/project-termina/chromeos-base/termina-lxd-scripts/files/lxd_setup.sh
-		os_dir_t *crosDir = os_opendir("/opt/google/cros-containers");
-		if (crosDir) {
-			QMessageBox::StandardButtons buttons(QMessageBox::Ok);
-			QMessageBox mb(QMessageBox::Critical, QTStr("ChromeOS.Title"), QTStr("ChromeOS.Text"), buttons,
-				       nullptr);
-
-			mb.exec();
+		if (obs_main_host_refuse_launch()) {
 			return 0;
 		}
-#endif
 
 		if (!created_log) {
 			create_log_file(logFile);
 		}
 
-#if defined(_WIN32) && defined(OBS_RUST_VERSION)
-		// Read back the process identity after the persistent logger is ready.
-		if (!VerifyAppIdentity()) {
-			throw "Windows application identity changed during startup";
-		}
-#endif
-#ifdef __APPLE__
-		if (!VerifyMacApplicationIcon()) {
-			throw "Failed to initialize the macOS application icon";
-		}
-#endif
+		obs_main_host_verify_startup();
 		program.checkForUncleanShutdown();
 
 		qInstallMessageHandler([](QtMsgType type, const QMessageLogContext &, const QString &message) {
@@ -628,35 +615,7 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 			}
 		});
 
-#ifdef __APPLE__
-		MacPermissionStatus audio_permission = CheckPermission(kAudioDeviceAccess);
-		MacPermissionStatus video_permission = CheckPermission(kVideoDeviceAccess);
-		MacPermissionStatus input_monitoring_permission = CheckPermission(kInputMonitoring);
-		MacPermissionStatus screen_permission = CheckPermission(kScreenCapture);
-
-		int permissionsDialogLastShown =
-			config_get_int(App()->GetAppConfig(), "General", "MacOSPermissionsDialogLastShown");
-		if (permissionsDialogLastShown < MACOS_PERMISSIONS_DIALOG_VERSION) {
-			OBSPermissions check(nullptr, screen_permission, video_permission, audio_permission,
-					     input_monitoring_permission);
-			check.exec();
-		}
-#endif
-
-#ifdef _WIN32
-		if (IsRunningOnWine()) {
-			QMessageBox mb(QMessageBox::Question, QTStr("Wine.Title"), QTStr("Wine.Text"));
-			mb.setTextFormat(Qt::RichText);
-			mb.addButton(QTStr("AlreadyRunning.LaunchAnyway"), QMessageBox::AcceptRole);
-			QPushButton *closeButton = mb.addButton(QMessageBox::Close);
-			mb.setDefaultButton(closeButton);
-
-			mb.exec();
-			if (mb.clickedButton() == closeButton) {
-				return 0;
-			}
-		}
-#endif
+		obs_main_host_permissions();
 
 		if (argc > 1) {
 			stringstream stor;
@@ -696,215 +655,32 @@ static int run_program(fstream &logFile, int argc, char *argv[])
 	return ret;
 }
 
-#define MAX_CRASH_REPORT_SIZE (200 * 1024)
-
-#ifdef _WIN32
-
-#define CRASH_MESSAGE                                                      \
-	"Woops, OBS has crashed!\n\nWould you like to copy the crash log " \
-	"to the clipboard? The crash log will still be saved to:\n\n%s"
-
-static void main_crash_handler(const char *format, va_list args, void * /* param */)
-{
-	char *text = new char[MAX_CRASH_REPORT_SIZE];
-
-	vsnprintf(text, MAX_CRASH_REPORT_SIZE, format, args);
-	text[MAX_CRASH_REPORT_SIZE - 1] = 0;
-
-	string crashFilePath = "obs-studio/crashes";
-
-	delete_oldest_file(true, crashFilePath.c_str());
-
-	string name = crashFilePath + "/";
-	name += "Crash " + GenerateTimeDateFilename("txt");
-
-	BPtr<char> path(GetAppConfigPathPtr(name.c_str()));
-
-	fstream file;
-
-#ifdef _WIN32
-	BPtr<wchar_t> wpath;
-	os_utf8_to_wcs_ptr(path, 0, &wpath);
-	file.open(wpath, ios_base::in | ios_base::out | ios_base::trunc | ios_base::binary);
-#else
-	file.open(path, ios_base::in | ios_base::out | ios_base::trunc | ios_base::binary);
-#endif
-	file << text;
-	file.close();
-
-	string pathString(path.Get());
-
-#ifdef _WIN32
-	std::replace(pathString.begin(), pathString.end(), '/', '\\');
-#endif
-
-	string absolutePath = canonical(filesystem::path(pathString)).u8string();
-
-	size_t size = snprintf(nullptr, 0, CRASH_MESSAGE, absolutePath.c_str());
-
-	unique_ptr<char[]> message_buffer(new char[size + 1]);
-
-	snprintf(message_buffer.get(), size + 1, CRASH_MESSAGE, absolutePath.c_str());
-
-	string finalMessage = string(message_buffer.get(), message_buffer.get() + size);
-
-	int ret = MessageBoxA(NULL, finalMessage.c_str(), "OBS has crashed!", MB_YESNO | MB_ICONERROR | MB_TASKMODAL);
-
-	if (ret == IDYES) {
-		size_t len = strlen(text);
-
-		HGLOBAL mem = GlobalAlloc(GMEM_MOVEABLE, len);
-		memcpy(GlobalLock(mem), text, len);
-		GlobalUnlock(mem);
-
-		OpenClipboard(0);
-		EmptyClipboard();
-		SetClipboardData(CF_TEXT, mem);
-		CloseClipboard();
-	}
-
-	exit(-1);
-}
-
-static void load_debug_privilege(void)
-{
-	const DWORD flags = TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY;
-	TOKEN_PRIVILEGES tp;
-	HANDLE token;
-	LUID val;
-
-	if (!OpenProcessToken(GetCurrentProcess(), flags, &token)) {
-		return;
-	}
-
-	if (!!LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &val)) {
-		tp.PrivilegeCount = 1;
-		tp.Privileges[0].Luid = val;
-		tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-
-		AdjustTokenPrivileges(token, false, &tp, sizeof(tp), NULL, NULL);
-	}
-
-	if (!!LookupPrivilegeValue(NULL, SE_INC_BASE_PRIORITY_NAME, &val)) {
-		tp.PrivilegeCount = 1;
-		tp.Privileges[0].Luid = val;
-		tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-
-		if (!AdjustTokenPrivileges(token, false, &tp, sizeof(tp), NULL, NULL)) {
-			blog(LOG_INFO, "Could not set privilege to "
-				       "increase GPU priority");
-		}
-	}
-
-	CloseHandle(token);
-}
-#endif
-
 static inline bool arg_is(const char *arg, const char *long_form, const char *short_form)
 {
 	return (long_form && strcmp(arg, long_form) == 0) || (short_form && strcmp(arg, short_form) == 0);
 }
 
-#ifdef _WIN32
-static constexpr char vcRunErrorTitle[] = "Outdated Visual C++ Runtime";
-static constexpr char vcRunErrorMsg[] = "OBS Studio requires a newer version of the Microsoft Visual C++ "
-					"Redistributables.\n\nYou will now be directed to the download page.";
-static constexpr char vcRunInstallerUrl[] = "https://obsproject.com/visual-studio-2022-runtimes";
-
-static bool vc_runtime_outdated()
-{
-	win_version_info ver;
-	if (!get_dll_ver(L"msvcp140.dll", &ver)) {
-		return true;
-	}
-	/* Major is always 14 (hence 140.dll), so we only care about minor. */
-	if (ver.minor >= 40) {
-		return false;
-	}
-
-	int choice = MessageBoxA(NULL, vcRunErrorMsg, vcRunErrorTitle, MB_OKCANCEL | MB_ICONERROR | MB_TASKMODAL);
-	if (choice == IDOK) {
-		/* Open the URL in the default browser. */
-		ShellExecuteA(NULL, "open", vcRunInstallerUrl, NULL, NULL, SW_SHOWNORMAL);
-	}
-
-	return true;
-}
-
-static void set_process_mitigation_policies()
-{
-	PROCESS_MITIGATION_DEP_POLICY dep = {0};
-	dep.DisableAtlThunkEmulation = 1;
-	dep.Enable = 1;
-	dep.Permanent = TRUE;
-	SetProcessMitigationPolicy(ProcessDEPPolicy, &dep, sizeof(dep));
-
-	PROCESS_MITIGATION_ASLR_POLICY aslr = {0};
-	aslr.EnableBottomUpRandomization = 1;
-	aslr.EnableHighEntropy = 1;
-	aslr.EnableForceRelocateImages = 1;
-	aslr.DisallowStrippedImages = 1;
-	SetProcessMitigationPolicy(ProcessASLRPolicy, &aslr, sizeof(aslr));
-
-#ifdef _DEBUG
-	PROCESS_MITIGATION_STRICT_HANDLE_CHECK_POLICY hcheck = {0};
-	hcheck.RaiseExceptionOnInvalidHandleReference = 1;
-	hcheck.HandleExceptionsPermanentlyEnabled = 1;
-	SetProcessMitigationPolicy(ProcessStrictHandleCheckPolicy, &hcheck, sizeof(hcheck));
-#endif
-}
-#endif
-
-#if defined(__APPLE__) || defined(__linux__)
-#define BASE_PATH ".."
-#else
+/* Where portable-mode marker files sit, and whether portable mode exists:
+ * the host headers in the PCH may set both (#865). */
+#ifndef BASE_PATH
 #define BASE_PATH "../.."
 #endif
 
-#if defined(ENABLE_PORTABLE_CONFIG) || defined(_WIN32)
+#ifndef ALLOW_PORTABLE_MODE
+#ifdef ENABLE_PORTABLE_CONFIG
 #define ALLOW_PORTABLE_MODE 1
 #else
 #define ALLOW_PORTABLE_MODE 0
+#endif
 #endif
 
 int main(int argc, char *argv[])
 {
 	InstallPlatformAppSignalHandlers();
 
-#ifdef _WIN32
-	// Abort as early as possible if MSVC runtime is outdated
-	if (vc_runtime_outdated()) {
+	if (!obs_main_host_early_init()) {
 		return 1;
 	}
-
-	// Try to keep this as early as possible
-	InstallPlatformDllBlocklist();
-
-	set_process_mitigation_policies();
-
-	obs_init_win32_crash_handler();
-	SetErrorMode(SEM_FAILCRITICALERRORS);
-	SetSearchPathMode(BASE_SEARCH_PATH_ENABLE_SAFE_SEARCHMODE | BASE_SEARCH_PATH_PERMANENT);
-	SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
-	SetDllDirectoryW(L"");
-	load_debug_privilege();
-	base_set_crash_handler(main_crash_handler, nullptr);
-
-	/* Shutdown priority value is a range from 0 - 4FF with higher values getting first priority.
-	 * 000 - 0FF and 400 - 4FF are reserved system ranges.
-	 * Processes start at shutdown level 0x280 by default.
-	 * We set the main OBS application to a higher priority to ensure it tries to close before
-	 * any subprocesses such as CEF.
-	 */
-	SetProcessShutdownParameters(0x300, SHUTDOWN_NORETRY);
-
-	const HMODULE hRtwq = LoadLibrary(L"RTWorkQ.dll");
-	if (hRtwq) {
-		typedef HRESULT(STDAPICALLTYPE * PFN_RtwqStartup)();
-		PFN_RtwqStartup func = (PFN_RtwqStartup)GetProcAddress(hRtwq, "RtwqStartup");
-		func();
-	}
-#endif
 
 	base_get_log_handler(&def_log_handler, nullptr);
 
@@ -1008,11 +784,7 @@ int main(int argc, char *argv[])
 				"--disable-missing-files-check: Disable the missing files dialog which can appear on startup.\n\n"
 				"--disable-shutdown-check: Do not show the crash dialog after an unclean shutdown; log it and launch normally.\n\n";
 
-#ifdef _WIN32
-			MessageBoxA(NULL, help.c_str(), "Help", MB_OK | MB_ICONASTERISK);
-#else
-			std::cout << help << "--version, -V: Get current version.\n";
-#endif
+			obs_main_host_show_help(help);
 			exit(0);
 
 		} else if (arg_is(argv[i], "--version", "-V")) {
@@ -1049,16 +821,7 @@ int main(int argc, char *argv[])
 	curl_global_init(CURL_GLOBAL_ALL);
 	int ret = run_program(logFile, argc, argv);
 
-#ifdef _WIN32
-	if (hRtwq) {
-		typedef HRESULT(STDAPICALLTYPE * PFN_RtwqShutdown)();
-		PFN_RtwqShutdown func = (PFN_RtwqShutdown)GetProcAddress(hRtwq, "RtwqShutdown");
-		func();
-		FreeLibrary(hRtwq);
-	}
-
-	LogPlatformBlockedDlls();
-#endif
+	obs_main_host_shutdown();
 
 	blog(LOG_INFO, "Number of memory leaks: %ld", bnum_allocs());
 	base_set_log_handler(nullptr, nullptr);
@@ -1074,7 +837,7 @@ int main(int argc, char *argv[])
 /* File-local macros (BUILD.md): out of the next file in the unity group. */
 #undef MAX_REPEATED_LINES
 #undef MAX_CHAR_VARIATION
-#undef MAX_CRASH_REPORT_SIZE
-#undef CRASH_MESSAGE
 #undef BASE_PATH
 #undef ALLOW_PORTABLE_MODE
+#undef OBS_MAIN_LOG_ECHO
+#undef OBS_MAIN_LOG_ECHO_ALL

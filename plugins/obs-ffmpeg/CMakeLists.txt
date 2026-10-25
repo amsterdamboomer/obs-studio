@@ -31,6 +31,14 @@ target_sources(
     $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:vaapi-utils.h>
     build/obs-ffmpeg.core+.h.c
     build/obs-ffmpeg.mux+.h.c
+    $<$<PLATFORM_ID:Darwin>:build/obs-ffmpeg.mux-host-macos+.h.c>
+    $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:build/obs-ffmpeg.mux-host-posix+.h.c>
+    $<$<PLATFORM_ID:Windows>:build/obs-ffmpeg.mux-host-windows+.h.c>
+    $<$<PLATFORM_ID:Windows>:build/obs-ffmpeg.host-windows+.h.c>
+    $<$<PLATFORM_ID:Linux>:build/obs-ffmpeg.host-linux+.h.c>
+    $<$<PLATFORM_ID:Darwin,FreeBSD,OpenBSD>:build/obs-ffmpeg.host-posix+.h.c>
+    obs-ffmpeg-host.h
+    obs-ffmpeg-mux-host.h
     build/obs-ffmpeg.output+.h.c
     build/obs-ffmpeg.source+.h.c
     build/obs-ffmpeg.video-encoders+.h.c
@@ -40,6 +48,12 @@ target_sources(
     obs-ffmpeg-output.h
 )
 
+# Each host's obs-ffmpeg-net-host.h, included by obs-ffmpeg-url.h (#853).
+target_include_directories(
+  obs-ffmpeg
+  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/hosts/$<IF:$<PLATFORM_ID:Windows>,windows,posix>"
+)
+
 target_compile_options(obs-ffmpeg PRIVATE $<$<COMPILE_LANG_AND_ID:C,AppleClang,Clang>:-Wno-shorten-64-to-32>)
 target_compile_definitions(
   obs-ffmpeg
@@ -47,6 +61,8 @@ target_compile_definitions(
     $<$<BOOL:${ENABLE_FFMPEG_LOGGING}>:ENABLE_FFMPEG_LOGGING>
     $<$<BOOL:${ENABLE_FFMPEG_NVENC}>:ENABLE_FFMPEG_NVENC>
     $<$<BOOL:${ENABLE_NEW_MPEGTS_OUTPUT}>:NEW_MPEGTS_OUTPUT>
+    $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:LIBAVUTIL_VAAPI_AVAILABLE>
+    $<$<BOOL:${OBS_FFMPEG_MUX_NAME}>:OBS_FFMPEG_MUX_NAME="${OBS_FFMPEG_MUX_NAME}">
 )
 
 target_link_libraries(
@@ -76,6 +92,7 @@ if(OS_WINDOWS)
   if(CMAKE_VS_PLATFORM_NAME STREQUAL x64)
     target_sources(obs-ffmpeg PRIVATE build/obs-ffmpeg.amf-windows+.hpp.cpp texture-amf-opts.hpp)
     target_link_libraries(obs-ffmpeg PRIVATE AMF::AMF)
+    target_compile_definitions(obs-ffmpeg PRIVATE OBS_FFMPEG_AMF)
   endif()
 
   configure_file(cmake/windows/obs-module.rc.in obs-ffmpeg.rc)

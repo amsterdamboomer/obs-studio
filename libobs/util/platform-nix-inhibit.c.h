@@ -70,7 +70,11 @@ os_inhibit_t *os_inhibit_sleep_create(const char *reason)
 		return info;
 	}
 #endif
-	os_event_init(&info->stop_event, OS_EVENT_TYPE_AUTO);
+	if (os_event_init(&info->stop_event, OS_EVENT_TYPE_AUTO) != 0) {
+		blog(LOG_ERROR, "Failed to create the screen saver inhibitor's stop event");
+		bfree(info);
+		return NULL;
+	}
 	posix_spawnattr_init(&info->attr);
 
 	sigemptyset(&set);
@@ -135,7 +139,7 @@ bool os_inhibit_sleep_set_active(os_inhibit_t *info, bool active)
 
 	if (active) {
 		ret = pthread_create(&info->screensaver_thread, NULL, &screensaver_thread, info);
-		if (ret < 0) {
+		if (ret != 0) {
 			blog(LOG_ERROR, "Failed to create screensaver "
 					"inhibitor thread");
 			return false;

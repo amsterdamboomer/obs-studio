@@ -12,7 +12,9 @@ Lanes:
            the diff touches, ci/rust_scope.py): the Fast Gate job;
 - tier2:   libobs, the crates linked into libobs (derived from
            rust/libobs-rust/Cargo.toml), test/cmocka, deps, the validate
-           tooling -> Tier 2 Linux (cmocka against hybrid libobs and
+           tooling, and every plugin/frontend/shared source a cmocka test
+           compiles (its ${CMAKE_SOURCE_DIR}/... paths, submodule bumps
+           included) -> Tier 2 Linux (cmocka against hybrid libobs and
            libobs-c-reference);
 - linux_targets: plugins/<x>/ and shared/<x>/ touched -> the Linux CMake
            targets of those modules (one configure, ENABLE_FRONTEND=OFF, no
@@ -29,6 +31,10 @@ Lanes:
            or Tier 2 job (Windows/macOS Qt lanes are a follow-up), except a
            host-named one (below).
 - docs/, ci/, .github/ and unported plugins start nothing but lint.
+- docs_only: every changed file is documentation (DOCS_ONLY): a PR or
+           merge-queue run skips Fast Gate too, since no Rust, C or CMake
+           changed. The Format job's ci/ self-tests, which read AGENTS.md,
+           SECURITY.md, the skills and other docs, still run (#2079).
 Platform and Qt lanes:
 - macos:   macOS code (or shared build/CI config) changed -> macOS Rust
            tests and Tier 2;
@@ -36,13 +42,16 @@ Platform and Qt lanes:
            tests and Tier 2;
 - qt:      frontend/Qt code or a Qt-linked cmocka test changed -> the Linux
            Qt frontend build and its unit tests (#992);
+- qt_sdk:  rust/obs-build's Qt SDK resolver changed -> the macOS and
+           Windows Rust lanes check it against the published Qt SDKs (#1878);
 - core:    libobs or the Rust workspace changed (informational).
 Platform is decided by path alone (#897, ci/platform_paths.py): a changed
 file of a platform (`win-capture/`, `platform-osx.mm`, `threading-posix.c`,
 `rust/*/src/platform/windows/`, ...) starts that platform's jobs. Core files
 carry no platform defines (ci/platform_ifdef_ratchet.py), so a core change
 runs on Linux. `.github/`, `cmake/common/`, `cmake/finders/`, `libobs/cmake/`
-(except `os-<os>.cmake`, which starts its own OS),
+(except `os-<os>.cmake`, which starts its own OS, and the three hidden-symbol
+lists when they add or drop the same plain names, which Linux checks: #2288),
 the root CMake files, crate `build.rs`, `platform/mod.rs` and the C++ cmocka tests (with their
 tests.d registrations) stay shared: every platform consumes them.
 Host-named files (docs/rust-port/naming.md, #1294) start their OS lane in any
@@ -81,6 +90,56 @@ OS_CMAKE = re.compile(r"^libobs/cmake/os-[a-z]+\.cmake$")
 SHARED_TEST = re.compile(r"^test/cmocka/(CMakeLists\.txt|[^/]+\.(cpp|hpp))$")
 # A tests.d registration is shared when it registers a C++ test.
 TESTS_D = re.compile(r"^test/cmocka/tests\.d/([^/]+)\.cmake$")
+# One hidden-symbol inventory, written once per linker (#2288).
+HIDDEN_LISTS = ("libobs/cmake/rust-hidden.txt", "libobs/cmake/rust-exports.map", "libobs/cmake/rust-unexports-macos.txt")
+
+
+HIDDEN_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+MAP_NAME = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*);[ \t]*$", re.M)
+MAP_COMMENT = re.compile(r"/\*.*?\*/", re.S)
+
+
+def _split_hidden(text: str, prefix: str) -> tuple[set[str], str]:
+    """(plain symbol names, every other line). Wildcards stay in the rest."""
+    names, rest = set(), []
+    for line in text.splitlines():
+        word = line.strip()
+        if word.startswith("#") or not word:
+            continue
+        if word.startswith(prefix) and HIDDEN_NAME.fullmatch(word[len(prefix):]):
+            names.add(word[len(prefix):])
+        else:
+            rest.append(word)
+    return names, "\n".join(rest)
+
+
+def _split_map(text: str) -> tuple[set[str], str]:
+    text = MAP_COMMENT.sub("", text)
+    names = set(MAP_NAME.findall(text))
+    return names, "\n".join(l.strip() for l in MAP_NAME.sub("", text).splitlines() if l.strip())
+
+
+def hidden_lists_mirrored(old: Callable[[str], str | None], new: Callable[[str], str | None]) -> bool:
+    """True when the three lists add or drop the same plain names and nothing
+    else: no wildcard, section or `global:` change. Every linker then hides
+    exactly what the Linux link hides, and Windows reads none of them."""
+    splits = (lambda t: _split_hidden(t, ""), _split_map, lambda t: _split_hidden(t, "_"))
+    deltas = set()
+    for path, split in zip(HIDDEN_LISTS, splits):
+        before, after = split(old(path) or ""), split(new(path) or "")
+        if before[1] != after[1]:
+            return False
+        deltas.add((frozenset(after[0] - before[0]), frozenset(before[0] - after[0])))
+    return len(deltas) == 1
+
+
+# Files no build or Rust lint reads (#2079). ci/test_*.py read some of them,
+# and the Format job runs those tests on every PR.
+DOCS_ONLY = re.compile(r"^(?:.*\.md|docs/ci-evidence/.*|LICENSE|COPYING|\.gitignore)\Z")
+
+
+def is_docs(path: str) -> bool:
+    return bool(DOCS_ONLY.match(path))
 
 
 @dataclass(frozen=True)
@@ -92,6 +151,8 @@ class Scope:
     tier2: bool = False
     full: bool = False
     linux_targets: str = ""
+    qt_sdk: bool = False
+    docs_only: bool = False
 
 
 # The path -> lane table (#992). Adding a module is adding a row. Globs use
@@ -128,6 +189,30 @@ def _glob(pattern: str) -> re.Pattern[str]:
 
 def lane_hit(lane: str, path: str, extra: tuple[str, ...] = ()) -> bool:
     return any(_glob(g).match(path) for g in LANES.get(lane, ()) + extra)
+
+
+# Cmocka tests that build plugin, frontend or shared sources name them as
+# ${CMAKE_SOURCE_DIR}/<path>; a change under <path> runs Tier 2 too.
+_SOURCE_REF = re.compile(r"\$\{CMAKE_SOURCE_DIR\}/([^\s\"')$;]+)")
+CMOCKA_BUILD_FILES = ("test/cmocka/CMakeLists.txt", "test/cmocka/tests.d")
+
+
+def cmocka_source_paths(texts: list[str]) -> tuple[str, ...]:
+    """Source paths (files or directories) the cmocka build files compile."""
+    found = {m.rstrip("/") for text in texts for m in _SOURCE_REF.findall(text)}
+    # A top-level directory (frontend, libobs-opengl) is only an include
+    # root; matching it would send every change under it to Tier 2.
+    return tuple(sorted(p for p in found if "/" in p))
+
+
+def repo_cmocka_source_paths(root: Path = Path(__file__).resolve().parent.parent) -> tuple[str, ...]:
+    files = [root / CMOCKA_BUILD_FILES[0], *sorted((root / CMOCKA_BUILD_FILES[1]).glob("*.cmake"))]
+    return cmocka_source_paths([read_text(str(f)) for f in files])
+
+
+def cmocka_compiles(path: str, refs: tuple[str, ...]) -> bool:
+    # path under a referenced source, or a gitlink (submodule root) above one.
+    return any(path == r or path.startswith(r + "/") or r.startswith(path + "/") for r in refs)
 
 
 def linked_crates(read: Callable[[str], str], root: str = "libobs-rust") -> set[str]:
@@ -209,6 +294,25 @@ QT_FILES = {
 TEST_SOURCE = re.compile(r"^test/cmocka/([^/]+)\.(?:cpp|hpp|c|h)$")
 
 
+# rust/obs-build's Qt SDK resolver and native Qt test graph: the Windows and
+# macOS lanes fetch the published obs-studio-libs SDKs and run them (#1878).
+QT_SDK_PATHS = (
+    "rust/obs-build/src/qt.rs",
+    "rust/obs-build/src/qt/**",
+    "rust/obs-build/src/platform/qt_sdk.rs",
+    "rust/obs-build/tests/qt_sdk.rs",
+    # The native test graph and package linking the Qt tests build through.
+    "rust/obs-build/tests/native.rs",
+    "rust/obs-build/src/validation.rs",
+    "rust/obs-build/src/validation/**",
+    "rust/obs-build/src/platform/shared_library.rs",
+)
+
+
+def is_qt_sdk(path: str) -> bool:
+    return any(_glob(g).match(path) for g in QT_SDK_PATHS)
+
+
 def is_qt(path: str, read: Callable[[str], str]) -> bool:
     """Frontend/Qt code, the job's own files, or a Qt-linked cmocka test: a
     tests.d fragment that finds Qt6, or the test source it registers."""
@@ -245,11 +349,13 @@ def scope(
     exists: Callable[[str], bool] = lambda path: False,
     read: Callable[[str], str] = lambda path: "",
     submodules: frozenset[str] = frozenset(),
+    cmocka_paths: tuple[str, ...] = (),
+    hidden_mirrored: bool = False,
 ) -> Scope:
     """`exists(path)` says whether a file exists in the checkout, `read(path)`
     returns its text ("" when missing). `submodules` is accepted for callers
     but no path escalates to a full run any more."""
-    core = macos = windows = qt = tier2 = False
+    core = macos = windows = qt = tier2 = qt_sdk = False
     targets: set[str] = set()
     linked = tuple(f"rust/{c}/**" for c in sorted(linked_crates(read)))
     for path in files:
@@ -257,12 +363,18 @@ def scope(
         plat = path_platforms(path)
         # A platform-only file (libobs/**/platform-windows.c) never starts the
         # Linux Tier 2.
-        if lane_hit("tier2", path, linked) and (plat is None or LINUX in plat):
+        if (lane_hit("tier2", path, linked) or cmocka_compiles(path, cmocka_paths)) and (
+            plat is None or LINUX in plat
+        ):
             tier2 = True
         if target := linux_target(path):
             targets.add(target)
         if path.startswith(CORE_PREFIXES) or path in CORE_FILES:
             core = True
+        if is_qt_sdk(path):
+            qt_sdk = macos = windows = True
+        if hidden_mirrored and path in HIDDEN_LISTS:
+            continue
         if is_shared(path, exists):
             macos = windows = True
             continue
@@ -275,7 +387,8 @@ def scope(
         found = os_lanes(path)
         macos |= MACOS in found
         windows |= WINDOWS in found
-    return Scope(core, macos, windows, qt, tier2, False, ",".join(sorted(targets)))
+    docs_only = bool(files) and all(is_docs(path) for path in files)
+    return Scope(core, macos, windows, qt, tier2, False, ",".join(sorted(targets)), qt_sdk, docs_only)
 
 
 def changed_files(base: str) -> list[str]:
@@ -293,9 +406,26 @@ def read_text(path: str) -> str:
         return ""
 
 
+def base_text(base: str, path: str) -> str:
+    out = subprocess.run(["git", "show", f"{base}:{path}"], capture_output=True, text=True)
+    return out.stdout if out.returncode == 0 else ""
+
+
 def main() -> int:
     files = changed_files(sys.argv[1])
-    result = scope(files, lambda path: Path(path).is_file(), read_text)
+    mirrored = False
+    if sys.argv[1] != "ALL" and any(path in HIDDEN_LISTS for path in files):
+        fork = subprocess.run(
+            ["git", "merge-base", sys.argv[1], "HEAD"], check=True, capture_output=True, text=True
+        ).stdout.strip()
+        mirrored = hidden_lists_mirrored(lambda path: base_text(fork, path), read_text)
+    result = scope(
+        files,
+        lambda path: Path(path).is_file(),
+        read_text,
+        cmocka_paths=repo_cmocka_source_paths(Path(".")),
+        hidden_mirrored=mirrored,
+    )
     lines = [f"{k}={str(v).lower()}" for k, v in vars(result).items()]
     print("\n".join(lines))
     if out := os.environ.get("GITHUB_OUTPUT"):

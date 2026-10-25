@@ -274,7 +274,32 @@ if(_host STREQUAL WINDOWS)
     SOURCES build/obs-nvenc.core+.h.c build/obs-nvenc.windows+.h.c build/obs-nvenc.cuda-load+.h.c build/obs-nvenc.override+.h.c
     INCLUDES shared/opts-parser
   )
-  _obs_cross_plugin(coreaudio-encoder-cross DIR plugins/coreaudio-encoder SOURCES build/coreaudio-encoder.core+.hpp.cpp)
+  _obs_cross_plugin(coreaudio-encoder-cross DIR plugins/coreaudio-encoder SOURCES build/coreaudio-encoder.windows+.hpp.cpp INCLUDES plugins/coreaudio-encoder/hosts/windows)
+  _obs_cross_plugin(obs-ffmpeg-mux-host-cross DIR plugins/obs-ffmpeg SOURCES build/obs-ffmpeg.mux-host-windows+.h.c)
+  _obs_cross_plugin(obs-ffmpeg-mux-helper-host-cross DIR plugins/obs-ffmpeg/ffmpeg-mux SOURCES build/ffmpeg-mux.windows+.h.c)
+  _obs_cross_plugin(obs-ffmpeg-host-cross DIR plugins/obs-ffmpeg SOURCES build/obs-ffmpeg.host-windows+.h.c)
+  _obs_cross_plugin(
+    obs-outputs-net-if-host-cross
+    DIR plugins/obs-outputs
+    SOURCES build/obs-outputs.net-if-host-windows+.h.c
+    INCLUDES plugins/obs-outputs/hosts/windows
+  )
+  _obs_cross_plugin(
+    obs-outputs-rtmp-host-cross
+    DIR plugins/obs-outputs
+    SOURCES build/obs-outputs.windows+.h.c
+    INCLUDES plugins/obs-outputs/hosts/windows
+    DEFINES USE_MBEDTLS CRYPTO
+  )
+  _obs_cross_plugin(obs-outputs-host-cross DIR plugins/obs-outputs SOURCES build/obs-outputs.host-windows+.h.c)
+  _obs_cross_plugin(obs-scripting-lua-host-cross DIR shared/obs-scripting SOURCES build/obs-scripting.lua-host-windows+.h.c)
+  _obs_cross_plugin(obs-scripting-python-import-host-cross DIR shared/obs-scripting SOURCES build/obs-scripting.python-import-host-windows+.h.c)
+  _obs_cross_plugin(
+    obs-scripting-python-host-cross
+    DIR shared/obs-scripting
+    SOURCES build/obs-scripting.python-host-windows+.h.c
+    DEFINES SCRIPT_DIR="cross-check"
+  )
   # The Windows-only shared libraries' unity groups (BUILD.md), which the
   # Windows plugins compile through their INTERFACE libraries.
   _obs_cross_plugin(
@@ -395,7 +420,7 @@ elseif(_host STREQUAL MACOS)
     decklink-cross
     DIR plugins/decklink
     SOURCES build/decklink.core+.hpp.cpp build/decklink.audio-repack+.h.c build/decklink.macos+.hpp.cpp
-    INCLUDES plugins/decklink/mac/decklink-sdk deps/libcaption
+    INCLUDES plugins/decklink/mac/decklink-sdk plugins/decklink/hosts/macos deps/libcaption
   )
   # mac-virtualcam's unity groups (BUILD.md): the DAL plug-in and the output.
   _obs_cross_plugin(
@@ -428,10 +453,40 @@ elseif(_host STREQUAL MACOS)
     INCLUDES deps/glad/include
     DEFINES GL_SILENCE_DEPRECATION
   )
-  _obs_cross_plugin(coreaudio-encoder-cross DIR plugins/coreaudio-encoder SOURCES build/coreaudio-encoder.core+.hpp.cpp)
+  _obs_cross_plugin(coreaudio-encoder-cross DIR plugins/coreaudio-encoder SOURCES build/coreaudio-encoder.macos+.hpp.cpp INCLUDES plugins/coreaudio-encoder/hosts/macos)
+  _obs_cross_plugin(obs-ffmpeg-mux-host-cross DIR plugins/obs-ffmpeg SOURCES build/obs-ffmpeg.mux-host-macos+.h.c)
+  _obs_cross_plugin(obs-ffmpeg-mux-helper-host-cross DIR plugins/obs-ffmpeg/ffmpeg-mux SOURCES build/ffmpeg-mux.posix+.h.c)
+  _obs_cross_plugin(obs-ffmpeg-host-cross DIR plugins/obs-ffmpeg SOURCES build/obs-ffmpeg.host-posix+.h.c)
+  _obs_cross_plugin(
+    obs-outputs-net-if-host-cross
+    DIR plugins/obs-outputs
+    SOURCES build/obs-outputs.net-if-host-posix+.h.c
+    INCLUDES plugins/obs-outputs/hosts/posix
+  )
+  _obs_cross_plugin(
+    obs-outputs-rtmp-host-cross
+    DIR plugins/obs-outputs
+    SOURCES build/obs-outputs.rtmp-host-posix+.h.c
+    INCLUDES plugins/obs-outputs/hosts/posix
+  )
+  _obs_cross_plugin(obs-outputs-host-cross DIR plugins/obs-outputs SOURCES build/obs-outputs.host-posix+.h.c)
+  _obs_cross_plugin(obs-scripting-lua-host-cross DIR shared/obs-scripting SOURCES build/obs-scripting.lua-host-macos+.h.c)
+  _obs_cross_plugin(obs-scripting-python-import-host-cross DIR shared/obs-scripting SOURCES build/obs-scripting.python-import-host-macos+.h.c)
+  _obs_cross_plugin(
+    obs-scripting-python-host-cross
+    DIR shared/obs-scripting
+    SOURCES build/obs-scripting.python-host-macos+.h.c
+    DEFINES SCRIPT_DIR="cross-check"
+  )
 endif()
 
 # obs-ffmpeg's unity groups (BUILD.md) but VA-API, with every optional one.
+# obs-ffmpeg-url.h finds its host's obs-ffmpeg-net-host.h in hosts/<os> (#853).
+if(_host STREQUAL WINDOWS)
+  set(_obs_ffmpeg_net_host windows)
+else()
+  set(_obs_ffmpeg_net_host posix)
+endif()
 _obs_cross_plugin(
   obs-ffmpeg-cross
   DIR plugins/obs-ffmpeg
@@ -444,7 +499,7 @@ _obs_cross_plugin(
     build/obs-ffmpeg.output+.h.c
     build/obs-ffmpeg.source+.h.c
     build/obs-ffmpeg.video-encoders+.h.c
-  INCLUDES shared/media-playback shared/opts-parser
+  INCLUDES shared/media-playback shared/opts-parser plugins/obs-ffmpeg/hosts/${_obs_ffmpeg_net_host}
   DEFINES ENABLE_FFMPEG_LOGGING ENABLE_FFMPEG_NVENC NEW_MPEGTS_OUTPUT
 )
 

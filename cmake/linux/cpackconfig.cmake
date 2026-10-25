@@ -37,6 +37,21 @@ if(OS_LINUX)
   set(CPACK_SET_DESTDIR TRUE)
   set(CPACK_DEBIAN_DEBUGINFO_PACKAGE TRUE)
   set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${OBS_COMPANY_NAME}")
+  if(OBS_BRAND_RUST)
+    # Started at run time, so shlibdeps can't find them (#2301): xdg-open for
+    # Show Recordings and links, portals for Wayland capture.
+    set(
+      CPACK_DEBIAN_PACKAGE_RECOMMENDS
+      "xdg-utils, xdg-desktop-portal, xdg-desktop-portal-gtk | xdg-desktop-portal-backend"
+    )
+    set(CPACK_DEBIAN_PACKAGE_SUGGESTS "v4l2loopback-dkms")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${OBS_PROJECT_DEVELOPER_NAME}")
+    set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${OBS_PROJECT_HOMEPAGE}")
+  endif()
+  if(OBS_BRAND_RUST AND OBS_RUST_RELEASE_VERSION)
+    include(deb-version)
+    obs_deb_version(CPACK_DEBIAN_PACKAGE_VERSION CPACK_DEBIAN_PACKAGE_EPOCH)
+  endif()
 elseif(OS_FREEBSD)
   set(CPACK_GENERATOR "FREEBSD")
 

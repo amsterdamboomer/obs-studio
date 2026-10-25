@@ -83,6 +83,7 @@ static bool init_encoder(struct obs_encoder *encoder, const char *name, obs_data
 	pthread_mutex_init_value(&encoder->outputs_mutex);
 	pthread_mutex_init_value(&encoder->pause.mutex);
 	pthread_mutex_init_value(&encoder->roi_mutex);
+	pthread_mutex_init_value(&encoder->last_error_mutex);
 
 	if (!obs_context_data_init(&encoder->context, OBS_OBJ_TYPE_ENCODER, settings, name, NULL, hotkey_data, false))
 		return false;
@@ -95,6 +96,8 @@ static bool init_encoder(struct obs_encoder *encoder, const char *name, obs_data
 	if (pthread_mutex_init(&encoder->pause.mutex, NULL) != 0)
 		return false;
 	if (pthread_mutex_init(&encoder->roi_mutex, NULL) != 0)
+		return false;
+	if (pthread_mutex_init(&encoder->last_error_mutex, NULL) != 0)
 		return false;
 
 	if (encoder->orig_info.get_defaults) {
@@ -173,17 +176,35 @@ obs_encoder_t *obs_audio_encoder_create(const char *id, const char *name, obs_da
 static void receive_video(void *param, struct video_data *frame);
 static void receive_audio(void *param, size_t mix_idx, struct audio_data *data);
 
+/* The constants obs-encoder-size.h copies. */
+_Static_assert(OBS_ENCODER_SIZE_TYPE_AUDIO == OBS_ENCODER_AUDIO, "OBS_ENCODER_AUDIO");
+_Static_assert(OBS_ENCODER_SIZE_TYPE_VIDEO == OBS_ENCODER_VIDEO, "OBS_ENCODER_VIDEO");
+_Static_assert(OBS_ENCODER_SIZE_CAP_SCALING == OBS_ENCODER_CAP_SCALING, "OBS_ENCODER_CAP_SCALING");
+_Static_assert(OBS_ENCODER_SIZE_AUDIO_FORMAT_UNKNOWN == AUDIO_FORMAT_UNKNOWN, "AUDIO_FORMAT_UNKNOWN");
+_Static_assert(OBS_ENCODER_SIZE_SPEAKERS_UNKNOWN == SPEAKERS_UNKNOWN, "SPEAKERS_UNKNOWN");
+
+/* The constant obs-encoder-audio-start.h copies. */
+_Static_assert(OBS_ENCODER_AUDIO_START_TYPE_VIDEO == OBS_ENCODER_VIDEO, "OBS_ENCODER_VIDEO");
+
 static inline void get_audio_info(const struct obs_encoder *encoder, struct audio_convert_info *info)
 {
 	const struct audio_output_info *aoi;
 	aoi = audio_output_get_info(encoder->media);
 
-	if (info->format == AUDIO_FORMAT_UNKNOWN)
-		info->format = aoi->format;
-	if (!info->samples_per_sec)
-		info->samples_per_sec = aoi->samples_per_sec;
-	if (info->speakers == SPEAKERS_UNKNOWN)
-		info->speakers = aoi->speakers;
+	const struct obs_encoder_audio_fill in = {
+		.format = (int)info->format,
+		.samples_per_sec = info->samples_per_sec,
+		.speakers = (int)info->speakers,
+	};
+	const struct obs_encoder_audio_fill mix = {
+		.format = (int)aoi->format,
+		.samples_per_sec = aoi->samples_per_sec,
+		.speakers = (int)aoi->speakers,
+	};
+	const struct obs_encoder_audio_fill out = obs_encoder_size_audio_defaults(&in, &mix);
+	info->format = (enum audio_format)out.format;
+	info->samples_per_sec = out.samples_per_sec;
+	info->speakers = (enum speaker_layout)out.speakers;
 
 	if (encoder->info.get_audio_info)
 		encoder->info.get_audio_info(encoder->context.data, info);
@@ -203,15 +224,10 @@ static inline void get_video_info(struct obs_encoder *encoder, struct video_scal
 	if (encoder->info.get_video_info)
 		encoder->info.get_video_info(encoder->context.data, info);
 
-	/**
-	 * Prevent video output from performing an actual scale. If GPU scaling is
-	 * enabled, the voi will contain the scaled size. Therefore, GPU scaling
-	 * takes priority over self-scaling functionality.
-	 */
-	if ((encoder->info.caps & OBS_ENCODER_CAP_SCALING) != 0) {
-		info->width = voi->width;
-		info->height = voi->height;
-	}
+	const struct obs_encoder_size size =
+		obs_encoder_size_cap_override(encoder->info.caps, info->width, info->height, voi->width, voi->height);
+	info->width = size.width;
+	info->height = size.height;
 }
 
 static inline bool gpu_encode_available(const struct obs_encoder *encoder)
@@ -486,6 +502,7 @@ void obs_encoder_destroy(obs_encoder_t *encoder)
 		pthread_mutex_destroy(&encoder->outputs_mutex);
 		pthread_mutex_destroy(&encoder->pause.mutex);
 		pthread_mutex_destroy(&encoder->roi_mutex);
+		pthread_mutex_destroy(&encoder->last_error_mutex);
 		obs_context_data_free(&encoder->context);
 		if (encoder->owns_info_id)
 			bfree((void *)(uintptr_t)encoder->info.id);
@@ -1056,31 +1073,35 @@ void obs_encoder_set_scaled_size(obs_encoder_t *encoder, uint32_t width, uint32_
 {
 	if (!obs_encoder_valid(encoder, "obs_encoder_set_scaled_size"))
 		return;
-	if (encoder->info.type != OBS_ENCODER_VIDEO) {
+
+	switch (obs_encoder_size_scaled_gate((int)encoder->info.type, encoder_active(encoder), encoder->initialized)) {
+	case OBS_ENCODER_SCALED_NOT_VIDEO:
 		blog(LOG_WARNING,
 		     "obs_encoder_set_scaled_size: "
 		     "encoder '%s' is not a video encoder",
 		     obs_encoder_get_name(encoder));
 		return;
-	}
-	if (encoder_active(encoder)) {
+	case OBS_ENCODER_SCALED_ACTIVE:
 		blog(LOG_WARNING,
 		     "encoder '%s': Cannot set the scaled "
 		     "resolution while the encoder is active",
 		     obs_encoder_get_name(encoder));
 		return;
-	}
-	if (encoder->initialized) {
+	case OBS_ENCODER_SCALED_INITIALIZED:
 		blog(LOG_WARNING,
 		     "encoder '%s': Cannot set the scaled resolution "
 		     "after the encoder has been initialized",
 		     obs_encoder_get_name(encoder));
 		return;
+	case OBS_ENCODER_SCALED_CHECK:
+	default:
+		break;
 	}
 
 	const struct video_output_info *voi;
 	voi = video_output_get_info(encoder->media);
-	if (voi && voi->width == width && voi->height == height) {
+	if (obs_encoder_size_scaled_match(voi != NULL, voi ? voi->width : 0, voi ? voi->height : 0, width, height) ==
+	    OBS_ENCODER_SCALED_DISABLE) {
 		blog(LOG_WARNING,
 		     "encoder '%s': Scaled resolution "
 		     "matches output resolution, scaling "
@@ -1098,7 +1119,7 @@ void obs_encoder_set_gpu_scale_type(obs_encoder_t *encoder, enum obs_scale_type 
 {
 	if (!obs_encoder_valid(encoder, "obs_encoder_set_gpu_scale_type"))
 		return;
-	if (encoder->info.type != OBS_ENCODER_VIDEO) {
+	if (obs_encoder_audio_start_not_video((int)encoder->info.type)) {
 		blog(LOG_WARNING,
 		     "obs_encoder_set_gpu_scale_type: "
 		     "encoder '%s' is not a video encoder",
@@ -1128,7 +1149,7 @@ bool obs_encoder_set_frame_rate_divisor(obs_encoder_t *encoder, uint32_t frame_r
 	if (!obs_encoder_valid(encoder, "obs_encoder_set_frame_rate_divisor"))
 		return false;
 
-	if (encoder->info.type != OBS_ENCODER_VIDEO) {
+	if (obs_encoder_audio_start_not_video((int)encoder->info.type)) {
 		blog(LOG_WARNING,
 		     "obs_encoder_set_frame_rate_divisor: "
 		     "encoder '%s' is not a video encoder",
@@ -1152,7 +1173,7 @@ bool obs_encoder_set_frame_rate_divisor(obs_encoder_t *encoder, uint32_t frame_r
 		return false;
 	}
 
-	if (frame_rate_divisor == 0) {
+	if (!obs_encoder_audio_start_divisor_ok(frame_rate_divisor)) {
 		blog(LOG_WARNING,
 		     "encoder '%s': Cannot set frame "
 		     "rate divisor to 0",
@@ -1180,41 +1201,51 @@ bool obs_encoder_scaling_enabled(const obs_encoder_t *encoder)
 	if (!obs_encoder_valid(encoder, "obs_encoder_scaling_enabled"))
 		return false;
 
-	return encoder->scaled_width || encoder->scaled_height;
+	return obs_encoder_size_scaling(encoder->scaled_width, encoder->scaled_height);
 }
 
 uint32_t obs_encoder_get_width(const obs_encoder_t *encoder)
 {
 	if (!obs_encoder_valid(encoder, "obs_encoder_get_width"))
 		return 0;
-	if (encoder->info.type != OBS_ENCODER_VIDEO) {
+
+	switch (obs_encoder_size_video_route((int)encoder->info.type, encoder->media != NULL, encoder->scaled_width)) {
+	case OBS_ENCODER_SIZE_WRONG_TYPE:
 		blog(LOG_WARNING,
 		     "obs_encoder_get_width: "
 		     "encoder '%s' is not a video encoder",
 		     obs_encoder_get_name(encoder));
 		return 0;
-	}
-	if (!encoder->media)
+	case OBS_ENCODER_SIZE_STORED:
+		return encoder->scaled_width;
+	case OBS_ENCODER_SIZE_MEDIA:
+		return video_output_get_width(encoder->media);
+	case OBS_ENCODER_SIZE_NO_MEDIA:
+	default:
 		return 0;
-
-	return encoder->scaled_width != 0 ? encoder->scaled_width : video_output_get_width(encoder->media);
+	}
 }
 
 uint32_t obs_encoder_get_height(const obs_encoder_t *encoder)
 {
 	if (!obs_encoder_valid(encoder, "obs_encoder_get_height"))
 		return 0;
-	if (encoder->info.type != OBS_ENCODER_VIDEO) {
+
+	switch (obs_encoder_size_video_route((int)encoder->info.type, encoder->media != NULL, encoder->scaled_height)) {
+	case OBS_ENCODER_SIZE_WRONG_TYPE:
 		blog(LOG_WARNING,
 		     "obs_encoder_get_height: "
 		     "encoder '%s' is not a video encoder",
 		     obs_encoder_get_name(encoder));
 		return 0;
-	}
-	if (!encoder->media)
+	case OBS_ENCODER_SIZE_STORED:
+		return encoder->scaled_height;
+	case OBS_ENCODER_SIZE_MEDIA:
+		return video_output_get_height(encoder->media);
+	case OBS_ENCODER_SIZE_NO_MEDIA:
+	default:
 		return 0;
-
-	return encoder->scaled_height != 0 ? encoder->scaled_height : video_output_get_height(encoder->media);
+	}
 }
 
 bool obs_encoder_gpu_scaling_enabled(obs_encoder_t *encoder)
@@ -1267,17 +1298,22 @@ uint32_t obs_encoder_get_sample_rate(const obs_encoder_t *encoder)
 {
 	if (!obs_encoder_valid(encoder, "obs_encoder_get_sample_rate"))
 		return 0;
-	if (encoder->info.type != OBS_ENCODER_AUDIO) {
+
+	switch (obs_encoder_size_rate_route((int)encoder->info.type, encoder->media != NULL, encoder->samplerate)) {
+	case OBS_ENCODER_SIZE_WRONG_TYPE:
 		blog(LOG_WARNING,
 		     "obs_encoder_get_sample_rate: "
 		     "encoder '%s' is not an audio encoder",
 		     obs_encoder_get_name(encoder));
 		return 0;
-	}
-	if (!encoder->media)
+	case OBS_ENCODER_SIZE_STORED:
+		return encoder->samplerate;
+	case OBS_ENCODER_SIZE_MEDIA:
+		return audio_output_get_sample_rate(encoder->media);
+	case OBS_ENCODER_SIZE_NO_MEDIA:
+	default:
 		return 0;
-
-	return encoder->samplerate != 0 ? encoder->samplerate : audio_output_get_sample_rate(encoder->media);
+	}
 }
 
 size_t obs_encoder_get_frame_size(const obs_encoder_t *encoder)
@@ -1742,7 +1778,7 @@ static void receive_video(void *param, struct video_data *frame)
 		struct obs_encoder_group *group = encoder->encoder_group;
 		bool ready = false;
 		pthread_mutex_lock(&group->mutex);
-		ready = group->start_timestamp == frame->timestamp;
+		ready = obs_encoder_audio_start_group_ready(group->start_timestamp, frame->timestamp);
 		pthread_mutex_unlock(&group->mutex);
 		if (!ready)
 			goto wait_for_audio;
@@ -1754,7 +1790,8 @@ static void receive_video(void *param, struct video_data *frame)
 			if (!paired)
 				continue;
 
-			if (!paired->first_received || paired->first_raw_ts > frame->timestamp) {
+			if (!paired->first_received ||
+			    obs_encoder_audio_start_paired_late(paired->first_raw_ts, frame->timestamp)) {
 				obs_encoder_release(paired);
 				goto wait_for_audio;
 			}
@@ -1782,7 +1819,8 @@ static void receive_video(void *param, struct video_data *frame)
 	enc_frame.pts = encoder->cur_pts;
 
 	if (do_encode(encoder, &enc_frame, &frame->timestamp))
-		encoder->cur_pts += encoder->timebase_num * encoder->frame_rate_divisor;
+		encoder->cur_pts = obs_encoder_audio_start_video_pts(encoder->cur_pts, encoder->timebase_num,
+								     encoder->frame_rate_divisor);
 
 wait_for_audio:
 	profile_end(receive_video_name);
@@ -1797,10 +1835,9 @@ static void clear_audio(struct obs_encoder *encoder)
 static inline void push_back_audio(struct obs_encoder *encoder, struct audio_data *data, size_t size,
 				   size_t offset_size)
 {
-	if (offset_size >= size)
+	size = obs_encoder_audio_start_push_size(size, offset_size);
+	if (!size)
 		return;
-
-	size -= offset_size;
 
 	/* push in to the circular buffer */
 	for (size_t i = 0; i < encoder->planes; i++)
@@ -1809,9 +1846,9 @@ static inline void push_back_audio(struct obs_encoder *encoder, struct audio_dat
 
 static inline size_t calc_offset_size(struct obs_encoder *encoder, uint64_t v_start_ts, uint64_t a_start_ts)
 {
-	uint64_t offset = v_start_ts - a_start_ts;
+	uint64_t offset = obs_encoder_audio_start_offset_ns(v_start_ts, a_start_ts);
 	offset = util_mul_div64(offset, encoder->samplerate, 1000000000ULL);
-	return (size_t)offset * encoder->blocksize;
+	return obs_encoder_audio_start_offset_size(offset, encoder->blocksize);
 }
 
 static void start_from_buffer(struct obs_encoder *encoder, uint64_t v_start_ts)
@@ -1825,7 +1862,7 @@ static void start_from_buffer(struct obs_encoder *encoder, uint64_t v_start_ts)
 		memset(&encoder->audio_input_buffer[i], 0, sizeof(struct deque));
 	}
 
-	if (encoder->first_raw_ts < v_start_ts)
+	if (obs_encoder_audio_start_buffer_offset(encoder->first_raw_ts, v_start_ts))
 		offset_size = calc_offset_size(encoder, v_start_ts, encoder->first_raw_ts);
 
 	push_back_audio(encoder, &audio, size, offset_size);
@@ -1839,7 +1876,7 @@ static bool buffer_audio(struct obs_encoder *encoder, struct audio_data *data)
 {
 	profile_start(buffer_audio_name);
 
-	size_t size = data->frames * encoder->blocksize;
+	size_t size = obs_encoder_audio_start_size(data->frames, encoder->blocksize);
 	size_t offset_size = 0;
 	bool success = true;
 
@@ -1849,38 +1886,34 @@ static bool buffer_audio(struct obs_encoder *encoder, struct audio_data *data)
 		paired_encoder = obs_weak_encoder_get_encoder(encoder->paired_encoders.array[0]);
 	}
 
-	if (!encoder->start_ts && paired_encoder) {
-		uint64_t end_ts = data->timestamp;
+	if (obs_encoder_audio_start_paired(encoder->start_ts, paired_encoder != NULL)) {
 		uint64_t v_start_ts = paired_encoder->start_ts;
+		struct obs_encoder_audio_start_plan plan;
 
-		/* no video yet, so don't start audio */
-		if (!v_start_ts) {
+		if (obs_encoder_audio_start_no_video(v_start_ts)) {
 			success = false;
 			goto fail;
 		}
 
-		/* audio starting point still not synced with video starting
-		 * point, so don't start audio */
-		end_ts += util_mul_div64(data->frames, 1000000000ULL, encoder->samplerate);
-		if (end_ts <= v_start_ts) {
+		plan = obs_encoder_audio_start_packet(
+			data->timestamp, util_mul_div64(data->frames, 1000000000ULL, encoder->samplerate), v_start_ts);
+		if (plan.wait) {
 			success = false;
 			goto fail;
 		}
 
-		/* ready to start audio, truncate if necessary */
-		if (data->timestamp < v_start_ts)
+		if (plan.truncate)
 			offset_size = calc_offset_size(encoder, v_start_ts, data->timestamp);
-		if (data->timestamp <= v_start_ts)
+		if (plan.clear)
 			clear_audio(encoder);
 
 		encoder->start_ts = v_start_ts;
 
-		/* use currently buffered audio instead */
-		if (v_start_ts < data->timestamp) {
+		if (plan.from_buffer) {
 			start_from_buffer(encoder, v_start_ts);
 		}
 
-	} else if (!encoder->start_ts && !paired_encoder) {
+	} else if (obs_encoder_audio_start_unpaired(encoder->start_ts, paired_encoder != NULL)) {
 		encoder->start_ts = data->timestamp;
 	}
 
@@ -1912,7 +1945,7 @@ static bool send_audio_data(struct obs_encoder *encoder)
 	if (!do_encode(encoder, &enc_frame, NULL))
 		return false;
 
-	encoder->cur_pts += encoder->framesize;
+	encoder->cur_pts = obs_encoder_audio_start_audio_pts(encoder->cur_pts, encoder->framesize);
 	return true;
 }
 
@@ -2001,7 +2034,7 @@ static void receive_audio(void *param, size_t mix_idx, struct audio_data *in)
 	if (!buffer_audio(encoder, &audio))
 		goto end;
 
-	while (encoder->audio_input_buffer[0].size >= encoder->framesize_bytes) {
+	while (obs_encoder_audio_start_can_send(encoder->audio_input_buffer[0].size, encoder->framesize_bytes)) {
 		if (!send_audio_data(encoder)) {
 			break;
 		}
@@ -2224,6 +2257,7 @@ void obs_encoder_set_last_error(obs_encoder_t *encoder, const char *message)
 	if (!obs_encoder_valid(encoder, "obs_encoder_set_last_error"))
 		return;
 
+	pthread_mutex_lock(&encoder->last_error_mutex);
 	if (encoder->last_error_message)
 		bfree(encoder->last_error_message);
 
@@ -2231,6 +2265,15 @@ void obs_encoder_set_last_error(obs_encoder_t *encoder, const char *message)
 		encoder->last_error_message = bstrdup(message);
 	else
 		encoder->last_error_message = NULL;
+	pthread_mutex_unlock(&encoder->last_error_mutex);
+}
+
+char *obs_encoder_dup_last_error(obs_encoder_t *encoder)
+{
+	pthread_mutex_lock(&encoder->last_error_mutex);
+	char *message = bstrdup(encoder->last_error_message);
+	pthread_mutex_unlock(&encoder->last_error_mutex);
+	return message;
 }
 
 uint64_t obs_encoder_get_pause_offset(const obs_encoder_t *encoder)
@@ -2240,20 +2283,16 @@ uint64_t obs_encoder_get_pause_offset(const obs_encoder_t *encoder)
 
 bool obs_encoder_has_roi(const obs_encoder_t *encoder)
 {
-	return encoder->roi.num > 0;
+	return obs_encoder_valid(encoder, "obs_encoder_has_roi") ? encoder->roi.num > 0 : false;
 }
 
 bool obs_encoder_add_roi(obs_encoder_t *encoder, const struct obs_encoder_roi *roi)
 {
+	if (!obs_encoder_valid(encoder, "obs_encoder_add_roi"))
+		return false;
 	if (!roi)
 		return false;
-	if (!(encoder->info.caps & OBS_ENCODER_CAP_ROI))
-		return false;
-	/* Area smaller than the smallest possible block (16x16) */
-	if (roi->bottom - roi->top < 16 || roi->right - roi->left < 16)
-		return false;
-	/* Other invalid ROIs */
-	if (roi->priority < -1.0f || roi->priority > 1.0f)
+	if (!obs_encoder_roi_admit(encoder->info.caps, roi))
 		return false;
 
 	pthread_mutex_lock(&encoder->roi_mutex);
@@ -2266,6 +2305,8 @@ bool obs_encoder_add_roi(obs_encoder_t *encoder, const struct obs_encoder_roi *r
 
 void obs_encoder_clear_roi(obs_encoder_t *encoder)
 {
+	if (!obs_encoder_valid(encoder, "obs_encoder_clear_roi"))
+		return;
 	if (!encoder->roi.num)
 		return;
 	pthread_mutex_lock(&encoder->roi_mutex);
@@ -2276,6 +2317,9 @@ void obs_encoder_clear_roi(obs_encoder_t *encoder)
 
 void obs_encoder_enum_roi(obs_encoder_t *encoder, void (*enum_proc)(void *, struct obs_encoder_roi *), void *param)
 {
+	if (!obs_encoder_valid(encoder, "obs_encoder_enum_roi"))
+		return;
+
 	float scale_x = 0;
 	float scale_y = 0;
 
@@ -2284,11 +2328,9 @@ void obs_encoder_enum_roi(obs_encoder_t *encoder, void (*enum_proc)(void *, stru
 		const uint32_t width = video_output_get_width(encoder->media);
 		const uint32_t height = video_output_get_height(encoder->media);
 
-		if (!width || !height)
+		if (!obs_encoder_roi_scale_factors(encoder->scaled_width, encoder->scaled_height, width, height,
+						   &scale_x, &scale_y))
 			return;
-
-		scale_x = (float)encoder->scaled_width / (float)width;
-		scale_y = (float)encoder->scaled_height / (float)height;
 	}
 
 	pthread_mutex_lock(&encoder->roi_mutex);
@@ -2298,13 +2340,8 @@ void obs_encoder_enum_roi(obs_encoder_t *encoder, void (*enum_proc)(void *, stru
 		struct obs_encoder_roi *roi = &encoder->roi.array[--idx];
 
 		if (scale_x > 0 && scale_y > 0) {
-			struct obs_encoder_roi scaled_roi = {
-				.top = (uint32_t)((float)roi->top * scale_y),
-				.bottom = (uint32_t)((float)roi->bottom * scale_y),
-				.left = (uint32_t)((float)roi->left * scale_x),
-				.right = (uint32_t)((float)roi->right * scale_x),
-				.priority = roi->priority,
-			};
+			struct obs_encoder_roi scaled_roi;
+			obs_encoder_roi_scale(roi, scale_x, scale_y, &scaled_roi);
 
 			enum_proc(param, &scaled_roi);
 		} else {
@@ -2317,7 +2354,7 @@ void obs_encoder_enum_roi(obs_encoder_t *encoder, void (*enum_proc)(void *, stru
 
 uint32_t obs_encoder_get_roi_increment(const obs_encoder_t *encoder)
 {
-	return encoder->roi_increment;
+	return obs_encoder_valid(encoder, "obs_encoder_get_roi_increment") ? encoder->roi_increment : 0;
 }
 
 bool obs_encoder_set_group(obs_encoder_t *encoder, obs_encoder_group_t *group)
@@ -2415,7 +2452,11 @@ void obs_encoder_group_destroy(obs_encoder_group_t *group)
 
 bool obs_encoder_video_tex_active(const obs_encoder_t *encoder, enum video_format format)
 {
-	struct obs_core_video_mix *mix = get_mix_for_video(encoder->media);
+	/* No mix owns the video of an encoder with no video set, or of one
+	 * whose canvas mix is gone (#2267): no texture input then. */
+	const struct obs_core_video_mix *mix = get_mix_for_video(encoder->media);
+	if (!mix)
+		return false;
 
 	if (format == VIDEO_FORMAT_NV12)
 		return mix->using_nv12_tex;

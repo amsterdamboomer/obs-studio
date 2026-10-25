@@ -14,6 +14,7 @@ pub mod darray;
 pub mod dbus_inhibit;
 pub mod deque;
 pub mod dstr;
+pub mod dstr_libc;
 pub mod file_serializer;
 pub mod lexer;
 #[cfg(unix)]
@@ -22,6 +23,7 @@ pub mod path_extension;
 pub mod pipe;
 #[cfg(target_os = "macos")]
 pub mod platform_cocoa;
+pub mod platform_conversions;
 pub mod platform_file;
 pub mod platform_filename;
 pub mod platform_mkdirs;
@@ -36,6 +38,7 @@ pub mod platform_windows;
 #[cfg(all(unix, not(target_os = "macos"), feature = "gio"))]
 pub mod portal_inhibit;
 pub mod profiler;
+pub mod profiler_io;
 pub mod profiler_snapshot;
 pub mod task;
 pub mod text_lookup;

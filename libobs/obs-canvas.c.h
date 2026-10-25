@@ -22,6 +22,9 @@ static const char *MAIN_CANVAS_NAME = "Main";
 static const char *MAIN_CANVAS_UUID = "6c69626f-6273-4c00-9d88-c5136d61696e";
 /* Internal flag to mark a canvas as removed */
 static const uint32_t REMOVED = 1u << 31;
+/* The flags a caller or a scene collection may set (MAIN is the main
+ * canvas's own; REMOVED and unknown bits are dropped). */
+static const uint32_t PUBLIC_CANVAS_FLAGS = ACTIVATE | MIX_AUDIO | SCENE_REF | EPHEMERAL;
 
 /*** Signals ***/
 
@@ -139,8 +142,11 @@ static obs_canvas_t *obs_canvas_create_internal(const char *name, const char *uu
 	struct obs_canvas *canvas = bzalloc(sizeof(struct obs_canvas));
 	canvas->flags = flags;
 
-	if (!obs_context_data_init(&canvas->context, OBS_OBJ_TYPE_CANVAS, NULL, name, uuid, NULL, private))
+	if (!obs_context_data_init(&canvas->context, OBS_OBJ_TYPE_CANVAS, NULL, name, uuid, NULL, private)) {
+		/* obs_context_data_init() already freed the context. */
+		bfree(canvas);
 		return NULL;
+	}
 
 	if (!signal_handler_add_array(canvas->context.signals, canvas_signals)) {
 		obs_context_data_free(&canvas->context);
@@ -191,13 +197,13 @@ obs_canvas_t *obs_create_main_canvas(void)
 
 obs_canvas_t *obs_canvas_create(const char *name, struct obs_video_info *ovi, uint32_t flags)
 {
-	flags &= ~MAIN; /* Prevent user from creating a MAIN canvas. */
+	flags &= PUBLIC_CANVAS_FLAGS; /* Prevent user from creating a MAIN or removed canvas. */
 	return obs_canvas_create_internal(name, NULL, ovi, flags, false);
 }
 
 obs_canvas_t *obs_canvas_create_private(const char *name, struct obs_video_info *ovi, uint32_t flags)
 {
-	flags &= ~MAIN; /* Prevent user from creating a MAIN canvas. */
+	flags &= PUBLIC_CANVAS_FLAGS; /* Prevent user from creating a MAIN or removed canvas. */
 	return obs_canvas_create_internal(name, NULL, ovi, flags, true);
 }
 
@@ -207,13 +213,23 @@ void obs_canvas_destroy(obs_canvas_t *canvas)
 
 	obs_canvas_clear_mix(canvas);
 
+	/* Empty the list before releasing anything: HASH_CLEAR reads the
+	 * table through the list head, and a release can free the head on the
+	 * destruction task thread. Sources still alive are destroyed later by
+	 * obs_free_data(), which cannot remove them from a freed canvas
+	 * (#2038, #2049). */
 	obs_source_t *source = canvas->sources;
+	HASH_CLEAR(hh, *(struct obs_context_data **)&canvas->sources);
+
 	while (source) {
+		/* The release can free the source; take the next one first. */
+		obs_source_t *next = source->context.hh.next;
+
 		/* Canvases can hold strong refs to scene sources, release them here. */
 		if (canvas->flags & SCENE_REF && obs_source_is_scene(source))
 			obs_source_release(source);
 
-		source = source->context.hh.next;
+		source = next;
 	}
 
 	obs_context_data_remove_uuid(&canvas->context, &obs->data.canvases_mutex, &obs->data.canvases);
@@ -254,7 +270,7 @@ obs_canvas_t *obs_load_canvas(obs_data_t *data)
 	const bool private = obs_data_get_bool(data, "private");
 	uint32_t flags = (uint32_t)obs_data_get_int(data, "flags");
 
-	flags &= ~MAIN; /* Prevent user from creating a MAIN canvas. */
+	flags &= PUBLIC_CANVAS_FLAGS; /* Prevent user from creating a MAIN or removed canvas. */
 	return obs_canvas_create_internal(name, uuid, NULL, flags, private);
 }
 
@@ -354,8 +370,10 @@ static bool remove_groups_enum_cb(void *param, obs_source_t *scene_source)
 void obs_canvas_remove_source(obs_source_t *source)
 {
 	obs_canvas_t *canvas = obs_weak_canvas_get_canvas(source->canvas);
+	/* Also when the canvas is gone: obs_free_data() releases the main
+	 * canvas before it destroys the sources left alive (#2038). */
+	obs_weak_canvas_release(source->canvas);
 	if (canvas) {
-		obs_weak_canvas_release(source->canvas);
 		obs_context_data_remove_name(&source->context, &canvas->sources_mutex, &canvas->sources);
 
 		canvas_dosignal_source("source_remove", canvas, source);

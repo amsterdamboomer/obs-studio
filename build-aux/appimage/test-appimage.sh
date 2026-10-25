@@ -19,6 +19,18 @@
 #      come from the bundle too.
 #   2. first-start: a new user's OBS opens a window that renders, with one
 #      libsrt mapped, the AppImage's.
+#   2b. first-start-no-libva: the same first start on a host without libva
+#      (libva.so.2, libva-drm.so.2, libva-x11.so.2 deleted). libva is optional:
+#      OBS must start, render and map no libva; the hostlib/ shim reports it
+#      unavailable at most once (obs-rust/obs-studio#959; without the shims the
+#      loader failed before main()).
+#   2c. missing-host-lib: a host without one library the AppImage takes from
+#      the host, one at a time: libwayland-egl.so.1 (libobs-opengl links it),
+#      then libGLX.so.0 (obs and Qt link it). AppRun's preflight
+#      (obs-hostlib-check) must stop with exit status 127 and name the library
+#      and the package to install, instead of OBS failing with "Graphics module
+#      not found" (obs-rust/obs-studio#2298) or the dynamic loader's "error
+#      while loading shared libraries" (#2337). Debian and Ubuntu images only.
 #   3. probes: the AppImage's own PipeWire, PulseAudio, gconv and D-Bus
 #      libraries, in AppRun's environment, work against a private session.
 #   4. saved-profile: OBS starts with a returning user's scene that holds a
@@ -46,11 +58,12 @@ unset DISPLAY WAYLAND_DISPLAY DBUS_SESSION_BUS_ADDRESS PIPEWIRE_REMOTE PIPEWIRE_
 
 APPIMAGE="$(realpath "$1")"
 OUT="$(realpath -m "${2:-.}")"
-USAGE="usage: test-appimage.sh <AppImage> <output-dir> <obs-appimage-testkit> <bundle|first-start|probes|saved-profile|saved-profile-custom|saved-profile-existing|gpu>"
+USAGE="usage: test-appimage.sh <AppImage> <output-dir> <obs-appimage-testkit> <bundle|first-start|probes|saved-profile|saved-profile-custom|saved-profile-existing|gpu|first-start-no-libva|missing-host-lib>"
 TESTKIT="$(realpath "${3:?$USAGE}")"
 SCENARIO="${4:?$USAGE}"
 case "$SCENARIO" in
-bundle | first-start | probes | saved-profile | saved-profile-custom | saved-profile-existing | gpu) ;;
+bundle | first-start | first-start-no-libva | missing-host-lib | probes | saved-profile | saved-profile-custom | \
+    saved-profile-existing | gpu) ;;
 *)
     echo "::error::unknown scenario $SCENARIO; $USAGE"
     exit 1
@@ -289,11 +302,12 @@ if [ -n "${EXPECT_RUST_VERSION:-}" ] && [[ "$VERSION_LINE" != "OBS-Studio-Rust $
     exit 1
 fi
 
-# Release candidates must retain updater information in the actual runtime.
+# Release candidates must retain updater information in the actual runtime,
+# pointing at the certified release like Windows and macOS (#1881).
 # The workflow's asset_metadata.py check verifies its zsync against this file.
 if [ -n "${EXPECT_APPIMAGE_UPDATE:-}" ]; then
     UPDATE_INFO="$("$APPIMAGE" --appimage-updateinformation)"
-    [[ "$UPDATE_INFO" == gh-releases-zsync\|*\|*\|continuous\|OBS-Studio-Rust-\*-linux-x86_64.AppImage.zsync ]] ||
+    [[ "$UPDATE_INFO" == gh-releases-zsync\|*\|*\|latest\|OBS-Studio-Rust-\*-linux-x86_64.AppImage.zsync ]] ||
         { echo "::error::missing or stale AppImage update target: $UPDATE_INFO"; exit 1; }
 fi
 
@@ -373,6 +387,12 @@ if [ ! -f "$INVENTORY" ]; then
     find "$PACKAGE_MODULES" -name '*.so' -printf '%f\n' | sort >"$PWD/modules.txt"
     INVENTORY="$PWD/modules.txt"
 fi
+# Modules users depend on that a build must not quietly leave out. The saved
+# profile run below then requires every inventoried module to load.
+#   obs-webrtc.so: the WHIP service and output (obs-rust/obs-studio#1744)
+for m in obs-webrtc.so; do
+    grep -qx "$m" "$INVENTORY" || fail "the AppImage does not ship $m"
+done
 
 # ============================================================================
 # No desktop-session package is installed in this scenario, so nothing in the
@@ -557,7 +577,84 @@ require_one_libsrt_mapped() {
 }
 
 # ============================================================================
-if [ "$SCENARIO" = first-start ]; then
+if [ "$SCENARIO" = first-start-no-libva ]; then
+    echo "::group::2b. Remove libva from this host"
+    find / -xdev \( -name 'libva.so*' -o -name 'libva-*.so*' \) \( -type f -o -type l \) -not -path "$APPDIR/*" \
+        -not -path '/proc/*' -print -delete
+    ldconfig 2>/dev/null || true
+    if ldconfig -p | grep -q 'libva'; then
+        fail "libva is still on this host after removing it"
+    fi
+    echo "::endgroup::"
+fi
+
+# One missing-host-lib case: hides the host's $1 (every $1* file outside the
+# AppImage, moved aside), starts AppRun and requires the preflight to stop it
+# with exit status 127, naming $1 and the package $2. $3: the failure OBS
+# shows when it starts without $1 anyway. Puts the files back afterwards.
+missing_host_lib_case() {
+    local soname="$1" package="$2" symptom="$3" stem="${1%%.so*}" rc f
+    local hidden="$PWD/hidden-$stem" stdout="$OUT/obs-stdout-$stem.log" stderr="$OUT/obs-stderr-$stem.log"
+    echo "::group::2c. A host without $soname"
+    while read -r f; do
+        mkdir -p "$hidden$(dirname "$f")"
+        mv "$f" "$hidden$f"
+        echo "hid $f"
+    done < <(find / -xdev -name "$stem.so*" \( -type f -o -type l \) -not -path "$APPDIR/*" \
+        -not -path "$PWD/*" -not -path '/proc/*')
+    ldconfig 2>/dev/null || true
+    if ldconfig -p | grep -qF "$stem.so"; then
+        fail "$stem is still on this host after hiding it"
+    else
+        export HOME="$PWD/home-missing-$stem"
+        mkdir -p "$HOME"
+        # The preflight exits at once. Without it OBS either does not load
+        # (the dynamic loader exits 127 too) or starts and waits at an error
+        # dialog until it is stopped below.
+        LD_LIBRARY_PATH="$HOSTILE_LD" dbus-run-session -- "$APPDIR/AppRun" --disable-shutdown-check \
+            >"$stdout" 2>"$stderr" &
+        APP_PID=$!
+        OWN_PIDS+=("$APP_PID")
+        for _ in $(seq 1 30); do
+            alive "$APP_PID" || break
+            sleep 1
+        done
+        if alive "$APP_PID"; then
+            fail "AppRun was still running 30 s after starting on a host without $soname; the preflight exits 127 at once"
+            stop_tree "$APP_PID" -KILL
+            wait "$APP_PID" 2>/dev/null || true
+        else
+            set +e
+            wait "$APP_PID"
+            rc=$?
+            set -e
+            [ "$rc" -eq 127 ] || fail "AppRun $(describe_exit "$rc") on a host without $soname; the preflight exits 127"
+        fi
+        cat "$stderr"
+        grep -qF "  $soname (" "$stderr" || fail "the preflight did not name $soname"
+        grep -qF "install $package" "$stderr" || fail "the preflight did not say to install $package"
+        if grep -hF "$symptom" "$stdout" "$stderr"; then
+            fail "OBS got past the preflight without $soname"
+        fi
+    fi
+    cp -a "$hidden/." /
+    rm -rf "$hidden"
+    ldconfig 2>/dev/null || true
+    echo "::endgroup::"
+}
+
+if [ "$SCENARIO" = missing-host-lib ]; then
+    require_no_obs_running
+    [ "$FAMILY" = debian ] || { fail "missing-host-lib runs on Debian and Ubuntu images only"; finish; }
+    # libobs-opengl links it; OBS starts and fails to load its graphics module.
+    missing_host_lib_case libwayland-egl.so.1 libwayland-egl1 'Graphics module not found'
+    # obs, Qt and most modules link it; the dynamic loader stops OBS. Debian's
+    # libglx0, which libegl1 and libopengl0 do not pull in (#2337).
+    missing_host_lib_case libGLX.so.0 libglx0 'error while loading shared libraries'
+    finish
+fi
+
+if [ "$SCENARIO" = first-start ] || [ "$SCENARIO" = first-start-no-libva ]; then
     require_no_obs_running
     echo "::group::2. First start with a new profile"
     export HOME="$PWD/home-new"
@@ -574,6 +671,24 @@ if [ "$SCENARIO" = first-start ]; then
             >/run/opengl-driver/share/egl/egl_external_platform.d/10_nvidia_wayland.json
         DRIVER_ENV_CASE=nixos
     fi
+    # A stand-in for the NVIDIA driver's NVML in the host library directory
+    # (fake-nvml.c): OBS's GPU usage sampler must find the host's copy through
+    # AppRun's loader by its bare name (#1970).
+    NVML_HOST=""
+    FAKE_NVML="$(dirname "$TESTKIT")/obs-appimage-fake-nvml.so"
+    if [ "$(id -u)" = 0 ]; then
+        [ -f "$FAKE_NVML" ] || fail "missing $FAKE_NVML (built with the testkit)"
+        for dir in /usr/lib/x86_64-linux-gnu /usr/lib64 /usr/lib; do
+            if [ -d "$dir" ] && [ -f "$FAKE_NVML" ]; then
+                NVML_HOST="$dir/libnvidia-ml.so.1"
+                install -m755 "$FAKE_NVML" "$NVML_HOST"
+                ldconfig 2>/dev/null || true
+                break
+            fi
+        done
+    fi
+    export OBS_TEST_NVML_MARKER="$OUT/nvml-loaded"
+    rm -f "$OBS_TEST_NVML_MARKER"
     unset GBM_BACKENDS_PATH LIBVA_DRIVERS_PATH __EGL_VENDOR_LIBRARY_DIRS __EGL_VENDOR_LIBRARY_FILENAMES \
         __EGL_EXTERNAL_PLATFORM_CONFIG_DIRS __EGL_EXTERNAL_PLATFORM_CONFIG_FILENAMES VK_DRIVER_FILES VK_ICD_FILENAMES
     LD_LIBRARY_PATH="$HOSTILE_LD" dbus-run-session -- "$APPDIR/AppRun" --disable-shutdown-check --verbose >"$OUT/obs-stdout.log" 2>&1 &
@@ -588,7 +703,7 @@ if [ "$SCENARIO" = first-start ]; then
         # A real window owned by OBS (not just the window manager's own chrome).
         # (capture first: `grep -q` closing the pipe early fails the pipeline under pipefail)
         WINDOWS="$(xwininfo -tree -root 2>/dev/null || true)"
-        if grep -qE '"OBS-Studio-Rust|\"OBS [0-9]|"obs"' <<<"$WINDOWS"; then
+        if grep -qE '"OBS Studio Rust|"OBS-Studio-Rust|\"OBS [0-9]|"obs"' <<<"$WINDOWS"; then
             # Qt derives WM_CLASS from the real GUI executable name. Verify
             # the owned native window rather than accepting a matching title.
             CLASS_FOUND=0
@@ -616,10 +731,34 @@ if [ "$SCENARIO" = first-start ]; then
 
     xwininfo -tree -root 2>&1 | head -40 || true
     OBS_PID="$(obs_pid_of "$APP_PID")"
+    if [ "$SCENARIO" = first-start-no-libva ]; then
+        grep -q 'error while loading shared libraries' "$OUT/obs-stdout.log" &&
+            fail "OBS did not start without libva: $(grep -m1 'error while loading shared libraries' "$OUT/obs-stdout.log")"
+        # The shim (hostlib/) looks for libva on the first VA call, if any, and
+        # then logs one line, which must say it is unavailable.
+        VA_LINES="$(grep '^hostlib: va ' "$OUT/obs-stdout.log" || true)"
+        [ "$(grep -c . <<<"$VA_LINES")" -le 1 ] || fail "the libva shim logged more than once: $VA_LINES"
+        [ -z "$VA_LINES" ] || grep -q '^hostlib: va unavailable' <<<"$VA_LINES" ||
+            fail "the libva shim reported a libva on a host without one: $VA_LINES"
+        if [ -n "$OBS_PID" ] && grep -o '/[^ ]*' "/proc/$OBS_PID/maps" | grep -E '/libva(\.so|-)' | grep .; then
+            fail "OBS mapped a libva above on a host without one"
+        fi
+    fi
     if [ -n "$OBS_PID" ]; then
         # The driver search paths the running OBS's EGL, GBM, VA-API and Vulkan loaders see.
         "$HERE_DIR/test-apprun-driver-env.sh" --check "$OBS_PID" "$DRIVER_ENV_CASE" ||
             fail "OBS did not get the host driver search paths (see above)"
+        if [ -n "$NVML_HOST" ]; then
+            # The loader names the file by the path it found (merged /usr:
+            # /lib/x86_64-linux-gnu is /usr/lib/x86_64-linux-gnu), so compare files.
+            NVML_LOADED="$(head -1 "$OBS_TEST_NVML_MARKER" 2>/dev/null || true)"
+            if [ -n "$NVML_LOADED" ] && [ "$NVML_LOADED" -ef "$NVML_HOST" ] &&
+                grep -qF "$NVML_LOADED" "/proc/$OBS_PID/maps"; then
+                echo "NVML: loaded the host's $NVML_HOST as $NVML_LOADED"
+            else
+                fail "OBS's GPU usage sampler did not load the host's $NVML_HOST ($(cat "$OBS_TEST_NVML_MARKER" 2>/dev/null || echo 'not loaded'))"
+            fi
+        fi
         # Libraries actually mapped into the running process: the core stack must be bundled.
         echo "Libraries mapped from outside the AppImage:"
         grep -o '/[^ ]*\.so[^ ]*' "/proc/$OBS_PID/maps" | sort -u | grep -v "$APPDIR" | grep -v '/tmp/.obs-rust-appimage-' || true
@@ -760,6 +899,13 @@ if [ "$SCENARIO" = probes ]; then
         [ "$rc" -eq 0 ] || fail "$probe failed ($(describe_exit "$rc"))"
     done
     echo "::endgroup::"
+    # The Mbed TLS behind RTMPS certificate checks, SRT and RIST: at least 3.6.7,
+    # which fixes public advisories on the RTMPS client path (#1121).
+    set +e
+    in_appimage probe-mbedtls 3.6.7 2>&1
+    rc=$?
+    set -e
+    [ "$rc" -eq 0 ] || fail "probe-mbedtls failed ($(describe_exit "$rc"))"
 
     # HTTPS through the bundled libcurl (update check, remote text, file
     # updater, service plugins), trusting only what the host trusts: a test CA,
@@ -1058,6 +1204,9 @@ for i in $(seq 1 $((RECORD_SECONDS + 5))); do
         cat "/proc/$OBS_PID/maps" >"$OUT/obs-maps.txt"
         require_one_libsrt_mapped "$OBS_PID"
         MAPS_CHECKED=1
+        # The main window with live sources and no first-run wizard: the
+        # picture the AppStream metadata points at (#2132).
+        import -window root "$OUT/screenshot.png" || true
     fi
 done
 echo "PipeWire links and PulseAudio streams while OBS records:"

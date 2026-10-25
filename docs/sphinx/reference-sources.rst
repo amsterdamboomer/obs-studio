@@ -1165,7 +1165,9 @@ General Source Functions
 .. function:: void obs_source_set_volume(obs_source_t *source, float volume)
               float obs_source_get_volume(const obs_source_t *source)
 
-   Sets/gets the user volume for a source that has audio output.
+   Sets/gets the user volume for a source that has audio output, as a
+   multiplier of 0.0 or more (1.0 is unchanged). A negative volume sets
+   0.0, NaN sets the default, 1.0, and infinity sets 20.0 (+26 dB).
 
 ---------------------
 
@@ -1185,7 +1187,9 @@ General Source Functions
 .. function:: void obs_source_set_balance_value(obs_source_t *source, float balance)
               float obs_source_get_balance_value(const obs_source_t *source)
 
-   Sets/gets the audio balance value.
+   Sets/gets the audio balance value, from 0.0 (left) to 1.0 (right).
+   A value outside that range is clamped to it, and NaN sets the
+   default, 0.5.
 
 ---------------------
 
@@ -1277,7 +1281,7 @@ General Source Functions
 .. function:: uint64_t obs_source_get_push_to_mute_delay(const obs_source_t *source)
               void obs_source_set_push_to_mute_delay(obs_source_t *source, uint64_t delay)
 
-   Sets/gets the push-to-mute delay.
+   Sets/gets the push-to-mute delay, in milliseconds.
 
 ---------------------
 
@@ -1291,7 +1295,7 @@ General Source Functions
 .. function:: uint64_t obs_source_get_push_to_talk_delay(const obs_source_t *source)
               void obs_source_set_push_to_talk_delay(obs_source_t *source, uint64_t delay)
 
-   Sets/gets the push-to-talk delay.
+   Sets/gets the push-to-talk delay, in milliseconds.
 
 ---------------------
 
@@ -1686,7 +1690,8 @@ Functions used by sources
 
    Allows the ability to set rotation (0, 90, 180, -90, 270) for an
    async video source.  The rotation will be automatically applied to
-   the source.
+   the source.  The rotation is in degrees; any multiple of 90 (such as
+   -180 or 450) is taken as its equivalent in 0-359.
 
 ---------------------
 

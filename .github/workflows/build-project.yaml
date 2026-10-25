@@ -76,6 +76,7 @@ env:
   SOLDR_RUSTC_WRAPPER: none
 jobs:
   check-event:
+    timeout-minutes: 10
     name: Event Data 🔎
     runs-on: ubuntu-26.04
     defaults:
@@ -96,6 +97,8 @@ jobs:
       qt: ${{ steps.native.outputs.qt }}
       tier2: ${{ steps.native.outputs.tier2 }}
       linux_targets: ${{ steps.native.outputs.linux_targets }}
+      qt_sdk: ${{ steps.native.outputs.qt_sdk }}
+      docs_only: ${{ steps.native.outputs.docs_only }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -213,7 +216,7 @@ jobs:
             event_full=true
           fi
           if [[ "${event_full}" == true ]]; then
-            full=true core=true macos=true windows=true qt=true tier2=true linux_targets=
+            full=true core=true macos=true windows=true qt=true tier2=true qt_sdk=true linux_targets=
           else
             if [[ "${GITHUB_EVENT_NAME}" == pull_request ]]; then
               base="origin/${GITHUB_BASE_REF}"
@@ -238,13 +241,14 @@ jobs:
             && [[ "${GITHUB_EVENT_NAME}" == pull_request || "${GITHUB_EVENT_NAME}" == merge_group ]]; then
             deferred=true
           fi
-          # master pushes run every lane the scope would skip on a PR.
+          # master pushes run every lane the scope would skip on a PR,
+          # Fast Gate included even for a docs-only change (#2079).
           if [[ "${deferred}" != true ]]; then
-            qt=true tier2=true
+            qt=true tier2=true docs_only=false
           fi
           # Measurement jobs keep their app builds and Fast Gate, not unrelated matrices.
           if [[ "$FLATPAK_MEASUREMENT_ONLY" == true || "$NATIVE_MEASUREMENT_ONLY" == true ]]; then
-            core=false macos=false windows=false qt=false tier2=false linux_targets=
+            core=false macos=false windows=false qt=false tier2=false qt_sdk=false linux_targets=
           fi
           os=()
           [[ "${macos}" == true ]] && os+=('"macos-26"')
@@ -258,11 +262,14 @@ jobs:
             echo "qt=${qt:-false}"
             echo "tier2=${tier2:-false}"
             echo "linux_targets=${linux_targets:-}"
+            echo "qt_sdk=${qt_sdk:-false}"
+            echo "docs_only=${docs_only:-false}"
             echo "platform_os=[$(IFS=,; echo "${os[*]}")]"
           } >> "${GITHUB_OUTPUT}"
           echo "full=${full} core=${core} macos=${macos} windows=${windows} qt=${qt} tier2=${tier2}"
 
   macos-build:
+    timeout-minutes: 90
     name: macOS 🍏
     runs-on: macos-26
     needs: check-event
@@ -505,6 +512,7 @@ jobs:
           if-no-files-found: error
 
   ubuntu-build:
+    timeout-minutes: 90
     name: Ubuntu 🐧 ${{ matrix.rust == 'ON' && '(OBS-Studio-Rust) ' || '' }}
     strategy:
       fail-fast: false
@@ -697,6 +705,7 @@ jobs:
           key: zccache-ubuntu-${{ matrix.os }}-x86_64-rust${{ matrix.rust }}-${{ needs.check-event.outputs.config }}-${{ github.sha }}
 
   flatpak-build:
+    timeout-minutes: 120
     name: Flatpak 📦
     runs-on: ubuntu-26.04
     needs: check-event
@@ -1274,6 +1283,7 @@ jobs:
           retention-days: 7
 
   windows-build:
+    timeout-minutes: 90
     name: Windows 🪟
     strategy:
       # A missing qualification profile must not cancel the other axis.
@@ -1553,7 +1563,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: zackees/ci.yml
-          ref: 1a970f01574447d681571ff3d0b8de56cb983dcc
+          ref: a1917ce76598904ce515cd7eec83450c317ea6f2
           path: .ci-lint
           persist-credentials: false
           sparse-checkout: ci_lint
@@ -1602,10 +1612,13 @@ jobs:
         run: uv run ci/lane_proof.py check --lane tier2-linux --base "${BASE}" --repo "${GITHUB_REPOSITORY}"
 
   rust-tests-linux:
+    timeout-minutes: 60
     name: Fast Gate ⚡
     runs-on: ubuntu-26.04
     needs: [check-event, ci-mode]
-    if: needs.ci-mode.outputs.skip_rust-tests-linux != 'true'
+    # A docs-only PR or queue run changes no Rust, C or CMake: skipped, and
+    # passing CI Gate; the Format job still runs the ci/ self-tests (#2079).
+    if: needs.ci-mode.outputs.skip_rust-tests-linux != 'true' && needs.check-event.outputs.docs_only != 'true'
     defaults:
       run:
         shell: bash
@@ -1635,10 +1648,13 @@ jobs:
       # cache and cargo registry. Remote saves only warm master; PR and
       # merge-group runs restore. Local act/act2 saves stay enabled.
       - name: Set Up soldr 🦀
-        uses: zackees/setup-soldr@b782f606a2f3beadc35b9e3bf5b4565e005f52ed # v0.9.86
+        uses: zackees/setup-soldr@71e6b565d05e546781eb9b0668bee02e574de7c9 # v0.9.88
         with:
-          # soldr 0.9.38 embeds zccache 1.15.5 (has zackees/zccache#1937).
-          version: 0.9.38
+          # One scope for every caller (push.yaml, ci.yml), so PRs replay
+          # the verdicts master publishes (forge-ci/setup-soldr#604).
+          verdict-scope: build-project
+          # soldr 0.9.43 embeds zccache 1.15.5+ (has zackees/zccache#1937).
+          version: 0.9.43
           build-cache: false
           prebuild-deps-flags: ${{ needs.check-event.outputs.core == 'true' && '--release' || '--profile dev' }}
           # Host/container archive paths have different Actions-cache versions.
@@ -1787,6 +1803,7 @@ jobs:
   # Linux through soldr (#472). Every PR push runs it unless the head is
   # attested for the same gates (the `cross` local-gate lane).
   rust-cross-lint:
+    timeout-minutes: 45
     name: Rust Cross Lint 🦀 (Windows, macOS)
     runs-on: ubuntu-26.04
     needs: [check-event, ci-mode, rust-tests-linux]
@@ -1798,9 +1815,12 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set Up soldr 🦀
-        uses: zackees/setup-soldr@b782f606a2f3beadc35b9e3bf5b4565e005f52ed # v0.9.86
+        uses: zackees/setup-soldr@71e6b565d05e546781eb9b0668bee02e574de7c9 # v0.9.88
         with:
-          version: 0.9.38
+          # One scope for every caller (push.yaml, ci.yml), so PRs replay
+          # the verdicts master publishes (forge-ci/setup-soldr#604).
+          verdict-scope: build-project
+          version: 0.9.43
           build-cache: false
           prebuild-deps-flags: --profile dev
           cache-key-suffix: linux-host-v1
@@ -1831,6 +1851,7 @@ jobs:
           if-no-files-found: error
 
   rust-cross-lint-release:
+    timeout-minutes: 45
     name: Rust Cross Lint 🦀 (release targets)
     # Release gate only (#955): Windows arm64, macOS x64 and Linux arm64 on top
     # of the PR gate's targets.
@@ -1844,9 +1865,12 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set Up soldr 🦀
-        uses: zackees/setup-soldr@b782f606a2f3beadc35b9e3bf5b4565e005f52ed # v0.9.86
+        uses: zackees/setup-soldr@71e6b565d05e546781eb9b0668bee02e574de7c9 # v0.9.88
         with:
-          version: 0.9.38
+          # One scope for every caller (push.yaml, ci.yml), so PRs replay
+          # the verdicts master publishes (forge-ci/setup-soldr#604).
+          verdict-scope: build-project
+          version: 0.9.43
           build-cache: false
           prebuild-deps-flags: --profile dev
           cache-key-suffix: linux-host-v1
@@ -1863,6 +1887,7 @@ jobs:
         run: uv run ci/local_gate.py --lane cross-release
 
   rust-tests:
+    timeout-minutes: 60
     name: Rust Tests 🦀
     # Only the platforms the change touches (#436); Linux is rust-tests-linux.
     if: ${{ always() && !cancelled() && needs.rust-tests-linux.result != 'failure' && (needs.check-event.outputs.platform_os != '[]') }}
@@ -1884,10 +1909,13 @@ jobs:
       # cache and cargo registry. Remote saves only warm master; PR and
       # merge-group runs restore. Local act/act2 saves stay enabled.
       - name: Set Up soldr 🦀
-        uses: zackees/setup-soldr@b782f606a2f3beadc35b9e3bf5b4565e005f52ed # v0.9.86
+        uses: zackees/setup-soldr@71e6b565d05e546781eb9b0668bee02e574de7c9 # v0.9.88
         with:
-          # soldr 0.9.38 embeds zccache 1.15.5 (has zackees/zccache#1937).
-          version: 0.9.38
+          # One scope for every caller (push.yaml, ci.yml), so PRs replay
+          # the verdicts master publishes (forge-ci/setup-soldr#604).
+          verdict-scope: build-project
+          # soldr 0.9.43 embeds zccache 1.15.5+ (has zackees/zccache#1937).
+          version: 0.9.43
           build-cache: false
           prebuild-deps-flags: --profile dev
           save-cache-remote: ${{ github.ref == 'refs/heads/master' }}
@@ -1913,10 +1941,57 @@ jobs:
         run: soldr cargo test --workspace --locked
 
       - name: Run Clippy 📎
-        run: soldr cargo clippy --workspace --all-targets -- -D warnings
+        run: soldr cargo clippy --locked --workspace --all-targets -- -D warnings
 
       - name: Check Formatting 🎨
         run: soldr cargo fmt --all --check
+
+      # rust/obs-build's Qt SDK resolver against the published obs-studio-libs
+      # SDK for this runner's OS (#1878). Only Qt SDK paths and full runs
+      # select it; no Actions cache: the Windows SDK alone is 163 MB packed,
+      # over ci.toml's libs-qt budget.
+      - name: Check Published Qt SDK 🧩
+        if: needs.check-event.outputs.qt_sdk == 'true'
+        # A Qt test app that cannot start can wait on a dialog; bound it.
+        timeout-minutes: 15
+        env:
+          QT_TAG: qt6-6.11.1
+        run: |
+          : Check Published Qt SDK 🧩
+          if [[ "${RUNNER_OS}" == Windows ]]; then
+            asset=qt6-6.11.1-windows-x86_64-relwithdebinfo.tar.zst
+            sha=b05c17386d2a1b0564b00755bc1fba152a18eaac34e512d9315922990715b751
+            variable=OBS_QT_TEST_WINDOWS_PREFIX
+          else
+            asset=qt6-6.11.1-darwin-universal2-11.0-release.tar.zst
+            sha=85093eae764f83d167f8850c5b057c0ff5d2f928ad7d49fe2544ce0ca20074b0
+            variable=OBS_QT_TEST_MACOS_PREFIX
+          fi
+          start=${SECONDS}
+          uv run ci/fetch_libs_asset.py "${QT_TAG}" "${asset}" "${sha}" "${RUNNER_TEMP}/qt"
+          echo "fetched ${asset} in $((SECONDS - start)) s"
+          export "${variable}=${RUNNER_TEMP}/qt"
+          soldr cargo test -p obs-studio-rust --locked --test obs-tests-app -- --exact qt_sdk::qt_sdk_resolves_published_sdks --nocapture 2>&1 | tee "${RUNNER_TEMP}/qt-sdk.log"
+          grep -q ": Qt 6\." "${RUNNER_TEMP}/qt-sdk.log"
+          # The Qt native test graph (moc, uic, rcc, link, run) against the
+          # same SDK; Windows loads the Qt DLLs and the minimal platform plugin
+          # from the SDK.
+          export OBS_QT_TARGET_PREFIX="${RUNNER_TEMP}/qt" CMAKE_PREFIX_PATH="${RUNNER_TEMP}/qt" QT_PLUGIN_PATH="${RUNNER_TEMP}/qt/plugins"
+          if [[ "${RUNNER_OS}" == Windows ]]; then
+            export PATH="${RUNNER_TEMP}/qt/bin:${PATH}"
+          fi
+          # The unchanged remux queue test needs cmocka: brew on macOS; on
+          # Windows vcpkg's (as Tier 2) and its pkgconf for the pkg-config crate.
+          if [[ "${RUNNER_OS}" == Windows ]]; then
+            vcpkg="$(cygpath -u "${VCPKG_INSTALLATION_ROOT}")/installed/x64-windows"
+            "${GITHUB_WORKSPACE}/.github/scripts/retry" vcpkg install cmocka:x64-windows pkgconf:x64-windows
+            export PKG_CONFIG="${vcpkg}/tools/pkgconf/pkgconf.exe" PKG_CONFIG_PATH="${vcpkg}/lib/pkgconfig"
+            export PATH="${vcpkg}/bin:${PATH}"
+          else
+            "${GITHUB_WORKSPACE}/.github/scripts/retry" brew install cmocka
+          fi
+          export QT_QPA_PLATFORM_PLUGIN_PATH="${RUNNER_TEMP}/qt/plugins/platforms"
+          soldr cargo test -p obs-studio-rust --locked --features libobs-integration --test obs-tests-app -- --exact native_build::native_test_graph_generates_qt_metaobjects native_build::canonical_remux_queue_runs_unchanged --nocapture
 
   # Tier 2 Linux builds once and fans the tests out (#937, #1065): the build
   # job explicitly builds hybrid libobs and the C reference in one tree, runs the checks
@@ -1967,8 +2042,15 @@ jobs:
       # them (the stock image's docker-clean config deletes them after each
       # install) and restore the archive dir, keyed on the list and the image.
       # zstd is installed above: the cache entry is versioned by compressor.
+      # dpkg in this throwaway container needs neither fsync nor docs: with the
+      # .debs restored, unpacking 594 packages took 29 s; force-unsafe-io and
+      # skipping doc/man/info cut a local run of the same install by 25% (#2072).
       - name: Keep apt Downloads 📦
-        run: rm -f /etc/apt/apt.conf.d/docker-clean
+        run: |
+          rm -f /etc/apt/apt.conf.d/docker-clean
+          printf '%s\n' force-unsafe-io 'path-exclude=/usr/share/doc/*' \
+            'path-exclude=/usr/share/man/*' 'path-exclude=/usr/share/info/*' \
+            > /etc/dpkg/dpkg.cfg.d/ci-tier2-fast
       - uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         id: apt-cache
         with:
@@ -2014,9 +2096,12 @@ jobs:
       # Production hybrid libobs builds the Rust ports through Corrosion;
       # the shims put soldr's cargo/rustc (rust-toolchain.toml) on PATH.
       - name: Set Up soldr 🦀
-        uses: zackees/setup-soldr@b782f606a2f3beadc35b9e3bf5b4565e005f52ed # v0.9.86
+        uses: zackees/setup-soldr@71e6b565d05e546781eb9b0668bee02e574de7c9 # v0.9.88
         with:
-          version: 0.9.38
+          # One scope for every caller (push.yaml, ci.yml), so PRs replay
+          # the verdicts master publishes (forge-ci/setup-soldr#604).
+          verdict-scope: build-project
+          version: 0.9.43
           build-cache: false
           prebuild-deps-flags: --release
           cache-key-suffix: linux-container-v1
@@ -2085,7 +2170,7 @@ jobs:
           key: zccache-tier2-linux-both-${{ github.sha }}
 
   rust-linux-tier2:
-    name: Rust Tier 2 Linux 🐧 (tests ${{ matrix.mode }})
+    name: Rust Tier 2 Linux 🐧 (tests ${{ matrix.mode }}${{ matrix.part != 'suite' && format(', {0}', matrix.part) || '' }})
     runs-on: ubuntu-26.04
     # Load a verified prepared runtime, or install the exact closure in the
     # same pinned stock base. The helper retains original artifact paths.
@@ -2095,13 +2180,15 @@ jobs:
     # remaining lint/Rust work; the caller's required gate still needs both.
     # Failed/skipped builds and workflow cancellation cannot start tests.
     if: ${{ always() && !cancelled() && needs.rust-linux-tier2-build.result == 'success' }}
-    # One complete suite per backend (#1662): nine serial barriers were
-    # removed in #1643. Retain deinterlace isolation within each suite and
-    # avoid repeating runner setup for a second shard.
+    # One suite per backend (#1662), less its RUN_SERIAL tests, which run
+    # on runners of their own: inside the suite the deinterlace test held
+    # the runner alone for 146 of 238 s (#1643, #2071). Its five rate entries
+    # run on two runners (#2072).
     strategy:
       fail-fast: false
       matrix:
         mode: ["OFF", "ON"]
+        part: ["suite", "serial-1-of-2", "serial-2-of-2"]
     defaults:
       run:
         shell: bash
@@ -2157,12 +2244,12 @@ jobs:
             --source "$GITHUB_WORKSPACE" --build "$RUNNER_TEMP/tier2" \
             --cost "$GITHUB_WORKSPACE/.tier2-cost" --uv "$(command -v uv)" \
             --archives /var/cache/apt/archives \
-            --state "$RUNNER_TEMP/tier2-runtime" --mode '${{ matrix.mode }}'
+            --state "$RUNNER_TEMP/tier2-runtime" --mode '${{ matrix.mode }}' --part '${{ matrix.part }}'
       - name: Upload Runtime Setup Measurement
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: tier2-runtime-${{ matrix.mode }}
+          name: tier2-runtime-${{ matrix.mode }}-${{ matrix.part }}
           path: ${{ runner.temp }}/tier2-runtime/runtime-measurement.json
           retention-days: 1
           if-no-files-found: warn
@@ -2170,7 +2257,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always() && github.event_name == 'push' && github.ref == 'refs/heads/master'
         with:
-          name: tier2-cost-${{ matrix.mode }}
+          name: tier2-cost-${{ matrix.mode }}-${{ matrix.part }}
           path: .tier2-cost/ctest-cost-${{ matrix.mode }}.txt
           include-hidden-files: true
           retention-days: 1
@@ -2389,6 +2476,7 @@ jobs:
           key: libs-ffmpeg-${{ env.FFMPEG_SHA256 }}
 
   rust-tier2:
+    timeout-minutes: 90
     name: Rust Tier 2 ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -2408,11 +2496,14 @@ jobs:
       # Production hybrid libobs builds Rust ports through Corrosion; shims select
       # pinned soldr. Native C/C++ caches remain separate from the Rust bypass.
       - name: Set Up soldr 🦀
-        uses: zackees/setup-soldr@b782f606a2f3beadc35b9e3bf5b4565e005f52ed # v0.9.86
+        uses: zackees/setup-soldr@71e6b565d05e546781eb9b0668bee02e574de7c9 # v0.9.88
         with:
-          # soldr 0.9.38 embeds zccache 1.15.5, which names MSVC staticlib
+          # One scope for every caller (push.yaml, ci.yml), so PRs replay
+          # the verdicts master publishes (forge-ci/setup-soldr#604).
+          verdict-scope: build-project
+          # soldr 0.9.43 embeds zccache 1.15.5+, which names MSVC staticlib
           # outputs <crate>-<hash>.lib (zackees/zccache#1937).
-          version: 0.9.38
+          version: 0.9.43
           build-cache: false
           prebuild-deps-flags: --release
           save-cache-remote: ${{ github.ref == 'refs/heads/master' }}
@@ -2438,6 +2529,7 @@ jobs:
         shell: bash
         env:
           XCODE_CAS_PATH: ${{ github.workspace }}/.tier2-xcas
+          OBS_CTEST_JOBS: 3
         run: |
           "${GITHUB_WORKSPACE}/.github/scripts/retry" brew install cmocka
           bash rust/tools/tier2-validate/validate.sh
@@ -2500,6 +2592,7 @@ jobs:
         shell: pwsh
         env:
           VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-bin,readwrite
+          OBS_CTEST_JOBS: 4
         run: |
           New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE/.vcpkg-bin" | Out-Null
           vcpkg install cmocka:x64-windows

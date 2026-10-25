@@ -2,20 +2,23 @@
 autotests = false
 name = "obs-graphics"
 version = "0.1.0"
-description = "Rust ports of libobs/graphics"
+description = "Rust ports of libobs/graphics, including libobs/graphics/graphics-sprite.c.h (the sprite and texture upload geometry extracted from graphics.c.h)"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 obs-util = { path = "../obs-util" }
 # `rand` / `RAND_MAX` in ffi/math_extra.rs, the same CRT libobs calls.
-libc = "0.2"
+libc = { workspace = true, default-features = true }
 
 [dev-dependencies]
 obs-c-oracle = { path = "../obs-c-oracle" }
-proptest = "1"
+proptest = { workspace = true, default-features = true }
 
 [lib]
 test = false

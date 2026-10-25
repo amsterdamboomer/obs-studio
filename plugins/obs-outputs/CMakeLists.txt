@@ -47,6 +47,14 @@ target_sources(
     mp4-mux-internal.h
     mp4-mux.h
     build/obs-outputs.net-if+.h.c
+    $<$<PLATFORM_ID:Windows>:build/obs-outputs.net-if-host-windows+.h.c>
+    $<$<NOT:$<PLATFORM_ID:Windows>>:build/obs-outputs.net-if-host-posix+.h.c>
+    $<$<NOT:$<PLATFORM_ID:Windows>>:build/obs-outputs.rtmp-host-posix+.h.c>
+    $<$<PLATFORM_ID:Windows>:build/obs-outputs.host-windows+.h.c>
+    $<$<NOT:$<PLATFORM_ID:Windows>>:build/obs-outputs.host-posix+.h.c>
+    obs-outputs-host.h
+    rtmp-stream-host.h
+    net-if-host.h
     net-if.h
     obs-output-ver.h
     rtmp-av1.h
@@ -65,6 +73,12 @@ if(OS_WINDOWS)
 endif()
 
 target_compile_definitions(obs-outputs PRIVATE USE_MBEDTLS CRYPTO)
+
+# Each host's net-if-os.h, included by net-if.h (#851).
+target_include_directories(
+  obs-outputs
+  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/hosts/$<IF:$<PLATFORM_ID:Windows>,windows,posix>"
+)
 
 # Vendored librtmp (C89 code that casts away const throughout) is not ported
 # or edited here; -Wcast-qual and -Wshadow (obs-rust/obs-studio#516) cover our own sources.

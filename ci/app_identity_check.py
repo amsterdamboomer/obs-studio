@@ -41,6 +41,10 @@ def check_appdir(root: Path, *, deb: bool = False) -> None:
         or metadata.findtext("launchable") != f"{APP_ID}.desktop"
     ):
         raise RuntimeError("packaged metainfo does not identify the Rust app")
+    links = {url.get("type"): url.text or "" for url in metadata.findall("url")}
+    for kind in ("homepage", "bugtracker", "vcs-browser"):
+        if not links.get(kind, "").startswith("https://github.com/obs-rust/"):
+            raise RuntimeError(f"packaged metainfo {kind} is {links.get(kind)!r}, not obs-rust (#2302)")
     if not (root / f"usr/bin/{GUI}").is_file():
         raise RuntimeError("packaged Rust GUI executable is missing")
     if (root / "usr/bin/obs").exists():
@@ -64,6 +68,22 @@ def check_appdir(root: Path, *, deb: bool = False) -> None:
                 raise RuntimeError(
                     f"Debian package installs over upstream libobs: {library.relative_to(root)}"
                 )
+
+
+def check_deb_recommends(field: str) -> None:
+    """The .deb recommends xdg-open and a portal with a backend (#2301)."""
+    names = {alt.strip().split(" ")[0] for item in field.split(",") for alt in item.split("|")}
+    for need in ("xdg-utils", "xdg-desktop-portal", "xdg-desktop-portal-backend"):
+        if need not in names:
+            raise RuntimeError(f"Debian package Recommends {field!r} lacks {need}")
+
+
+def check_deb_commands(names: list[str]) -> None:
+    """Every command the .deb puts in /usr/bin is branded, so it installs
+    next to the distribution's obs-studio (#2296)."""
+    for name in names:
+        if not name.startswith("obs-studio-rust"):
+            raise RuntimeError(f"Debian package installs /usr/bin/{name}, which upstream OBS ships too")
 
 
 def check_bundle(root: Path) -> None:
@@ -105,11 +125,17 @@ def main() -> None:
             raise RuntimeError(
                 f"Debian package identity is {name!r}, expected obs-studio-rust"
             )
+        check_deb_recommends(
+            subprocess.check_output(
+                ["dpkg-deb", "--field", str(args.path), "Recommends"], text=True
+            ).strip()
+        )
         with tempfile.TemporaryDirectory(prefix="obs-deb-identity-") as scratch:
             subprocess.run(
                 ["dpkg-deb", "--extract", str(args.path), scratch], check=True
             )
             check_appdir(Path(scratch), deb=True)
+            check_deb_commands(sorted(p.name for p in (Path(scratch) / "usr/bin").iterdir()))
     elif args.kind == "bundle":
         check_bundle(args.path)
     else:

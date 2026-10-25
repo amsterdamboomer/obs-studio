@@ -8,16 +8,27 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[lints]
+workspace = true
+
 [build-dependencies]
-cc = "1"
-pkg-config = "0.3"
+cc = { workspace = true, default-features = true }
+pkg-config = { workspace = true, default-features = true }
 
 [dev-dependencies]
-criterion = { version = "=0.8.2", default-features = false, features = ["cargo_bench_support"] }
+criterion = { workspace = true, features = ["cargo_bench_support"] }
 obs-util = { path = "../obs-util" }
 obs-graphics = { path = "../obs-graphics" }
 obs-codec = { path = "../obs-codec" }
 obs-callback = { path = "../obs-callback" }
+obs-core = { path = "../obs-core" }
+obs-output = { path = "../obs-output" }
+obs-media-io = { path = "../obs-media-io" }
+obs-source = { path = "../obs-source" }
+# The obs-service oracle calls obs_data_* and obs_properties_apply_settings.
+obs-data = { path = "../obs-data" }
+obs-properties = { path = "../obs-properties" }
+obs-scene = { path = "../obs-scene" }
 
 [[bench]]
 name = "port_comparison"

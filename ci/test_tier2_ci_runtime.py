@@ -25,7 +25,9 @@ class RuntimeTest(unittest.TestCase):
 
     def test_changed_closure_falls_back_without_download_or_docker(self):
         with patch.object(runtime.urllib.request, 'urlopen') as download, patch.object(runtime, 'command') as command:
-            self.assertIsNone(runtime.prepared_image(self.descriptor(), 'a=2\n', Path('/unused')))
+            # A few changed packages install on top (ci/test_tier2_runtime_delta.py).
+            changed = ''.join(f'p{i}=1\n' for i in range(runtime.MAX_DELTA + 1))
+            self.assertIsNone(runtime.prepared_image(self.descriptor(), changed, Path('/unused')))
             download.assert_not_called()
             command.assert_not_called()
 
@@ -58,7 +60,7 @@ class RuntimeTest(unittest.TestCase):
             (root / 'packages.txt').write_text('a=1\n')
             args = argparse.Namespace(packages=root / 'packages.txt', descriptor=root / 'descriptor.json',
                                       state=root / 'state', cost=root / 'cost', source=root,
-                                      build=root, uv=root / 'uv', archives=root, mode='ON')
+                                      build=root, uv=root / 'uv', archives=root, mode='ON', part='suite')
             ident = 'b' * 64
 
             def command(*argv):
@@ -77,6 +79,7 @@ class RuntimeTest(unittest.TestCase):
                 self.assertIn('OBS_TIER2_MODES=ON', invocation)
                 self.assertIn('OBS_TIER2_STAGE=test', invocation)
                 self.assertIn('OBS_CTEST_JOBS=8', invocation)
+                self.assertIn('OBS_CTEST_PART=suite', invocation)
                 self.assertIn('OBS_TIER2_COST_DIR=' + runtime.COST, invocation)
                 self.assertEqual(commands.call_args.args, ('docker', 'stop', '--timeout', '1', ident))
                 report = json.loads((root / 'state/runtime-measurement.json').read_text())

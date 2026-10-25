@@ -19,195 +19,138 @@
 
 /* A frame is due once the source clock is this far past its timestamp. */
 #define FRAME_TOLERANCE 2000000ULL
+_Static_assert(FRAME_TOLERANCE == OBS_SOURCE_DEINTERLACE_PACING_FRAME_TOLERANCE, "FRAME_TOLERANCE");
 
+/* obs-source-deinterlace-select.c decides with the same threshold */
+_Static_assert(OBS_SOURCE_DEINTERLACE_SELECT_MAX_TS_VAR == MAX_TS_VAR, "MAX_TS_VAR");
+
+/* async_mutex is held (async_tick()). obs-source-deinterlace-select.c
+ * decides from a copy of the queue's timestamps (a queued frame's timestamp
+ * is not written after it is queued); this applies the result in the order
+ * ready_deinterlace_frames() did: the dropped frames off the front, each
+ * erased and then released to the cache, then the fields. An unbuffered
+ * source left with two frames reads async_unbuffered again, and
+ * deinterlace_offset, after the drops, where the walk read them. Every
+ * reader of last_frame_ts and deinterlace_offset takes async_mutex or runs
+ * on this thread, so each is stored once, with the walk's final value. */
 static bool ready_deinterlace_frames(obs_source_t *source, uint64_t sys_time)
 {
-	struct obs_source_frame *next_frame = source->async_frames.array[0];
-	struct obs_source_frame *prev_frame = NULL;
-	struct obs_source_frame *frame = NULL;
-	uint64_t sys_offset = sys_time - source->last_sys_timestamp;
-	uint64_t frame_time = next_frame->timestamp;
-	uint64_t frame_offset = 0;
-	size_t idx = 1;
+	uint64_t stack_timestamps[OBS_SOURCE_FRAME_COPY_MAX_ASYNC_FRAMES];
+	uint64_t *timestamps = stack_timestamps;
+	const size_t num = source->async_frames.num;
+	const uint64_t last_sys_timestamp = source->last_sys_timestamp;
+	const bool async_unbuffered = source->async_unbuffered;
+	const uint64_t last_frame_ts = async_unbuffered ? 0 : source->last_frame_ts;
+	struct obs_source_deinterlace_select_walk_result walk;
 
-	if (source->async_unbuffered) {
-		while (source->async_frames.num > 2) {
-			da_erase(source->async_frames, 0);
-			remove_async_frame(source, next_frame);
-			next_frame = source->async_frames.array[0];
-		}
+	/* cache_video() stops at MAX_ASYNC_FRAMES, but it unlocks async_mutex
+	 * before obs_source_output_video_internal() queues the frame, so
+	 * sources that output from more than one thread can queue a few more. */
+	if (num > OBS_SOURCE_FRAME_COPY_MAX_ASYNC_FRAMES)
+		timestamps = bmalloc(num * sizeof(*timestamps));
+	for (size_t i = 0; i < num; i++)
+		timestamps[i] = source->async_frames.array[i]->timestamp;
 
-		if (source->async_frames.num == 2) {
-			bool has_prev_frame = true;
-			if (source->async_unbuffered && source->deinterlace_offset) {
-				const uint64_t timestamp = source->async_frames.array[0]->timestamp;
-				const uint64_t after_timestamp = source->async_frames.array[1]->timestamp;
-				const uint64_t duration = after_timestamp - timestamp;
-				const uint64_t frame_end = timestamp + source->deinterlace_offset + duration;
-				if (sys_time < frame_end) {
-					// Don't skip ahead prematurely.
-					has_prev_frame = false;
-					source->deinterlace_frame_ts = timestamp - duration;
-				}
-			}
-			source->async_frames.array[0]->prev_frame = has_prev_frame;
-		}
-		source->last_frame_ts = next_frame->timestamp;
-		return true;
+	walk = obs_source_deinterlace_select_walk(timestamps, num, sys_time, last_frame_ts, last_sys_timestamp,
+						  async_unbuffered);
+
+	for (size_t i = 0; i < walk.drop_front; i++) {
+		struct obs_source_frame *dropped = source->async_frames.array[0];
+		da_erase(source->async_frames, 0);
+		remove_async_frame(source, dropped);
 	}
 
-	/* account for timestamp invalidation */
-	if (frame_out_of_bounds(source, frame_time)) {
-		source->last_frame_ts = next_frame->timestamp;
+	if (walk.pairs) {
+		const uint64_t offset = source->async_unbuffered ? source->deinterlace_offset : 0;
+		const struct obs_source_deinterlace_select_pair_result pair =
+			obs_source_deinterlace_select_unbuffered_pair(
+				timestamps[walk.drop_front], timestamps[walk.drop_front + 1], offset, sys_time);
+
+		if (pair.set_frame_ts)
+			source->deinterlace_frame_ts = pair.frame_ts;
+		source->async_frames.array[0]->prev_frame = pair.prev_frame;
+	}
+
+	if (timestamps != stack_timestamps)
+		bfree(timestamps);
+
+	source->last_frame_ts = walk.last_frame_ts;
+	if (walk.offset_reset)
 		source->deinterlace_offset = 0;
-		return true;
-	} else {
-		frame_offset = frame_time - source->last_frame_ts;
-		source->last_frame_ts += sys_offset;
-	}
+	if (walk.flag_front)
+		source->async_frames.array[0]->prev_frame = true;
 
-	while (source->last_frame_ts > next_frame->timestamp) {
-
-		/* this tries to reduce the needless frame duplication, also
-		 * helps smooth out async rendering to frame boundaries.  In
-		 * other words, tries to keep the framerate as smooth as
-		 * possible */
-		if ((source->last_frame_ts - next_frame->timestamp) < FRAME_TOLERANCE)
-			break;
-
-		if (prev_frame) {
-			da_erase(source->async_frames, 0);
-			remove_async_frame(source, prev_frame);
-		}
-
-		if (source->async_frames.num <= 2) {
-			bool exit = true;
-
-			if (prev_frame) {
-				prev_frame->prev_frame = true;
-
-			} else if (!frame && source->async_frames.num == 2) {
-				exit = false;
-			}
-
-			if (exit) {
-				source->deinterlace_offset = 0;
-				return true;
-			}
-		}
-
-		if (frame)
-			idx = 2;
-		else
-			idx = 1;
-
-		prev_frame = frame;
-		frame = next_frame;
-		next_frame = source->async_frames.array[idx];
-
-		/* more timestamp checking and compensating */
-		if ((next_frame->timestamp - frame_time) > MAX_TS_VAR) {
-			source->last_frame_ts = next_frame->timestamp - frame_offset;
-			source->deinterlace_offset = 0;
-		}
-
-		frame_time = next_frame->timestamp;
-		frame_offset = frame_time - source->last_frame_ts;
-	}
-
-	if (prev_frame)
-		prev_frame->prev_frame = true;
-
-	return frame != NULL;
+	return walk.ready;
 }
 
 static inline bool first_frame(obs_source_t *s)
 {
-	if (s->last_frame_ts)
-		return false;
+	const struct obs_source_deinterlace_select_first_result first =
+		obs_source_deinterlace_select_first(s->last_frame_ts, s->async_frames.num);
 
-	if (s->async_frames.num >= 2)
+	if (first.flag_front)
 		s->async_frames.array[0]->prev_frame = true;
-	return true;
+	return first.first;
 }
 
-#define TWOX_TOLERANCE 1000000
-#define TS_JUMP_THRESHOLD 70000000ULL
-
+/* Whether the taken frame pairs, whether last_frame_ts starts there and how
+ * deinterlace_offset is set go through obs-source-deinterlace-select.c, on
+ * values; each field is read where it was before. */
 static inline void deinterlace_get_closest_frames(obs_source_t *s, uint64_t sys_time)
 {
 	if (s->async_unbuffered && s->deinterlace_offset) {
-		// Want to keep frame if it has not elapsed.
-		const uint64_t frame_end = s->deinterlace_frame_ts + s->deinterlace_offset +
-					   ((uint64_t)s->deinterlace_half_duration * 2) - TWOX_TOLERANCE;
-		if (sys_time < frame_end) {
-			// Process new frames if we think time jumped.
-			const uint64_t diff = frame_end - sys_time;
-			if (diff < TS_JUMP_THRESHOLD) {
-				return;
-			}
-		}
+		// Want to keep frame if it has not elapsed, unless we think time jumped.
+		if (obs_source_deinterlace_pacing_hold(s->deinterlace_frame_ts, s->deinterlace_offset,
+						       s->deinterlace_half_duration, sys_time))
+			return;
 	}
 
 	if (!s->async_frames.num)
 		return;
 
 	if (first_frame(s) || ready_deinterlace_frames(s, sys_time)) {
-		uint64_t offset;
-
 		s->prev_async_frame = NULL;
 		s->cur_async_frame = s->async_frames.array[0];
 
 		da_erase(s->async_frames, 0);
 
-		if ((s->async_frames.num > 0) && s->cur_async_frame->prev_frame) {
+		const size_t remaining = s->async_frames.num;
+		const bool prev_frame = obs_source_deinterlace_select_take_reads_flag(remaining) &&
+					s->cur_async_frame->prev_frame;
+
+		if (obs_source_deinterlace_select_take_pair(remaining, prev_frame)) {
 			s->prev_async_frame = s->cur_async_frame;
 			s->cur_async_frame = s->async_frames.array[0];
 
 			da_erase(s->async_frames, 0);
 
-			s->deinterlace_half_duration =
-				(uint32_t)((s->cur_async_frame->timestamp - s->prev_async_frame->timestamp) / 2);
+			s->deinterlace_half_duration = obs_source_deinterlace_pacing_half_duration(
+				s->cur_async_frame->timestamp, s->prev_async_frame->timestamp,
+				s->deinterlace_half_duration, obs->video.video_frame_interval_ns);
 		} else {
-			s->deinterlace_half_duration =
-				(uint32_t)((s->cur_async_frame->timestamp - s->deinterlace_frame_ts) / 2);
+			s->deinterlace_half_duration = obs_source_deinterlace_pacing_half_duration(
+				s->cur_async_frame->timestamp, s->deinterlace_frame_ts, s->deinterlace_half_duration,
+				obs->video.video_frame_interval_ns);
 		}
 
-		if (!s->last_frame_ts)
+		if (obs_source_deinterlace_select_take_init_last(s->last_frame_ts))
 			s->last_frame_ts = s->cur_async_frame->timestamp;
 
 		s->deinterlace_frame_ts = s->cur_async_frame->timestamp;
 
-		if (!s->async_unbuffered) {
-			/* Show the second field by the rule that picks frames:
-			 * once the source clock (last_frame_ts) is
-			 * FRAME_TOLERANCE past the field's time, so the offset
-			 * maps source time to video time. Anchoring it at the
-			 * tick that picked the frame put the second field up
-			 * to a canvas interval late, after the next frame when
-			 * the field rate does not match the canvas (50i into
-			 * 60 fps skipped a field in four). */
+		switch (obs_source_deinterlace_select_take_offset(s->async_unbuffered)) {
+		case OBS_SOURCE_DEINTERLACE_SELECT_OFFSET_BUFFERED:
 			s->deinterlace_offset =
-				obs->video.video_time - s->last_frame_ts + FRAME_TOLERANCE + TWOX_TOLERANCE;
+				obs_source_deinterlace_pacing_buffered_offset(obs->video.video_time, s->last_frame_ts);
 			return;
+		case OBS_SOURCE_DEINTERLACE_SELECT_OFFSET_REANCHOR:
+		default:
+			break;
 		}
 
-		/* Unbuffered frames are picked at the first tick after they
-		 * arrive and the previous frame ends, so the tick lags the
-		 * frame by anything up to a canvas interval. Re-anchoring the
-		 * offset at every pick held each frame for its duration
-		 * rounded up to whole ticks, so a 50i source fell behind a
-		 * 60 fps canvas and had frames dropped. Keep the offset unless
-		 * the frame comes earlier than it, or missed its tick and its
-		 * first field (a late delivery, a new clock). */
-		const uint64_t field_or_tick = s->deinterlace_half_duration > obs->video.video_frame_interval_ns
-						       ? s->deinterlace_half_duration
-						       : obs->video.video_frame_interval_ns;
-		offset = obs->video.video_time - s->deinterlace_frame_ts;
-		const int64_t late = (int64_t)(offset - s->deinterlace_offset);
-
-		if (!s->deinterlace_offset || late < 0 || (uint64_t)late + TWOX_TOLERANCE >= field_or_tick)
-			s->deinterlace_offset = offset;
+		s->deinterlace_offset = obs_source_deinterlace_pacing_reanchor(
+			s->deinterlace_offset, obs->video.video_time, s->deinterlace_frame_ts,
+			s->deinterlace_half_duration, obs->video.video_frame_interval_ns);
 	}
 }
 
@@ -257,7 +200,8 @@ void deinterlace_update_async_video(obs_source_t *source)
 
 	pthread_mutex_unlock(&source->async_mutex);
 
-	if (frame) {
+	switch (obs_source_deinterlace_select_update(frame != NULL, updated)) {
+	case OBS_SOURCE_DEINTERLACE_SELECT_UPDATE_UPLOAD:
 		os_atomic_inc_long(&frame->refs);
 
 		if (set_async_texture_size(source, frame)) {
@@ -265,8 +209,8 @@ void deinterlace_update_async_video(obs_source_t *source)
 		}
 
 		obs_source_release_frame(source, frame);
-
-	} else if (updated) { /* swap cur/prev if no previous texture */
+		break;
+	case OBS_SOURCE_DEINTERLACE_SELECT_UPDATE_SWAP:
 		for (size_t c = 0; c < MAX_AV_PLANES; c++) {
 			gs_texture_t *prev_tex = source->async_prev_textures[c];
 			source->async_prev_textures[c] = source->async_textures[c];
@@ -278,52 +222,40 @@ void deinterlace_update_async_video(obs_source_t *source)
 			source->async_prev_texrender = source->async_texrender;
 			source->async_texrender = prev;
 		}
+		break;
+	case OBS_SOURCE_DEINTERLACE_SELECT_UPDATE_NONE:
+	default:
+		break;
 	}
 }
 
+_Static_assert(sizeof(enum obs_deinterlace_mode) == sizeof(int), "enum obs_deinterlace_mode is passed as int");
+_Static_assert(sizeof(enum gs_color_space) == sizeof(int), "enum gs_color_space is passed as int");
+
 static inline gs_effect_t *get_effect(enum obs_deinterlace_mode mode)
 {
-	switch (mode) {
-	case OBS_DEINTERLACE_MODE_DISABLE:
+	switch (obs_source_deinterlace_draw_effect(mode)) {
+	case OBS_SOURCE_DEINTERLACE_DRAW_EFFECT_NONE:
 		return NULL;
-	case OBS_DEINTERLACE_MODE_DISCARD:
+	case OBS_SOURCE_DEINTERLACE_DRAW_EFFECT_DISCARD:
 		return obs_load_effect(&obs->video.deinterlace_discard_effect, "deinterlace_discard.effect");
-	case OBS_DEINTERLACE_MODE_RETRO:
+	case OBS_SOURCE_DEINTERLACE_DRAW_EFFECT_DISCARD_2X:
 		return obs_load_effect(&obs->video.deinterlace_discard_2x_effect, "deinterlace_discard_2x.effect");
-	case OBS_DEINTERLACE_MODE_BLEND:
+	case OBS_SOURCE_DEINTERLACE_DRAW_EFFECT_BLEND:
 		return obs_load_effect(&obs->video.deinterlace_blend_effect, "deinterlace_blend.effect");
-	case OBS_DEINTERLACE_MODE_BLEND_2X:
+	case OBS_SOURCE_DEINTERLACE_DRAW_EFFECT_BLEND_2X:
 		return obs_load_effect(&obs->video.deinterlace_blend_2x_effect, "deinterlace_blend_2x.effect");
-	case OBS_DEINTERLACE_MODE_LINEAR:
+	case OBS_SOURCE_DEINTERLACE_DRAW_EFFECT_LINEAR:
 		return obs_load_effect(&obs->video.deinterlace_linear_effect, "deinterlace_linear.effect");
-	case OBS_DEINTERLACE_MODE_LINEAR_2X:
+	case OBS_SOURCE_DEINTERLACE_DRAW_EFFECT_LINEAR_2X:
 		return obs_load_effect(&obs->video.deinterlace_linear_2x_effect, "deinterlace_linear_2x.effect");
-	case OBS_DEINTERLACE_MODE_YADIF:
+	case OBS_SOURCE_DEINTERLACE_DRAW_EFFECT_YADIF:
 		return obs_load_effect(&obs->video.deinterlace_yadif_effect, "deinterlace_yadif.effect");
-	case OBS_DEINTERLACE_MODE_YADIF_2X:
+	case OBS_SOURCE_DEINTERLACE_DRAW_EFFECT_YADIF_2X:
 		return obs_load_effect(&obs->video.deinterlace_yadif_2x_effect, "deinterlace_yadif_2x.effect");
 	}
 
 	return NULL;
-}
-
-static bool deinterlace_linear_required(enum obs_deinterlace_mode mode)
-{
-	switch (mode) {
-	case OBS_DEINTERLACE_MODE_DISABLE:
-	case OBS_DEINTERLACE_MODE_DISCARD:
-	case OBS_DEINTERLACE_MODE_RETRO:
-		return false;
-	case OBS_DEINTERLACE_MODE_BLEND:
-	case OBS_DEINTERLACE_MODE_BLEND_2X:
-	case OBS_DEINTERLACE_MODE_LINEAR:
-	case OBS_DEINTERLACE_MODE_LINEAR_2X:
-	case OBS_DEINTERLACE_MODE_YADIF:
-	case OBS_DEINTERLACE_MODE_YADIF_2X:
-		return true;
-	}
-
-	return false;
 }
 
 void deinterlace_render(obs_source_t *s)
@@ -343,54 +275,22 @@ void deinterlace_render(obs_source_t *s)
 	gs_texture_t *prev_tex = s->async_prev_texrender ? gs_texrender_get_texture(s->async_prev_texrender)
 							 : s->async_prev_textures[0];
 
-	if (!cur_tex || !prev_tex || !s->async_width || !s->async_height)
+	if (obs_source_deinterlace_draw_skip(cur_tex != NULL, prev_tex != NULL, s->async_width, s->async_height))
 		return;
 
 	const enum gs_color_space source_space = convert_video_space(s->async_format, s->async_trc);
 
-	const bool linear_srgb = (source_space != GS_CS_SRGB) || gs_get_linear_srgb() ||
-				 deinterlace_linear_required(s->deinterlace_mode);
+	const bool gs_linear_srgb = obs_source_deinterlace_draw_reads_linear_srgb(source_space) && gs_get_linear_srgb();
+	const bool linear_srgb =
+		obs_source_deinterlace_draw_linear_srgb(source_space, gs_linear_srgb, s->deinterlace_mode);
 
 	const enum gs_color_space current_space = gs_get_color_space();
-	const char *tech_name = "Draw";
-	float multiplier = 1.0;
-	switch (source_space) {
-	case GS_CS_SRGB:
-	case GS_CS_SRGB_16F:
-		if (current_space == GS_CS_709_SCRGB) {
-			tech_name = "DrawMultiply";
-			multiplier = obs_get_video_sdr_white_level() / 80.0f;
-		}
-		break;
-	case GS_CS_709_EXTENDED:
-		switch (current_space) {
-		case GS_CS_SRGB:
-		case GS_CS_SRGB_16F:
-			tech_name = "DrawTonemap";
-			break;
-		case GS_CS_709_SCRGB:
-			tech_name = "DrawMultiply";
-			multiplier = obs_get_video_sdr_white_level() / 80.0f;
-			break;
-		case GS_CS_709_EXTENDED:
-			break;
-		}
-		break;
-	case GS_CS_709_SCRGB:
-		switch (current_space) {
-		case GS_CS_SRGB:
-		case GS_CS_SRGB_16F:
-			tech_name = "DrawMultiplyTonemap";
-			multiplier = 80.0f / obs_get_video_sdr_white_level();
-			break;
-		case GS_CS_709_EXTENDED:
-			tech_name = "DrawMultiply";
-			multiplier = 80.0f / obs_get_video_sdr_white_level();
-			break;
-		case GS_CS_709_SCRGB:
-			break;
-		}
-	}
+	const char *tech_name =
+		obs_source_draw_technique_name(obs_source_deinterlace_draw_technique(source_space, current_space));
+	const float multiplier = obs_source_deinterlace_draw_reads_white_level(source_space, current_space)
+					 ? obs_source_deinterlace_draw_multiplier(source_space, current_space,
+										  obs_get_video_sdr_white_level())
+					 : 1.0f;
 
 	const bool previous = gs_framebuffer_srgb_enabled();
 	gs_enable_framebuffer_srgb(linear_srgb);
@@ -407,9 +307,9 @@ void deinterlace_render(obs_source_t *s)
 	gs_effect_set_int(field, s->deinterlace_top_first);
 	gs_effect_set_vec2(dimensions, &size);
 
-	const uint64_t frame2_ts =
-		s->deinterlace_frame_ts + s->deinterlace_offset + s->deinterlace_half_duration - TWOX_TOLERANCE;
-	gs_effect_set_bool(frame2, obs->video.video_time >= frame2_ts);
+	gs_effect_set_bool(frame2,
+			   obs_source_deinterlace_draw_frame2(obs->video.video_time, s->deinterlace_frame_ts,
+							      s->deinterlace_offset, s->deinterlace_half_duration));
 
 	while (gs_effect_loop(effect, tech_name))
 		gs_draw_sprite(NULL, s->async_flip ? GS_FLIP_V : 0, s->async_width, s->async_height);
@@ -456,18 +356,24 @@ void obs_source_set_deinterlace_mode(obs_source_t *source, enum obs_deinterlace_
 {
 	if (!obs_source_valid(source, "obs_source_set_deinterlace_mode"))
 		return;
-	if (source->deinterlace_mode == mode)
+	/* A mode outside the enum is DISABLE (#2090): the decision says
+	 * disable, or nothing when the source is disabled already. Enable and
+	 * switch come only with a mode in the enum. */
+	switch (obs_source_deinterlace_draw_mode_change(source->deinterlace_mode, mode)) {
+	case OBS_SOURCE_DEINTERLACE_DRAW_MODE_SAME:
 		return;
-
-	if (source->deinterlace_mode == OBS_DEINTERLACE_MODE_DISABLE) {
+	case OBS_SOURCE_DEINTERLACE_DRAW_MODE_ENABLE:
 		enable_deinterlacing(source, mode);
-	} else if (mode == OBS_DEINTERLACE_MODE_DISABLE) {
+		break;
+	case OBS_SOURCE_DEINTERLACE_DRAW_MODE_DISABLE:
 		disable_deinterlacing(source);
-	} else {
+		break;
+	case OBS_SOURCE_DEINTERLACE_DRAW_MODE_SWITCH:
 		obs_enter_graphics();
 		source->deinterlace_mode = mode;
 		source->deinterlace_effect = get_effect(mode);
 		obs_leave_graphics();
+		break;
 	}
 }
 
@@ -495,5 +401,3 @@ enum obs_deinterlace_field_order obs_source_get_deinterlace_field_order(const ob
 
 /* File-local macros (BUILD.md): out of the next file in the unity group. */
 #undef FRAME_TOLERANCE
-#undef TWOX_TOLERANCE
-#undef TS_JUMP_THRESHOLD

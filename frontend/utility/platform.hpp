@@ -55,6 +55,31 @@ bool SetDisplayAffinitySupported(void);
 
 bool HighContrastEnabled();
 
+/* Copies the host's own streaming output options from the profile's Output
+ * section into the output's settings (Windows: the new socket loop and
+ * low-latency mode). */
+void SetOutputNetworkOptions(config_t *config, obs_data_t *settings);
+
+/* Replaces an encoder id an older OBS on this host saved in a profile with
+ * the id the encoder has now (macOS: the VideoToolbox H.264 encoders). */
+void TranslateLegacyEncoderId(const char *&encoder);
+
+/* Brings window back to the front after a file dialog closes (macOS:
+ * QTBUG-42661 leaves it behind other windows). */
+void RaiseAfterFileDialog(QWidget *window);
+
+/* Whether combo boxes open the host's native popup (macOS) instead of Qt's. */
+bool UseNativeComboBoxPopup();
+
+/* The color space a screenshot of source is rendered in: the host keeps HDR
+ * when it can save it (Windows: scRGB for JXR), otherwise SDR sRGB. */
+enum gs_color_space ScreenshotColorSpace(obs_source_t *source);
+
+/* Saves cx x cy RGBA half-float pixels (a screenshot rendered in a non-sRGB
+ * ScreenshotColorSpace()) to path. False when the host cannot (no HDR image
+ * format) or saving failed. */
+bool SaveHdrScreenshot(const char *path, uint8_t *pixels, uint32_t cx, uint32_t cy);
+
 /* glGetString from the GL library libobs-opengl uses (the frontend does not
  * link GL), or nullptr. Call it only with the graphics context entered. */
 void *GetGlGetStringProc();
@@ -101,6 +126,55 @@ void ConfigureOAuthLinkMessageBox(QMessageBox &dialog);
 bool PlatformUseModernWizardStyle();
 bool PlatformSupportsAppleHardwareEncoder(const char *id);
 bool PlatformNeedsQsvStreamingFallback();
+
+/* Files dropped on the main window (#873). */
+class QFileInfo;
+bool IsPlatformImageExtension(const char *suffix);
+const char *GetPlatformTextSourceId();
+void SetPlatformTextFileSettings(obs_data_t *settings, const char *file, QString &name);
+/* False when the drop is handled here or skipped; a non-empty urlTarget is
+ * a URL to offer instead. May replace a shortcut with its target. */
+bool ResolvePlatformDroppedFile(QString &file, QFileInfo &info, QString &urlTarget);
+
+/* Main window host choices (#873). */
+class QScreen;
+/* The locale key of the meta (Windows/Super/Command) key's name. */
+const char *GetPlatformMetaKeyText();
+/* A screen's name for the projector menu, before simplification. */
+QString GetPlatformScreenName(QScreen *screen);
+/* False where a better desktop audio source replaces the device one. */
+bool PlatformUsesDesktopAudioDevice();
+
+/* System tray (#873). */
+class QIcon;
+enum class TrayIconState { Idle, Active, Paused };
+/* The tray image when the icon theme has none. */
+QIcon GetPlatformTrayIcon(TrayIconState state);
+/* False where a tray click only opens the menu. */
+bool PlatformTrayActivationTogglesWindow();
+void SetPlatformDockIconVisible(bool visible);
+
+/* The NVENC capability test program's file name, or nullptr where the host
+ * has no NVENC (#873). */
+const char *GetPlatformNvencTestProgram();
+
+/* Main window controls (#873). */
+/* The screen, camera, microphone and input permission dialog, where the
+ * host asks for them. */
+void ShowPlatformPermissionsDialog(QWidget *parent);
+/* True where an always-on-top toggle recreates every window. */
+bool PlatformRecreatesWindowsOnTopToggle();
+
+/* Updates (#873). */
+class QThread;
+/* True where OBS updates itself (the Windows updater), not through Sparkle
+ * or a package manager. */
+bool PlatformSupportsBuiltinUpdater();
+/* The built-in updater's check (or repair) thread; nullptr where there is
+ * none. */
+QThread *CreatePlatformUpdateThread(bool manualUpdate, bool repair);
+/* Whether a What's New item that lists its platforms applies to this host. */
+bool IsWhatsNewItemForPlatform(bool onWindows, bool onMacos, bool onLinux);
 
 /* Settings and hotkey editor platform policy (#869). */
 bool PlatformNeedsNonNativeColorDialog();

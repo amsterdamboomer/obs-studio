@@ -1,0 +1,463 @@
+/******************************************************************************
+    Copyright (C) 2023 by Lain Bailey <lain@obsproject.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+#include "libobs/build/libobs-ported-service-getters.pch.h"
+
+/* Service capability and connect-info getters, moved from obs-service.c
+ * (#1899): each checks its arguments, writes its out-parameters' defaults
+ * and calls the plugin's optional callback with the service's data. They
+ * reach the service only through the hidden obs_service_get_info_table()
+ * and obs_service_get_plugin_data() (obs-service.c), so the Rust port (obs-output's
+ * service module) can replace this file. test_service_getters pins what
+ * they do, including two cases that are characterized, not endorsed:
+ * obs_service_get_max_bitrate() zeroes its out-parameters before it checks
+ * the service, and the codec getters do not check for a NULL service. */
+
+#define service_info(service) obs_service_get_info_table(service)
+#define service_data(service) obs_service_get_plugin_data(service)
+
+void obs_service_get_supported_resolutions(const obs_service_t *service, struct obs_service_resolution **resolutions,
+					   size_t *count)
+{
+	if (!obs_service_valid(service, "obs_service_supported_resolutions"))
+		return;
+	if (!obs_ptr_valid(resolutions, "obs_service_supported_resolutions"))
+		return;
+	if (!obs_ptr_valid(count, "obs_service_supported_resolutions"))
+		return;
+
+	*resolutions = NULL;
+	*count = 0;
+
+	if (service_info(service)->get_supported_resolutions)
+		service_info(service)->get_supported_resolutions(service_data(service), resolutions, count);
+}
+
+void obs_service_get_max_fps(const obs_service_t *service, int *fps)
+{
+	if (!obs_service_valid(service, "obs_service_get_max_fps"))
+		return;
+	if (!obs_ptr_valid(fps, "obs_service_get_max_fps"))
+		return;
+
+	*fps = 0;
+
+	if (service_info(service)->get_max_fps)
+		service_info(service)->get_max_fps(service_data(service), fps);
+}
+
+void obs_service_get_max_bitrate(const obs_service_t *service, int *video_bitrate, int *audio_bitrate)
+{
+	if (video_bitrate)
+		*video_bitrate = 0;
+	if (audio_bitrate)
+		*audio_bitrate = 0;
+
+	if (!obs_service_valid(service, "obs_service_get_max_bitrate"))
+		return;
+
+	if (service_info(service)->get_max_bitrate)
+		service_info(service)->get_max_bitrate(service_data(service), video_bitrate, audio_bitrate);
+}
+
+const char **obs_service_get_supported_video_codecs(const obs_service_t *service)
+{
+	if (service_info(service)->get_supported_video_codecs)
+		return service_info(service)->get_supported_video_codecs(service_data(service));
+	return NULL;
+}
+
+const char **obs_service_get_supported_audio_codecs(const obs_service_t *service)
+{
+	if (service_info(service)->get_supported_audio_codecs)
+		return service_info(service)->get_supported_audio_codecs(service_data(service));
+	return NULL;
+}
+
+const char *obs_service_get_protocol(const obs_service_t *service)
+{
+	if (!obs_service_valid(service, "obs_service_get_protocol"))
+		return NULL;
+
+	return service_info(service)->get_protocol(service_data(service));
+}
+
+const char *obs_service_get_preferred_output_type(const obs_service_t *service)
+{
+	if (!obs_service_valid(service, "obs_service_get_preferred_output_type"))
+		return NULL;
+
+	if (service_info(service)->get_output_type)
+		return service_info(service)->get_output_type(service_data(service));
+	return NULL;
+}
+
+const char *obs_service_get_connect_info(const obs_service_t *service, uint32_t type)
+{
+	if (!obs_service_valid(service, "obs_service_get_info"))
+		return NULL;
+
+	if (!service_info(service)->get_connect_info)
+		return NULL;
+	return service_info(service)->get_connect_info(service_data(service), type);
+}
+
+bool obs_service_can_try_to_connect(const obs_service_t *service)
+{
+	if (!obs_service_valid(service, "obs_service_can_connect"))
+		return false;
+
+	if (!service_info(service)->can_try_to_connect)
+		return true;
+	return service_info(service)->can_try_to_connect(service_data(service));
+}
+
+/* Settings, properties and identity (#1913), moved the same way. The
+ * by-id functions look the type up with find_service() (obs-service.c). */
+
+const char *obs_service_get_display_name(const char *id)
+{
+	const struct obs_service_info *info = find_service(id);
+	return (info != NULL) ? info->get_name(info->type_data) : NULL;
+}
+
+const char *obs_service_get_name(const obs_service_t *service)
+{
+	return obs_service_valid(service, "obs_service_get_name") ? obs_service_get_context_name(service) : NULL;
+}
+
+static inline obs_data_t *service_get_defaults(const struct obs_service_info *info)
+{
+	obs_data_t *settings = obs_data_create();
+	if (info->get_defaults)
+		info->get_defaults(settings);
+	return settings;
+}
+
+obs_data_t *obs_service_defaults(const char *id)
+{
+	const struct obs_service_info *info = find_service(id);
+	return (info) ? service_get_defaults(info) : NULL;
+}
+
+obs_properties_t *obs_get_service_properties(const char *id)
+{
+	const struct obs_service_info *info = find_service(id);
+	if (info && info->get_properties) {
+		obs_data_t *defaults = service_get_defaults(info);
+		obs_properties_t *properties;
+
+		properties = info->get_properties(NULL);
+		obs_properties_apply_settings(properties, defaults);
+		obs_data_release(defaults);
+		return properties;
+	}
+	return NULL;
+}
+
+obs_properties_t *obs_service_properties(const obs_service_t *service)
+{
+	if (!obs_service_valid(service, "obs_service_properties"))
+		return NULL;
+
+	if (service_info(service)->get_properties) {
+		obs_properties_t *props;
+		props = service_info(service)->get_properties(service_data(service));
+		obs_properties_apply_settings(props, obs_service_get_context_settings(service));
+		return props;
+	}
+
+	return NULL;
+}
+
+const char *obs_service_get_type(const obs_service_t *service)
+{
+	return obs_service_valid(service, "obs_service_get_type") ? service_info(service)->id : NULL;
+}
+
+void obs_service_update(obs_service_t *service, obs_data_t *settings)
+{
+	if (!obs_service_valid(service, "obs_service_update"))
+		return;
+
+	obs_data_apply(obs_service_get_context_settings(service), settings);
+
+	if (service_info(service)->update)
+		service_info(service)->update(service_data(service), obs_service_get_context_settings(service));
+}
+
+obs_data_t *obs_service_get_settings(const obs_service_t *service)
+{
+	if (!obs_service_valid(service, "obs_service_get_settings"))
+		return NULL;
+
+	obs_data_addref(obs_service_get_context_settings(service));
+	return obs_service_get_context_settings(service);
+}
+
+void obs_service_apply_encoder_settings(obs_service_t *service, obs_data_t *video_encoder_settings,
+					obs_data_t *audio_encoder_settings)
+{
+	if (!obs_service_valid(service, "obs_service_apply_encoder_settings"))
+		return;
+	if (!service_info(service)->apply_encoder_settings)
+		return;
+
+	if (video_encoder_settings || audio_encoder_settings)
+		service_info(service)->apply_encoder_settings(service_data(service), video_encoder_settings,
+							      audio_encoder_settings);
+}
+
+void *obs_service_get_type_data(obs_service_t *service)
+{
+	return obs_service_valid(service, "obs_service_get_type_data") ? service_info(service)->type_data : NULL;
+}
+
+const char *obs_service_get_id(const obs_service_t *service)
+{
+	return obs_service_valid(service, "obs_service_get_id") ? service_info(service)->id : NULL;
+}
+
+/* Lifecycle, references, module lookup and activation, moved from
+ * obs-service.c (#1920). The steps on struct obs_service, its context and
+ * its reference counts are the hidden obs_service_*() and
+ * obs_weak_service_*() helpers there, so the Rust port can replace this
+ * code too. test_service_lifecycle pins the public half. */
+
+obs_module_t *obs_service_get_module(const char *id)
+{
+	obs_module_t *module = obs_service_module_first(false);
+	while (module) {
+		for (size_t i = 0; i < obs_service_module_service_count(module); i++) {
+			if (strcmp(obs_service_module_service_id(module, i), id) == 0) {
+				return module;
+			}
+		}
+		module = obs_service_module_next(module);
+	}
+
+	module = obs_service_module_first(true);
+	while (module) {
+		for (size_t i = 0; i < obs_service_module_service_count(module); i++) {
+			if (strcmp(obs_service_module_service_id(module, i), id) == 0) {
+				return module;
+			}
+		}
+		module = obs_service_module_next(module);
+	}
+
+	return NULL;
+}
+
+enum obs_module_load_state obs_service_load_state(const char *id)
+{
+	obs_module_t *module = obs_service_get_module(id);
+	if (!module) {
+		return OBS_MODULE_MISSING;
+	}
+	return obs_service_module_load_state(module);
+}
+
+static obs_service_t *obs_service_create_internal(const char *id, const char *name, obs_data_t *settings,
+						  obs_data_t *hotkey_data, bool private)
+{
+	const struct obs_service_info *info = find_service(id);
+	obs_service_t *service;
+
+	if (!info) {
+		blog(LOG_ERROR, "Service '%s' not found", id);
+		return NULL;
+	}
+
+	service = obs_service_context_new(name, settings, hotkey_data, private);
+	if (!service)
+		return NULL;
+
+	obs_service_set_info(service, info);
+	obs_service_set_plugin_data(service,
+				    service_info(service)->create(obs_service_get_context_settings(service), service));
+	if (!service_data(service))
+		blog(LOG_ERROR, "Failed to create service '%s'!", name);
+
+	obs_service_context_insert(service);
+
+	blog(LOG_DEBUG, "service '%s' (%s) created", name, id);
+	return service;
+}
+
+obs_service_t *obs_service_create(const char *id, const char *name, obs_data_t *settings, obs_data_t *hotkey_data)
+{
+	return obs_service_create_internal(id, name, settings, hotkey_data, false);
+}
+
+obs_service_t *obs_service_create_private(const char *id, const char *name, obs_data_t *settings)
+{
+	return obs_service_create_internal(id, name, settings, NULL, true);
+}
+
+static void actually_destroy_service(obs_service_t *service)
+{
+	if (service_data(service))
+		service_info(service)->destroy(service_data(service));
+
+	if (obs_service_has_output(service))
+		obs_service_detach_from_output(service);
+
+	blog(LOG_DEBUG, "service '%s' destroyed", obs_service_get_context_name(service));
+
+	obs_service_context_free(service);
+}
+
+void obs_service_destroy(obs_service_t *service)
+{
+	if (service) {
+		obs_service_context_remove(service);
+
+		obs_service_set_destroy(service);
+
+		/* do NOT destroy the service until the service is no
+		 * longer in use */
+		if (!obs_service_is_active(service))
+			actually_destroy_service(service);
+	}
+}
+
+void obs_service_activate(struct obs_service *service)
+{
+	if (!obs_service_valid(service, "obs_service_activate"))
+		return;
+	if (!obs_service_has_output(service)) {
+		blog(LOG_WARNING,
+		     "obs_service_deactivate: service '%s' "
+		     "is not assigned to an output",
+		     obs_service_get_name(service));
+		return;
+	}
+	if (obs_service_is_active(service))
+		return;
+
+	if (service_info(service)->activate)
+		service_info(service)->activate(service_data(service), obs_service_get_context_settings(service));
+	obs_service_set_active(service, true);
+}
+
+void obs_service_deactivate(struct obs_service *service, bool remove)
+{
+	if (!obs_service_valid(service, "obs_service_deactivate"))
+		return;
+	if (!obs_service_has_output(service)) {
+		blog(LOG_WARNING,
+		     "obs_service_deactivate: service '%s' "
+		     "is not assigned to an output",
+		     obs_service_get_name(service));
+		return;
+	}
+
+	if (!obs_service_is_active(service))
+		return;
+
+	if (service_info(service)->deactivate)
+		service_info(service)->deactivate(service_data(service));
+	obs_service_set_active(service, false);
+
+	if (obs_service_is_destroying(service))
+		actually_destroy_service(service);
+	else if (remove)
+		obs_service_clear_output(service);
+}
+
+bool obs_service_initialize(struct obs_service *service, struct obs_output *output)
+{
+	if (!obs_service_valid(service, "obs_service_initialize"))
+		return false;
+	if (!obs_output_valid(output, "obs_service_initialize"))
+		return false;
+
+	if (service_info(service)->initialize)
+		return service_info(service)->initialize(service_data(service), output);
+	return true;
+}
+
+void obs_service_release(obs_service_t *service)
+{
+	if (!service)
+		return;
+
+	obs_weak_service_t *control = obs_service_get_control(service);
+	if (obs_weak_service_strong_release(control)) {
+		// The order of operations is important here since
+		// get_context_by_name in obs.c relies on weak refs
+		// being alive while the context is listed
+		obs_service_destroy(service);
+		obs_weak_service_release(control);
+	}
+}
+
+void obs_weak_service_addref(obs_weak_service_t *weak)
+{
+	if (!weak)
+		return;
+
+	obs_weak_service_weak_addref(weak);
+}
+
+void obs_weak_service_release(obs_weak_service_t *weak)
+{
+	if (!weak)
+		return;
+
+	if (obs_weak_service_weak_release(weak))
+		obs_weak_service_free(weak);
+}
+
+obs_service_t *obs_service_get_ref(obs_service_t *service)
+{
+	if (!service)
+		return NULL;
+
+	return obs_weak_service_get_service(obs_service_get_control(service));
+}
+
+obs_weak_service_t *obs_service_get_weak_service(obs_service_t *service)
+{
+	if (!service)
+		return NULL;
+
+	obs_weak_service_t *weak = obs_service_get_control(service);
+	obs_weak_service_addref(weak);
+	return weak;
+}
+
+obs_service_t *obs_weak_service_get_service(obs_weak_service_t *weak)
+{
+	if (!weak)
+		return NULL;
+
+	if (obs_weak_service_weak_get_ref(weak))
+		return obs_weak_service_target(weak);
+
+	return NULL;
+}
+
+bool obs_weak_service_references_service(obs_weak_service_t *weak, obs_service_t *service)
+{
+	return weak && service && obs_weak_service_target(weak) == service;
+}
+
+/* File-local macros: keep them out of the next source of a unity build. */
+#undef service_info
+#undef service_data

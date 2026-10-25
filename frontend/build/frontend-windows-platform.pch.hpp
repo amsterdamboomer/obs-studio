@@ -11,7 +11,11 @@
 #include <OBSApp.hpp>
 
 #include <QApplication>
+#include <QFileInfo>
 #include <QIcon>
+#include <QScreen>
+#include <QSettings>
+#include <QUrl>
 
 #include <util/dstr.h>
 #include <util/windows/ComPtr.hpp>
@@ -27,10 +31,15 @@
 #include <sstream>
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <wincodec.h>
+#include <wincodecsdk.h>
+#include <wrl/client.h>
+#pragma comment(lib, "windowscodecs.lib")
 
 #include "json11.hpp"
 #include <util/platform.h>
 
+#include "frontend/utility/AutoUpdateThread.hpp"
 #include "frontend/utility/OBSProxyStyle.hpp"
 
 #include "frontend/widgets/OBSQTDisplay.hpp"

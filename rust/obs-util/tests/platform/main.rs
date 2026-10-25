@@ -2,6 +2,7 @@
 
 use crate::common;
 
+mod bounded_free_space;
 #[path = "../../build/gio.rs"]
 mod build_gio;
 #[cfg(all(unix, not(target_os = "macos")))]
@@ -18,6 +19,8 @@ mod pipe;
 mod pipe_parity;
 mod platform_cocoa;
 mod platform_cocoa_parity;
+mod platform_conversions;
+mod platform_conversions_parity;
 mod platform_file;
 mod platform_file_parity;
 mod platform_filename;

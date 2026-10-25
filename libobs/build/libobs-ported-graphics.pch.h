@@ -15,6 +15,19 @@
 #include "graphics/matrix4.h"
 #include "graphics/plane.h"
 
+/* graphics/effect-lookups.c */
+#include <string.h>
+#include "graphics/effect.h"
+
+/* graphics/image-file.c */
+#include "graphics/image-file.h"
+#include "graphics/srgb.h"
+#include "util/base.h"
+#include "util/platform.h"
+#include "util/dstr.h"
+#include "graphics/vec4.h"
+#include "graphics/libnsgif/nsgif.h"
+
 /* graphics/math-extra.c */
 #include <stdlib.h>
 #include "graphics/vec2.h"
@@ -28,6 +41,9 @@
 /* graphics/shader-param-names.c */
 #include "util/platform.h"
 #include "graphics/shader-parser.h"
+
+/* graphics/texture-render.c */
+#include "graphics/graphics.h"
 
 /* graphics/vec2.c */
 #include <math.h>

@@ -386,6 +386,29 @@ struct obs_view {
 extern bool obs_view_init(struct obs_view *view, enum view_type type);
 extern void obs_view_free(struct obs_view *view);
 
+/* Hidden accessors (obs-view.c) for obs-view-api.c and its Rust port
+ * (obs-core's view module, #1933): struct obs_view, a source's removed flag
+ * and the video mixes list, one step each. */
+extern size_t obs_view_struct_size(void);
+extern bool obs_view_mutex_init(struct obs_view *view);
+extern void obs_view_mutex_destroy(struct obs_view *view);
+extern void obs_view_lock(struct obs_view *view);
+extern void obs_view_unlock(struct obs_view *view);
+extern enum view_type obs_view_get_type(const struct obs_view *view);
+extern void obs_view_set_type(struct obs_view *view, enum view_type type);
+extern obs_source_t *obs_view_channel(const struct obs_view *view, size_t channel);
+extern void obs_view_set_channel(struct obs_view *view, size_t channel, obs_source_t *source);
+extern void obs_view_clear_channels(struct obs_view *view);
+extern bool obs_view_source_removed(const obs_source_t *source);
+extern struct obs_video_info *obs_view_main_mix_info(void);
+extern video_t *obs_view_mix_add(struct obs_view *view, struct obs_video_info *ovi);
+extern void obs_view_mixes_lock(void);
+extern void obs_view_mixes_unlock(void);
+extern size_t obs_view_mix_count(void);
+extern struct obs_view *obs_view_mix_view(size_t i);
+extern void obs_view_mix_clear_view(size_t i);
+extern struct obs_video_info *obs_view_mix_info(size_t i);
+
 /* ------------------------------------------------------------------------- */
 /* displays */
 
@@ -804,6 +827,62 @@ extern void obs_context_wait(struct obs_context_data *context);
 extern void obs_context_data_setname(struct obs_context_data *context, const char *name);
 extern void obs_context_data_setname_ht(struct obs_context_data *context, const char *name, void *phead);
 
+/* Module search paths (obs-module-paths.c): pure, no libobs state.
+ * obs_module_paths_data_dir(): a bmalloc'd data path for the module name,
+ * every %module% of data_dir replaced by it and one trailing '/' taken off;
+ * for a name that starts with "lib" (any case) whose path does not exist, the
+ * path without "lib". NULL when that is empty.
+ * obs_module_paths_find(): calls callback for every module that the search
+ * path bin/data has: *ext files in bin, or, when bin has %module%, the
+ * directories where bin ends before it, with the binary <name> plus
+ * add_extension(), else lib<name><ext>. The info is valid for the call.
+ * obs_module_paths_find_file(): a bmalloc'd data_path '/' file, or NULL when
+ * that does not exist. obs-module.c keeps the search path list, the module
+ * list and the loading, and passes get_module_extension() and
+ * obs_host_add_module_extension(). Not exported. */
+typedef void (*obs_module_add_extension_t)(struct dstr *bin_path);
+
+char *obs_module_paths_data_dir(const char *module_name, const char *data_dir);
+void obs_module_paths_find(const char *bin, const char *data, enum obs_runtime_module_type type, const char *ext,
+			   obs_module_add_extension_t add_extension, obs_find_module_callback2_t callback, void *param);
+char *obs_module_paths_find_file(const char *data_path, const char *file);
+
+/* Module names and files (obs-module-names.c): pure, no libobs state.
+ * obs_module_names_file_name(): the file name of a binary path, after its
+ * last '/' (a pointer into path).
+ * obs_module_names_module_name(): a bmalloc'd module name, the file name
+ * without the length of ext at its end; NULL when that is empty.
+ * obs_module_names_config_path(): a bmalloc'd config_path, one '/' when it
+ * has none at the end, module_name, '/', file.
+ * obs_module_names_manifest_path(): a bmalloc'd data_path, one '/' when it
+ * has none at the end, "manifest.json".
+ * obs_module_names_listed(): name is one of the count names.
+ * obs_module_names_find_core(): calls callback for the core module name when
+ * binary plus ext exists, with the data path of obs_module_paths_data_dir();
+ * the info is valid for the call. obs-module.c keeps the module lists, the
+ * config path, struct obs_module and the loading, and passes
+ * get_module_extension(). Ported to rust/obs-core (module_names). Not
+ * exported. */
+const char *obs_module_names_file_name(const char *path);
+char *obs_module_names_module_name(const char *file, const char *ext);
+char *obs_module_names_config_path(const char *config_path, const char *module_name, const char *file);
+char *obs_module_names_manifest_path(const char *data_path);
+bool obs_module_names_listed(char *const *names, size_t count, const char *name);
+bool obs_module_names_find_core(const char *binary, const char *name, const char *data,
+				enum obs_runtime_module_type type, const char *ext,
+				obs_find_module_callback2_t callback, void *param);
+
+/* Module locale files (obs-module-locale.c): pure, no libobs state.
+ * obs_module_locale_default_file(): a bmalloc'd "locale/<default_locale>.ini".
+ * obs_module_locale_is_default(): locale is default_locale, ignoring case
+ * (astrcmpi()).
+ * obs_module_locale_file(): a bmalloc'd "/locale/<locale>.ini".
+ * obs_module_load_locale() keeps the module, the lookups and the logging, and
+ * passes the locales. Ported to rust/obs-core (module_locale). Not exported. */
+char *obs_module_locale_default_file(const char *default_locale);
+bool obs_module_locale_is_default(const char *locale, const char *default_locale);
+char *obs_module_locale_file(const char *locale);
+
 /* Context names (obs-context-names.c): pure, no libobs state. Both return a
  * bmalloc'd name, or NULL, that the caller owns. obs_context_name_dup():
  * NULL for a private context without a name, "__unnamed%04lld" from
@@ -815,6 +894,55 @@ typedef bool (*obs_context_name_exists_t)(void *param, const char *name);
 
 char *obs_context_name_dup(const char *name, bool private, long long *unnamed_index);
 char *obs_context_name_deduplicate(const char *name, obs_context_name_exists_t exists, void *param);
+
+/* Source registration rules (obs-module-source-rules.c): pure, no libobs
+ * state. obs_register_source_s() keeps the duplicate lookup, the module's
+ * source list, the copy, the type lists, the logging and the error path, and
+ * calls these in its order of checks.
+ * obs_module_source_rules_list_of(): the list of a type: input, filter or
+ * transition, none for a scene, unknown for any other type.
+ * obs_module_source_rules_size_supported(): size is at most supported.
+ * obs_module_source_rules_output_flags(): the flags, an audio-only (no
+ * video) filter made async and a transition made composite, video and
+ * custom draw.
+ * obs_module_source_rules_check(): the first rule a source breaks, in order:
+ * composite with audio, composite with async (flags, normalized), no
+ * get_name, no get_width or get_height for a sync video source that is not
+ * a filter or a transition (type and info_flags, the caller's), no
+ * audio_render for a composite source (flags). callbacks has a
+ * OBS_MODULE_SOURCE_RULES_HAS_* bit for each callback set inside the size.
+ * obs_module_source_rules_versioned_id(): a bmalloc'd "<id>_v<version>",
+ * the version printed as an int, or a copy of id for version 0. Ported to
+ * rust/obs-core (module_source_rules). Not exported. */
+enum obs_module_source_rules_list {
+	OBS_MODULE_SOURCE_RULES_LIST_UNKNOWN,
+	OBS_MODULE_SOURCE_RULES_LIST_NONE,
+	OBS_MODULE_SOURCE_RULES_LIST_INPUT,
+	OBS_MODULE_SOURCE_RULES_LIST_FILTER,
+	OBS_MODULE_SOURCE_RULES_LIST_TRANSITION,
+};
+
+#define OBS_MODULE_SOURCE_RULES_HAS_GET_NAME (1 << 0)
+#define OBS_MODULE_SOURCE_RULES_HAS_GET_WIDTH (1 << 1)
+#define OBS_MODULE_SOURCE_RULES_HAS_GET_HEIGHT (1 << 2)
+#define OBS_MODULE_SOURCE_RULES_HAS_AUDIO_RENDER (1 << 3)
+
+enum obs_module_source_rules_error {
+	OBS_MODULE_SOURCE_RULES_OK,
+	OBS_MODULE_SOURCE_RULES_COMPOSITE_AUDIO,
+	OBS_MODULE_SOURCE_RULES_COMPOSITE_ASYNC,
+	OBS_MODULE_SOURCE_RULES_NO_GET_NAME,
+	OBS_MODULE_SOURCE_RULES_NO_GET_WIDTH,
+	OBS_MODULE_SOURCE_RULES_NO_GET_HEIGHT,
+	OBS_MODULE_SOURCE_RULES_NO_AUDIO_RENDER,
+};
+
+enum obs_module_source_rules_list obs_module_source_rules_list_of(enum obs_source_type type);
+bool obs_module_source_rules_size_supported(size_t size, size_t supported);
+uint32_t obs_module_source_rules_output_flags(enum obs_source_type type, uint32_t output_flags);
+enum obs_module_source_rules_error obs_module_source_rules_check(enum obs_source_type type, uint32_t info_flags,
+								 uint32_t flags, uint32_t callbacks);
+char *obs_module_source_rules_versioned_id(const char *id, uint32_t version);
 
 /* Scene item visibility audio ramp (obs-scene-item-audio-actions.c, around
  * the core in obs-scene-audio-actions.c), called by obs-scene.c. apply_scene_item_audio_actions() applies the item's queued
@@ -991,8 +1119,8 @@ struct obs_source {
 
 	/* used to indicate that the source has been removed and all
 	 * references to it should be released (not exactly how I would prefer
-	 * to handle things but it's the best option) */
-	bool removed;
+	 * to handle things but it's the best option). Atomic: the render threads read it (#2105). */
+	volatile bool removed;
 
 	/*  used to indicate if the source should show up when queried for user ui */
 	bool temp_removed;
@@ -1406,6 +1534,8 @@ struct obs_output {
 	bool received_audio;
 	volatile bool data_active;
 	volatile bool end_data_capture_thread_active;
+	/* Created and not joined yet: it can have finished already (#2063). */
+	volatile bool end_data_capture_thread_joinable;
 	int64_t video_offsets[MAX_OUTPUT_VIDEO_ENCODERS];
 	int64_t audio_offsets[MAX_OUTPUT_AUDIO_ENCODERS];
 	int64_t highest_audio_ts;
@@ -1593,6 +1723,12 @@ extern void obs_output_actual_stop(obs_output_t *output, bool force, uint64_t ts
 
 extern const struct obs_output_info *find_output(const char *id);
 
+/* Output protocol-list match (obs-output-protocols.c), called by
+ * obs_enum_output_types_with_protocol(): how many of the ';'-separated
+ * segments of protocols equal protocol, byte for byte (0 for a NULL list).
+ * protocol must not be NULL. Not exported. */
+extern size_t obs_output_protocol_list_count(const char *protocols, const char *protocol);
+
 extern void obs_output_remove_encoder(struct obs_output *output, struct obs_encoder *encoder);
 
 extern void obs_encoder_packet_create_instance(struct encoder_packet *dst, const struct encoder_packet *src);
@@ -1725,6 +1861,9 @@ struct obs_encoder {
 	struct pause_data pause;
 
 	const char *profile_encoder_encode_name;
+	/* Leaf lock: the output's stop signal copies the message while another
+	 * thread's shutdown can replace it (#2110). */
+	pthread_mutex_t last_error_mutex;
 	char *last_error_message;
 
 	/* reconfigure encoder at next possible opportunity */
@@ -1732,6 +1871,7 @@ struct obs_encoder {
 };
 
 extern struct obs_encoder_info *find_encoder(const char *id);
+extern char *obs_encoder_dup_last_error(obs_encoder_t *encoder);
 
 extern bool obs_encoder_initialize(obs_encoder_t *encoder);
 extern void obs_encoder_shutdown(obs_encoder_t *encoder);
@@ -1791,6 +1931,41 @@ extern const struct obs_service_info *find_service(const char *id);
 
 extern void obs_service_activate(struct obs_service *service);
 extern void obs_service_deactivate(struct obs_service *service, bool remove);
+/* obs-service.c: the callback table and plugin data of a service, for obs-service-getters.c
+ * and its Rust port (#1899). */
+extern const struct obs_service_info *obs_service_get_info_table(const obs_service_t *service);
+extern void *obs_service_get_plugin_data(const obs_service_t *service);
+/* obs-service.c: the context fields obs-service-getters.c reads (#1913). */
+extern const char *obs_service_get_context_name(const obs_service_t *service);
+extern obs_data_t *obs_service_get_context_settings(const obs_service_t *service);
+/* obs-service.c: the steps on struct obs_service, its context and its
+ * reference counts that the lifecycle in obs-service-getters.c takes (#1920). */
+extern obs_module_t *obs_service_module_first(bool disabled);
+extern obs_module_t *obs_service_module_next(obs_module_t *module);
+extern size_t obs_service_module_service_count(obs_module_t *module);
+extern const char *obs_service_module_service_id(obs_module_t *module, size_t i);
+extern enum obs_module_load_state obs_service_module_load_state(obs_module_t *module);
+extern obs_service_t *obs_service_context_new(const char *name, obs_data_t *settings, obs_data_t *hotkey_data,
+					      bool private);
+extern void obs_service_set_info(obs_service_t *service, const struct obs_service_info *info);
+extern void obs_service_set_plugin_data(obs_service_t *service, void *data);
+extern void obs_service_context_insert(obs_service_t *service);
+extern void obs_service_context_remove(obs_service_t *service);
+extern void obs_service_context_free(obs_service_t *service);
+extern void obs_service_set_destroy(obs_service_t *service);
+extern bool obs_service_is_destroying(const obs_service_t *service);
+extern bool obs_service_is_active(const obs_service_t *service);
+extern void obs_service_set_active(obs_service_t *service, bool active);
+extern bool obs_service_has_output(const obs_service_t *service);
+extern void obs_service_clear_output(obs_service_t *service);
+extern void obs_service_detach_from_output(obs_service_t *service);
+extern obs_weak_service_t *obs_service_get_control(const obs_service_t *service);
+extern bool obs_weak_service_strong_release(obs_weak_service_t *weak);
+extern void obs_weak_service_weak_addref(obs_weak_service_t *weak);
+extern bool obs_weak_service_weak_release(obs_weak_service_t *weak);
+extern bool obs_weak_service_weak_get_ref(obs_weak_service_t *weak);
+extern obs_service_t *obs_weak_service_target(const obs_weak_service_t *weak);
+extern void obs_weak_service_free(obs_weak_service_t *weak);
 extern bool obs_service_initialize(struct obs_service *service, struct obs_output *output);
 
 void obs_service_destroy(obs_service_t *service);

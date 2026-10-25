@@ -12,22 +12,89 @@ PORTED = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PORTED)
 
 
+# One entry per line, sorted (ci/test_sorted_shared_lists.py, #1997): ports
+# add rows here instead of appending assertions at the end.
+# Ported on Linux, Windows and macOS.
+PORTED_ON_EVERY_HOST = (
+    "graphics/graphics-sprite.c.h.o",
+    "obs-audio-mix.c.h.o",
+    "obs-canvas-draw.c.h.o",
+    "obs-context-names.c.h.o",
+    "obs-encoder-audio-start.c.h.o",
+    "obs-encoder-roi.c.h.o",
+    "obs-encoder-size.c.h.o",
+    "obs-hotkey-pair.c.h.o",
+    "obs-hotkey-press.c.h.o",
+    "obs-module-locale.c.h.o",
+    "obs-module-names.c.h.o",
+    "obs-module-paths.c.h.o",
+    "obs-module-source-rules.c.h.o",
+    "obs-module-type-rules.c.h.o",
+    "obs-output-protocols.c.h.o",
+    "obs-output-video-checks.c.h.o",
+    "obs-scene-audio-actions.c.h.o",
+    "obs-scene-audio-window.c.h.o",
+    "obs-scene-crop.c.h.o",
+    "obs-scene-extent.c.h.o",
+    "obs-scene-item-names.c.h.o",
+    "obs-scene-render-plan.c.h.o",
+    "obs-service-getters.c.h.o",
+    "obs-source-async-pacing.c.h.o",
+    "obs-source-async-upload.c.h.o",
+    "obs-source-audio-input.c.h.o",
+    "obs-source-audio-render.c.h.o",
+    "obs-source-audio-timing.c.h.o",
+    "obs-source-color-space.c.h.o",
+    "obs-source-conversion-plan.c.h.o",
+    "obs-source-deinterlace-draw.c.h.o",
+    "obs-source-deinterlace-pacing.c.h.o",
+    "obs-source-deinterlace-select.c.h.o",
+    "obs-source-draw-plan.c.h.o",
+    "obs-source-frame-copy.c.h.o",
+    "obs-source-load.c.h.o",
+    "obs-source-media-admission.c.h.o",
+    "obs-source-ptm-gate.c.h.o",
+    "obs-source-render-route.c.h.o",
+    "obs-source-size.c.h.o",
+    "obs-source-transition-clock.c.h.o",
+    "obs-source-transition-render.c.h.o",
+    "obs-source-volume.c.h.o",
+    "obs-video-copy-plan.c.h.o",
+    "obs-video-output-step.c.h.o",
+    "obs-view-api.c.h.o",
+)
+# Ported, checked on Linux.
+PORTED_ON_LINUX = (
+    "obs-data.c.h.o",
+    "obs-hevc.c.h.o",
+    "obs-video-plan.c.h.o",
+)
+# The unported remainder of a split file: still compiled as C.
+NOT_PORTED = (
+    "graphics/graphics.c.h.o",
+    "obs-audio.c.h.o",
+    "obs-encoder.c.h.o",
+    "obs-module.c.h.o",
+    "obs-scene-item-audio-actions.c.h.o",
+    "obs-scene.c.h.o",
+    "obs-source-deinterlace.c.h.o",
+    "obs-source-transition.c.h.o",
+    "obs-source.c.h.o",
+)
+
+
 class PortedSourceTest(unittest.TestCase):
     def test_current_linux_inventory_keeps_the_existing_exclusion_floor(self):
         objects = PORTED.ported_objects(ROOT, "linux")
         self.assertGreaterEqual(len(objects), 20)
-        self.assertIn("obs-data.c.h.o", objects)
-        self.assertIn("obs-hevc.c.h.o", objects)
-        self.assertIn("obs-video-plan.c.h.o", objects)
-        self.assertIn("obs-context-names.c.h.o", objects)
-        self.assertIn("obs-context-names.c.h.o", PORTED.ported_objects(ROOT, "windows"))
-        self.assertIn("obs-context-names.c.h.o", PORTED.ported_objects(ROOT, "macos"))
-        self.assertIn("obs-hotkey-press.c.h.o", objects)
-        self.assertIn("obs-hotkey-press.c.h.o", PORTED.ported_objects(ROOT, "windows"))
-        self.assertIn("obs-hotkey-press.c.h.o", PORTED.ported_objects(ROOT, "macos"))
-        self.assertIn("obs-hotkey-pair.c.h.o", objects)
-        self.assertIn("obs-hotkey-pair.c.h.o", PORTED.ported_objects(ROOT, "windows"))
-        self.assertIn("obs-hotkey-pair.c.h.o", PORTED.ported_objects(ROOT, "macos"))
+        for name in PORTED_ON_LINUX:
+            self.assertIn(name, objects)
+        for name in PORTED_ON_EVERY_HOST:
+            for host in ("linux", "windows", "macos"):
+                with self.subTest(name=name, host=host):
+                    self.assertIn(name, PORTED.ported_objects(ROOT, host))
+        for name in NOT_PORTED:
+            self.assertNotIn(name, objects)
         self.assertIn("audio-monitoring/pulse/pulseaudio-stream-flags.c.h.o", objects)
         self.assertIn("audio-monitoring/pulse/pulseaudio-monitor-format.c.h.o", objects)
         self.assertIn("util/platform-nix-dbus.c.h.o", objects)

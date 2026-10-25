@@ -13,6 +13,7 @@
 
 use std::borrow::Cow;
 use std::ffi::{CStr, CString, c_char, c_int, c_void};
+use std::mem::ManuallyDrop;
 use std::ptr;
 use std::sync::{Arc, RwLock};
 
@@ -115,6 +116,19 @@ fn borrow_data(ptr: *mut c_void) -> Option<Data> {
     })
 }
 
+/// The caller's object without a reference of its own: no atomic count
+/// change per call (#1453). It must not outlive the call.
+fn peek_data(ptr: *mut c_void) -> Option<ManuallyDrop<Data>> {
+    if ptr.is_null() {
+        return None;
+    }
+    // SAFETY: `ptr` is a live data object; `ManuallyDrop` never releases
+    // the caller's reference.
+    Some(ManuallyDrop::new(Data {
+        inner: unsafe { Arc::from_raw(ptr as *const RwLock<DataInner>) },
+    }))
+}
+
 fn take_data(ptr: *mut c_void) -> Option<Data> {
     if ptr.is_null() {
         return None;
@@ -190,7 +204,7 @@ fn leak_array(array: Array) -> *mut c_void {
 }
 
 fn named<R>(data: *mut c_void, name: *const c_char, f: impl FnOnce(&Data, &str) -> R) -> Option<R> {
-    let data = borrow_data(data)?;
+    let data = peek_data(data)?;
     let name = c_str(name)?;
     Some(f(&data, &name))
 }
@@ -208,10 +222,10 @@ fn load_file(path: *const c_char) -> *mut c_void {
     if buf.is_null() {
         return ptr::null_mut();
     }
-    let text = unsafe { CStr::from_ptr(buf) }.to_string_lossy();
-    let data = Data::from_json(&text);
+    // SAFETY: the buffer is a live C string until bfree below.
+    let data = unsafe { obs_data_create_from_json(buf) };
     unsafe { bfree(buf.cast()) };
-    data.map(leak_data).unwrap_or(ptr::null_mut())
+    data
 }
 
 fn write_json(data: *mut c_void, file: *const c_char, pretty: bool) -> Option<CString> {
@@ -349,8 +363,11 @@ fn set_quat(data: *mut c_void, name: *const c_char, val: *const quat, slot: u8) 
     }
 }
 
-fn named_pair<'a>(data: *mut c_void, name: *const c_char) -> Option<(Data, Cow<'a, str>)> {
-    Some((borrow_data(data)?, c_str(name)?))
+fn named_pair<'a>(
+    data: *mut c_void,
+    name: *const c_char,
+) -> Option<(ManuallyDrop<Data>, Cow<'a, str>)> {
+    Some((peek_data(data)?, c_str(name)?))
 }
 
 fn get_vec2(data: *mut c_void, name: *const c_char, val: *mut vec2, slot: u8) {
@@ -512,10 +529,12 @@ pub unsafe extern "C" fn obs_data_create() -> *mut c_void {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn obs_data_create_from_json(json_string: *const c_char) -> *mut c_void {
-    let Some(text) = c_str(json_string) else {
+    if json_string.is_null() {
         return ptr::null_mut();
-    };
-    Data::from_json(&text)
+    }
+    // SAFETY: the non-null input is a C string that outlives parsing.
+    let text = unsafe { CStr::from_ptr(json_string) }.to_bytes();
+    super::json::load_data_bytes(text)
         .map(leak_data)
         .unwrap_or(ptr::null_mut())
 }

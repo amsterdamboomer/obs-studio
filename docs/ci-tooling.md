@@ -88,7 +88,7 @@ What not to do:
 Known pitfall: zccache has replayed stale Rust compiler output. Both the build
 and release workflows set `SOLDR_RUSTC_WRAPPER=none` for setup/cook and native
 Rust consumers; the local gate sets it too (`OBS_GATE_ZCCACHE=1` opts back in
-locally). Pinned soldr 0.9.38 defaults to the managed wrapper without this
+locally). Pinned soldr 0.9.43 defaults to the managed wrapper without this
 override, and [zccache#1943](https://github.com/zackees/zccache/issues/1943)
 remains unresolved. This safeguard preserves standalone C/C++ compiler
 caching and soldr cook/target archives. All seven setup-soldr callsites also
@@ -107,10 +107,29 @@ the same bypass policy; no release runtime comparison is claimed.
 Soldr 0.9.38 fixes source mtime truncation during archive replay (#1359).
 Regenerated local `obs-util` full and base plus delta archives preserve the
 exact nanosecond timestamp and report Fresh with the wrapper disabled. The
-pinned setup action's cook keys include the Soldr version, so 0.9.35 archives
-cannot match the new base key or delta restore prefixes. The action's default
-is still 0.9.33; retain the explicit 0.9.38 override until its default includes
-the fix. See the [probe and limits](ci-evidence/2026-10-20-soldr-source-mtime.md).
+pinned setup action's cook keys include the Soldr version, so archives of an
+older Soldr cannot match the new base key or delta restore prefixes. The pinned
+setup-soldr v0.9.88 defaults to Soldr 0.9.42; the workflows still name the
+version explicitly. See the [probe and limits](ci-evidence/2026-10-20-soldr-source-mtime.md).
+
+Soldr 0.9.41+ keeps a **verdict ledger** (soldr#3894): a `clippy`,
+`fmt --check`, `dylint` or doctest run whose exact inputs (git blob ids, or
+content hashes for uncommitted files, plus toolchain, argv and environment)
+already passed is replayed instead of re-run, narrowed per workspace member.
+setup-soldr carries it between CI runs (`verdicts: auto`, the default): master
+publishes, PRs restore. Every setup-soldr step in `build-project.yaml` sets
+`verdict-scope: build-project`: the manifest scope otherwise hashes the
+calling workflow (`push.yaml` on master, `ci.yml` on PRs), so PRs never found
+master's verdicts (forge-ci/setup-soldr#604, `ci/test_verdict_scope.py`).
+In CI the first master run with it (40159829966) published 8 verdicts under
+scope `b88ba65d043f3f19`, the scope PR and merge-queue Fast Gate runs read.
+It is content-keyed, so it does not depend on the
+wrapper bypass above. `SOLDR_VERDICTS=off` forces a run. The gate's source
+probe sets it, because before forge-ci/soldr#3913 a scratch crate in an ignored
+directory (`target/`) keyed on none of its files and replayed a stale pass.
+The lint lane runs the Dylints through `soldr dylint` with soldr's managed
+driver (`SOLDR_FORCE_MANAGED_CARGO_SUBCOMMANDS=1`) in `target-dylint/`, beside
+the stable Clippy steps (#2293).
 This does not solve the separate
 restored-target fingerprint hazard documented in the cache audit. If a
 build behaves impossibly, retry with that variable set before debugging the
@@ -133,7 +152,7 @@ input header's recorded mtime before clang loads it; real content changes
 remain subject to clang's validation. This fixes `#pragma once` redefinitions
 after touches or checkouts without relaxing PCH validation.
 
-The pinned soldr 0.9.38 also embeds zccache 1.15.5, including the wrapper
+The pinned soldr 0.9.43 also embeds zccache 1.15.5, including the wrapper
 selected by the optional `ENABLE_ZCCACHE` CMake module. Updating the standalone
 installer alone does not update that embedded wrapper. Matching the versions
 does not establish Rust compiler-cache correctness: the Rust wrapper bypass
@@ -241,9 +260,10 @@ What not to do:
 - Install bosn unasked, or add stacks to `bosn.toml` without a reason. It's
   manifest-driven, and the machine owner decides what runs.
 
-The repo's `bosn.toml` declares one stack so far: `appimage`, an Ubuntu 26.04
-image (`build-aux/appimage/Dockerfile`) with the AppImage build dependencies
-preinstalled. `bosn run --task appimage` builds the AppImage locally by
+The repo's `bosn.toml` declares the AppImage stack `appimage-228`, the
+glibc 2.28 image (`build-aux/appimage/manylinux/Dockerfile`) the workflow
+builds on.
+`bosn run --task appimage` builds the AppImage locally on the 2.28 image by
 running `build-aux/appimage/build.py`, the same script the AppImage workflow
 calls, with no act and no GitHub involved. The source is bind-mounted, the zccache
 and cargo caches live in bosn volumes, and the AppImage lands in
@@ -314,7 +334,7 @@ ideas:
 Always use the pinned version from [AGENTS.md](../AGENTS.md):
 
 ```
-uvx --from git+https://github.com/zackees/ci.yml@1a970f01574447d681571ff3d0b8de56cb983dcc ci-lint local-gate run
+uvx --from git+https://github.com/zackees/ci.yml@a1917ce76598904ce515cd7eec83450c317ea6f2 ci-lint local-gate run
 ```
 
 ### ci.toml and local-gate.toml: what runs for which change
@@ -520,12 +540,22 @@ condition on that operation's job. Do not skip the whole entry point merely
 because one maintenance operation does not apply.
 
 The cache janitor runs only for `merge_group` or a `push` to
-`refs/heads/master`. Fork PR tokens cannot delete repository caches, so PR
-pushes must skip the janitor job. Keep cache deletion out of untrusted PR
+`refs/heads/master`. `ci-pre.yml`'s janitor sweeps master pushes. The merge
+queue sweeps at the end of the run, in `ci.yml`'s final `cache-janitor` job
+(`needs` every other job, `if: always()`), never at the start (#1854). The
+queue serializes master's cache writes, so that sweep has the cache to itself
+and sees what the run saved. Pinned to zackees/ci.yml#405, it evicts the
+least recently accessed entries until the repository total fits
+`[cache].budget`, keeping each family's newest entry and anything younger
+than 10 minutes, so GitHub's own LRU eviction never chooses what to drop.
+Declared family maxima may add up to more than the budget; the end-of-queue
+sweep is what keeps live usage under it. Fork PR tokens cannot delete
+repository caches, so PR pushes must skip both janitor jobs. Keep cache deletion out of untrusted PR
 events; do not switch to `pull_request_target` to obtain a write token.
 
 Cache cleanup is best-effort maintenance. It has no dependents in the Pull
-or Push workflow and is excluded from `CI Gate ✅`. Its own failures remain
+or Push workflow and is excluded from `CI Gate ✅` (the end-of-queue sweep
+runs after the gate, which never waits on it). Its own failures remain
 visible for investigation, but cannot delay builds, queue cancellation or
 merging. Keep the repo-wide `cache-janitor` concurrency group with
 `cancel-in-progress: false`. A future pre-work job that is required for

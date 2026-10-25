@@ -52,6 +52,14 @@ static inline bool data_capture_ending(const struct obs_output *output)
 	return os_atomic_load_bool(&output->end_data_capture_thread_active);
 }
 
+/* Joins the last end-capture thread, running or finished: it clears
+ * end_data_capture_thread_active itself when it returns (#2063). */
+static inline void join_end_data_capture_thread(struct obs_output *output)
+{
+	if (os_atomic_exchange_bool(&output->end_data_capture_thread_joinable, false))
+		pthread_join(output->end_data_capture_thread, NULL);
+}
+
 static inline bool flag_encoded(const struct obs_output *output)
 {
 	return (output->info.flags & OBS_OUTPUT_ENCODED) != 0;
@@ -229,7 +237,7 @@ obs_output_t *obs_output_create(const char *id, const char *name, obs_data_t *se
 		output->info.get_defaults(output->context.settings);
 
 	ret = os_event_init(&output->reconnect_stop_event, OS_EVENT_TYPE_MANUAL);
-	if (ret < 0)
+	if (ret != 0)
 		goto fail;
 
 	output->reconnect_retry_sec = 2;
@@ -297,8 +305,7 @@ void obs_output_destroy(obs_output_t *output)
 			obs_output_actual_stop(output, true, 0);
 
 		os_event_wait(output->stopping_event);
-		if (data_capture_ending(output))
-			pthread_join(output->end_data_capture_thread, NULL);
+		join_end_data_capture_thread(output);
 
 		if (output->service)
 			output->service->output = NULL;
@@ -1011,13 +1018,7 @@ audio_t *obs_output_audio(const obs_output_t *output)
 
 static inline size_t get_first_mixer(const obs_output_t *output)
 {
-	for (size_t i = 0; i < MAX_AUDIO_MIXES; i++) {
-		if ((((size_t)1 << i) & output->mixer_mask) != 0) {
-			return i;
-		}
-	}
-
-	return 0;
+	return obs_output_first_mixer(output->mixer_mask);
 }
 
 void obs_output_set_mixer(obs_output_t *output, size_t mixer_idx)
@@ -1026,6 +1027,11 @@ void obs_output_set_mixer(obs_output_t *output, size_t mixer_idx)
 		return;
 	if (log_flag_encoded(output, __FUNCTION__, true))
 		return;
+	if (mixer_idx >= MAX_AUDIO_MIXES) {
+		blog(LOG_WARNING, "output '%s': Ignoring mixer index %zu, it must be below %d",
+		     obs_output_get_name(output), mixer_idx, MAX_AUDIO_MIXES);
+		return;
+	}
 	if (active(output))
 		return;
 
@@ -1342,13 +1348,18 @@ uint32_t obs_output_get_width2(const obs_output_t *output, size_t idx)
 	if (idx >= MAX_OUTPUT_VIDEO_ENCODERS)
 		return 0;
 
-	if (flag_encoded(output)) {
-		if (output->video_encoders[idx])
-			return obs_encoder_get_width(output->video_encoders[idx]);
-		else
-			return 0;
-	} else
-		return output->scaled_width != 0 ? output->scaled_width : video_output_get_width(output->video);
+	switch (obs_output_size_route(flag_encoded(output), output->video_encoders[idx] != NULL,
+				      output->scaled_width)) {
+	case OBS_OUTPUT_SIZE_ENCODER:
+		return obs_encoder_get_width(output->video_encoders[idx]);
+	case OBS_OUTPUT_SIZE_SCALED:
+		return output->scaled_width;
+	case OBS_OUTPUT_SIZE_VIDEO:
+		return video_output_get_width(output->video);
+	case OBS_OUTPUT_SIZE_ZERO:
+	default:
+		return 0;
+	}
 }
 
 uint32_t obs_output_get_width(const obs_output_t *output)
@@ -1370,13 +1381,18 @@ uint32_t obs_output_get_height2(const obs_output_t *output, size_t idx)
 	if (idx >= MAX_OUTPUT_VIDEO_ENCODERS)
 		return 0;
 
-	if (flag_encoded(output)) {
-		if (output->video_encoders[idx])
-			return obs_encoder_get_height(output->video_encoders[idx]);
-		else
-			return 0;
-	} else
-		return output->scaled_height != 0 ? output->scaled_height : video_output_get_height(output->video);
+	switch (obs_output_size_route(flag_encoded(output), output->video_encoders[idx] != NULL,
+				      output->scaled_height)) {
+	case OBS_OUTPUT_SIZE_ENCODER:
+		return obs_encoder_get_height(output->video_encoders[idx]);
+	case OBS_OUTPUT_SIZE_SCALED:
+		return output->scaled_height;
+	case OBS_OUTPUT_SIZE_VIDEO:
+		return video_output_get_height(output->video);
+	case OBS_OUTPUT_SIZE_ZERO:
+	default:
+		return 0;
+	}
 }
 
 uint32_t obs_output_get_height(const obs_output_t *output)
@@ -1415,55 +1431,34 @@ void obs_output_set_audio_conversion(obs_output_t *output, const struct audio_co
 	output->audio_conversion_set = true;
 }
 
-static inline bool video_valid(const struct obs_output *output)
-{
-	if (flag_encoded(output)) {
-		for (size_t i = 0; i < MAX_OUTPUT_VIDEO_ENCODERS; i++) {
-			if (output->video_encoders[i]) {
-				return true;
-			}
-		}
-		return false;
-	} else {
-		return output->video != NULL;
-	}
-}
-
-static inline bool audio_valid(const struct obs_output *output)
-{
-	if (flag_encoded(output)) {
-		for (size_t i = 0; i < MAX_OUTPUT_AUDIO_ENCODERS; i++) {
-			if (output->audio_encoders[i]) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	return output->audio != NULL;
-}
+/* The flags and limits obs-output-video-checks.h copies. */
+_Static_assert(OBS_OUTPUT_VIDEO_CHECKS_VIDEO == OBS_OUTPUT_VIDEO, "OBS_OUTPUT_VIDEO");
+_Static_assert(OBS_OUTPUT_VIDEO_CHECKS_AUDIO == OBS_OUTPUT_AUDIO, "OBS_OUTPUT_AUDIO");
+_Static_assert(OBS_OUTPUT_VIDEO_CHECKS_ENCODED == OBS_OUTPUT_ENCODED, "OBS_OUTPUT_ENCODED");
+_Static_assert(OBS_OUTPUT_VIDEO_CHECKS_SERVICE == OBS_OUTPUT_SERVICE, "OBS_OUTPUT_SERVICE");
+_Static_assert(OBS_OUTPUT_VIDEO_CHECKS_MAX_AUDIO_MIXES == MAX_AUDIO_MIXES, "MAX_AUDIO_MIXES");
+_Static_assert(OBS_OUTPUT_VIDEO_CHECKS_MAX_VIDEO_ENCODERS == MAX_OUTPUT_VIDEO_ENCODERS, "MAX_OUTPUT_VIDEO_ENCODERS");
+_Static_assert(OBS_OUTPUT_VIDEO_CHECKS_MAX_AUDIO_ENCODERS == MAX_OUTPUT_AUDIO_ENCODERS, "MAX_OUTPUT_AUDIO_ENCODERS");
 
 static bool can_begin_data_capture(const struct obs_output *output)
 {
-	if (flag_video(output) && !video_valid(output))
-		return false;
+	struct obs_output_capture_presence presence = {
+		.flags = output->info.flags,
+		.video = output->video != NULL,
+		.audio = output->audio != NULL,
+		.service = output->service != NULL,
+	};
 
-	if (flag_audio(output) && !audio_valid(output))
-		return false;
+	for (size_t i = 0; i < MAX_OUTPUT_VIDEO_ENCODERS; i++) {
+		if (output->video_encoders[i])
+			presence.video_encoders |= (uint32_t)1 << i;
+	}
+	for (size_t i = 0; i < MAX_OUTPUT_AUDIO_ENCODERS; i++) {
+		if (output->audio_encoders[i])
+			presence.audio_encoders |= (uint32_t)1 << i;
+	}
 
-	if (flag_service(output) && !output->service)
-		return false;
-
-	return true;
-}
-
-static inline bool has_scaling(const struct obs_output *output)
-{
-	uint32_t video_width = video_output_get_width(output->video);
-	uint32_t video_height = video_output_get_height(output->video);
-
-	return output->scaled_width && output->scaled_height &&
-	       (video_width != output->scaled_width || video_height != output->scaled_height);
+	return obs_output_capture_ready(&presence);
 }
 
 const struct video_scale_info *obs_output_get_video_conversion(struct obs_output *output)
@@ -1471,23 +1466,35 @@ const struct video_scale_info *obs_output_get_video_conversion(struct obs_output
 	if (log_flag_encoded(output, __FUNCTION__, true) || !log_flag_video(output, __FUNCTION__))
 		return NULL;
 
-	if (output->video_conversion_set) {
-		if (!output->video_conversion.width)
-			output->video_conversion.width = obs_output_get_width(output);
+	struct obs_output_conversion_sizes sizes = {
+		.set = output->video_conversion_set,
+		.set_width = output->video_conversion.width,
+		.set_height = output->video_conversion.height,
+		.scaled_width = output->scaled_width,
+		.scaled_height = output->scaled_height,
+		.video_width = video_output_get_width(output->video),
+		.video_height = video_output_get_height(output->video),
+	};
+	struct obs_output_conversion_choice plan = obs_output_conversion_plan(&sizes);
 
-		if (!output->video_conversion.height)
-			output->video_conversion.height = obs_output_get_height(output);
-
+	if (plan.kind == OBS_OUTPUT_CONVERSION_SET) {
+		output->video_conversion.width = plan.width;
+		output->video_conversion.height = plan.height;
 		return &output->video_conversion;
 
-	} else if (has_scaling(output)) {
+	} else if (plan.kind == OBS_OUTPUT_CONVERSION_SCALED) {
 		const struct video_output_info *info = video_output_get_info(output->video);
+
+		/* A scaled size but no video (obs_output_set_media() with NULL
+		 * video): nothing to convert from. */
+		if (!info)
+			return NULL;
 
 		output->video_conversion.format = info->format;
 		output->video_conversion.colorspace = VIDEO_CS_DEFAULT;
 		output->video_conversion.range = VIDEO_RANGE_DEFAULT;
-		output->video_conversion.width = output->scaled_width;
-		output->video_conversion.height = output->scaled_height;
+		output->video_conversion.width = plan.width;
+		output->video_conversion.height = plan.height;
 		return &output->video_conversion;
 	}
 
@@ -1954,18 +1961,53 @@ static inline void signal_reconnect_success(struct obs_output *output)
 	do_output_signal(output, "reconnect_success");
 }
 
+/* obs_output_get_last_error, copied under each encoder's lock: an
+ * end-capture thread can be shutting the encoders down (#2110). */
+static char *dup_last_error(struct obs_output *output)
+{
+	if (output->last_error_message)
+		return bstrdup(output->last_error_message);
+
+	for (size_t i = 0; i < MAX_OUTPUT_VIDEO_ENCODERS; i++) {
+		obs_encoder_t *vencoder = output->video_encoders[i];
+		char *message = vencoder ? obs_encoder_dup_last_error(vencoder) : NULL;
+		if (message)
+			return message;
+	}
+
+	for (size_t i = 0; i < MAX_OUTPUT_AUDIO_ENCODERS; i++) {
+		obs_encoder_t *aencoder = output->audio_encoders[i];
+		char *message = aencoder ? obs_encoder_dup_last_error(aencoder) : NULL;
+		if (message)
+			return message;
+	}
+
+	return NULL;
+}
+
+/* Copies the last error: the stop signal can be sent after a thread that
+ * frees it has started (#2086). */
+static inline void stop_params_init(struct obs_output *output, struct calldata *params)
+{
+	char *last_error = dup_last_error(output);
+	calldata_init(params);
+	calldata_set_string(params, "last_error", last_error);
+	bfree(last_error);
+	calldata_set_int(params, "code", output->stop_code);
+	calldata_set_ptr(params, "output", output);
+}
+
+static inline void signal_stop_params(struct obs_output *output, struct calldata *params)
+{
+	signal_handler_signal(output->context.signals, "stop", params);
+	calldata_free(params);
+}
+
 static inline void signal_stop(struct obs_output *output)
 {
 	struct calldata params;
-
-	calldata_init(&params);
-	calldata_set_string(&params, "last_error", obs_output_get_last_error(output));
-	calldata_set_int(&params, "code", output->stop_code);
-	calldata_set_ptr(&params, "output", output);
-
-	signal_handler_signal(output->context.signals, "stop", &params);
-
-	calldata_free(&params);
+	stop_params_init(output, &params);
+	signal_stop_params(output, &params);
 }
 
 bool obs_output_can_begin_data_capture(const obs_output_t *output, uint32_t flags)
@@ -1975,13 +2017,19 @@ bool obs_output_can_begin_data_capture(const obs_output_t *output, uint32_t flag
 	if (!obs_output_valid(output, "obs_output_can_begin_data_capture"))
 		return false;
 
-	if (delay_active(output))
+	switch (obs_output_begin_gate(delay_active(output), active(output))) {
+	case OBS_OUTPUT_BEGIN_READY:
 		return true;
-	if (active(output))
+	case OBS_OUTPUT_BEGIN_REFUSE:
 		return false;
+	case OBS_OUTPUT_BEGIN_CHECK:
+	default:
+		break;
+	}
 
-	if (data_capture_ending(output))
-		pthread_join(output->end_data_capture_thread, NULL);
+	/* The public signature is const; joining was always a write
+	 * (through uintptr_t: -Wcast-qual). */
+	join_end_data_capture_thread((struct obs_output *)(uintptr_t)output);
 
 	return can_begin_data_capture(output);
 }
@@ -2351,13 +2399,21 @@ static void obs_output_end_data_capture_internal(obs_output_t *output, bool sign
 			 * The next start, and destroy, join the thread first. This
 			 * never waits: if an end-capture thread is still running,
 			 * leave the encoders to it or to the next stop. */
+			/* Before the thread below starts: it clears the encoders'
+			 * last errors that the stop signal reports (#2086). */
+			struct calldata params;
+			stop_params_init(output, &params);
 			if (!active(output) && flag_encoded(output) && !data_capture_ending(output)) {
+				/* A finished one is still unjoined: never waits. */
+				join_end_data_capture_thread(output);
 				os_atomic_set_bool(&output->end_data_capture_thread_active, true);
 				if (pthread_create(&output->end_data_capture_thread, NULL,
 						   shutdown_unstarted_encoders_thread, output) != 0)
 					os_atomic_set_bool(&output->end_data_capture_thread_active, false);
+				else
+					os_atomic_set_bool(&output->end_data_capture_thread_joinable, true);
 			}
-			signal_stop(output);
+			signal_stop_params(output, &params);
 			output->stop_code = OBS_OUTPUT_SUCCESS;
 			os_event_signal(output->stopping_event);
 		}
@@ -2380,8 +2436,13 @@ static void obs_output_end_data_capture_internal(obs_output_t *output, bool sign
 	if (flag_video(output))
 		log_frame_info(output);
 
-	if (data_capture_ending(output))
-		pthread_join(output->end_data_capture_thread, NULL);
+	join_end_data_capture_thread(output);
+
+	/* Before the thread below starts: stopping the encoders clears the last
+	 * errors that the stop signal reports (#2098). */
+	struct calldata params = {0};
+	if (signal)
+		stop_params_init(output, &params);
 
 	os_atomic_set_bool(&output->end_data_capture_thread_active, true);
 	ret = pthread_create(&output->end_data_capture_thread, NULL, end_data_capture_thread, output);
@@ -2391,10 +2452,12 @@ static void obs_output_end_data_capture_internal(obs_output_t *output, bool sign
 		     "for output '%s'!",
 		     output->context.name);
 		end_data_capture_thread(output);
+	} else {
+		os_atomic_set_bool(&output->end_data_capture_thread_joinable, true);
 	}
 
 	if (signal) {
-		signal_stop(output);
+		signal_stop_params(output, &params);
 		output->stop_code = OBS_OUTPUT_SUCCESS;
 	}
 }
@@ -2462,7 +2525,7 @@ static void output_reconnect(struct obs_output *output)
 
 	output->stop_code = OBS_OUTPUT_DISCONNECTED;
 	ret = pthread_create(&output->reconnect_thread, NULL, &reconnect_thread, output);
-	if (ret < 0) {
+	if (ret != 0) {
 		blog(LOG_WARNING, "Failed to create reconnect thread");
 		os_atomic_set_bool(&output->reconnecting, false);
 	} else {
@@ -2672,14 +2735,8 @@ float obs_output_get_congestion(obs_output_t *output)
 	if (!obs_output_valid(output, "obs_output_get_congestion"))
 		return 0;
 
-	if (output->info.get_congestion) {
-		float val = output->info.get_congestion(output->context.data);
-		if (val < 0.0f)
-			val = 0.0f;
-		else if (val > 1.0f)
-			val = 1.0f;
-		return val;
-	}
+	if (output->info.get_congestion)
+		return obs_output_congestion_clamp(output->info.get_congestion(output->context.data));
 	return 0;
 }
 
@@ -2764,20 +2821,14 @@ void obs_enum_output_types_with_protocol(const char *protocol, void *data, bool 
 	if (!obs_is_output_protocol_registered(protocol))
 		return;
 
-	size_t protocol_len = strlen(protocol);
 	for (size_t i = 0; i < obs->output_types.num; i++) {
 		if (!(obs->output_types.array[i].flags & OBS_OUTPUT_SERVICE))
 			continue;
 
-		const char *substr = obs->output_types.array[i].protocols;
-		while (substr && substr[0] != '\0') {
-			const char *next = strchr(substr, ';');
-			size_t len = next ? (size_t)(next - substr) : strlen(substr);
-			if (protocol_len == len && strncmp(substr, protocol, len) == 0) {
-				if (!enum_cb(data, obs->output_types.array[i].id))
-					return;
-			}
-			substr = next ? next + 1 : NULL;
+		size_t matches = obs_output_protocol_list_count(obs->output_types.array[i].protocols, protocol);
+		for (size_t match = 0; match < matches; match++) {
+			if (!enum_cb(data, obs->output_types.array[i].id))
+				return;
 		}
 	}
 }

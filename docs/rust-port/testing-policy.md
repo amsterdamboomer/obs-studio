@@ -215,6 +215,16 @@ CURRENT C behavior, including odd or buggy behavior. Comment such cases as
   exercise the Rust swap until the symbol is reachable.
 - Use only portable behavior, or guard platform-specific cases with
   `#ifdef _WIN32` / `#ifndef _WIN32`.
+- Don't call `fail_msg()` in a test that Windows builds: it expands to
+  cmocka's private `cm_print_error()`, which the Windows cmocka does not
+  export, so the test fails to link (LNK2019, #1580, #1713). Print the
+  diagnostic with `fprintf(stderr, ...)` and then call `fail()`.
+  `ci/test_cmocka_windows_diagnostics.py` (Fast Gate) catches the call; it
+  is a source check for this one symbol, not proof that the test links on
+  Windows (#1739).
+- A PR's green checks prove only the lanes its paths selected. A shared
+  `.c` test selects Linux Tier 2, not Windows or macOS, so don't claim a new
+  test builds everywhere unless a native Tier 2 run built it.
 
 ### Port order for Phase 3 (pure leaf utilities)
 
@@ -491,6 +501,14 @@ timing evidence before claiming a speed improvement.
   any Dockerfile, workflow or doc pin differs.
 - `soldr cargo clippy --all-targets -- -D warnings` and `soldr cargo fmt --check`
   must be clean.
+- **Cargo feature sets** (#2056). `--workspace` runs unify features, so they
+  build each crate only with the union of what its dependents enable (for
+  example `obs-util/gio` always on). `./lint` also runs clippy for each entry
+  of `FEATURE_SETS` in `ci/local_gate.py`, and `./unittest` runs the
+  `FEATURE_TEST_SETS` tests. `./lint` fails when a workspace feature is not
+  built both on and off by some clippy run. A new Cargo feature therefore
+  needs a `FEATURE_SETS` entry, or a `FEATURE_SET_EXEMPT` entry that says
+  why not and where it is checked instead.
 - `unsafe` is allowed only in `src/ffi/` shims, in `obs-c-oracle`, and in the
   Tier 2/3 test files that call C ABI functions. Each `unsafe` block has a
   `// SAFETY:` comment. Every port crate denies the `unsafe_code` lint, so a

@@ -20,6 +20,11 @@
 #include "obs.h"
 #include "graphics/matrix4.h"
 #include "obs-scene-audio-actions.h"
+#include "obs-scene-crop.h"
+#include "obs-scene-extent.h"
+
+#include <limits.h>
+#include <math.h>
 
 /* how obs scene! */
 
@@ -110,3 +115,18 @@ struct obs_scene {
 	pthread_mutex_t audio_mutex;
 	struct obs_scene_item *first_item;
 };
+
+/* Scene item crop arithmetic for obs-scene.c, here so that
+ * test_scene_crop_steps can build it on its own with UBSan. The size, the
+ * rescale, the offset and the clamp are in obs-scene-crop.h. */
+
+/* A crop read from a scene collection, as an int: the nearest one when it
+ * is past the range. */
+static inline int obs_scene_crop_from_int64(int64_t crop)
+{
+	if (crop > INT_MAX)
+		return INT_MAX;
+	if (crop < INT_MIN)
+		return INT_MIN;
+	return (int)crop;
+}

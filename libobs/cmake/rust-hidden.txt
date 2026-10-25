@@ -3,6 +3,9 @@
 # One symbol per line; lines starting with '#' are comments.
 base_begin_crash
 profiler_name_store_push
+# profiler-io.c: non-static but not EXPORT; nothing outside the file
+# calls it, and the C build hides it.
+profile_print_func
 utf8_to_wchar
 wchar_to_utf8
 # platform-nix-dbus.c: called only by the Linux/FreeBSD sleep inhibitor;
@@ -48,6 +51,21 @@ video_output_inc_texture_frames
 video_output_inc_texture_skipped_frames
 video_output_create_with_frame_rate_divisor
 video_output_free_frame_rate_divisor
+# graphics/graphics-sprite.c: gs_draw_quadf(), gs_draw_sprite_subregion(),
+# gs_texture_set_image(), gs_texture_create(), gs_cubetexture_create() and
+# graphics_init_sprite_vbs() in graphics.c call them inside libobs. Declared
+# in graphics-sprite.h without EXPORT, so the shims stay hidden the same way.
+gs_sprite_build
+gs_sprite_quad_buffer
+gs_sprite_quad_refusal
+gs_sprite_quad_texture_size
+gs_sprite_subregion_is_whole
+gs_sprite_uv_norm
+gs_sprite_uv_rect
+gs_sprite_uv_subregion
+gs_texture_is_pow2
+gs_texture_mip_plan
+gs_texture_upload_plan
 # obs-scene-bounds.c: obs-scene.c calls it inside libobs. The C file has
 # no EXPORT, so the shim stays hidden the same way.
 obs_bounds_fit_scale
@@ -70,9 +88,337 @@ obs_scene_item_relative_scale
 # file has no EXPORT, so the shims stay hidden the same way.
 obs_scene_transform_val
 obs_scene_group_transform
+# obs-scene-extent.c: obs-scene.c calls them inside libobs. Declared in
+# obs-scene-extent.h without EXPORT, so the shims stay hidden the same way.
+obs_scene_extent_init
+obs_scene_extent_add
+obs_scene_extent_size
+# obs-scene-crop.c: obs-scene.c calls them inside libobs. Declared in
+# obs-scene-crop.h without EXPORT, so the shims stay hidden the same way.
+obs_scene_cropped_size
+obs_scene_scale_crop
+obs_scene_crop_offset
+obs_scene_clamp_crop
+# obs-scene-render-plan.c: render_item() and render_item_texture() in
+# obs-scene.c call them inside libobs. Declared in obs-scene-render-plan.h
+# without EXPORT, so the shims stay hidden the same way.
+obs_scene_render_texture_enabled
+obs_scene_render_texrender_action
+obs_scene_render_size_empty
+obs_scene_render_clear_white
+obs_scene_render_child
+obs_scene_render_linear_srgb
+obs_scene_texcoords_centered
+obs_scene_render_effect
+obs_scene_render_multiplier
+obs_scene_render_technique
+# obs-scene-item-names.c: scene_load_item() and scene_save_item() in
+# obs-scene.c call them inside libobs. Declared in obs-scene-item-names.h
+# without EXPORT, so the shims stay hidden the same way.
+obs_scene_item_scale_filter_from_name
+obs_scene_item_blend_method_from_name
+obs_scene_item_blend_type_from_name
+obs_scene_item_scale_filter_name
+obs_scene_item_blend_method_name
+obs_scene_item_blend_type_name
+obs_scene_item_transform_keys
+obs_scene_item_bounds_keys
+obs_scene_item_save_relative
+# obs-scene-audio-actions.c: obs-scene-item-audio-actions.c calls them inside
+# libobs. Declared in obs-scene-audio-actions.h without EXPORT, so the shims
+# stay hidden the same way.
+obs_scene_audio_actions_apply
+obs_scene_audio_action_due
+# obs-scene-audio-window.c: scene_audio_render() in obs-scene.c calls them
+# inside libobs. Declared in obs-scene-audio-window.h without EXPORT, so the
+# shims stay hidden the same way.
+obs_scene_audio_window_pick
+obs_scene_audio_window_counts
+obs_scene_audio_window_earliest
+obs_scene_audio_window_silent
+obs_scene_audio_window_frames
+obs_scene_audio_window_mixes
+obs_scene_audio_window_adds
+# obs-source-async-pacing.c: get_closest_frame() in obs-source.c calls it
+# inside libobs. Declared in obs-source-async-pacing.h without EXPORT, so the
+# shim stays hidden the same way.
+obs_source_async_pacing
+# obs-source-async-upload.c: set_async_texture_size(), update_async_texrender(),
+# update_async_textures(), check_to_swap_bgrx_bgra() and
+# obs_source_update_async_video() in obs-source.c call them inside libobs.
+# Declared in obs-source-async-upload.h without EXPORT, so the shims stay
+# hidden the same way.
+obs_source_async_upload_texture_changed
+obs_source_async_upload_tries_gpu
+obs_source_async_upload_size_uniforms
+obs_source_async_upload_hlg_peak
+obs_source_async_upload_maximum_nits
+obs_source_async_upload_over_sdr_white
+obs_source_async_upload_hdr_lw
+obs_source_async_upload_sets_range
+obs_source_async_upload_linear_alpha
+obs_source_async_upload_uses_texrender
+obs_source_async_upload_plain
+obs_source_async_upload_bgr_swap
+obs_source_async_upload_reanchor_reads_unbuffered
+obs_source_async_upload_reanchor
+# obs-source-audio-input.c: process_audio() and reset_resampler() in
+# obs-source.c call them inside libobs. Declared in obs-source-audio-input.h
+# without EXPORT, so the shims stay hidden the same way.
+obs_source_audio_input_discontinuous
+obs_source_audio_input_reset_needed
+obs_source_audio_input_resampler_needed
+obs_source_audio_input_balance_needed
+obs_source_audio_input_mono_needed
+obs_source_audio_input_balance
+obs_source_audio_input_downmix
+# obs-source-audio-render.c: obs_source_audio_render(), custom_audio_render()
+# and process_audio_source_tick() in obs-source.c call them inside libobs.
+# Declared in obs-source-audio-render.h without EXPORT, so the shims stay
+# hidden the same way.
+obs_source_audio_render_route
+obs_source_audio_render_custom_clear_before
+obs_source_audio_render_custom_ts
+obs_source_audio_render_custom_pending
+obs_source_audio_render_custom_unmixed
+obs_source_audio_render_custom_in_tick
+obs_source_audio_render_custom_clear_after
+obs_source_audio_render_tick_unset
+obs_source_audio_render_tick_short
+obs_source_audio_render_tick_stop
+obs_source_audio_render_tick_copy
+obs_source_audio_render_tick_volume
+obs_source_audio_render_tick_clear_main
+# obs-source-audio-timing.c: source_output_audio_data() and
+# reset_audio_data_at_sys_time() in obs-source.c call them inside libobs.
+# Declared in obs-source-audio-timing.h without EXPORT, so the shims stay
+# hidden the same way.
+obs_source_audio_timing_pre_lock
+obs_source_audio_timing_under_lock
+obs_source_audio_timing_buffer_start
+# obs-source-color-space.c: obs_source_get_color_space() in obs-source.c calls
+# them inside libobs. Declared in obs-source-color-space.h without EXPORT, so
+# the shims stay hidden the same way.
+obs_source_color_space_route
+obs_source_color_space_pick
+# obs-source-conversion-plan.c: get_convert_type(), init_gpu_conversion(),
+# select_conversion_technique() and need_linear_output() in obs-source.c call
+# it inside libobs. Declared in obs-source-conversion-plan.h without EXPORT, so
+# the shim stays hidden the same way.
+obs_source_conversion_plan_fill
+# obs-source-deinterlace-draw.c: get_effect(), deinterlace_render() and
+# obs_source_set_deinterlace_mode() in obs-source-deinterlace.c call them
+# inside libobs. Declared in obs-source-deinterlace-draw.h without EXPORT, so
+# the shims stay hidden the same way.
+obs_source_deinterlace_draw_effect
+obs_source_deinterlace_draw_linear_required
+obs_source_deinterlace_draw_skip
+obs_source_deinterlace_draw_reads_linear_srgb
+obs_source_deinterlace_draw_linear_srgb
+obs_source_deinterlace_draw_technique
+obs_source_deinterlace_draw_reads_white_level
+obs_source_deinterlace_draw_multiplier
+obs_source_deinterlace_draw_frame2
+obs_source_deinterlace_draw_mode_change
+# obs-source-deinterlace-pacing.c: deinterlace_get_closest_frames() and
+# ready_deinterlace_frames() in obs-source-deinterlace.c call them inside
+# libobs. Declared in obs-source-deinterlace-pacing.h without EXPORT, so the
+# shims stay hidden the same way.
+obs_source_deinterlace_pacing_hold
+obs_source_deinterlace_pacing_wait_for_next
+obs_source_deinterlace_pacing_waiting_frame_ts
+obs_source_deinterlace_pacing_half_duration
+obs_source_deinterlace_pacing_buffered_offset
+obs_source_deinterlace_pacing_reanchor
+# obs-source-deinterlace-select.c: first_frame(), ready_deinterlace_frames(),
+# deinterlace_get_closest_frames() and deinterlace_update_async_video() in
+# obs-source-deinterlace.c call them inside libobs. Declared in
+# obs-source-deinterlace-select.h without EXPORT, so the shims stay hidden the
+# same way.
+obs_source_deinterlace_select_first
+obs_source_deinterlace_select_walk
+obs_source_deinterlace_select_unbuffered_pair
+obs_source_deinterlace_select_take_reads_flag
+obs_source_deinterlace_select_take_pair
+obs_source_deinterlace_select_take_init_last
+obs_source_deinterlace_select_take_offset
+obs_source_deinterlace_select_update
+# obs-source-draw-plan.c: rotate_async_video(),
+# obs_source_render_async_video() and source_render() in obs-source.c call
+# them inside libobs. Declared in obs-source-draw-plan.h without EXPORT, so the
+# shims stay hidden the same way.
+obs_source_draw_plan_rotation_x
+obs_source_draw_plan_rotation_y
+obs_source_draw_plan_async_linear_srgb
+obs_source_draw_plan_async_nonlinear_alpha
+obs_source_draw_plan_technique
+obs_source_draw_plan_reads_white_level
+obs_source_draw_plan_multiplier
+obs_source_draw_plan_convert
+# obs-source-frame-copy.c: copy_frame_data(), cache_video(), clean_cache(),
+# preload_frame_changed() and the obs_source_output_video(),
+# obs_source_preload_video() and obs_source_set_video_frame() families in
+# obs-source.c call them inside libobs. Declared in obs-source-frame-copy.h
+# without EXPORT, so the shims stay hidden the same way.
+obs_source_frame_copy_plan
+obs_source_frame_copy_cache_step
+obs_source_frame_copy_cache_clean
+obs_source_frame_copy_full_range
+obs_source_frame_copy_full_range2
+obs_source_frame_copy_preload_changed
+# obs-source-media-admission.c: the obs_source_media_*() functions and
+# process_media_actions() in obs-source.c call them inside libobs. Declared in
+# obs-source-media-admission.h without EXPORT, so the shims stay hidden the
+# same way.
+obs_source_media_admit
+obs_source_media_admit_flags
+obs_source_media_admit_callback
+obs_source_media_time_fallback
+obs_source_media_state_fallback
+obs_source_media_dispatch
+obs_source_media_signal_reads_pause
+obs_source_media_signal
+# obs-source-ptm-gate.c: source_muted() and get_source_volume() in
+# obs-source.c call them inside libobs. Declared in obs-source-ptm-gate.h
+# without EXPORT, so the shims stay hidden the same way.
+obs_source_ptm_gate_stop_time
+obs_source_ptm_gate_held
+obs_source_ptm_gate_mutes
+obs_source_ptm_gate_talk_mutes
+# obs-source-render-route.c: source_render_video(), obs_source_main_render(),
+# can_bypass(), obs_source_process_filter_begin_with_color_space(),
+# obs_source_process_filter_tech_end() and obs_source_skip_video_filter() in
+# obs-source.c call them inside libobs. Declared in obs-source-render-route.h
+# without EXPORT, so the shims stay hidden the same way.
+obs_source_render_route_filter
+obs_source_render_route_video_reads_flags
+obs_source_render_route_video_none
+obs_source_render_route_async_reads_flags
+obs_source_render_route_async_reads_rendering_filter
+obs_source_render_route_async_update
+obs_source_render_route_reads_enabled
+obs_source_render_route_inactive
+obs_source_render_route_draw
+obs_source_render_route_draw_next
+obs_source_render_route_main_custom_draw
+obs_source_render_route_main_srgb_aware
+obs_source_render_route_main_reads_filters
+obs_source_render_route_main_default_effect
+obs_source_render_route_bypass_reads_space
+obs_source_render_route_bypass
+obs_source_render_route_size_skip
+obs_source_render_route_texrender_stale
+obs_source_render_route_filter_render
+obs_source_render_route_tech_end_linear_srgb
+obs_source_render_route_tech_name
+obs_source_render_route_tech_end
+obs_source_render_route_skip
+# obs-source-size.c: get_base_width(), get_base_height(), get_recurse_width()
+# and get_recurse_height() in obs-source.c call them inside libobs. Declared in
+# obs-source-size.h without EXPORT, so the shims stay hidden the same way.
+obs_source_size_route
+obs_source_size_entry
+# obs-source-transition-clock.c: calc_time(), obs_transition_tick(), get_cx(),
+# get_cy(), recalculate_transition_size(), recalculate_transition_matrix(),
+# mix_spaces() and transition_calc_min_ts() in obs-source-transition.c call
+# them inside libobs. Declared in obs-source-transition-clock.h without
+# EXPORT, so the shims stay hidden the same way.
+obs_source_transition_clock_time
+obs_source_transition_clock_manual
+obs_source_transition_clock_size
+obs_source_transition_clock_fold
+obs_source_transition_clock_fit
+obs_source_transition_clock_mix_spaces
+obs_source_transition_clock_min_ts
+# obs-source-transition-render.c: obs_transition_video_render2(),
+# obs_transition_video_render_direct(), obs_transition_audio_render(),
+# transition_process_audio() and recalculate_transition_matrix() in
+# obs-source-transition.c call them inside libobs. Declared in
+# obs-source-transition-render.h without EXPORT, so the shims stay hidden the
+# same way.
+obs_source_transition_render_video_due
+obs_source_transition_render_video_stop
+obs_source_transition_render_draw
+obs_source_transition_render_direct_index
+obs_source_transition_render_audio_stop
+obs_source_transition_render_audio_mix
+obs_source_transition_render_audio_valid
+obs_source_transition_render_audio_place
+obs_source_transition_render_offset
+# obs-source-volume.c: get_source_volume() and apply_audio_volume() in
+# obs-source.c call them inside libobs. Declared in obs-source-volume.h
+# without EXPORT, so the shims stay hidden the same way.
+obs_source_volume_snap
+obs_source_volume_action_due
+obs_source_volume_step
+obs_source_volume_mixes
+# obs-audio-mix.c: obs-audio.c calls them inside libobs. Declared in
+# obs-audio-mix.h without EXPORT, so the shims stay hidden the same way.
+obs_audio_mix_time_to_frames
+obs_audio_mix_add
+obs_audio_buffering_maxed
+obs_audio_buffering_fixed
+obs_audio_buffering_add
 # obs-output-caption-text.c: obs-output.c calls it inside libobs. Declared
 # in obs-internal.h without EXPORT, so the shim stays hidden the same way.
 obs_output_caption_text_page
+# obs-output-protocols.c: obs_enum_output_types_with_protocol() in
+# obs-output.c calls it inside libobs. Declared in obs-internal.h without
+# EXPORT, so the shim stays hidden the same way.
+obs_output_protocol_list_count
+# obs-output-video-checks.c: get_first_mixer(), obs_output_get_width2(),
+# obs_output_get_height2(), can_begin_data_capture(),
+# obs_output_get_video_conversion(), obs_output_can_begin_data_capture() and
+# obs_output_get_congestion() in obs-output.c call them inside libobs.
+# Declared in obs-output-video-checks.h without EXPORT, so the shims stay
+# hidden the same way.
+obs_output_first_mixer
+obs_output_size_route
+obs_output_capture_ready
+obs_output_begin_gate
+obs_output_conversion_plan
+obs_output_congestion_clamp
+# obs-encoder-roi.c: obs_encoder_add_roi() and obs_encoder_enum_roi() in
+# obs-encoder.c call them inside libobs. Declared in obs-encoder-roi.h without
+# EXPORT, so the shims stay hidden the same way.
+obs_encoder_roi_admit
+obs_encoder_roi_scale_factors
+obs_encoder_roi_scale
+# obs-encoder-audio-start.c: receive_video(), buffer_audio(),
+# calc_offset_size(), start_from_buffer(), push_back_audio(), receive_audio(),
+# send_audio_data(), obs_encoder_set_gpu_scale_type() and
+# obs_encoder_set_frame_rate_divisor() in obs-encoder.c call them inside
+# libobs. Declared in obs-encoder-audio-start.h without EXPORT, so the shims
+# stay hidden the same way.
+obs_encoder_audio_start_group_ready
+obs_encoder_audio_start_paired_late
+obs_encoder_audio_start_video_pts
+obs_encoder_audio_start_size
+obs_encoder_audio_start_paired
+obs_encoder_audio_start_unpaired
+obs_encoder_audio_start_no_video
+obs_encoder_audio_start_packet
+obs_encoder_audio_start_offset_ns
+obs_encoder_audio_start_offset_size
+obs_encoder_audio_start_buffer_offset
+obs_encoder_audio_start_push_size
+obs_encoder_audio_start_can_send
+obs_encoder_audio_start_audio_pts
+obs_encoder_audio_start_not_video
+obs_encoder_audio_start_divisor_ok
+# obs-encoder-size.c: get_audio_info(), get_video_info(),
+# obs_encoder_set_scaled_size(), obs_encoder_scaling_enabled(),
+# obs_encoder_get_width(), obs_encoder_get_height() and
+# obs_encoder_get_sample_rate() in obs-encoder.c call them inside libobs.
+# Declared in obs-encoder-size.h without EXPORT, so the shims stay hidden the
+# same way.
+obs_encoder_size_audio_defaults
+obs_encoder_size_cap_override
+obs_encoder_size_scaled_gate
+obs_encoder_size_scaled_match
+obs_encoder_size_scaling
+obs_encoder_size_video_route
+obs_encoder_size_rate_route
 # obs-output-delay.c: obs-output.c calls them inside libobs and installs
 # process_delay as the encoded packet callback. Declared in obs-internal.h
 # without EXPORT, so the shims stay hidden the same way.
@@ -128,6 +474,46 @@ obs_nix_portal_sets_partition
 # obs-internal.h without EXPORT, so the shims stay hidden the same way.
 obs_context_name_dup
 obs_context_name_deduplicate
+# obs-module-locale.c: obs-module.c calls them inside libobs. Declared in
+# obs-internal.h without EXPORT, so the shims stay hidden the same way.
+obs_module_locale_default_file
+obs_module_locale_is_default
+obs_module_locale_file
+# obs-module-names.c: obs-module.c calls them inside libobs. Declared in
+# obs-internal.h without EXPORT, so the shims stay hidden the same way.
+obs_module_names_file_name
+obs_module_names_module_name
+obs_module_names_config_path
+obs_module_names_manifest_path
+obs_module_names_listed
+obs_module_names_find_core
+# obs-module-paths.c: obs-module.c calls them inside libobs. Declared in
+# obs-internal.h without EXPORT, so the shims stay hidden the same way.
+obs_module_paths_data_dir
+obs_module_paths_find
+obs_module_paths_find_file
+# obs-module-source-rules.c: obs-module.c calls them inside libobs. Declared
+# in obs-internal.h without EXPORT, so the shims stay hidden the same way.
+obs_module_source_rules_list_of
+obs_module_source_rules_size_supported
+obs_module_source_rules_output_flags
+obs_module_source_rules_check
+obs_module_source_rules_versioned_id
+# obs-module-type-rules.c: obs-module.c calls them inside libobs. Declared
+# in obs-module-type-rules.h without EXPORT, so the shims stay hidden the same
+# way.
+obs_module_type_rules_output_check
+obs_module_type_rules_encoder_check
+obs_module_type_rules_service_check
+obs_module_type_rules_protocol_listed
+# obs-source-load.c: obs.c calls them inside libobs. Declared in
+# obs-source-load.h without EXPORT, so the shims stay hidden the same way.
+obs_source_load_prev_ver
+obs_source_load_volume
+obs_source_load_balance
+obs_source_load_delay
+obs_source_load_deinterlace_mode
+obs_source_load_monitoring_migration
 # obs-video-plan.c: obs.c calls them inside libobs. Declared in
 # obs-internal.h without EXPORT, so the shims stay hidden the same way.
 obs_video_size_valid
@@ -135,9 +521,69 @@ obs_video_align_output_size
 obs_video_output_size_valid
 obs_video_scale_type_name
 obs_video_output_plan
+# obs-video-copy-plan.c: set_gpu_converted_data(), copy_rgbx_frame(),
+# get_scale_effect() and can_reuse_mix_texture() in obs-video.c call them
+# inside libobs. Declared in obs-video-copy-plan.h without EXPORT, so the
+# shims stay hidden the same way.
+obs_video_gpu_copy_plan
+obs_video_rgbx_copy_plan
+obs_video_scale_resolution_close
+obs_video_scale_effect_choice
+obs_video_mix_reuse_match
+# obs-video-output-step.c: update_active_state(), stage_output_texture(),
+# queue_frame(), render_video() and output_frame() in obs-video.c call them
+# inside libobs. Declared in obs-video-output-step.h without EXPORT, so the
+# shims stay hidden the same way.
+obs_video_step_activation
+obs_video_step_stage
+obs_video_step_queue
+obs_video_step_queue_copy_uv
+obs_video_step_queue_count
+obs_video_step_render_targets
+obs_video_step_render
+obs_video_step_ring
+obs_video_step_download
+obs_video_step_output
+# obs-canvas-draw.c: obs_render_canvas_texture_internal() in obs.c and
+# render_display_begin() in obs-display.c call them inside libobs. Declared in
+# obs-canvas-draw.h without EXPORT, so the shims stay hidden the same way.
+obs_canvas_draw_multiplier
+obs_canvas_draw_reads_white_level
+obs_canvas_draw_skip
+obs_canvas_draw_technique
+obs_display_clear_draws_solid
+obs_display_clear_flags
+obs_display_clear_linear
+obs_display_clear_reads_space
+# util/source-profiler.c: obs.c, obs-video.c and obs-source.c call the frame
+# hooks inside libobs. Declared in obs-internal.h without EXPORT, so the
+# shims stay hidden the same way.
+source_profiler_reset_video
+source_profiler_render_begin
+source_profiler_render_end
+source_profiler_frame_begin
+source_profiler_frame_collect
+source_profiler_async_frame_received
+source_profiler_source_tick_start
+source_profiler_source_tick_end
+source_profiler_source_render_begin
+source_profiler_source_render_end
+source_profiler_remove_source
 # effect-parser lifecycle: internal entry point, not EXPORT.
 ep_free
 
 # Internal scene bounds placement.
 add_alignment
 obs_bounds_place
+
+# obs-service.c (#1920): obs-output.c and the context list call them inside
+# libobs; the C has no EXPORT.
+obs_service_destroy
+obs_service_activate
+obs_service_deactivate
+obs_service_initialize
+
+# obs-view.c (#1933): obs-canvas.c calls them on the view embedded in each
+# canvas; the C has no EXPORT.
+obs_view_init
+obs_view_free

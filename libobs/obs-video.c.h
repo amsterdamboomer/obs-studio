@@ -121,19 +121,29 @@ static inline void unmap_last_surface(struct obs_core_video_mix *video)
 	}
 }
 
+static inline struct obs_video_mix_reuse_key mix_reuse_key(const struct obs_core_video_mix *mix)
+{
+	struct obs_video_mix_reuse_key key = {
+		.view = (uintptr_t)mix->view,
+		.render_space = mix->render_space,
+		.base_width = mix->ovi.base_width,
+		.base_height = mix->ovi.base_height,
+		.rendered = mix->texture_rendered,
+	};
+	return key;
+}
+
 static inline bool can_reuse_mix_texture(const struct obs_core_video_mix *mix, size_t *idx)
 {
+	const struct obs_video_mix_reuse_key key = mix_reuse_key(mix);
+
 	for (size_t i = 0, num = obs->video.mixes.num; i < num; i++) {
 		const struct obs_core_video_mix *other = obs->video.mixes.array[i];
 		if (other == mix)
 			break;
-		if (other->view != mix->view)
-			continue;
-		if (other->render_space != mix->render_space)
-			continue;
-		if (other->ovi.base_width != mix->ovi.base_width || other->ovi.base_height != mix->ovi.base_height)
-			continue;
-		if (!other->texture_rendered)
+
+		const struct obs_video_mix_reuse_key other_key = mix_reuse_key(other);
+		if (!obs_video_mix_reuse_match(&other_key, &key))
 			continue;
 
 		*idx = i;
@@ -210,54 +220,69 @@ static inline void render_main_texture(struct obs_core_video_mix *video)
 	profile_end(render_main_texture_name);
 }
 
-static inline gs_effect_t *get_scale_effect_internal(struct obs_core_video_mix *mix)
+/* The scale types obs-video-copy-plan.h copies. */
+_Static_assert(OBS_VIDEO_COPY_SCALE_DISABLE == OBS_SCALE_DISABLE, "OBS_SCALE_DISABLE");
+_Static_assert(OBS_VIDEO_COPY_SCALE_POINT == OBS_SCALE_POINT, "OBS_SCALE_POINT");
+_Static_assert(OBS_VIDEO_COPY_SCALE_BICUBIC == OBS_SCALE_BICUBIC, "OBS_SCALE_BICUBIC");
+_Static_assert(OBS_VIDEO_COPY_SCALE_BILINEAR == OBS_SCALE_BILINEAR, "OBS_SCALE_BILINEAR");
+_Static_assert(OBS_VIDEO_COPY_SCALE_LANCZOS == OBS_SCALE_LANCZOS, "OBS_SCALE_LANCZOS");
+_Static_assert(OBS_VIDEO_COPY_SCALE_AREA == OBS_SCALE_AREA, "OBS_SCALE_AREA");
+_Static_assert(OBS_VIDEO_COPY_MAX == NUM_CHANNELS, "NUM_CHANNELS");
+
+static inline uint32_t loaded_scale_effects(const struct obs_core_video *video)
 {
-	struct obs_core_video *video = &obs->video;
-	const struct video_output_info *info = video_output_get_info(mix->video);
-
-	/* if the dimension is under half the size of the original image,
-	 * bicubic/lanczos can't sample enough pixels to create an accurate
-	 * image, so use the bilinear low resolution effect instead */
-	if (info->width < (mix->ovi.base_width / 2) && info->height < (mix->ovi.base_height / 2)) {
-		return video->bilinear_lowres_effect;
-	}
-
-	switch (mix->ovi.scale_type) {
-	case OBS_SCALE_BILINEAR:
-		return video->default_effect;
-	case OBS_SCALE_LANCZOS:
-		return video->lanczos_effect;
-	case OBS_SCALE_AREA:
-		return video->area_effect;
-	case OBS_SCALE_BICUBIC:
-	default:;
-	}
-
-	return video->bicubic_effect;
+	uint32_t loaded = 0;
+	if (video->default_effect)
+		loaded |= OBS_VIDEO_SCALE_LOADED(OBS_VIDEO_SCALE_EFFECT_DEFAULT);
+	if (video->bilinear_lowres_effect)
+		loaded |= OBS_VIDEO_SCALE_LOADED(OBS_VIDEO_SCALE_EFFECT_BILINEAR_LOWRES);
+	if (video->bicubic_effect)
+		loaded |= OBS_VIDEO_SCALE_LOADED(OBS_VIDEO_SCALE_EFFECT_BICUBIC);
+	if (video->lanczos_effect)
+		loaded |= OBS_VIDEO_SCALE_LOADED(OBS_VIDEO_SCALE_EFFECT_LANCZOS);
+	if (video->area_effect)
+		loaded |= OBS_VIDEO_SCALE_LOADED(OBS_VIDEO_SCALE_EFFECT_AREA);
+	return loaded;
 }
 
-static inline bool resolution_close(struct obs_core_video_mix *mix, uint32_t width, uint32_t height)
+static inline gs_effect_t *scale_effect_pointer(const struct obs_core_video *video, enum obs_video_scale_effect effect)
 {
-	long width_cmp = (long)mix->ovi.base_width - (long)width;
-	long height_cmp = (long)mix->ovi.base_height - (long)height;
-
-	return labs(width_cmp) <= 16 && labs(height_cmp) <= 16;
+	switch (effect) {
+	case OBS_VIDEO_SCALE_EFFECT_BILINEAR_LOWRES:
+		return video->bilinear_lowres_effect;
+	case OBS_VIDEO_SCALE_EFFECT_BICUBIC:
+		return video->bicubic_effect;
+	case OBS_VIDEO_SCALE_EFFECT_LANCZOS:
+		return video->lanczos_effect;
+	case OBS_VIDEO_SCALE_EFFECT_AREA:
+		return video->area_effect;
+	case OBS_VIDEO_SCALE_EFFECT_DEFAULT:
+	default:
+		return video->default_effect;
+	}
 }
 
 static inline gs_effect_t *get_scale_effect(struct obs_core_video_mix *mix, uint32_t width, uint32_t height)
 {
 	struct obs_core_video *video = &obs->video;
+	struct obs_video_scale_input input = {
+		.base_width = mix->ovi.base_width,
+		.base_height = mix->ovi.base_height,
+		.target_width = width,
+		.target_height = height,
+		.scale_type = mix->ovi.scale_type,
+		.loaded = loaded_scale_effects(video),
+	};
 
-	if (resolution_close(mix, width, height)) {
-		return video->default_effect;
-	} else {
-		/* if the scale method couldn't be loaded, use either bicubic
-		 * or bilinear by default */
-		gs_effect_t *effect = get_scale_effect_internal(mix);
-		if (!effect)
-			effect = !!video->bicubic_effect ? video->bicubic_effect : video->default_effect;
-		return effect;
+	/* The output's size is only read when the target is not close to the
+	 * base size, as before. */
+	if (!obs_video_scale_resolution_close(input.base_width, input.base_height, width, height)) {
+		const struct video_output_info *info = video_output_get_info(mix->video);
+		input.output_width = info->width;
+		input.output_height = info->height;
 	}
+
+	return scale_effect_pointer(video, obs_video_scale_effect_choice(&input));
 }
 
 static const char *render_output_texture_name = "render_output_texture";
@@ -397,6 +422,10 @@ static void render_convert_texture(struct obs_core_video_mix *video, gs_texture_
 	profile_end(render_convert_texture_name);
 }
 
+/* The texture ring and channel counts obs-video-output-step.h copies. */
+_Static_assert(OBS_VIDEO_STEP_TEXTURES == NUM_TEXTURES, "NUM_TEXTURES");
+_Static_assert(OBS_VIDEO_STEP_CHANNELS == NUM_CHANNELS, "NUM_CHANNELS");
+
 static const char *stage_output_texture_name = "stage_output_texture";
 static inline void stage_output_texture(struct obs_core_video_mix *video, int cur_texture,
 					gs_texture_t *const *const convert_textures, gs_texture_t *output_texture,
@@ -406,25 +435,18 @@ static inline void stage_output_texture(struct obs_core_video_mix *video, int cu
 
 	unmap_last_surface(video);
 
-	if (!video->gpu_conversion) {
-		gs_stagesurf_t *copy = copy_surfaces[0];
-		if (copy)
-			gs_stage_texture(copy, output_texture);
-		video->active_copy_surfaces[cur_texture][0] = copy;
+	const struct obs_video_step_stage stage =
+		obs_video_step_stage(video->gpu_conversion, video->texture_converted, channel_count);
 
-		for (size_t i = 1; i < NUM_CHANNELS; ++i)
-			video->active_copy_surfaces[cur_texture][i] = NULL;
-
-		video->textures_copied[cur_texture] = true;
-	} else if (video->texture_converted) {
-		for (size_t i = 0; i < channel_count; i++) {
+	if (stage.staged) {
+		for (size_t i = 0; i < stage.channels; i++) {
 			gs_stagesurf_t *copy = copy_surfaces[i];
 			if (copy)
-				gs_stage_texture(copy, convert_textures[i]);
+				gs_stage_texture(copy, stage.from_output ? output_texture : convert_textures[i]);
 			video->active_copy_surfaces[cur_texture][i] = copy;
 		}
 
-		for (size_t i = channel_count; i < NUM_CHANNELS; ++i)
+		for (size_t i = stage.channels; i < NUM_CHANNELS; ++i)
 			video->active_copy_surfaces[cur_texture][i] = NULL;
 
 		video->textures_copied[cur_texture] = true;
@@ -435,10 +457,10 @@ static inline void stage_output_texture(struct obs_core_video_mix *video, int cu
 
 static inline bool queue_frame(struct obs_core_video_mix *video, bool raw_active, struct obs_vframe_info *vframe_info)
 {
-	bool duplicate = !video->gpu_encoder_avail_queue.size ||
-			 (video->gpu_encoder_queue.size && vframe_info->count > 1);
+	const enum obs_video_step_queue_action action = obs_video_step_queue(
+		video->gpu_encoder_avail_queue.size, video->gpu_encoder_queue.size, vframe_info->count, raw_active);
 
-	if (duplicate) {
+	if (action == OBS_VIDEO_STEP_QUEUE_DUPLICATE) {
 		struct obs_tex_frame *tf =
 			deque_data(&video->gpu_encoder_queue, video->gpu_encoder_queue.size - sizeof(*tf));
 
@@ -460,17 +482,9 @@ static inline bool queue_frame(struct obs_core_video_mix *video, bool raw_active
 		tf.released = false;
 	}
 
-	/* the vframe_info->count > 1 case causing a copy can only happen if by
-	 * some chance the very first frame has to be duplicated for whatever
-	 * reason.  otherwise, it goes to the 'duplicate' case above, which
-	 * will ensure better performance. */
-	if (raw_active || vframe_info->count > 1) {
+	if (action == OBS_VIDEO_STEP_QUEUE_COPY) {
 		gs_copy_texture(tf.tex, video->convert_textures_encode[0]);
-		/* Y and UV textures are views of the same texture on D3D, and
-		 * gs_copy_texture will copy all views of the underlying
-		 * texture. On other platforms, these are two distinct textures
-		 * that must be copied separately. */
-		if (!obs_host_nv12_planes_share_texture())
+		if (obs_video_step_queue_copy_uv(obs_host_nv12_planes_share_texture()))
 			gs_copy_texture(tf.tex_uv, video->convert_textures_encode[1]);
 	} else {
 		gs_texture_t *tex = video->convert_textures_encode[0];
@@ -492,7 +506,8 @@ static inline bool queue_frame(struct obs_core_video_mix *video, bool raw_active
 	os_sem_post(video->gpu_encode_semaphore);
 
 finish:
-	return --vframe_info->count;
+	vframe_info->count = obs_video_step_queue_count(vframe_info->count);
+	return vframe_info->count;
 }
 
 extern void full_stop(struct obs_encoder *encoder);
@@ -534,26 +549,30 @@ static inline void render_video(struct obs_core_video_mix *video, bool raw_activ
 
 	render_main_texture(video);
 
-	if (raw_active || gpu_active) {
+	const struct obs_video_step_render_targets targets = obs_video_step_render_targets(raw_active, gpu_active);
+	if (targets.outputs) {
 		gs_texture_t *const *convert_textures = video->convert_textures;
 		gs_stagesurf_t *const *copy_surfaces = video->copy_surfaces[cur_texture];
 		size_t channel_count = NUM_CHANNELS;
 		gs_texture_t *output_texture = render_output_texture(video);
 
-		if (gpu_active) {
+		if (targets.encode) {
 			convert_textures = video->convert_textures_encode;
 			obs_host_gpu_encode_surfaces(video, &copy_surfaces, &channel_count);
 		}
 
-		if (video->gpu_conversion) {
+		const struct obs_video_step_render step =
+			obs_video_step_render(raw_active, gpu_active, video->gpu_conversion);
+
+		if (step.convert) {
 			render_convert_texture(video, convert_textures, output_texture);
 		}
 
-		if (gpu_active) {
+		if (step.encode) {
 			output_gpu_encoders(video, raw_active);
 		}
 
-		if (raw_active) {
+		if (step.stage) {
 			stage_output_texture(video, cur_texture, convert_textures, output_texture, copy_surfaces,
 					     channel_count);
 		}
@@ -582,18 +601,18 @@ static inline bool download_frame(struct obs_core_video_mix *video, int prev_tex
 	return true;
 }
 
-static const uint8_t *set_gpu_converted_plane(uint32_t width, uint32_t height, uint32_t linesize_input,
-					      uint32_t linesize_output, const uint8_t *in, uint8_t *out)
+/* One copy of the plan (obs-video-copy-plan.c): returns where the source
+ * ended. */
+static const uint8_t *set_gpu_converted_plane(const struct obs_video_copy *copy, const uint8_t *in, uint8_t *out)
 {
-	if ((width == linesize_input) && (width == linesize_output)) {
-		size_t total = (size_t)width * (size_t)height;
-		memcpy(out, in, total);
-		in += total;
+	if (copy->whole) {
+		memcpy(out, in, copy->bytes);
+		in += copy->bytes;
 	} else {
-		for (size_t y = 0; y < height; y++) {
-			memcpy(out, in, width);
-			out += linesize_output;
-			in += linesize_input;
+		for (size_t y = 0; y < copy->rows; y++) {
+			memcpy(out, in, copy->bytes);
+			out += copy->dst_stride;
+			in += copy->src_stride;
 		}
 	}
 
@@ -603,160 +622,26 @@ static const uint8_t *set_gpu_converted_plane(uint32_t width, uint32_t height, u
 static void set_gpu_converted_data(struct video_frame *output, const struct video_data *input,
 				   const struct video_output_info *info)
 {
-	switch (info->format) {
-	case VIDEO_FORMAT_I420: {
-		const uint32_t width = info->width;
-		const uint32_t height = info->height;
+	const struct obs_video_copy_plan plan =
+		obs_video_gpu_copy_plan(info->format, info->width, info->height, input->linesize, output->linesize);
+	const uint8_t *after_plane0 = NULL;
 
-		set_gpu_converted_plane(width, height, input->linesize[0], output->linesize[0], input->data[0],
-					output->data[0]);
-
-		const uint32_t width_d2 = width / 2;
-		const uint32_t height_d2 = height / 2;
-
-		set_gpu_converted_plane(width_d2, height_d2, input->linesize[1], output->linesize[1], input->data[1],
-					output->data[1]);
-
-		set_gpu_converted_plane(width_d2, height_d2, input->linesize[2], output->linesize[2], input->data[2],
-					output->data[2]);
-
-		break;
-	}
-	case VIDEO_FORMAT_NV12: {
-		const uint32_t width = info->width;
-		const uint32_t height = info->height;
-		const uint32_t height_d2 = height / 2;
-		if (input->linesize[1]) {
-			set_gpu_converted_plane(width, height, input->linesize[0], output->linesize[0], input->data[0],
-						output->data[0]);
-			set_gpu_converted_plane(width, height_d2, input->linesize[1], output->linesize[1],
-						input->data[1], output->data[1]);
-		} else {
-			const uint8_t *const in_uv = set_gpu_converted_plane(width, height, input->linesize[0],
-									     output->linesize[0], input->data[0],
-									     output->data[0]);
-			set_gpu_converted_plane(width, height_d2, input->linesize[0], output->linesize[1], in_uv,
-						output->data[1]);
-		}
-
-		break;
-	}
-	case VIDEO_FORMAT_I444: {
-		const uint32_t width = info->width;
-		const uint32_t height = info->height;
-
-		set_gpu_converted_plane(width, height, input->linesize[0], output->linesize[0], input->data[0],
-					output->data[0]);
-
-		set_gpu_converted_plane(width, height, input->linesize[1], output->linesize[1], input->data[1],
-					output->data[1]);
-
-		set_gpu_converted_plane(width, height, input->linesize[2], output->linesize[2], input->data[2],
-					output->data[2]);
-
-		break;
-	}
-	case VIDEO_FORMAT_I010: {
-		const uint32_t width = info->width;
-		const uint32_t height = info->height;
-
-		set_gpu_converted_plane(width * 2, height, input->linesize[0], output->linesize[0], input->data[0],
-					output->data[0]);
-
-		const uint32_t height_d2 = height / 2;
-
-		set_gpu_converted_plane(width, height_d2, input->linesize[1], output->linesize[1], input->data[1],
-					output->data[1]);
-
-		set_gpu_converted_plane(width, height_d2, input->linesize[2], output->linesize[2], input->data[2],
-					output->data[2]);
-
-		break;
-	}
-	case VIDEO_FORMAT_P010: {
-		const uint32_t width_x2 = info->width * 2;
-		const uint32_t height = info->height;
-		const uint32_t height_d2 = height / 2;
-		if (input->linesize[1]) {
-			set_gpu_converted_plane(width_x2, height, input->linesize[0], output->linesize[0],
-						input->data[0], output->data[0]);
-			set_gpu_converted_plane(width_x2, height_d2, input->linesize[1], output->linesize[1],
-						input->data[1], output->data[1]);
-		} else {
-			const uint8_t *const in_uv = set_gpu_converted_plane(width_x2, height, input->linesize[0],
-									     output->linesize[0], input->data[0],
-									     output->data[0]);
-			set_gpu_converted_plane(width_x2, height_d2, input->linesize[0], output->linesize[1], in_uv,
-						output->data[1]);
-		}
-
-		break;
-	}
-	case VIDEO_FORMAT_P216: {
-		const uint32_t width_x2 = info->width * 2;
-		const uint32_t height = info->height;
-
-		set_gpu_converted_plane(width_x2, height, input->linesize[0], output->linesize[0], input->data[0],
-					output->data[0]);
-
-		set_gpu_converted_plane(width_x2, height, input->linesize[1], output->linesize[1], input->data[1],
-					output->data[1]);
-
-		break;
-	}
-	case VIDEO_FORMAT_P416: {
-		const uint32_t height = info->height;
-
-		set_gpu_converted_plane(info->width * 2, height, input->linesize[0], output->linesize[0],
-					input->data[0], output->data[0]);
-
-		set_gpu_converted_plane(info->width * 4, height, input->linesize[1], output->linesize[1],
-					input->data[1], output->data[1]);
-
-		break;
-	}
-
-	case VIDEO_FORMAT_NONE:
-	case VIDEO_FORMAT_YVYU:
-	case VIDEO_FORMAT_YUY2:
-	case VIDEO_FORMAT_UYVY:
-	case VIDEO_FORMAT_RGBA:
-	case VIDEO_FORMAT_BGRA:
-	case VIDEO_FORMAT_BGRX:
-	case VIDEO_FORMAT_Y800:
-	case VIDEO_FORMAT_BGR3:
-	case VIDEO_FORMAT_I412:
-	case VIDEO_FORMAT_I422:
-	case VIDEO_FORMAT_I210:
-	case VIDEO_FORMAT_I40A:
-	case VIDEO_FORMAT_I42A:
-	case VIDEO_FORMAT_YUVA:
-	case VIDEO_FORMAT_YA2L:
-	case VIDEO_FORMAT_AYUV:
-	case VIDEO_FORMAT_V210:
-	case VIDEO_FORMAT_R10L:
-		/* unimplemented */
-		;
+	for (size_t i = 0; i < plan.count && i < OBS_VIDEO_COPY_MAX; i++) {
+		const struct obs_video_copy *copy = &plan.copies[i];
+		const uint8_t *in = copy->src_after_plane0 ? after_plane0 : input->data[i];
+		const uint8_t *end = set_gpu_converted_plane(copy, in, output->data[i]);
+		if (i == 0)
+			after_plane0 = end;
 	}
 }
 
 static inline void copy_rgbx_frame(struct video_frame *output, const struct video_data *input,
 				   const struct video_output_info *info)
 {
-	uint8_t *in_ptr = input->data[0];
-	uint8_t *out_ptr = output->data[0];
+	const struct obs_video_copy copy =
+		obs_video_rgbx_copy_plan(info->width, info->height, input->linesize[0], output->linesize[0]);
 
-	/* if the line sizes match, do a single copy */
-	if (input->linesize[0] == output->linesize[0]) {
-		memcpy(out_ptr, in_ptr, (size_t)input->linesize[0] * (size_t)info->height);
-	} else {
-		const size_t copy_size = (size_t)info->width * 4;
-		for (size_t y = 0; y < info->height; y++) {
-			memcpy(out_ptr, in_ptr, copy_size);
-			in_ptr += input->linesize[0];
-			out_ptr += output->linesize[0];
-		}
-	}
+	set_gpu_converted_plane(&copy, input->data[0], output->data[0]);
 }
 
 static inline void output_video_data(struct obs_core_video_mix *video, struct video_data *input_frame, int count)
@@ -855,7 +740,7 @@ static inline void output_frame(struct obs_core_video_mix *video)
 	const bool gpu_active = video->gpu_was_active;
 
 	int cur_texture = video->cur_texture;
-	int prev_texture = cur_texture == 0 ? NUM_TEXTURES - 1 : cur_texture - 1;
+	int prev_texture = obs_video_step_ring(cur_texture).prev;
 	struct video_data frame;
 	bool frame_ready = 0;
 
@@ -870,7 +755,7 @@ static inline void output_frame(struct obs_core_video_mix *video)
 	GS_DEBUG_MARKER_END();
 	profile_end(output_frame_render_video_name);
 
-	if (raw_active) {
+	if (obs_video_step_download(raw_active)) {
 		profile_start(output_frame_download_frame_name);
 		frame_ready = download_frame(video, prev_texture, &frame);
 		profile_end(output_frame_download_frame_name);
@@ -883,7 +768,7 @@ static inline void output_frame(struct obs_core_video_mix *video)
 	gs_leave_context();
 	profile_end(output_frame_gs_context_name);
 
-	if (raw_active && frame_ready) {
+	if (obs_video_step_output(raw_active, frame_ready)) {
 		struct obs_vframe_info vframe_info;
 		deque_pop_front(&video->vframe_info_buffer, &vframe_info, sizeof(vframe_info));
 
@@ -893,8 +778,7 @@ static inline void output_frame(struct obs_core_video_mix *video)
 		profile_end(output_frame_output_video_data_name);
 	}
 
-	if (++video->cur_texture == NUM_TEXTURES)
-		video->cur_texture = 0;
+	video->cur_texture = obs_video_step_ring(video->cur_texture).next;
 }
 
 static inline void output_frames(void)
@@ -957,24 +841,27 @@ static const char *render_displays_name = "render_displays";
 static const char *output_frame_name = "output_frame";
 static inline void update_active_state(struct obs_core_video_mix *video)
 {
-	const bool raw_was_active = video->raw_was_active;
-	const bool gpu_was_active = video->gpu_was_active;
-	const bool was_active = video->was_active;
+	struct obs_video_step_activation_input input = {
+		.raw_was_active = video->raw_was_active,
+		.gpu_was_active = video->gpu_was_active,
+		.was_active = video->was_active,
+	};
 
-	bool raw_active = os_atomic_load_long(&video->raw_active) > 0;
-	const bool gpu_active = os_atomic_load_long(&video->gpu_encoder_active) > 0;
-	const bool active = raw_active || gpu_active;
+	input.raw_active = os_atomic_load_long(&video->raw_active);
+	input.gpu_encoder_active = os_atomic_load_long(&video->gpu_encoder_active);
 
-	if (!was_active && active)
+	const struct obs_video_step_activation step = obs_video_step_activation(&input);
+
+	if (step.clear_base)
 		clear_base_frame_data(video);
-	if (!raw_was_active && raw_active)
+	if (step.clear_raw)
 		clear_raw_frame_data(video);
-	if (!gpu_was_active && gpu_active)
+	if (step.clear_gpu)
 		clear_gpu_frame_data(video);
 
-	video->gpu_was_active = gpu_active;
-	video->raw_was_active = raw_active;
-	video->was_active = active;
+	video->gpu_was_active = step.gpu_active;
+	video->raw_was_active = step.raw_active;
+	video->was_active = step.active;
 }
 
 static inline void update_active_states(void)

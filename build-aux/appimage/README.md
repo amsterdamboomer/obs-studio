@@ -10,9 +10,7 @@ pre-release, a tag push attaches it to that tag's release.
 | --- | --- |
 | `assemble-appdir.sh` | Turns a `cmake --install` tree into an AppDir: bundles Qt plugins and every shared library (including all of glibc and its loader), then calls `set-runpaths.sh`. |
 | `set-runpaths.sh` | Gives every bundled ELF file a relative `DT_RPATH` pointing at `usr/lib`. |
-| `build.py` | The build: dependencies, libavutil, version, configure, build, AppDir, AppImage. Run by the workflow and by `bosn run --task appimage`. |
-| `Dockerfile` | Ubuntu 26.04 image with the build dependencies, for the `appimage` bosn task. |
-| `build_vaapi_compat.py` | Builds the pinned Ubuntu libavutil source with optional newer VA mapping support, then checks exported ABI and registered hardware backends against the original library. |
+| `build.py` | The build: version, configure, build, AppDir, AppImage, in the glibc 2.28 image (`manylinux/Dockerfile`). Run by the workflow and by `bosn run --task appimage`. |
 | `AppRun` | Entry point. Installs the bundled loader, sets up the environment, runs OBS and writes a crash report if it crashes. |
 | `check-appdir.sh` | Fails when a path `AppRun` exports into the AppDir is missing or empty, or when PipeWire's `client.conf`, the modules and SPA plugins it loads, gconv or the Qt xcb plugin are not bundled, or when the AppDir holds anything but exactly one libsrt of at least 1.5.7 (two copies in one process aborted OBS on quit after any SRT use). Run by `assemble-appdir.sh` (fails the build) and again by the test. |
 | `check-glibc-floor.sh` | Fails when any ELF file in the AppDir requires a `GLIBC_` symbol version above the floor (2.28, #926). Reads only the versions a file *requires* (`objdump -p`), so the bundled glibc does not count. Run by `assemble-appdir.sh` (fails the build). |
@@ -25,8 +23,9 @@ pre-release, a tag push attaches it to that tag's release.
 
 The workflow's build steps live in `build.py`; the workflow calls it one step
 at a time. To build the AppImage on your machine, under
-[bosn](../../docs/ci-tooling.md#bosn-docker-under-supervision) in an Ubuntu
-26.04 container (`Dockerfile`, declared in the root `bosn.toml`):
+[bosn](../../docs/ci-tooling.md#bosn-docker-under-supervision) in the same glibc
+2.28 container the workflow uses (`manylinux/Dockerfile`, declared in the root
+`bosn.toml`), with the submodules checked out (`git submodule update --init`):
 
 ```sh
 bosn run --task appimage
@@ -34,17 +33,19 @@ bosn run --task appimage
 
 The AppImage is written to `build_appimage/`. The zccache compiler cache and the cargo registry
 persist in bosn volumes, as does `build_ubuntu/`; the other intermediates
-(`AppDir/`, `avutil-compat/`, `squashfs-root/`, `.apt-cache/`) are written
-into the checkout, owned by the container's root.
+(`AppDir/`, `appimagetool`, `squashfs-root/`) are written into the checkout,
+owned by the container's root.
 
-On an Ubuntu 26.04 host, run the script directly (it uses `sudo` for apt):
+The script refuses to build anywhere but glibc 2.28, so run it inside that
+image (`manylinux/run.sh`, as the workflow does). `--dry-run` works anywhere:
 
 ```sh
-uv run build-aux/appimage/build.py                          # every step
-uv run build-aux/appimage/build.py --skip-deps              # packages already installed
-uv run build-aux/appimage/build.py --rust-libobs false --qsv true --rust-version 0.1.0-beta.20261013
 uv run build-aux/appimage/build.py --steps version,configure --dry-run
+uv run build-aux/appimage/build.py --rust-libobs false --qsv true --rust-version 0.1.0-beta.20261013
 ```
+
+The Ubuntu 26.04 build base (`--base ubuntu`, `build-aux/appimage/Dockerfile`)
+was retired in #1999: no workflow built on it, and it no longer built.
 
 `--dry-run` prints each step's environment and script. The scripts are the
 workflow's former inline steps, unchanged; `ci/test_appimage_build_script.py`
@@ -58,11 +59,10 @@ checks that and that the workflow calls every step with every input.
   the NVIDIA libraries (the AppImage excludelist). The host's drivers are built
   against the host's copies of these and look for their backends in the
   host's directories; a bundled copy would win over them through the relative
-  RPATH (#625). The test fails if any of them is bundled. The pinned Ubuntu
-  FFmpeg source is rebuilt with its original configuration and hardware
-  backends: VA mapping uses `vaMapBuffer2` when the host provides it and
-  otherwise uses `vaMapBuffer`. Assembly requires this audited libavutil;
-  the original library cannot start against Ubuntu 22.04's host libva.
+  RPATH (#625). The test fails if any of them is bundled. The bundled
+  FFmpeg comes from the glibc 2.28 image, built against its old libva, so it
+  starts against older host libva too. Assembly audits its libavutil: the right
+  SONAME and no dependency on `vaMapBuffer2`, which old libva lacks.
   `AppRun` points `LIBVA_DRIVERS_PATH` at the host's `dri` directories.
   It also sets host GBM backend, EGL vendor/external-platform and Vulkan ICD
   search paths, including `/run/opengl-driver` where present. Existing user
@@ -191,7 +191,7 @@ the supplied render node. Each probe has a bounded timeout.
 - **`/tmp` must allow executing files.** On a system where `/tmp` is mounted
   `noexec` the AppImage cannot start.
 - **x86_64 only.**
-- **Left out of the AppImage:** the browser source (CEF), VLC, WebRTC, AJA,
+- **Left out of the AppImage:** the browser source (CEF), VLC, AJA,
   Python scripting and the Intel QSV plugin. QSV probes the Intel GPU through
   the host's libvpl runtime at startup, which no CI runner can exercise; build
   it in with the workflow's `qsv` input.

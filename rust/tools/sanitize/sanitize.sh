@@ -85,7 +85,9 @@ if [ ! -x "$inst/bin/obs" ] || [ -z "$libobs" ]; then
 fi
 libdir=$(dirname "$libobs")
 
-export ASAN_OPTIONS="detect_leaks=1:abort_on_error=0:halt_on_error=0:log_path=$out/asan"
+# Full allocation stacks: distro FFmpeg has no frame pointers, and the fast
+# unwinder stops at av_malloc (#2035).
+export ASAN_OPTIONS="detect_leaks=1:fast_unwind_on_malloc=0:abort_on_error=0:halt_on_error=0:log_path=$out/asan"
 export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:log_path=$out/ubsan"
 export TSAN_OPTIONS="halt_on_error=0:second_deadlock_stack=1:log_path=$out/tsan"
 vg=(valgrind --error-exitcode=99 --child-silent-after-fork=yes --errors-for-leak-kinds=definite
@@ -102,20 +104,34 @@ sleep 2
 if [ -z "${SKIP_TESTS:-}" ]; then
   echo "== [$tool] unit tests"
   mkdir -p "$out/tests"
-  for t in $(find "$b/test/cmocka" -maxdepth 1 -type f -executable -name 'test_*' | sort); do
-    n=$(basename "$t")
+  # Each test as ctest runs it: its command line with arguments and its
+  # WORKING_DIRECTORY (libobs finds its data relative to it, #2043). Only
+  # registered tests, so plugin modules named test_* are not run (#2045). A
+  # wrapper in front of the binary (xvfb-run) is dropped: the display is ours.
+  ctest --test-dir "$b" --show-only=json-v1 2>/dev/null \
+    | jq -r '.tests[] | select(.command)
+        | [.name, ([(.properties // [])[] | select(.name == "WORKING_DIRECTORY") | .value][0] // ""),
+           (.command | join("\u001f"))] | @tsv' >"$out/tests/ctest.tsv"
+  sort "$out/tests/ctest.tsv" | while IFS=$'\t' read -r n wd cmdline; do
+    IFS=$'\x1f' read -r -a cmd <<<"$cmdline"
+    while [ ${#cmd[@]} -gt 0 ] && [ "${cmd[0]##*/}" != "$n" ]; do
+      cmd=("${cmd[@]:1}")
+    done
+    if [ ${#cmd[@]} -eq 0 ] || [ ! -x "${cmd[0]}" ]; then
+      continue
+    fi
     if [[ $n =~ $skip ]]; then
       echo "$n skipped (built with ASan)"
       continue
     fi
     if [ $tool = valgrind ]; then
-      (cd "$b/test/cmocka" && timeout 600 "${vg[@]}" --log-file="$out/tests/$n.vg.log" "$t" >"$out/tests/$n.log" 2>&1)
+      (cd "${wd:-$b/test/cmocka}" && timeout 600 "${vg[@]}" --log-file="$out/tests/$n.vg.log" "${cmd[@]}" </dev/null >"$out/tests/$n.log" 2>&1)
     else
-      (cd "$b/test/cmocka" \
+      (cd "${wd:-$b/test/cmocka}" \
         && ASAN_OPTIONS="$ASAN_OPTIONS:log_path=$out/tests/$n.asan" \
           TSAN_OPTIONS="$TSAN_OPTIONS:log_path=$out/tests/$n.tsan" \
           UBSAN_OPTIONS="$UBSAN_OPTIONS:log_path=$out/tests/$n.ubsan" \
-          timeout 600 "$t" >"$out/tests/$n.log" 2>&1)
+          timeout 600 "${cmd[@]}" </dev/null >"$out/tests/$n.log" 2>&1)
     fi
     echo "$n exit=$?"
   done | tee "$out/tests/summary.txt"

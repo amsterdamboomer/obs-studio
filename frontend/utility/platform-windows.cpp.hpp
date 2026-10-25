@@ -935,3 +935,246 @@ void HandlePlatformDisplayNativeEvent(OBSQTDisplay *display, void *message)
 		display->OnDisplayChange();
 	}
 }
+
+void SetOutputNetworkOptions(config_t *config, obs_data_t *settings)
+{
+	obs_data_set_bool(settings, "new_socket_loop_enabled",
+			  config_get_bool(config, "Output", "NewSocketLoopEnable"));
+	obs_data_set_bool(settings, "low_latency_mode_enabled", config_get_bool(config, "Output", "LowLatencyEnable"));
+}
+
+void TranslateLegacyEncoderId(const char *&)
+{
+	/* No legacy encoder ids on this host. */
+}
+
+void RaiseAfterFileDialog(QWidget *)
+{
+	/* File dialogs give focus back to their parent window here. */
+}
+
+bool UseNativeComboBoxPopup()
+{
+	return false;
+}
+
+static HRESULT SaveJxrImage(LPCWSTR path, uint8_t *pixels, uint32_t cx, uint32_t cy, IWICBitmapFrameEncode *frameEncode,
+			    IPropertyBag2 *options)
+{
+	wchar_t lossless[] = L"Lossless";
+	PROPBAG2 bag = {};
+	bag.pstrName = lossless;
+	VARIANT value = {};
+	value.vt = VT_BOOL;
+	value.bVal = TRUE;
+	HRESULT hr = options->Write(1, &bag, &value);
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	hr = frameEncode->Initialize(options);
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	hr = frameEncode->SetSize(cx, cy);
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	hr = frameEncode->SetResolution(72, 72);
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	WICPixelFormatGUID pixelFormat = GUID_WICPixelFormat64bppRGBAHalf;
+	hr = frameEncode->SetPixelFormat(&pixelFormat);
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	if (memcmp(&pixelFormat, &GUID_WICPixelFormat64bppRGBAHalf, sizeof(WICPixelFormatGUID)) != 0) {
+		return E_FAIL;
+	}
+
+	hr = frameEncode->WritePixels(cy, cx * 8, cx * cy * 8, pixels);
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	hr = frameEncode->Commit();
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	return S_OK;
+}
+
+static HRESULT SaveJxr(LPCWSTR path, uint8_t *pixels, uint32_t cx, uint32_t cy)
+{
+	Microsoft::WRL::ComPtr<IWICImagingFactory> factory;
+	HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER,
+				      IID_PPV_ARGS(factory.GetAddressOf()));
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	Microsoft::WRL::ComPtr<IWICStream> stream;
+	hr = factory->CreateStream(stream.GetAddressOf());
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	hr = stream->InitializeFromFilename(path, GENERIC_WRITE);
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	Microsoft::WRL::ComPtr<IWICBitmapEncoder> encoder = NULL;
+	hr = factory->CreateEncoder(GUID_ContainerFormatWmp, NULL, encoder.GetAddressOf());
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	hr = encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache);
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	Microsoft::WRL::ComPtr<IWICBitmapFrameEncode> frameEncode;
+	Microsoft::WRL::ComPtr<IPropertyBag2> options;
+	hr = encoder->CreateNewFrame(frameEncode.GetAddressOf(), options.GetAddressOf());
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	hr = SaveJxrImage(path, pixels, cx, cy, frameEncode.Get(), options.Get());
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	encoder->Commit();
+	return S_OK;
+}
+
+enum gs_color_space ScreenshotColorSpace(obs_source_t *source)
+{
+	enum gs_color_space space = obs_source_get_color_space(source, 0, nullptr);
+	if (space == GS_CS_709_EXTENDED) {
+		/* Convert for JXR */
+		space = GS_CS_709_SCRGB;
+	}
+	return space;
+}
+
+bool SaveHdrScreenshot(const char *path, uint8_t *pixels, uint32_t cx, uint32_t cy)
+{
+	wchar_t *path_w = nullptr;
+	os_utf8_to_wcs_ptr(path, 0, &path_w);
+	if (!path_w) {
+		return false;
+	}
+	bool saved = SUCCEEDED(SaveJxr(path_w, pixels, cx, cy));
+	bfree(path_w);
+	return saved;
+}
+
+bool IsPlatformImageExtension(const char *suffix)
+{
+	return astrcmpi(suffix, "jxr") == 0;
+}
+
+const char *GetPlatformTextSourceId()
+{
+	return "text_gdiplus";
+}
+
+void SetPlatformTextFileSettings(obs_data_t *settings, const char *file, QString &name)
+{
+	obs_data_set_bool(settings, "read_from_file", true);
+	obs_data_set_string(settings, "file", file);
+	name = QUrl::fromLocalFile(QString(file)).fileName();
+}
+
+static QString ReadWindowsURLFile(const QString &file)
+{
+	QSettings iniFile(file, QSettings::IniFormat);
+	QVariant url = iniFile.value("InternetShortcut/URL");
+	return url.toString();
+}
+
+bool ResolvePlatformDroppedFile(QString &file, QFileInfo &info, QString &urlTarget)
+{
+	if (info.suffix().compare("url", Qt::CaseInsensitive) == 0) {
+		urlTarget = ReadWindowsURLFile(file);
+		return false;
+	}
+	if (info.isShortcut()) {
+		file = info.symLinkTarget();
+		info = QFileInfo(file);
+		return info.exists();
+	}
+	return true;
+}
+
+const char *GetPlatformMetaKeyText()
+{
+	return "Hotkeys.Windows";
+}
+
+QString GetPlatformScreenName(QScreen *screen)
+{
+	return screen->name();
+}
+
+bool PlatformUsesDesktopAudioDevice()
+{
+	return true;
+}
+
+QIcon GetPlatformTrayIcon(TrayIconState state)
+{
+	switch (state) {
+	case TrayIconState::Active:
+		return QIcon(":/res/images/tray_active.png");
+	case TrayIconState::Paused:
+		return QIcon(":/res/images/obs_paused.png");
+	case TrayIconState::Idle:
+		break;
+	}
+	return QIcon(":/res/images/obs.png");
+}
+
+bool PlatformTrayActivationTogglesWindow()
+{
+	return true;
+}
+
+void SetPlatformDockIconVisible(bool) {}
+
+const char *GetPlatformNvencTestProgram()
+{
+	return "obs-nvenc-test.exe";
+}
+
+void ShowPlatformPermissionsDialog(QWidget *) {}
+
+bool PlatformRecreatesWindowsOnTopToggle()
+{
+	return false;
+}
+
+bool PlatformSupportsBuiltinUpdater()
+{
+	return true;
+}
+
+QThread *CreatePlatformUpdateThread(bool manualUpdate, bool repair)
+{
+	return new AutoUpdateThread(manualUpdate, repair);
+}
+
+bool IsWhatsNewItemForPlatform(bool windows, bool, bool)
+{
+	return windows;
+}

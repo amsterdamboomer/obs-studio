@@ -81,6 +81,24 @@ struct v4l2_data {
 	/* the above are also used from the udev thread and on save */
 	pthread_mutex_t controls_mutex;
 
+	/* The camera the source captures (obs-rust/obs-studio#2262): the
+	 * settings name it next to device_id, because the kernel numbers the
+	 * nodes in the order the devices appear, so a replugged or rebooted
+	 * camera can get another /dev/videoN. device_id is the node it was last
+	 * found at. Unknown until the device first opens for settings from
+	 * before. device_id, identity and match are also used from the udev
+	 * thread. */
+	pthread_mutex_t device_mutex;
+	struct v4l2_identity identity;
+	enum v4l2_identity_match match;
+	/* the node and camera of the settings at the last update or sync, to
+	 * tell a new choice from the node the source moved to (UI thread) */
+	char *settings_device_id;
+	struct v4l2_identity settings_identity;
+	/* what was reported about the absent camera: 0 nothing (it was
+	 * found), 1 that it is away, 2 that another camera has its node */
+	int absent_reported;
+
 	/* Another process has the device open (EBUSY, obs-rust/obs-studio#799):
 	 * the source names it, offers to close it, and retries until the
 	 * device is free. Also used from the graphics and udev threads. */
@@ -96,7 +114,10 @@ struct v4l2_data {
 };
 
 /* forward declarations */
-static void v4l2_init(struct v4l2_data *data);
+static void v4l2_init(struct v4l2_data *data, const char *hint);
+static int v4l2_setup_device(struct v4l2_data *data);
+static void v4l2_close_device(struct v4l2_data *data);
+static int v4l2_open_saved_camera(struct v4l2_data *data);
 static void v4l2_terminate(struct v4l2_data *data);
 static void v4l2_update(void *vptr, obs_data_t *settings);
 
@@ -155,11 +176,12 @@ static void v4l2_prep_obs_frame(struct v4l2_data *data, struct obs_source_frame 
 }
 
 /*
- * Worker thread to get video data
+ * Capture from the open device until the source stops it (returns true) or
+ * the device fails (returns false). Sets *attempt to 0 once the device
+ * delivers a buffer.
  */
-static void *v4l2_thread(void *vptr)
+static bool v4l2_capture(struct v4l2_data *data, uint32_t *attempt)
 {
-	V4L2_DATA(vptr);
 	int r;
 	fd_set fds;
 	uint8_t *start;
@@ -167,6 +189,7 @@ static void *v4l2_thread(void *vptr)
 	uint64_t first_ts;
 	bool have_first_ts;
 	uint64_t dropped;
+	bool stopped = false;
 	struct timeval tv;
 	struct v4l2_buffer buf;
 	struct obs_source_frame out;
@@ -174,9 +197,6 @@ static void *v4l2_thread(void *vptr)
 	int fps_num, fps_denom;
 	float ffps;
 	uint64_t timeout_usec;
-
-	blog(LOG_DEBUG, "%s: new capture thread", data->device_id);
-	os_set_thread_name("v4l2: capture");
 
 	/* Get framerate and calculate appropriate select timeout value. */
 	v4l2_unpack_tuple(&fps_num, &fps_denom, data->framerate);
@@ -200,7 +220,7 @@ static void *v4l2_thread(void *vptr)
 
 	blog(LOG_DEBUG, "%s: obs frame prepared", data->device_id);
 
-	while (os_event_try(data->event) == EAGAIN) {
+	while (!(stopped = os_event_try(data->event) != EAGAIN)) {
 		FD_ZERO(&fds);
 		FD_SET(data->dev, &fds);
 
@@ -212,7 +232,7 @@ static void *v4l2_thread(void *vptr)
 		if (r < 0) {
 			if (errno == EINTR)
 				continue;
-			blog(LOG_ERROR, "%s: select failed", data->device_id);
+			blog(LOG_ERROR, "%s: select failed: %s", data->device_id, strerror(errno));
 			break;
 		} else if (r == 0) {
 			blog(LOG_ERROR, "%s: select timed out", data->device_id);
@@ -243,9 +263,10 @@ static void *v4l2_thread(void *vptr)
 				blog(LOG_DEBUG, "%s: ioctl dqbuf eagain", data->device_id);
 				continue;
 			}
-			blog(LOG_ERROR, "%s: failed to dequeue buffer", data->device_id);
+			blog(LOG_ERROR, "%s: failed to dequeue buffer: %s", data->device_id, strerror(errno));
 			break;
 		}
+		*attempt = 0;
 
 		blog(LOG_DEBUG, "%s: ts: %06ld buf id #%d, flags 0x%08X, seq #%d, len %d, used %d", data->device_id,
 		     buf.timestamp.tv_usec, buf.index, buf.flags, buf.sequence, buf.length, buf.bytesused);
@@ -281,7 +302,7 @@ static void *v4l2_thread(void *vptr)
 
 	continue_queue_buffer:
 		if (v4l2_ioctl(data->dev, VIDIOC_QBUF, &buf) < 0) {
-			blog(LOG_ERROR, "%s: failed to enqueue buffer", data->device_id);
+			blog(LOG_ERROR, "%s: failed to enqueue buffer: %s", data->device_id, strerror(errno));
 			break;
 		}
 
@@ -292,6 +313,73 @@ static void *v4l2_thread(void *vptr)
 
 exit:
 	v4l2_stop_capture(data->dev);
+	return stopped;
+}
+
+/*
+ * The device failed while it stays registered: no udev "remove" comes for a
+ * camera whose firmware hangs, a driver that fails with EIO or ENODEV after
+ * resume, or a stream another process pulled (obs-rust/obs-studio#2264,
+ * upstream obsproject/obs-studio#9434). Let go of the device, which some
+ * drivers need before they recover, and open it again after a growing delay
+ * until it captures or the source stops. A real unplug ends this through
+ * device_removed(), and the replug starts the capture through device_added().
+ *
+ * Returns true with the device open again, false when the source stopped.
+ */
+static bool v4l2_reopen(struct v4l2_data *data, uint32_t *attempt)
+{
+	v4l2_close_device(data);
+	if (*attempt == 0)
+		blog(LOG_WARNING, "%s: the device failed, closing it and opening it again until it works",
+		     data->device_id);
+
+	for (;;) {
+		/* Returns at once when the source stops (v4l2_terminate) */
+		if (os_event_timedwait(data->event, v4l2_reopen_delay_ms(*attempt)) != ETIMEDOUT)
+			return false;
+		(*attempt)++;
+
+		/* Only the source's own camera: another one may have taken
+		 * the node meanwhile (obs-rust/obs-studio#2262) */
+		pthread_mutex_lock(&data->device_mutex);
+		bool known = v4l2_identity_known(&data->identity);
+		pthread_mutex_unlock(&data->device_mutex);
+		int dev = known ? v4l2_open_saved_camera(data)
+				: v4l2_open(data->device_id, O_RDWR | O_NONBLOCK | O_CLOEXEC);
+		const char *why = known ? "the camera is not at the node, or it cannot be opened" : strerror(errno);
+		if (dev != -1) {
+			pthread_mutex_lock(&data->controls_mutex);
+			data->dev = dev;
+			pthread_mutex_unlock(&data->controls_mutex);
+			if (v4l2_setup_device(data) == 0) {
+				blog(LOG_INFO, "%s: device reopened (attempt %" PRIu32 ")", data->device_id, *attempt);
+				return true;
+			}
+			why = strerror(errno);
+			v4l2_close_device(data);
+		}
+		blog(LOG_INFO, "%s: cannot reopen the device (attempt %" PRIu32 "): %s; next attempt in %" PRIu32 " s",
+		     data->device_id, *attempt, why, v4l2_reopen_delay_ms(*attempt) / 1000);
+	}
+}
+
+/*
+ * Worker thread to get video data
+ */
+static void *v4l2_thread(void *vptr)
+{
+	V4L2_DATA(vptr);
+	/* reopen attempts since the device last delivered a buffer */
+	uint32_t attempt = 0;
+
+	blog(LOG_DEBUG, "%s: new capture thread", data->device_id);
+	os_set_thread_name("v4l2: capture");
+
+	while (!v4l2_capture(data, &attempt)) {
+		if (!v4l2_reopen(data, &attempt))
+			break;
+	}
 	return NULL;
 }
 
@@ -362,21 +450,24 @@ static void v4l2_device_list(obs_property_t *prop, obs_data_t *settings)
 	bool cur_device_found;
 	size_t cur_device_index;
 	const char *cur_device_name;
+	struct v4l2_identity cur_identity;
 
 #ifdef __FreeBSD__
 	dirp = opendir("/dev");
 #else
-	dirp = opendir("/sys/class/video4linux");
+	dirp = opendir(V4L2_SYSFS_ROOT "/class/video4linux");
 #endif
 	if (!dirp)
 		return;
 
 	cur_device_found = false;
 	cur_device_name = obs_data_get_string(settings, "device_id");
+	v4l2_identity_load(settings, &cur_identity);
 
 	obs_property_list_clear(prop);
 
-	dstr_init_copy(&device, "/dev/");
+	dstr_init_copy(&device, V4L2_DEV_DIR "/");
+	const size_t dir_len = device.len;
 
 	while ((dp = readdir(dirp)) != NULL) {
 		int fd;
@@ -391,7 +482,7 @@ static void v4l2_device_list(obs_property_t *prop, obs_data_t *settings)
 		if (dp->d_type == DT_DIR)
 			continue;
 
-		dstr_resize(&device, 5);
+		dstr_resize(&device, dir_len);
 		dstr_cat(&device, dp->d_name);
 
 		if ((fd = v4l2_open(device.array, O_RDWR | O_NONBLOCK | O_CLOEXEC)) == -1) {
@@ -429,17 +520,32 @@ static void v4l2_device_list(obs_property_t *prop, obs_data_t *settings)
 		obs_property_list_add_string(prop, unique_device_name, device.array);
 		blog(LOG_INFO, "Found device '%s' at %s", video_cap.card, device.array);
 
-		/* check if this is the currently used device */
-		if (cur_device_name && !strcmp(cur_device_name, device.array))
-			cur_device_found = true;
+		/* check if this is the currently used device: the source's
+		 * camera at its node, not another camera that took the number */
+		if (cur_device_name && !strcmp(cur_device_name, device.array)) {
+			struct v4l2_identity identity;
+			cur_device_found = !v4l2_identity_known(&cur_identity) ||
+					   (v4l2_identity_query(fd, device.array, &identity) &&
+					    v4l2_identity_match(&cur_identity, &identity) != V4L2_MATCH_NONE);
+		}
 
 		v4l2_close(fd);
 	}
 
 	/* add currently selected device if not present, but disable it ... */
 	if (!cur_device_found && cur_device_name && strlen(cur_device_name)) {
-		cur_device_index = obs_property_list_add_string(prop, cur_device_name, cur_device_name);
-		obs_property_list_item_disable(prop, cur_device_index, true);
+		if (v4l2_identity_known(&cur_identity)) {
+			/* first, so it shows as selected rather than the other
+			 * camera now at its node */
+			struct dstr label = {0};
+			v4l2_identity_label(&cur_identity, &label);
+			obs_property_list_insert_string(prop, 0, label.array, cur_device_name);
+			obs_property_list_item_disable(prop, 0, true);
+			dstr_free(&label);
+		} else {
+			cur_device_index = obs_property_list_add_string(prop, cur_device_name, cur_device_name);
+			obs_property_list_item_disable(prop, cur_device_index, true);
+		}
 	}
 
 	closedir(dirp);
@@ -633,13 +739,28 @@ static void v4l2_framerate_list(int dev, uint_fast32_t pixelformat, uint_fast32_
 	dstr_free(&buffer);
 }
 
+/* The parameter of a properties object: the source, and whether the device
+ * list was filled in from the settings yet */
+struct v4l2_props_param {
+	struct v4l2_data *data;
+	bool device_listed;
+};
+
 /*
  * Device selected callback
  */
 static bool device_selected(obs_properties_t *props, obs_property_t *p, obs_data_t *settings)
 {
-	struct v4l2_data *data = obs_properties_get_param(props);
-	int dev = v4l2_open(obs_data_get_string(settings, "device_id"), O_RDWR | O_NONBLOCK | O_CLOEXEC);
+	struct v4l2_props_param *param = obs_properties_get_param(props);
+	struct v4l2_data *data = param ? param->data : NULL;
+	/* The first call fills the window from the settings; the next ones
+	 * are the user picking a device. */
+	bool picked = param && param->device_listed;
+	if (param)
+		param->device_listed = true;
+
+	const char *device_id = obs_data_get_string(settings, "device_id");
+	int dev = v4l2_open(device_id, O_RDWR | O_NONBLOCK | O_CLOEXEC);
 
 	v4l2_props_set_enabled(props, p, (dev == -1) ? false : true);
 
@@ -656,6 +777,16 @@ static bool device_selected(obs_properties_t *props, obs_property_t *p, obs_data
 	struct dstr identity = {0};
 	struct dstr saved_for = {0};
 	v4l2_device_identity(dev, &identity);
+
+	/* The pick stores the camera with its node (obs-rust/obs-studio#2262).
+	 * Opening the window does not: with the camera away and another one at
+	 * its node, the source keeps waiting for its camera. */
+	struct v4l2_identity camera, saved;
+	v4l2_identity_load(settings, &saved);
+	if (v4l2_identity_query(dev, device_id, &camera) && (picked || !v4l2_identity_known(&saved)) &&
+	    !v4l2_identity_equal(&camera, &saved))
+		v4l2_identity_save(settings, &camera);
+
 	dstr_copy(&saved_for, obs_data_get_string(settings, V4L2_CONTROLS_DEVICE));
 	if (dstr_is_empty(&saved_for) && data) {
 		pthread_mutex_lock(&data->controls_mutex);
@@ -783,6 +914,181 @@ static bool resolution_selected(obs_properties_t *props, obs_property_t *p, obs_
 	return true;
 }
 
+#define MAX_CANDIDATES 64
+
+/*
+ * Find the source's camera before opening it: the node may now be another
+ * camera's, and the camera may have another node. Hint is a node that just
+ * appeared. Without a known camera, the node in the settings, as before.
+ *
+ * Returns false when the camera is not there; the source then waits for it.
+ */
+static bool v4l2_find_device(struct v4l2_data *data, const char *hint)
+{
+	struct v4l2_identity saved;
+	enum v4l2_identity_match match;
+
+	pthread_mutex_lock(&data->device_mutex);
+	saved = data->identity;
+	char *path = bstrdup(data->device_id);
+	pthread_mutex_unlock(&data->device_mutex);
+
+	if (!v4l2_identity_known(&saved) || !path || !*path) {
+		bfree(path);
+		return true;
+	}
+
+	/* the saved node, the node that appeared, then every capture node */
+	struct v4l2_candidate *list = bzalloc(sizeof(*list) * MAX_CANDIDATES);
+	size_t count = 0;
+	bool at_path = v4l2_candidate_at(path, &list[count]);
+	count += at_path;
+	if (hint && strcmp(hint, path) != 0)
+		count += v4l2_candidate_at(hint, &list[count]);
+	int pick = v4l2_identity_pick(&saved, path, list, count, &match);
+	if (pick < 0 || match != V4L2_MATCH_EXACT) {
+		count = v4l2_candidates_scan(list, count, MAX_CANDIDATES);
+		pick = v4l2_identity_pick(&saved, path, list, count, &match);
+	}
+
+	struct dstr label = {0};
+	v4l2_identity_label(&saved, &label);
+	bool found = pick >= 0;
+	if (!found) {
+		int report = at_path ? 2 : 1;
+		if (data->absent_reported != report) {
+			if (at_path) {
+				struct dstr other = {0};
+				v4l2_identity_label(&list[0].identity, &other);
+				blog(LOG_WARNING, "Not capturing %s: it is now %s. Waiting for %s to be connected",
+				     path, other.array, label.array);
+				dstr_free(&other);
+			} else {
+				blog(LOG_INFO, "Waiting for %s (last at %s) to be connected", label.array, path);
+			}
+		}
+		data->absent_reported = report;
+	} else {
+		const struct v4l2_candidate *c = &list[pick];
+		struct dstr old_label = {0}, new_label = {0};
+		if (strcmp(c->path, path) != 0)
+			blog(LOG_INFO, "%s is now at %s (was %s)", label.array, c->path, path);
+
+		pthread_mutex_lock(&data->device_mutex);
+		bfree(data->device_id);
+		data->device_id = bstrdup(c->path);
+		data->match = match;
+		/* The same serial number on another port: the camera moved,
+		 * remember its new port. A camera told only by its model keeps
+		 * the old one, so the camera itself wins when it comes back. */
+		if (match == V4L2_MATCH_SERIAL) {
+			v4l2_identity_label(&data->identity, &old_label);
+			snprintf(data->identity.bus_info, sizeof(data->identity.bus_info), "%s", c->identity.bus_info);
+			v4l2_identity_label(&data->identity, &new_label);
+		}
+		pthread_mutex_unlock(&data->device_mutex);
+
+		/* and its saved camera controls go with it */
+		if (match == V4L2_MATCH_SERIAL) {
+			pthread_mutex_lock(&data->controls_mutex);
+			if (dstr_cmp(&data->controls_device, old_label.array) == 0)
+				dstr_copy_dstr(&data->controls_device, &new_label);
+			pthread_mutex_unlock(&data->controls_mutex);
+		}
+		dstr_free(&old_label);
+		dstr_free(&new_label);
+		data->absent_reported = 0;
+	}
+
+	dstr_free(&label);
+	bfree(list);
+	bfree(path);
+	return found;
+}
+
+/* Open the saved camera at its node, -1 if it is not there (or not known) */
+static int v4l2_open_saved_camera(struct v4l2_data *data)
+{
+	pthread_mutex_lock(&data->device_mutex);
+	struct v4l2_identity saved = data->identity;
+	char *path = bstrdup(data->device_id);
+	pthread_mutex_unlock(&data->device_mutex);
+
+	int fd = -1;
+	struct v4l2_identity camera;
+	if (v4l2_identity_known(&saved) && path && *path) {
+		/* Close-on-exec, as in v4l2_init() */
+		fd = v4l2_open(path, O_RDWR | O_NONBLOCK | O_CLOEXEC);
+		if (fd != -1 && (!v4l2_identity_query(fd, path, &camera) ||
+				 v4l2_identity_match(&saved, &camera) != V4L2_MATCH_EXACT)) {
+			v4l2_close(fd);
+			fd = -1;
+		}
+	}
+	bfree(path);
+
+	if (fd != -1) {
+		pthread_mutex_lock(&data->device_mutex);
+		data->match = V4L2_MATCH_EXACT;
+		pthread_mutex_unlock(&data->device_mutex);
+		data->absent_reported = 0;
+	}
+	return fd;
+}
+
+/* The camera was opened for the first time: record it (settings from
+ * before it was saved, or a node picked without it) */
+static void v4l2_record_device(struct v4l2_data *data)
+{
+	pthread_mutex_lock(&data->device_mutex);
+	if (!v4l2_identity_known(&data->identity) && v4l2_identity_query(data->dev, data->device_id, &data->identity))
+		data->match = V4L2_MATCH_EXACT;
+	pthread_mutex_unlock(&data->device_mutex);
+}
+
+/* Write the node the camera was found at, and the camera, to the settings,
+ * so obs-websocket, scripts and the properties see them (UI thread) */
+static void v4l2_sync_settings(struct v4l2_data *data, obs_data_t *settings)
+{
+	if (!settings)
+		return;
+
+	pthread_mutex_lock(&data->device_mutex);
+	if (v4l2_identity_known(&data->identity) && data->device_id) {
+		struct v4l2_identity saved;
+		if (strcmp(obs_data_get_string(settings, "device_id"), data->device_id) != 0)
+			obs_data_set_string(settings, "device_id", data->device_id);
+		v4l2_identity_load(settings, &saved);
+		if (!v4l2_identity_equal(&saved, &data->identity))
+			v4l2_identity_save(settings, &data->identity);
+		bfree(data->settings_device_id);
+		data->settings_device_id = bstrdup(data->device_id);
+		data->settings_identity = data->identity;
+	}
+	pthread_mutex_unlock(&data->device_mutex);
+}
+
+static void v4l2_sync_task(void *param)
+{
+	obs_weak_source_t *weak = param;
+	obs_source_t *source = obs_weak_source_get_source(weak);
+	obs_weak_source_release(weak);
+	if (!source)
+		return;
+
+	obs_data_t *settings = obs_source_get_settings(source);
+	v4l2_sync_settings(obs_obj_get_data(source), settings);
+	obs_data_release(settings);
+	obs_source_release(source);
+}
+
+/* From the udev thread */
+static void v4l2_queue_sync(struct v4l2_data *data)
+{
+	if (data->source)
+		obs_queue_task(OBS_TASK_UI, v4l2_sync_task, obs_source_get_weak_source(data->source), false);
+}
+
 #ifdef HAVE_UDEV
 /**
  * Device added callback
@@ -798,13 +1104,49 @@ static void device_added(void *vptr, calldata_t *calldata)
 
 	const char *dev;
 	calldata_get_string(calldata, "device", &dev);
-
-	if (strcmp(data->device_id, dev))
+	if (!dev)
 		return;
 
-	blog(LOG_INFO, "Device %s reconnected", dev);
+	pthread_mutex_lock(&data->device_mutex);
+	struct v4l2_identity saved = data->identity;
+	bool at_node = data->device_id && strcmp(data->device_id, dev) == 0;
+	enum v4l2_identity_match current = data->match;
+	pthread_mutex_unlock(&data->device_mutex);
 
-	v4l2_init(data);
+	/* A camera not recorded yet: its node, as before */
+	if (!v4l2_identity_known(&saved)) {
+		if (!at_node)
+			return;
+		blog(LOG_INFO, "Device %s reconnected", dev);
+		v4l2_init(data, NULL);
+		return;
+	}
+
+	/* Capturing: only the camera itself, back on its own port, replaces
+	 * a camera taken for it by model */
+	if (data->dev != -1 && current != V4L2_MATCH_MODEL)
+		return;
+
+	/* At its node, v4l2_init() checks the camera there. Elsewhere, the
+	 * node is opened only to see which camera it is. */
+	enum v4l2_identity_match match = V4L2_MATCH_NONE;
+	struct v4l2_candidate candidate;
+	if ((!at_node || data->dev != -1) && v4l2_candidate_at(dev, &candidate))
+		match = v4l2_identity_match(&saved, &candidate.identity);
+
+	if (data->dev != -1) {
+		if (match != V4L2_MATCH_EXACT)
+			return;
+		blog(LOG_INFO, "Device %s is the camera itself, switching to it", dev);
+		v4l2_terminate(data);
+	} else if (!at_node && match == V4L2_MATCH_NONE) {
+		return;
+	} else {
+		blog(LOG_INFO, "Device %s reconnected", dev);
+	}
+
+	v4l2_init(data, dev);
+	v4l2_queue_sync(data);
 }
 /**
  * Device removed callback
@@ -820,7 +1162,10 @@ static void device_removed(void *vptr, calldata_t *calldata)
 	const char *dev;
 	calldata_get_string(calldata, "device", &dev);
 
-	if (strcmp(data->device_id, dev))
+	pthread_mutex_lock(&data->device_mutex);
+	bool at_node = dev && data->device_id && strcmp(data->device_id, dev) == 0;
+	pthread_mutex_unlock(&data->device_mutex);
+	if (!at_node)
 		return;
 
 	blog(LOG_INFO, "Device %s disconnected", dev);
@@ -923,7 +1268,7 @@ static void v4l2_busy_task(void *param)
 		if (released)
 			blog(LOG_INFO, "%s (PID %d) released %s", holder.name, (int)holder.pid, data->device_id);
 		if (released || retry_due)
-			v4l2_init(data);
+			v4l2_init(data, NULL);
 	}
 
 	obs_source_release(source);
@@ -965,7 +1310,7 @@ static bool v4l2_force_camera_now(struct v4l2_data *data)
 		v4l2_force_release("/proc", data->device_id, &holder, getuid(), FORCE_TIMEOUT_MS);
 	switch (result) {
 	case V4L2_FORCE_RELEASED:
-		v4l2_init(data);
+		v4l2_init(data, NULL);
 		break;
 	case V4L2_FORCE_NOT_OWNER:
 		blog(LOG_WARNING, "Force Camera: %s (PID %d) belongs to another user, not closed", holder.name,
@@ -1040,7 +1385,9 @@ static obs_properties_t *v4l2_properties(void *vptr)
 	V4L2_DATA(vptr);
 
 	obs_properties_t *props = obs_properties_create();
-	obs_properties_set_param(props, data, NULL);
+	struct v4l2_props_param *param = bzalloc(sizeof(*param));
+	param->data = data;
+	obs_properties_set_param(props, param, bfree);
 
 	v4l2_busy_properties(data, props);
 
@@ -1084,6 +1431,8 @@ static obs_properties_t *v4l2_properties(void *vptr)
 	obs_properties_add_group(props, "controls", obs_module_text("CameraCtrls"), OBS_GROUP_NORMAL, ctrl_props);
 
 	obs_data_t *settings = obs_source_get_settings(data->source);
+	/* the list selects the node the camera is at now */
+	v4l2_sync_settings(data, settings);
 	v4l2_device_list(device_list, settings);
 	obs_data_release(settings);
 
@@ -1104,14 +1453,26 @@ static void v4l2_terminate(struct v4l2_data *data)
 		data->thread = 0;
 	}
 
+	v4l2_close_device(data);
+}
+
+/*
+ * Free what v4l2_setup_device() set up and close the device, once no capture
+ * runs on it
+ */
+static void v4l2_close_device(struct v4l2_data *data)
+{
 	if (data->pixfmt == V4L2_PIX_FMT_MJPEG || data->pixfmt == V4L2_PIX_FMT_H264) {
 		v4l2_destroy_decoder(&data->decoder);
 	}
 	v4l2_destroy_mmap(&data->buffers);
 
 	if (data->dev != -1) {
+		/* v4l2_restore_controls() uses the device from other threads */
+		pthread_mutex_lock(&data->controls_mutex);
 		v4l2_close(data->dev);
 		data->dev = -1;
+		pthread_mutex_unlock(&data->controls_mutex);
 	}
 }
 
@@ -1126,6 +1487,8 @@ static void v4l2_destroy(void *vptr)
 
 	if (data->device_id)
 		bfree(data->device_id);
+	bfree(data->settings_device_id);
+	pthread_mutex_destroy(&data->device_mutex);
 	obs_data_release(data->controls);
 	dstr_free(&data->controls_device);
 	dstr_free(&data->dev_identity);
@@ -1208,40 +1571,80 @@ static int64_t v4l2_saved_framerate(int_fast32_t dev, uint32_t pixelformat, int 
  * - maps the buffers
  * - starts the capture thread
  */
-static void v4l2_init(struct v4l2_data *data)
+static void v4l2_init(struct v4l2_data *data, const char *hint)
+{
+	/* A capture thread still waiting to reopen its failed device has no
+	 * device open (data->dev is -1), so device_added() takes the source
+	 * for stopped: stop that thread before starting another. */
+	if (data->thread)
+		v4l2_terminate(data);
+
+	/* The camera at its node opens right away; otherwise it is looked
+	 * for, and when it is not there the source waits for it. */
+	int fd = v4l2_open_saved_camera(data);
+	if (fd == -1 && !v4l2_find_device(data, hint)) {
+		v4l2_busy_update(data, 0);
+		return;
+	}
+
+	blog(LOG_INFO, "Start capture from %s", data->device_id);
+	/* Close-on-exec, so processes OBS starts (obs-ffmpeg-mux while recording)
+	 * do not keep the device busy after the source closes it. */
+	data->dev = fd != -1 ? fd : v4l2_open(data->device_id, O_RDWR | O_NONBLOCK | O_CLOEXEC);
+	if (data->dev == -1) {
+		blog(LOG_ERROR, "Unable to open device");
+		goto fail;
+	}
+	if (v4l2_setup_device(data) < 0)
+		goto fail;
+
+	/* start the capture thread */
+	if (os_event_init(&data->event, OS_EVENT_TYPE_MANUAL) != 0)
+		goto fail;
+	if (pthread_create(&data->thread, NULL, v4l2_thread, data) != 0)
+		goto fail;
+	v4l2_busy_update(data, 0);
+	return;
+fail:;
+	int err = errno;
+	blog(LOG_ERROR, "Initialization failed, errno: %s", strerror(err));
+	v4l2_terminate(data);
+	v4l2_busy_update(data, err);
+}
+
+/*
+ * Set up the open device for capture: input, standard or dv timing, format,
+ * framerate, the saved controls, the buffers and the decoder. Also used when
+ * the capture thread reopens a failed device. Returns negative on failure,
+ * with errno set; v4l2_close_device() frees what was set up.
+ */
+static int v4l2_setup_device(struct v4l2_data *data)
 {
 	uint32_t input_caps;
 	int fps_num, fps_denom;
 	int64_t saved;
 
-	blog(LOG_INFO, "Start capture from %s", data->device_id);
-	/* Close-on-exec, so processes OBS starts (obs-ffmpeg-mux while recording)
-	 * do not keep the device busy after the source closes it. */
-	data->dev = v4l2_open(data->device_id, O_RDWR | O_NONBLOCK | O_CLOEXEC);
-	if (data->dev == -1) {
-		blog(LOG_ERROR, "Unable to open device");
-		goto fail;
-	}
 	pthread_mutex_lock(&data->controls_mutex);
 	v4l2_device_identity(data->dev, &data->dev_identity);
 	pthread_mutex_unlock(&data->controls_mutex);
+	v4l2_record_device(data);
 
 	/* set input */
 	if (v4l2_set_input(data->dev, &data->input) < 0) {
 		blog(LOG_ERROR, "Unable to set input %d", data->input);
-		goto fail;
+		return -1;
 	}
 	blog(LOG_INFO, "Input: %d", data->input);
 	if (v4l2_get_input_caps(data->dev, -1, &input_caps) < 0) {
 		blog(LOG_ERROR, "Unable to get input capabilities");
-		goto fail;
+		return -1;
 	}
 
 	/* set video standard if supported */
 	if (input_caps & V4L2_IN_CAP_STD) {
 		if (v4l2_set_standard(data->dev, &data->standard) < 0) {
 			blog(LOG_ERROR, "Unable to set video standard");
-			goto fail;
+			return -1;
 		}
 		data->resolution = -1;
 		data->framerate = -1;
@@ -1250,7 +1653,7 @@ static void v4l2_init(struct v4l2_data *data)
 	if (input_caps & V4L2_IN_CAP_DV_TIMINGS) {
 		if (v4l2_set_dv_timing(data->dev, &data->dv_timing) < 0) {
 			blog(LOG_ERROR, "Unable to set dv timing");
-			goto fail;
+			return -1;
 		}
 		data->resolution = -1;
 		data->framerate = -1;
@@ -1259,12 +1662,12 @@ static void v4l2_init(struct v4l2_data *data)
 	/* set pixel format and resolution */
 	if (v4l2_set_format(data->dev, &data->resolution, &data->pixfmt, &data->linesize) < 0) {
 		blog(LOG_ERROR, "Unable to set format");
-		goto fail;
+		return -1;
 	}
 	if (v4l2_to_obs_video_format(data->pixfmt) == VIDEO_FORMAT_NONE && data->pixfmt != V4L2_PIX_FMT_MJPEG &&
 	    data->pixfmt != V4L2_PIX_FMT_H264) {
 		blog(LOG_ERROR, "Selected video format not supported");
-		goto fail;
+		return -1;
 	}
 	v4l2_unpack_tuple(&data->width, &data->height, data->resolution);
 	blog(LOG_INFO, "Resolution: %dx%d", data->width, data->height);
@@ -1281,7 +1684,7 @@ static void v4l2_init(struct v4l2_data *data)
 	}
 	if (v4l2_set_framerate(data->dev, &data->framerate) < 0) {
 		blog(LOG_ERROR, "Unable to set framerate");
-		goto fail;
+		return -1;
 	}
 	if (data->framerate == 0) {
 		blog(LOG_ERROR, "Framerate is not set, falling back to %i", FALLBACK_FRAMERATE);
@@ -1298,28 +1701,17 @@ static void v4l2_init(struct v4l2_data *data)
 	/* map buffers */
 	if (v4l2_create_mmap(data->dev, &data->buffers) < 0) {
 		blog(LOG_ERROR, "Failed to map buffers");
-		goto fail;
+		return -1;
 	}
 
 	if (data->pixfmt == V4L2_PIX_FMT_MJPEG || data->pixfmt == V4L2_PIX_FMT_H264) {
 		if (v4l2_init_decoder(&data->decoder, data->pixfmt) < 0) {
 			blog(LOG_ERROR, "Failed to initialize decoder");
-			goto fail;
+			return -1;
 		}
 	}
 
-	/* start the capture thread */
-	if (os_event_init(&data->event, OS_EVENT_TYPE_MANUAL) != 0)
-		goto fail;
-	if (pthread_create(&data->thread, NULL, v4l2_thread, data) != 0)
-		goto fail;
-	v4l2_busy_update(data, 0);
-	return;
-fail:;
-	int err = errno;
-	blog(LOG_ERROR, "Initialization failed, errno: %s", strerror(err));
-	v4l2_terminate(data);
-	v4l2_busy_update(data, err);
+	return 0;
 }
 
 /** Update source flags depending on the settings */
@@ -1336,8 +1728,13 @@ static bool v4l2_settings_changed(struct v4l2_data *data, obs_data_t *settings)
 {
 	bool res = false;
 
-	if (obs_data_get_string(settings, "device_id") != NULL && data->device_id != NULL) {
-		res |= strcmp(data->device_id, obs_data_get_string(settings, "device_id")) != 0;
+	if (obs_data_get_string(settings, "device_id") != NULL && data->settings_device_id != NULL) {
+		/* another node or camera picked; not the node the source moved
+		 * its camera to */
+		struct v4l2_identity identity;
+		v4l2_identity_load(settings, &identity);
+		res |= strcmp(data->settings_device_id, obs_data_get_string(settings, "device_id")) != 0;
+		res |= v4l2_identity_known(&identity) && !v4l2_identity_equal(&identity, &data->settings_identity);
 		res |= data->input != obs_data_get_int(settings, "input");
 		res |= data->pixfmt != obs_data_get_int(settings, "pixelformat");
 		res |= data->standard != obs_data_get_int(settings, "standard");
@@ -1365,6 +1762,38 @@ static bool v4l2_settings_changed(struct v4l2_data *data, obs_data_t *settings)
 	return res;
 }
 
+/*
+ * The node and camera from the settings. The source keeps the camera it
+ * found while the settings name the same node and camera: they may still
+ * have the node it moved from. A node picked without naming the camera (a
+ * script, obs-websocket) is the camera found there when it opens.
+ */
+static void v4l2_update_device(struct v4l2_data *data, obs_data_t *settings)
+{
+	const char *device_id = obs_data_get_string(settings, "device_id");
+	struct v4l2_identity identity;
+	v4l2_identity_load(settings, &identity);
+
+	bool same_node = data->settings_device_id && strcmp(data->settings_device_id, device_id) == 0;
+	bool same_camera = !v4l2_identity_known(&identity) || v4l2_identity_equal(&identity, &data->settings_identity);
+	if (same_node && same_camera && data->device_id)
+		return;
+	if (!same_node && same_camera)
+		v4l2_identity_clear(&identity);
+
+	pthread_mutex_lock(&data->device_mutex);
+	bfree(data->device_id);
+	data->device_id = bstrdup(device_id);
+	data->identity = identity;
+	data->match = V4L2_MATCH_EXACT;
+	pthread_mutex_unlock(&data->device_mutex);
+	data->absent_reported = 0;
+
+	bfree(data->settings_device_id);
+	data->settings_device_id = bstrdup(device_id);
+	data->settings_identity = identity;
+}
+
 /**
  * Update the settings for the v4l2 source
  *
@@ -1382,10 +1811,10 @@ static void v4l2_update(void *vptr, obs_data_t *settings)
 	if (needs_restart)
 		v4l2_terminate(data);
 
-	if (data->device_id)
-		bfree(data->device_id);
-
-	data->device_id = bstrdup(obs_data_get_string(settings, "device_id"));
+	/* The capture thread logs it: replace it only while stopped. Without a
+	 * restart, v4l2_settings_changed found it unchanged (#2103). */
+	if (needs_restart || !data->settings_device_id)
+		v4l2_update_device(data, settings);
 	data->input = obs_data_get_int(settings, "input");
 	data->pixfmt = obs_data_get_int(settings, "pixelformat");
 	data->standard = obs_data_get_int(settings, "standard");
@@ -1416,7 +1845,7 @@ static void v4l2_update(void *vptr, obs_data_t *settings)
 	v4l2_update_source_flags(data, settings);
 
 	if (needs_restart) {
-		v4l2_init(data);
+		v4l2_init(data, NULL);
 		/* Store a framerate setting saved by an older version as the
 		 * interval it stands for, so it matches the list and the
 		 * running device from now on. */
@@ -1426,12 +1855,16 @@ static void v4l2_update(void *vptr, obs_data_t *settings)
 		}
 	} else if (data->dev != -1 && restore_was_on)
 		v4l2_restore_controls(data);
+
+	v4l2_sync_settings(data, settings);
 }
 
 /* Record the device found for settings that did not say it */
 static void v4l2_save(void *vptr, obs_data_t *settings)
 {
 	V4L2_DATA(vptr);
+
+	v4l2_sync_settings(data, settings);
 
 	pthread_mutex_lock(&data->controls_mutex);
 	if (!dstr_is_empty(&data->controls_device) && !*obs_data_get_string(settings, V4L2_CONTROLS_DEVICE))
@@ -1448,6 +1881,9 @@ static void *v4l2_create(obs_data_t *settings, obs_source_t *source)
 	data->framerate_unchanged = false;
 	pthread_mutex_init(&data->controls_mutex, NULL);
 	pthread_mutex_init(&data->busy_mutex, NULL);
+	pthread_mutex_init(&data->device_mutex, NULL);
+	v4l2_identity_clear(&data->identity);
+	v4l2_identity_clear(&data->settings_identity);
 
 	proc_handler_t *ph = obs_source_get_proc_handler(source);
 	if (ph)
@@ -1502,3 +1938,4 @@ struct obs_source_info v4l2_input = {
 #undef BUSY_CHECK_NS
 #undef FORCE_TIMEOUT_MS
 #undef FALLBACK_FRAMERATE
+#undef MAX_CANDIDATES

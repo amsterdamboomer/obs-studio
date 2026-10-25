@@ -5,10 +5,32 @@ mod caption_text;
 mod caption_text_parity;
 mod delay;
 mod delay_parity;
+mod encoder_audio_start;
+mod encoder_audio_start_parity;
+mod encoder_roi;
+mod encoder_roi_parity;
+mod encoder_size;
+mod encoder_size_parity;
 mod interleave;
 mod interleave_parity;
+mod protocols;
+mod protocols_parity;
+mod service;
+mod service_lifecycle;
+mod service_lifecycle_parity;
+mod service_parity;
+mod service_settings;
+mod service_settings_parity;
+mod video_checks;
+mod video_checks_parity;
 
 use std::process::Command;
+use std::sync::Mutex;
+
+/// The oracle's process-wide service state: the `find_service()` table,
+/// the module lists and the lifecycle trace hook, shared by the service
+/// parity tests on both sides.
+pub(crate) static SERVICE_GLOBALS: Mutex<()> = Mutex::new(());
 
 const MARKER_ENV: &str = "OBS_OUTPUT_ISOLATED_TEST";
 

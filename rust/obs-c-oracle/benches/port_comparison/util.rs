@@ -3,8 +3,8 @@ use std::hint::black_box;
 use std::ptr;
 
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput};
-use obs_c_oracle::{bmem as c_mem, crc32 as c_crc, dstr as c_str};
-use obs_util::ffi::{bmem as rs_mem, crc32 as rs_crc, dstr as rs_str};
+use obs_c_oracle::{bmem as c_mem, crc32 as c_crc, dstr as c_str, dstr_libc as c_str_libc};
+use obs_util::ffi::{bmem as rs_mem, crc32 as rs_crc, dstr as rs_str, dstr_libc as rs_str_libc};
 
 type Allocate = unsafe extern "C" fn(usize) -> *mut c_void;
 type Release = unsafe extern "C" fn(*mut c_void);
@@ -273,7 +273,7 @@ impl Drop for Cstring {
 fn strings(criterion: &mut Criterion) {
     for size in [128, 4096] {
         let seed = std::ffi::CString::new("obs ".repeat(size / 4)).unwrap();
-        for operation in ["cat", "safe_printf", "replace"] {
+        for operation in ["cat", "safe_printf", "replace", "to_upper"] {
             let rust = |string: &mut RustString| {
                 // SAFETY: the destination owns a valid dstr; all input strings
                 // have static NUL-terminated storage valid throughout the call.
@@ -295,6 +295,7 @@ fn strings(criterion: &mut Criterion) {
                             black_box(c"obs".as_ptr()),
                             c"Rust OBS".as_ptr(),
                         ),
+                        "to_upper" => rs_str_libc::dstr_to_upper(black_box(&mut string.0)),
                         _ => unreachable!(),
                     }
                 }
@@ -321,6 +322,7 @@ fn strings(criterion: &mut Criterion) {
                             black_box(c"obs".as_ptr()),
                             c"Rust OBS".as_ptr(),
                         ),
+                        "to_upper" => c_str_libc::oracle_dstr_to_upper(black_box(&mut string.0)),
                         _ => unreachable!(),
                     }
                 }
@@ -443,8 +445,94 @@ fn crc(criterion: &mut Criterion) {
     group.finish();
 }
 
+/// One profiler snapshot in the C layout, `roots` roots each with `children`
+/// children, every entry with `times` time entries and as many between-call
+/// entries. Both sides read the same `#[repr(C)]` layout; the bench casts
+/// the pointer for the oracle. Leaked: the bench process exits after.
+fn profiler_snapshot(
+    roots: usize,
+    children: usize,
+    times: usize,
+) -> *mut obs_util::ffi::profiler_snapshot::profiler_snapshot {
+    use obs_util::ffi::profiler_snapshot::{
+        Darray, profiler_snapshot, profiler_snapshot_entry, profiler_time_entry,
+    };
+    fn darray<T>(items: Vec<T>) -> Darray<T> {
+        let mut items = std::mem::ManuallyDrop::new(items);
+        Darray {
+            array: items.as_mut_ptr(),
+            num: items.len(),
+            capacity: items.capacity(),
+        }
+    }
+    fn entry(kids: Vec<profiler_snapshot_entry>, times: usize) -> profiler_snapshot_entry {
+        let t = |k: u64| {
+            (0..times as u64)
+                .map(|i| profiler_time_entry {
+                    time_delta: (times as u64 - i) * 997 + k,
+                    count: i % 7 + 1,
+                })
+                .collect::<Vec<_>>()
+        };
+        profiler_snapshot_entry {
+            name: c"render_main_texture".as_ptr(),
+            times: darray(t(0)),
+            min_time: 997,
+            max_time: times as u64 * 997,
+            overall_count: 4 * times as u64,
+            times_between_calls: darray(t(13)),
+            expected_time_between_calls: 16_667,
+            min_time_between_calls: 1_000,
+            max_time_between_calls: 40_000,
+            overall_between_calls_count: 4 * times as u64,
+            children: darray(kids),
+        }
+    }
+    let roots = (0..roots)
+        .map(|_| {
+            entry(
+                (0..children).map(|_| entry(Vec::new(), times)).collect(),
+                times,
+            )
+        })
+        .collect();
+    Box::into_raw(Box::new(profiler_snapshot {
+        roots: darray(roots),
+    }))
+}
+
+fn profiler_io(criterion: &mut Criterion) {
+    use obs_c_oracle::profiler_io as c_io;
+    use obs_util::ffi::profiler_io as rs_io;
+
+    let snap = profiler_snapshot(8, 8, 32);
+    let dir = std::env::temp_dir().join(format!(
+        "port-comparison-profiler-io-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = std::ffi::CString::new(dir.join("out.csv").to_str().unwrap()).unwrap();
+
+    let mut group = criterion.benchmark_group("profiler_snapshot_dump_csv");
+    group.throughput(Throughput::Elements(8 * 9 * 64));
+    group.bench_function("rust", |b| {
+        // SAFETY: `snap` is a valid snapshot for the whole bench and `file`
+        // a C string naming a file in a directory that exists.
+        b.iter(|| unsafe { rs_io::profiler_snapshot_dump_csv(black_box(snap), file.as_ptr()) })
+    });
+    group.bench_function("c", |b| {
+        // SAFETY: as above; the oracle reads the same struct layout.
+        b.iter(|| unsafe {
+            c_io::oracle_profiler_snapshot_dump_csv(black_box(snap.cast()), file.as_ptr())
+        })
+    });
+    group.finish();
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 pub fn benchmarks(criterion: &mut Criterion) {
     memory(criterion);
     strings(criterion);
     crc(criterion);
+    profiler_io(criterion);
 }

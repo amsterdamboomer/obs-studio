@@ -5,6 +5,7 @@ __R*
 _rust_eh_personality
 _base_begin_crash
 _profiler_name_store_push
+_profile_print_func
 _base_default_log_handler
 _base_log_literal
 # utf8.c is not exported by the C libobs, so its Rust shims are hidden too.
@@ -45,6 +46,18 @@ _video_output_create_with_frame_rate_divisor
 _video_output_free_frame_rate_divisor
 # obs-data.c: json_decref is a static inline. The glue is not EXPORT.
 _obs_data_json_decref
+# graphics/graphics-sprite.c: graphics.c calls them inside libobs. Not EXPORT.
+_gs_sprite_build
+_gs_sprite_quad_buffer
+_gs_sprite_quad_refusal
+_gs_sprite_quad_texture_size
+_gs_sprite_subregion_is_whole
+_gs_sprite_uv_norm
+_gs_sprite_uv_rect
+_gs_sprite_uv_subregion
+_gs_texture_is_pow2
+_gs_texture_mip_plan
+_gs_texture_upload_plan
 # obs-scene-bounds.c: obs-scene.c calls it inside libobs. Not EXPORT.
 _obs_bounds_fit_scale
 # obs-scene-blend.c: the blend mode table, data. obs-scene.c reads it inside
@@ -63,8 +76,264 @@ _obs_scene_item_relative_scale
 # obs-scene-group-transform.c: obs-scene.c calls them inside libobs. Not EXPORT.
 _obs_scene_transform_val
 _obs_scene_group_transform
+# obs-scene-extent.c: obs-scene.c calls them inside libobs. Not EXPORT.
+_obs_scene_extent_init
+_obs_scene_extent_add
+_obs_scene_extent_size
+# obs-scene-crop.c: obs-scene.c calls them inside libobs. Not EXPORT.
+_obs_scene_cropped_size
+_obs_scene_scale_crop
+_obs_scene_crop_offset
+_obs_scene_clamp_crop
+# obs-scene-render-plan.c: obs-scene.c calls them inside libobs. Not EXPORT.
+_obs_scene_render_texture_enabled
+_obs_scene_render_texrender_action
+_obs_scene_render_size_empty
+_obs_scene_render_clear_white
+_obs_scene_render_child
+_obs_scene_render_linear_srgb
+_obs_scene_texcoords_centered
+_obs_scene_render_effect
+_obs_scene_render_multiplier
+_obs_scene_render_technique
+# obs-scene-item-names.c: obs-scene.c calls them inside libobs. Not EXPORT.
+_obs_scene_item_scale_filter_from_name
+_obs_scene_item_blend_method_from_name
+_obs_scene_item_blend_type_from_name
+_obs_scene_item_scale_filter_name
+_obs_scene_item_blend_method_name
+_obs_scene_item_blend_type_name
+_obs_scene_item_transform_keys
+_obs_scene_item_bounds_keys
+_obs_scene_item_save_relative
+# obs-scene-audio-actions.c: obs-scene-item-audio-actions.c calls them inside
+# libobs. Not EXPORT.
+_obs_scene_audio_actions_apply
+_obs_scene_audio_action_due
+# obs-scene-audio-window.c: obs-scene.c calls them inside libobs. Not EXPORT.
+_obs_scene_audio_window_pick
+_obs_scene_audio_window_counts
+_obs_scene_audio_window_earliest
+_obs_scene_audio_window_silent
+_obs_scene_audio_window_frames
+_obs_scene_audio_window_mixes
+_obs_scene_audio_window_adds
+# obs-source-async-pacing.c: obs-source.c calls it inside libobs. Not
+# EXPORT.
+_obs_source_async_pacing
+# obs-source-async-upload.c: obs-source.c calls them inside libobs. Not
+# EXPORT.
+_obs_source_async_upload_texture_changed
+_obs_source_async_upload_tries_gpu
+_obs_source_async_upload_size_uniforms
+_obs_source_async_upload_hlg_peak
+_obs_source_async_upload_maximum_nits
+_obs_source_async_upload_over_sdr_white
+_obs_source_async_upload_hdr_lw
+_obs_source_async_upload_sets_range
+_obs_source_async_upload_linear_alpha
+_obs_source_async_upload_uses_texrender
+_obs_source_async_upload_plain
+_obs_source_async_upload_bgr_swap
+_obs_source_async_upload_reanchor_reads_unbuffered
+_obs_source_async_upload_reanchor
+# obs-source-audio-input.c: obs-source.c calls them inside libobs. Not
+# EXPORT.
+_obs_source_audio_input_discontinuous
+_obs_source_audio_input_reset_needed
+_obs_source_audio_input_resampler_needed
+_obs_source_audio_input_balance_needed
+_obs_source_audio_input_mono_needed
+_obs_source_audio_input_balance
+_obs_source_audio_input_downmix
+# obs-source-audio-render.c: obs-source.c calls them inside libobs. Not
+# EXPORT.
+_obs_source_audio_render_route
+_obs_source_audio_render_custom_clear_before
+_obs_source_audio_render_custom_ts
+_obs_source_audio_render_custom_pending
+_obs_source_audio_render_custom_unmixed
+_obs_source_audio_render_custom_in_tick
+_obs_source_audio_render_custom_clear_after
+_obs_source_audio_render_tick_unset
+_obs_source_audio_render_tick_short
+_obs_source_audio_render_tick_stop
+_obs_source_audio_render_tick_copy
+_obs_source_audio_render_tick_volume
+_obs_source_audio_render_tick_clear_main
+# obs-source-audio-timing.c: obs-source.c calls them inside libobs. Not
+# EXPORT.
+_obs_source_audio_timing_pre_lock
+_obs_source_audio_timing_under_lock
+_obs_source_audio_timing_buffer_start
+# obs-source-color-space.c: obs-source.c calls them inside libobs. Not EXPORT.
+_obs_source_color_space_route
+_obs_source_color_space_pick
+# obs-source-conversion-plan.c: obs-source.c calls it inside libobs. Not
+# EXPORT.
+_obs_source_conversion_plan_fill
+# obs-source-deinterlace-draw.c: obs-source-deinterlace.c calls them inside
+# libobs. Not EXPORT.
+_obs_source_deinterlace_draw_effect
+_obs_source_deinterlace_draw_linear_required
+_obs_source_deinterlace_draw_skip
+_obs_source_deinterlace_draw_reads_linear_srgb
+_obs_source_deinterlace_draw_linear_srgb
+_obs_source_deinterlace_draw_technique
+_obs_source_deinterlace_draw_reads_white_level
+_obs_source_deinterlace_draw_multiplier
+_obs_source_deinterlace_draw_frame2
+_obs_source_deinterlace_draw_mode_change
+# obs-source-deinterlace-pacing.c: obs-source-deinterlace.c calls them inside
+# libobs. Not EXPORT.
+_obs_source_deinterlace_pacing_hold
+_obs_source_deinterlace_pacing_wait_for_next
+_obs_source_deinterlace_pacing_waiting_frame_ts
+_obs_source_deinterlace_pacing_half_duration
+_obs_source_deinterlace_pacing_buffered_offset
+_obs_source_deinterlace_pacing_reanchor
+# obs-source-deinterlace-select.c: obs-source-deinterlace.c calls them inside
+# libobs. Not EXPORT.
+_obs_source_deinterlace_select_first
+_obs_source_deinterlace_select_walk
+_obs_source_deinterlace_select_unbuffered_pair
+_obs_source_deinterlace_select_take_reads_flag
+_obs_source_deinterlace_select_take_pair
+_obs_source_deinterlace_select_take_init_last
+_obs_source_deinterlace_select_take_offset
+_obs_source_deinterlace_select_update
+# obs-source-draw-plan.c: obs-source.c calls them inside libobs. Not EXPORT.
+_obs_source_draw_plan_rotation_x
+_obs_source_draw_plan_rotation_y
+_obs_source_draw_plan_async_linear_srgb
+_obs_source_draw_plan_async_nonlinear_alpha
+_obs_source_draw_plan_technique
+_obs_source_draw_plan_reads_white_level
+_obs_source_draw_plan_multiplier
+_obs_source_draw_plan_convert
+# obs-source-frame-copy.c: obs-source.c calls them inside libobs. Not EXPORT.
+_obs_source_frame_copy_plan
+_obs_source_frame_copy_cache_step
+_obs_source_frame_copy_cache_clean
+_obs_source_frame_copy_full_range
+_obs_source_frame_copy_full_range2
+_obs_source_frame_copy_preload_changed
+# obs-source-media-admission.c: obs-source.c calls them inside libobs. Not
+# EXPORT.
+_obs_source_media_admit
+_obs_source_media_admit_flags
+_obs_source_media_admit_callback
+_obs_source_media_time_fallback
+_obs_source_media_state_fallback
+_obs_source_media_dispatch
+_obs_source_media_signal_reads_pause
+_obs_source_media_signal
+# obs-source-ptm-gate.c: obs-source.c calls them inside libobs. Not EXPORT.
+_obs_source_ptm_gate_stop_time
+_obs_source_ptm_gate_held
+_obs_source_ptm_gate_mutes
+_obs_source_ptm_gate_talk_mutes
+# obs-source-render-route.c: obs-source.c calls them inside libobs. Not
+# EXPORT.
+_obs_source_render_route_filter
+_obs_source_render_route_video_reads_flags
+_obs_source_render_route_video_none
+_obs_source_render_route_async_reads_flags
+_obs_source_render_route_async_reads_rendering_filter
+_obs_source_render_route_async_update
+_obs_source_render_route_reads_enabled
+_obs_source_render_route_inactive
+_obs_source_render_route_draw
+_obs_source_render_route_draw_next
+_obs_source_render_route_main_custom_draw
+_obs_source_render_route_main_srgb_aware
+_obs_source_render_route_main_reads_filters
+_obs_source_render_route_main_default_effect
+_obs_source_render_route_bypass_reads_space
+_obs_source_render_route_bypass
+_obs_source_render_route_size_skip
+_obs_source_render_route_texrender_stale
+_obs_source_render_route_filter_render
+_obs_source_render_route_tech_end_linear_srgb
+_obs_source_render_route_tech_name
+_obs_source_render_route_tech_end
+_obs_source_render_route_skip
+# obs-source-size.c: obs-source.c calls them inside libobs. Not EXPORT.
+_obs_source_size_route
+_obs_source_size_entry
+# obs-source-transition-clock.c: obs-source-transition.c calls them inside
+# libobs. Not EXPORT.
+_obs_source_transition_clock_time
+_obs_source_transition_clock_manual
+_obs_source_transition_clock_size
+_obs_source_transition_clock_fold
+_obs_source_transition_clock_fit
+_obs_source_transition_clock_mix_spaces
+_obs_source_transition_clock_min_ts
+# obs-source-transition-render.c: obs-source-transition.c calls them inside
+# libobs. Not EXPORT.
+_obs_source_transition_render_video_due
+_obs_source_transition_render_video_stop
+_obs_source_transition_render_draw
+_obs_source_transition_render_direct_index
+_obs_source_transition_render_audio_stop
+_obs_source_transition_render_audio_mix
+_obs_source_transition_render_audio_valid
+_obs_source_transition_render_audio_place
+_obs_source_transition_render_offset
+# obs-source-volume.c: obs-source.c calls them inside libobs. Not EXPORT.
+_obs_source_volume_snap
+_obs_source_volume_action_due
+_obs_source_volume_step
+_obs_source_volume_mixes
+# obs-audio-mix.c: obs-audio.c calls them inside libobs. Not EXPORT.
+_obs_audio_mix_time_to_frames
+_obs_audio_mix_add
+_obs_audio_buffering_maxed
+_obs_audio_buffering_fixed
+_obs_audio_buffering_add
 # obs-output-caption-text.c: obs-output.c calls it inside libobs. Not EXPORT.
 _obs_output_caption_text_page
+# obs-output-protocols.c: obs-output.c calls it inside libobs. Not EXPORT.
+_obs_output_protocol_list_count
+# obs-output-video-checks.c: obs-output.c calls them inside libobs. Not
+# EXPORT.
+_obs_output_first_mixer
+_obs_output_size_route
+_obs_output_capture_ready
+_obs_output_begin_gate
+_obs_output_conversion_plan
+_obs_output_congestion_clamp
+# obs-encoder-roi.c: obs-encoder.c calls them inside libobs. Not EXPORT.
+_obs_encoder_roi_admit
+_obs_encoder_roi_scale_factors
+_obs_encoder_roi_scale
+# obs-encoder-audio-start.c: obs-encoder.c calls them inside libobs. Not
+# EXPORT.
+_obs_encoder_audio_start_group_ready
+_obs_encoder_audio_start_paired_late
+_obs_encoder_audio_start_video_pts
+_obs_encoder_audio_start_size
+_obs_encoder_audio_start_paired
+_obs_encoder_audio_start_unpaired
+_obs_encoder_audio_start_no_video
+_obs_encoder_audio_start_packet
+_obs_encoder_audio_start_offset_ns
+_obs_encoder_audio_start_offset_size
+_obs_encoder_audio_start_buffer_offset
+_obs_encoder_audio_start_push_size
+_obs_encoder_audio_start_can_send
+_obs_encoder_audio_start_audio_pts
+_obs_encoder_audio_start_not_video
+_obs_encoder_audio_start_divisor_ok
+# obs-encoder-size.c: obs-encoder.c calls them inside libobs. Not EXPORT.
+_obs_encoder_size_audio_defaults
+_obs_encoder_size_cap_override
+_obs_encoder_size_scaled_gate
+_obs_encoder_size_scaled_match
+_obs_encoder_size_scaling
+_obs_encoder_size_video_route
+_obs_encoder_size_rate_route
 # obs-output-delay.c: obs-output.c calls them inside libobs. Not EXPORT.
 _process_delay
 _obs_output_delay_start
@@ -115,12 +384,86 @@ _obs_nix_portal_sets_partition
 # obs-context-names.c: obs.c calls them inside libobs. Not EXPORT.
 _obs_context_name_dup
 _obs_context_name_deduplicate
+# obs-module-locale.c: obs-module.c calls them inside libobs. Not EXPORT.
+_obs_module_locale_default_file
+_obs_module_locale_is_default
+_obs_module_locale_file
+# obs-module-names.c: obs-module.c calls them inside libobs. Not EXPORT.
+_obs_module_names_file_name
+_obs_module_names_module_name
+_obs_module_names_config_path
+_obs_module_names_manifest_path
+_obs_module_names_listed
+_obs_module_names_find_core
+# obs-module-paths.c: obs-module.c calls them inside libobs. Not EXPORT.
+_obs_module_paths_data_dir
+_obs_module_paths_find
+_obs_module_paths_find_file
+# obs-module-source-rules.c: obs-module.c calls them inside libobs. Not
+# EXPORT.
+_obs_module_source_rules_list_of
+_obs_module_source_rules_size_supported
+_obs_module_source_rules_output_flags
+_obs_module_source_rules_check
+_obs_module_source_rules_versioned_id
+# obs-module-type-rules.c: obs-module.c calls them inside libobs. Not EXPORT.
+_obs_module_type_rules_output_check
+_obs_module_type_rules_encoder_check
+_obs_module_type_rules_service_check
+_obs_module_type_rules_protocol_listed
+# obs-source-load.c: obs.c calls them inside libobs. Not EXPORT.
+_obs_source_load_prev_ver
+_obs_source_load_volume
+_obs_source_load_balance
+_obs_source_load_delay
+_obs_source_load_deinterlace_mode
+_obs_source_load_monitoring_migration
 # obs-video-plan.c: obs.c calls them inside libobs. Not EXPORT.
 _obs_video_size_valid
 _obs_video_align_output_size
 _obs_video_output_size_valid
 _obs_video_scale_type_name
 _obs_video_output_plan
+# obs-video-copy-plan.c: obs-video.c calls them inside libobs. Not EXPORT.
+_obs_video_gpu_copy_plan
+_obs_video_rgbx_copy_plan
+_obs_video_scale_resolution_close
+_obs_video_scale_effect_choice
+_obs_video_mix_reuse_match
+# obs-video-output-step.c: obs-video.c calls them inside libobs. Not EXPORT.
+_obs_video_step_activation
+_obs_video_step_stage
+_obs_video_step_queue
+_obs_video_step_queue_copy_uv
+_obs_video_step_queue_count
+_obs_video_step_render_targets
+_obs_video_step_render
+_obs_video_step_ring
+_obs_video_step_download
+_obs_video_step_output
+# obs-canvas-draw.c: obs.c and obs-display.c call them inside libobs. Not
+# EXPORT.
+_obs_canvas_draw_multiplier
+_obs_canvas_draw_reads_white_level
+_obs_canvas_draw_skip
+_obs_canvas_draw_technique
+_obs_display_clear_draws_solid
+_obs_display_clear_flags
+_obs_display_clear_linear
+_obs_display_clear_reads_space
+# util/source-profiler.c: the frame hooks libobs calls inside itself. Not
+# EXPORT.
+_source_profiler_reset_video
+_source_profiler_render_begin
+_source_profiler_render_end
+_source_profiler_frame_begin
+_source_profiler_frame_collect
+_source_profiler_async_frame_received
+_source_profiler_source_tick_start
+_source_profiler_source_tick_end
+_source_profiler_source_render_begin
+_source_profiler_source_render_end
+_source_profiler_remove_source
 # compiler-rt @available helpers (__isOSVersionAtLeast,
 # __isPlatformVersionAtLeast) that Rust's compiler_builtins brings in; the C
 # build does not export them. Wildcards: no error if absent.
@@ -131,3 +474,13 @@ _ep_free
 # Internal scene bounds placement.
 _add_alignment
 _obs_bounds_place
+
+# obs-service.c (#1920): internal service lifecycle.
+_obs_service_destroy
+_obs_service_activate
+_obs_service_deactivate
+_obs_service_initialize
+
+# obs-view.c (#1933): internal view init and free.
+_obs_view_init
+_obs_view_free

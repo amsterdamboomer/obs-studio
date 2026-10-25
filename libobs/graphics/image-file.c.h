@@ -15,7 +15,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 
-#include "build/libobs-media.pch.h"
+#include "libobs/build/libobs-ported-graphics.pch.h"
 
 #define blog(level, format, ...) blog(level, "%s: " format, __FUNCTION__, __VA_ARGS__)
 
@@ -187,8 +187,12 @@ static bool init_animated_gif(gs_image_file_ex_t *image, const char *path, uint6
 	image->loaded = true;
 
 fail:
-	if (!image->loaded)
+	if (!image->loaded) {
+		/* gs_image_file_ex_free() destroys the decoder only once loaded (#2032). */
+		nsgif_destroy(image->internal->gif);
+		image->internal->gif = NULL;
 		gs_image_file_ex_free(image);
+	}
 
 not_animated:
 	if (file)

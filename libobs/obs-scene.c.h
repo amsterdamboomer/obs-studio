@@ -25,8 +25,6 @@ static void resize_scene(obs_scene_t *scene);
 static void signal_parent(obs_scene_t *parent, const char *name, calldata_t *params);
 static void get_ungrouped_transform(obs_sceneitem_t *group, obs_sceneitem_t *item, struct vec2 *pos, struct vec2 *scale,
 				    float *rot);
-static inline bool crop_enabled(const struct obs_sceneitem_crop *crop);
-static inline bool item_texture_enabled(const struct obs_scene_item *item);
 static void init_hotkeys(obs_scene_t *scene, obs_sceneitem_t *item, const char *name);
 
 typedef DARRAY(struct obs_scene_item *) obs_scene_item_ptr_array_t;
@@ -264,8 +262,13 @@ static inline void get_scene_dimensions(const obs_sceneitem_t *item, float *x, f
 {
 	obs_scene_t *parent = item->parent;
 	if (!parent || (parent->is_group && !parent->source->canvas)) {
-		*x = (float)obs->data.main_canvas->mix->ovi.base_width;
-		*y = (float)obs->data.main_canvas->mix->ovi.base_height;
+		/* The main canvas has no mix until the first obs_reset_video()
+		 * (#2253): 0x0 then, as scene_getwidth() and scene_getheight()
+		 * answer for a scene. */
+		const obs_canvas_t *canvas = obs->data.main_canvas;
+		const struct obs_core_video_mix *mix = canvas ? canvas->mix : NULL;
+		*x = mix ? (float)mix->ovi.base_width : 0.0f;
+		*y = mix ? (float)mix->ovi.base_height : 0.0f;
 	} else if (parent->is_group) {
 		*x = (float)canvas_getwidth(parent->source->canvas);
 		*y = (float)canvas_getheight(parent->source->canvas);
@@ -337,6 +340,17 @@ static inline void item_relative_scale(struct vec2 *dst, const struct vec2 *v, c
 	obs_scene_item_relative_scale(dst, v, y, item->scale_ref.y);
 }
 
+/* A bounds type outside the enum (a hand-edited or foreign scene
+ * collection, undo data, a plugin) has no bounding box: OBS_BOUNDS_NONE.
+ * Takes the int64 a load reads, before any cast truncates it, and an enum
+ * value from a setter (an unsigned or a signed int, by compiler). */
+static inline enum obs_bounds_type valid_bounds_type(int64_t type)
+{
+	if (type < OBS_BOUNDS_NONE || type > OBS_BOUNDS_MAX_ONLY)
+		return OBS_BOUNDS_NONE;
+	return (enum obs_bounds_type)type;
+}
+
 static void calculate_bounds_data(struct obs_scene_item *item, struct vec2 *origin, struct vec2 *scale, uint32_t *cx,
 				  uint32_t *cy)
 {
@@ -352,14 +366,14 @@ static void calculate_bounds_data(struct obs_scene_item *item, struct vec2 *orig
 
 static inline uint32_t calc_cx(const struct obs_scene_item *item, uint32_t width)
 {
-	uint32_t crop_cx = item->crop.left + item->crop.right + item->bounds_crop.left + item->bounds_crop.right;
-	return (crop_cx > width) ? 2 : (width - crop_cx);
+	return obs_scene_cropped_size(width, item->crop.left, item->crop.right, item->bounds_crop.left,
+				      item->bounds_crop.right);
 }
 
 static inline uint32_t calc_cy(const struct obs_scene_item *item, uint32_t height)
 {
-	uint32_t crop_cy = item->crop.top + item->crop.bottom + item->bounds_crop.top + item->bounds_crop.bottom;
-	return (crop_cy > height) ? 2 : (height - crop_cy);
+	return obs_scene_cropped_size(height, item->crop.top, item->crop.bottom, item->bounds_crop.top,
+				      item->bounds_crop.bottom);
 }
 
 #ifdef DEBUG_TRANSFORM
@@ -385,33 +399,24 @@ static inline void update_nested_scene_crop(struct obs_scene_item *item, uint32_
 	float scale_x = (float)width / (float)item->last_width;
 	float scale_y = (float)height / (float)item->last_height;
 
-	item->crop.left = (int)((float)item->crop.left * scale_x);
-	item->crop.right = (int)((float)item->crop.right * scale_x);
-	item->crop.top = (int)((float)item->crop.top * scale_y);
-	item->crop.bottom = (int)((float)item->crop.bottom * scale_y);
+	item->crop.left = obs_scene_scale_crop(item->crop.left, scale_x);
+	item->crop.right = obs_scene_scale_crop(item->crop.right, scale_x);
+	item->crop.top = obs_scene_scale_crop(item->crop.top, scale_y);
+	item->crop.bottom = obs_scene_scale_crop(item->crop.bottom, scale_y);
 }
 
-static void update_item_transform(struct obs_scene_item *item, bool update_tex)
+/* Needs the parent's video lock: the graphics thread reads the results. */
+static void compute_item_transform(struct obs_scene_item *item, uint32_t width, uint32_t height, bool update_tex)
 {
-	uint32_t width;
-	uint32_t height;
 	uint32_t cx;
 	uint32_t cy;
 	struct vec2 base_origin;
 	struct vec2 origin;
 	struct vec2 scale;
 	struct vec2 position;
-	struct calldata params;
-	uint8_t stack[128];
-
-	if (os_atomic_load_long(&item->defer_update) > 0)
-		return;
 
 	/* Reset bounds crop */
 	memset(&item->bounds_crop, 0, sizeof(item->bounds_crop));
-
-	width = obs_source_get_width(item->source);
-	height = obs_source_get_height(item->source);
 
 	/* Adjust crop on nested scenes (if any) */
 	if (update_tex && item->is_scene)
@@ -485,8 +490,31 @@ static void update_item_transform(struct obs_scene_item *item, bool update_tex)
 #ifdef DEBUG_TRANSFORM
 	log_matrix(&item->draw_transform, "box_transform");
 #endif
+}
 
-	/* ----------------------- */
+/* Setters call this on their own thread while the graphics thread renders,
+ * so the transform is computed under the parent's video lock (recursive: the
+ * render path already holds it). The source size is read before locking, as
+ * get_width can reach plugin code, and item_transform is sent after
+ * unlocking, as its handlers can enter graphics, which the render thread
+ * holds while it takes the video lock (#2115). */
+static void update_item_transform(struct obs_scene_item *item, bool update_tex)
+{
+	struct calldata params;
+	uint8_t stack[128];
+
+	if (os_atomic_load_long(&item->defer_update) > 0)
+		return;
+
+	uint32_t width = obs_source_get_width(item->source);
+	uint32_t height = obs_source_get_height(item->source);
+
+	obs_scene_t *scene = item->parent;
+	if (scene)
+		video_lock(scene);
+	compute_item_transform(item, width, height, update_tex);
+	if (scene)
+		video_unlock(scene);
 
 	calldata_init_fixed(&params, stack, sizeof(stack));
 	calldata_set_ptr(&params, "item", item);
@@ -506,31 +534,107 @@ static inline bool source_size_changed(struct obs_scene_item *item)
 	return item->last_width != width || item->last_height != height;
 }
 
-static inline bool crop_enabled(const struct obs_sceneitem_crop *crop)
-{
-	return crop->left || crop->right || crop->top || crop->bottom;
-}
+/* obs-scene-render-plan.h mirrors these values, so it needs no core header. */
+_Static_assert(OBS_SCENE_RENDER_SCALE_DISABLE == OBS_SCALE_DISABLE, "OBS_SCALE_DISABLE");
+_Static_assert(OBS_SCENE_RENDER_SCALE_POINT == OBS_SCALE_POINT, "OBS_SCALE_POINT");
+_Static_assert(OBS_SCENE_RENDER_SCALE_BICUBIC == OBS_SCALE_BICUBIC, "OBS_SCALE_BICUBIC");
+_Static_assert(OBS_SCENE_RENDER_SCALE_LANCZOS == OBS_SCALE_LANCZOS, "OBS_SCALE_LANCZOS");
+_Static_assert(OBS_SCENE_RENDER_SCALE_AREA == OBS_SCALE_AREA, "OBS_SCALE_AREA");
+_Static_assert(OBS_SCENE_RENDER_BLEND_METHOD_SRGB_OFF == OBS_BLEND_METHOD_SRGB_OFF, "OBS_BLEND_METHOD_SRGB_OFF");
+_Static_assert(OBS_SCENE_RENDER_BLEND_NORMAL == OBS_BLEND_NORMAL, "OBS_BLEND_NORMAL");
+_Static_assert(OBS_SCENE_RENDER_BLEND_DARKEN == OBS_BLEND_DARKEN, "OBS_BLEND_DARKEN");
+_Static_assert(OBS_SCENE_RENDER_CS_SRGB == GS_CS_SRGB, "GS_CS_SRGB");
+_Static_assert(OBS_SCENE_RENDER_CS_SRGB_16F == GS_CS_SRGB_16F, "GS_CS_SRGB_16F");
+_Static_assert(OBS_SCENE_RENDER_CS_709_EXTENDED == GS_CS_709_EXTENDED, "GS_CS_709_EXTENDED");
+_Static_assert(OBS_SCENE_RENDER_CS_709_SCRGB == GS_CS_709_SCRGB, "GS_CS_709_SCRGB");
+_Static_assert(sizeof(enum obs_scale_type) == sizeof(int), "enum obs_scale_type is int-sized");
+_Static_assert(sizeof(enum obs_blending_method) == sizeof(int), "enum obs_blending_method is int-sized");
+_Static_assert(sizeof(enum obs_blending_type) == sizeof(int), "enum obs_blending_type is int-sized");
+_Static_assert(sizeof(enum gs_color_space) == sizeof(int), "enum gs_color_space is int-sized");
 
-static inline bool scale_filter_enabled(const struct obs_scene_item *item)
-{
-	return item->scale_filter != OBS_SCALE_DISABLE;
-}
-
-static inline bool default_blending_enabled(const struct obs_scene_item *item)
-{
-	return item->blend_type == OBS_BLEND_NORMAL;
-}
-
-static inline bool item_is_scene(const struct obs_scene_item *item)
-{
-	return item->source && item->source->info.type == OBS_SOURCE_TYPE_SCENE;
-}
+/* obs-scene-item-names.h mirrors these values, so it needs no core header. */
+_Static_assert(OBS_SCENE_ITEM_SCALE_DISABLE == OBS_SCALE_DISABLE, "OBS_SCALE_DISABLE");
+_Static_assert(OBS_SCENE_ITEM_SCALE_POINT == OBS_SCALE_POINT, "OBS_SCALE_POINT");
+_Static_assert(OBS_SCENE_ITEM_SCALE_BICUBIC == OBS_SCALE_BICUBIC, "OBS_SCALE_BICUBIC");
+_Static_assert(OBS_SCENE_ITEM_SCALE_BILINEAR == OBS_SCALE_BILINEAR, "OBS_SCALE_BILINEAR");
+_Static_assert(OBS_SCENE_ITEM_SCALE_LANCZOS == OBS_SCALE_LANCZOS, "OBS_SCALE_LANCZOS");
+_Static_assert(OBS_SCENE_ITEM_SCALE_AREA == OBS_SCALE_AREA, "OBS_SCALE_AREA");
+_Static_assert(OBS_SCENE_ITEM_BLEND_METHOD_DEFAULT == OBS_BLEND_METHOD_DEFAULT, "OBS_BLEND_METHOD_DEFAULT");
+_Static_assert(OBS_SCENE_ITEM_BLEND_METHOD_SRGB_OFF == OBS_BLEND_METHOD_SRGB_OFF, "OBS_BLEND_METHOD_SRGB_OFF");
+_Static_assert(OBS_SCENE_ITEM_BLEND_NORMAL == OBS_BLEND_NORMAL, "OBS_BLEND_NORMAL");
+_Static_assert(OBS_SCENE_ITEM_BLEND_ADDITIVE == OBS_BLEND_ADDITIVE, "OBS_BLEND_ADDITIVE");
+_Static_assert(OBS_SCENE_ITEM_BLEND_SUBTRACT == OBS_BLEND_SUBTRACT, "OBS_BLEND_SUBTRACT");
+_Static_assert(OBS_SCENE_ITEM_BLEND_SCREEN == OBS_BLEND_SCREEN, "OBS_BLEND_SCREEN");
+_Static_assert(OBS_SCENE_ITEM_BLEND_MULTIPLY == OBS_BLEND_MULTIPLY, "OBS_BLEND_MULTIPLY");
+_Static_assert(OBS_SCENE_ITEM_BLEND_LIGHTEN == OBS_BLEND_LIGHTEN, "OBS_BLEND_LIGHTEN");
+_Static_assert(OBS_SCENE_ITEM_BLEND_DARKEN == OBS_BLEND_DARKEN, "OBS_BLEND_DARKEN");
 
 static inline bool item_texture_enabled(const struct obs_scene_item *item)
 {
-	return crop_enabled(&item->crop) || crop_enabled(&item->bounds_crop) || scale_filter_enabled(item) ||
-	       (item->blend_method == OBS_BLEND_METHOD_SRGB_OFF) || !default_blending_enabled(item) ||
-	       (item_is_scene(item) && !item->is_group);
+	const struct obs_scene_render_triggers triggers = {
+		.crop_left = item->crop.left,
+		.crop_top = item->crop.top,
+		.crop_right = item->crop.right,
+		.crop_bottom = item->crop.bottom,
+		.bounds_crop_left = item->bounds_crop.left,
+		.bounds_crop_top = item->bounds_crop.top,
+		.bounds_crop_right = item->bounds_crop.right,
+		.bounds_crop_bottom = item->bounds_crop.bottom,
+		.scale_filter = item->scale_filter,
+		.blend_method = item->blend_method,
+		.blend_type = item->blend_type,
+		.is_scene = item->source && item->source->info.type == OBS_SOURCE_TYPE_SCENE,
+		.is_group = item->is_group,
+	};
+	return obs_scene_render_texture_enabled(&triggers);
+}
+
+/* The child render_item() draws: the show transition is asked for only when
+ * the item is visible, and the hide transition only when it is not. */
+static inline enum obs_scene_render_child_id item_render_child(const struct obs_scene_item *item)
+{
+	const bool user_visible = item->user_visible;
+	const bool show_active = user_visible && scene_transition_active(item->show_transition);
+	const bool hide_active = !user_visible && scene_transition_active(item->hide_transition);
+	return obs_scene_render_child(user_visible, show_active, hide_active);
+}
+
+static gs_effect_t *render_effect(int effect)
+{
+	switch (effect) {
+	case OBS_SCENE_RENDER_EFFECT_BILINEAR_LOWRES:
+		return obs->video.bilinear_lowres_effect;
+	case OBS_SCENE_RENDER_EFFECT_BICUBIC:
+		return obs->video.bicubic_effect;
+	case OBS_SCENE_RENDER_EFFECT_LANCZOS:
+		return obs->video.lanczos_effect;
+	case OBS_SCENE_RENDER_EFFECT_AREA:
+		return obs->video.area_effect;
+	}
+	return obs->video.default_effect;
+}
+
+static const char *render_technique_name(enum obs_scene_render_technique_id tech)
+{
+	switch (tech) {
+	case OBS_SCENE_RENDER_TECH_DRAW:
+		return "Draw";
+	case OBS_SCENE_RENDER_TECH_DRAW_MULTIPLY:
+		return "DrawMultiply";
+	case OBS_SCENE_RENDER_TECH_DRAW_TONEMAP:
+		return "DrawTonemap";
+	case OBS_SCENE_RENDER_TECH_DRAW_MULTIPLY_TONEMAP:
+		return "DrawMultiplyTonemap";
+	case OBS_SCENE_RENDER_TECH_DRAW_UPSCALE:
+		return "DrawUpscale";
+	case OBS_SCENE_RENDER_TECH_DRAW_UPSCALE_MULTIPLY:
+		return "DrawUpscaleMultiply";
+	case OBS_SCENE_RENDER_TECH_DRAW_UPSCALE_TONEMAP:
+		return "DrawUpscaleTonemap";
+	case OBS_SCENE_RENDER_TECH_DRAW_UPSCALE_MULTIPLY_TONEMAP:
+		return "DrawUpscaleMultiplyTonemap";
+	}
+	return "Draw";
 }
 
 static void render_item_texture(struct obs_scene_item *item, enum gs_color_space current_space,
@@ -543,115 +647,38 @@ static void render_item_texture(struct obs_scene_item *item, enum gs_color_space
 
 	GS_DEBUG_MARKER_BEGIN(GS_DEBUG_COLOR_ITEM_TEXTURE, "render_item_texture");
 
-	gs_effect_t *effect = obs->video.default_effect;
-	enum obs_scale_type type = item->scale_filter;
 	uint32_t cx = gs_texture_get_width(tex);
 	uint32_t cy = gs_texture_get_height(tex);
 
-	bool upscale = false;
-	if (type != OBS_SCALE_DISABLE) {
-		if (type == OBS_SCALE_POINT) {
-			gs_eparam_t *image = gs_effect_get_param_by_name(effect, "image");
-			gs_effect_set_next_sampler(image, obs->video.point_sampler);
+	struct obs_scene_render_effect_plan plan;
+	obs_scene_render_effect(item->scale_filter, item->output_scale.x, item->output_scale.y, &plan);
+	gs_effect_t *effect = render_effect(plan.effect);
 
-		} else if (!close_float(item->output_scale.x, 1.0f, EPSILON) ||
-			   !close_float(item->output_scale.y, 1.0f, EPSILON)) {
-			if (item->output_scale.x < 0.5f || item->output_scale.y < 0.5f) {
-				effect = obs->video.bilinear_lowres_effect;
-			} else if (type == OBS_SCALE_BICUBIC) {
-				effect = obs->video.bicubic_effect;
-			} else if (type == OBS_SCALE_LANCZOS) {
-				effect = obs->video.lanczos_effect;
-			} else if (type == OBS_SCALE_AREA) {
-				effect = obs->video.area_effect;
-				upscale = (item->output_scale.x >= 1.0f) && (item->output_scale.y >= 1.0f);
-			}
+	if (plan.point_sampler) {
+		gs_eparam_t *image = gs_effect_get_param_by_name(effect, "image");
+		gs_effect_set_next_sampler(image, obs->video.point_sampler);
+	}
 
-			gs_eparam_t *const scale_param = gs_effect_get_param_by_name(effect, "base_dimension");
-			if (scale_param) {
-				struct vec2 base_res = {(float)cx, (float)cy};
+	if (plan.base_dimension) {
+		gs_eparam_t *const scale_param = gs_effect_get_param_by_name(effect, "base_dimension");
+		if (scale_param) {
+			struct vec2 base_res = {(float)cx, (float)cy};
 
-				gs_effect_set_vec2(scale_param, &base_res);
-			}
+			gs_effect_set_vec2(scale_param, &base_res);
+		}
 
-			gs_eparam_t *const scale_i_param = gs_effect_get_param_by_name(effect, "base_dimension_i");
-			if (scale_i_param) {
-				struct vec2 base_res_i = {1.0f / (float)cx, 1.0f / (float)cy};
+		gs_eparam_t *const scale_i_param = gs_effect_get_param_by_name(effect, "base_dimension_i");
+		if (scale_i_param) {
+			struct vec2 base_res_i = {1.0f / (float)cx, 1.0f / (float)cy};
 
-				gs_effect_set_vec2(scale_i_param, &base_res_i);
-			}
+			gs_effect_set_vec2(scale_i_param, &base_res_i);
 		}
 	}
 
-	float multiplier = 1.f;
-
-	if (current_space == GS_CS_709_SCRGB) {
-		switch (source_space) {
-		case GS_CS_SRGB:
-		case GS_CS_SRGB_16F:
-		case GS_CS_709_EXTENDED:
-			multiplier = obs_get_video_sdr_white_level() / 80.f;
-			break;
-		case GS_CS_709_SCRGB:
-			break;
-		}
-	}
-
-	if (source_space == GS_CS_709_SCRGB) {
-		switch (current_space) {
-		case GS_CS_SRGB:
-		case GS_CS_SRGB_16F:
-		case GS_CS_709_EXTENDED:
-			multiplier = 80.f / obs_get_video_sdr_white_level();
-			break;
-		case GS_CS_709_SCRGB:
-			break;
-		}
-	}
-
-	const char *tech_name = "Draw";
-	if (upscale) {
-		tech_name = "DrawUpscale";
-		switch (source_space) {
-		case GS_CS_SRGB:
-		case GS_CS_SRGB_16F:
-			if (current_space == GS_CS_709_SCRGB)
-				tech_name = "DrawUpscaleMultiply";
-			break;
-		case GS_CS_709_EXTENDED:
-			if (current_space == GS_CS_SRGB || current_space == GS_CS_SRGB_16F)
-				tech_name = "DrawUpscaleTonemap";
-			else if (current_space == GS_CS_709_SCRGB)
-				tech_name = "DrawUpscaleMultiply";
-			break;
-		case GS_CS_709_SCRGB:
-			if (current_space == GS_CS_SRGB || current_space == GS_CS_SRGB_16F)
-				tech_name = "DrawUpscaleMultiplyTonemap";
-			else if (current_space == GS_CS_709_EXTENDED)
-				tech_name = "DrawUpscaleMultiply";
-			break;
-		}
-	} else {
-		switch (source_space) {
-		case GS_CS_SRGB:
-		case GS_CS_SRGB_16F:
-			if (current_space == GS_CS_709_SCRGB)
-				tech_name = "DrawMultiply";
-			break;
-		case GS_CS_709_EXTENDED:
-			if (current_space == GS_CS_SRGB || current_space == GS_CS_SRGB_16F)
-				tech_name = "DrawTonemap";
-			else if (current_space == GS_CS_709_SCRGB)
-				tech_name = "DrawMultiply";
-			break;
-		case GS_CS_709_SCRGB:
-			if (current_space == GS_CS_SRGB || current_space == GS_CS_SRGB_16F)
-				tech_name = "DrawMultiplyTonemap";
-			else if (current_space == GS_CS_709_EXTENDED)
-				tech_name = "DrawMultiply";
-			break;
-		}
-	}
+	const float multiplier =
+		obs_scene_render_multiplier(current_space, source_space, obs_get_video_sdr_white_level());
+	const char *tech_name =
+		render_technique_name(obs_scene_render_technique(plan.upscale, current_space, source_space));
 
 	gs_eparam_t *const multiplier_param = gs_effect_get_param_by_name(effect, "multiplier");
 	if (multiplier_param)
@@ -673,20 +700,6 @@ static void render_item_texture(struct obs_scene_item *item, enum gs_color_space
 	GS_DEBUG_MARKER_END();
 }
 
-static bool are_texcoords_centered(struct matrix4 *m)
-{
-	static const struct matrix4 identity = {
-		{1.0f, 0.0f, 0.0f, 0.0f},
-		{0.0f, 1.0f, 0.0f, 0.0f},
-		{0.0f, 0.0f, 1.0f, 0.0f},
-		{0.0f, 0.0f, 0.0f, 1.0f},
-	};
-	struct matrix4 copy = identity;
-	copy.t.x = floorf(m->t.x);
-	copy.t.y = floorf(m->t.y);
-	return memcmp(m, &copy, sizeof(*m)) == 0;
-}
-
 /* An item's show/hide transition only runs out, and releases the item's
  * source, when it is rendered. An item drawn through a texture is skipped
  * while its source has no size (a Media Source that cleared its frame at the
@@ -696,10 +709,16 @@ static void render_empty_item_transition(struct obs_scene_item *item)
 {
 	obs_source_t *transition = NULL;
 
-	if (item->user_visible && scene_transition_active(item->show_transition))
+	switch (item_render_child(item)) {
+	case OBS_SCENE_RENDER_CHILD_SHOW:
 		transition = item->show_transition;
-	else if (!item->user_visible && scene_transition_active(item->hide_transition))
+		break;
+	case OBS_SCENE_RENDER_CHILD_HIDE:
 		transition = item->hide_transition;
+		break;
+	case OBS_SCENE_RENDER_CHILD_SOURCE:
+		break;
+	}
 
 	if (!transition)
 		return;
@@ -719,12 +738,19 @@ static inline void render_item(struct obs_scene_item *item)
 	const enum gs_color_space source_space = obs_source_get_color_space(source, 1, &current_space);
 	const enum gs_color_format format = gs_get_format_from_space(source_space);
 
-	if (item->item_render && (!use_texrender || (gs_texrender_get_format(item->item_render) != format))) {
+	/* The texrender's format is asked for only when one is there and
+	 * wanted. */
+	const bool format_matches = item->item_render && use_texrender &&
+				    (gs_texrender_get_format(item->item_render) == format);
+	const enum obs_scene_render_texrender action =
+		obs_scene_render_texrender_action(item->item_render != NULL, use_texrender, format_matches);
+
+	if (action == OBS_SCENE_RENDER_TEXRENDER_DESTROY || action == OBS_SCENE_RENDER_TEXRENDER_RECREATE) {
 		gs_texrender_destroy(item->item_render);
 		item->item_render = NULL;
 	}
 
-	if (!item->item_render && use_texrender) {
+	if (action == OBS_SCENE_RENDER_TEXRENDER_CREATE || action == OBS_SCENE_RENDER_TEXRENDER_RECREATE) {
 		item->item_render = gs_texrender_create(format, GS_ZS_NONE);
 	}
 
@@ -732,7 +758,7 @@ static inline void render_item(struct obs_scene_item *item)
 		uint32_t width = obs_source_get_width(item->source);
 		uint32_t height = obs_source_get_height(item->source);
 
-		if (!width || !height) {
+		if (obs_scene_render_size_empty(width, height)) {
 			render_empty_item_transition(item);
 			goto cleanup;
 		}
@@ -745,13 +771,9 @@ static inline void render_item(struct obs_scene_item *item)
 			float cy_scale = (float)height / (float)cy;
 			struct vec4 clear_color;
 
-			/* Darken draws with GS_BLEND_OP_MIN, for which the graphics
-			 * APIs ignore the blend factors: a transparent pixel (0, 0,
-			 * 0, 0) would always win and draw black, with alpha 0.
-			 * Drawn over white instead, a transparent pixel is white
-			 * with alpha 1 and leaves what is under it, and an opaque
-			 * one is unchanged. */
-			if (item->blend_type == OBS_BLEND_DARKEN)
+			/* White for Darken (#1406), see
+			 * obs_scene_render_clear_white(). */
+			if (obs_scene_render_clear_white(item->blend_type))
 				vec4_set(&clear_color, 1.0f, 1.0f, 1.0f, 1.0f);
 			else
 				vec4_zero(&clear_color);
@@ -759,50 +781,65 @@ static inline void render_item(struct obs_scene_item *item)
 			gs_ortho(0.0f, (float)width, 0.0f, (float)height, -100.0f, 100.0f);
 
 			gs_matrix_scale3f(cx_scale, cy_scale, 1.0f);
-			gs_matrix_translate3f(-(float)(item->crop.left + item->bounds_crop.left),
-					      -(float)(item->crop.top + item->bounds_crop.top), 0.0f);
+			gs_matrix_translate3f(-obs_scene_crop_offset(item->crop.left, item->bounds_crop.left),
+					      -obs_scene_crop_offset(item->crop.top, item->bounds_crop.top), 0.0f);
 
-			if (item->user_visible && scene_transition_active(item->show_transition)) {
+			switch (item_render_child(item)) {
+			case OBS_SCENE_RENDER_CHILD_SHOW: {
 				const int show_cx = obs_source_get_width(item->source);
 				const int show_cy = obs_source_get_height(item->source);
 				obs_transition_set_size(item->show_transition, show_cx, show_cy);
 				obs_source_video_render(item->show_transition);
-			} else if (!item->user_visible && scene_transition_active(item->hide_transition)) {
+				break;
+			}
+			case OBS_SCENE_RENDER_CHILD_HIDE: {
 				const int hide_cx = obs_source_get_width(item->source);
 				const int hide_cy = obs_source_get_height(item->source);
 				obs_transition_set_size(item->hide_transition, hide_cx, hide_cy);
 				obs_source_video_render(item->hide_transition);
-			} else {
+				break;
+			}
+			case OBS_SCENE_RENDER_CHILD_SOURCE:
 				obs_source_set_texcoords_centered(item->source, true);
 				obs_source_video_render(item->source);
 				obs_source_set_texcoords_centered(item->source, false);
+				break;
 			}
 
 			gs_texrender_end(item->item_render);
 		}
 	}
 
-	const bool linear_srgb = !item->item_render || (item->blend_method != OBS_BLEND_METHOD_SRGB_OFF);
+	const bool linear_srgb = obs_scene_render_linear_srgb(item->item_render != NULL, item->blend_method);
 	const bool previous = gs_set_linear_srgb(linear_srgb);
 	gs_matrix_push();
 	gs_matrix_mul(&item->draw_transform);
 	if (item->item_render) {
 		render_item_texture(item, current_space, source_space);
-	} else if (item->user_visible && scene_transition_active(item->show_transition)) {
-		const int cx = obs_source_get_width(item->source);
-		const int cy = obs_source_get_height(item->source);
-		obs_transition_set_size(item->show_transition, cx, cy);
-		obs_source_video_render(item->show_transition);
-	} else if (!item->user_visible && scene_transition_active(item->hide_transition)) {
-		const int cx = obs_source_get_width(item->source);
-		const int cy = obs_source_get_height(item->source);
-		obs_transition_set_size(item->hide_transition, cx, cy);
-		obs_source_video_render(item->hide_transition);
 	} else {
-		const bool centered = are_texcoords_centered(&item->draw_transform);
-		obs_source_set_texcoords_centered(item->source, centered);
-		obs_source_video_render(item->source);
-		obs_source_set_texcoords_centered(item->source, false);
+		switch (item_render_child(item)) {
+		case OBS_SCENE_RENDER_CHILD_SHOW: {
+			const int cx = obs_source_get_width(item->source);
+			const int cy = obs_source_get_height(item->source);
+			obs_transition_set_size(item->show_transition, cx, cy);
+			obs_source_video_render(item->show_transition);
+			break;
+		}
+		case OBS_SCENE_RENDER_CHILD_HIDE: {
+			const int cx = obs_source_get_width(item->source);
+			const int cy = obs_source_get_height(item->source);
+			obs_transition_set_size(item->hide_transition, cx, cy);
+			obs_source_video_render(item->hide_transition);
+			break;
+		}
+		case OBS_SCENE_RENDER_CHILD_SOURCE: {
+			const bool centered = obs_scene_texcoords_centered(&item->draw_transform);
+			obs_source_set_texcoords_centered(item->source, centered);
+			obs_source_video_render(item->source);
+			obs_source_set_texcoords_centered(item->source, false);
+			break;
+		}
+		}
 	}
 	gs_matrix_pop();
 	gs_set_linear_srgb(previous);
@@ -1010,14 +1047,22 @@ static void scene_load_item(struct obs_scene *scene, obs_data_t *item_data)
 	visible = obs_data_get_bool(item_data, "visible");
 	lock = obs_data_get_bool(item_data, "locked");
 
-	if (!item->absolute_coordinates && obs_data_has_user_value(item_data, "pos_rel") &&
-	    obs_data_has_user_value(item_data, "scale_rel") && obs_data_has_user_value(item_data, "scale_ref")) {
+	/* Asked in this order, then passed to the choice
+	 * (obs-scene-item-names.c). Each is a plain lookup in item_data; the
+	 * old && chain skipped the later ones when an earlier test failed. */
+	bool has_pos_rel = obs_data_has_user_value(item_data, "pos_rel");
+	bool has_scale_rel = obs_data_has_user_value(item_data, "scale_rel");
+	bool has_scale_ref = obs_data_has_user_value(item_data, "scale_ref");
+	enum obs_scene_item_keys keys =
+		obs_scene_item_transform_keys(item->absolute_coordinates, has_pos_rel, has_scale_rel, has_scale_ref);
+
+	if (keys == OBS_SCENE_ITEM_KEYS_RELATIVE) {
 		obs_data_get_vec2(item_data, "pos_rel", &item->pos);
 		obs_data_get_vec2(item_data, "scale_rel", &item->scale);
 		obs_data_get_vec2(item_data, "scale_ref", &item->scale_ref);
 	} else {
 		obs_data_get_vec2(item_data, "pos", &item->pos);
-		if (!item->absolute_coordinates)
+		if (keys == OBS_SCENE_ITEM_KEYS_FROM_ABSOLUTE)
 			pos_from_absolute(&item->pos, &item->pos, item);
 		obs_data_get_vec2(item_data, "scale", &item->scale);
 	}
@@ -1030,65 +1075,41 @@ static void scene_load_item(struct obs_scene *scene, obs_data_t *item_data)
 	set_visibility(item, visible);
 	obs_sceneitem_set_locked(item, lock);
 
-	item->bounds_type = (enum obs_bounds_type)obs_data_get_int(item_data, "bounds_type");
+	item->bounds_type = valid_bounds_type(obs_data_get_int(item_data, "bounds_type"));
 	item->bounds_align = (uint32_t)obs_data_get_int(item_data, "bounds_align");
 	item->crop_to_bounds = obs_data_get_bool(item_data, "bounds_crop");
 	obs_data_get_vec2(item_data, "bounds", &item->bounds);
 
-	if (!item->absolute_coordinates && obs_data_has_user_value(item_data, "bounds_rel")) {
+	bool has_bounds_rel = obs_data_has_user_value(item_data, "bounds_rel");
+	keys = obs_scene_item_bounds_keys(item->absolute_coordinates, has_bounds_rel);
+
+	if (keys == OBS_SCENE_ITEM_KEYS_RELATIVE) {
 		obs_data_get_vec2(item_data, "bounds_rel", &item->bounds);
 	} else {
 		obs_data_get_vec2(item_data, "bounds", &item->bounds);
-		if (!item->absolute_coordinates)
+		if (keys == OBS_SCENE_ITEM_KEYS_FROM_ABSOLUTE)
 			size_from_absolute(&item->bounds, &item->bounds, item);
 	}
 
-	item->crop.left = (uint32_t)obs_data_get_int(item_data, "crop_left");
-	item->crop.top = (uint32_t)obs_data_get_int(item_data, "crop_top");
-	item->crop.right = (uint32_t)obs_data_get_int(item_data, "crop_right");
-	item->crop.bottom = (uint32_t)obs_data_get_int(item_data, "crop_bottom");
+	/* Through the setter, which clamps a negative crop to 0: a scene
+	 * collection OBS did not write can hold any value. */
+	struct obs_sceneitem_crop crop = {
+		.left = obs_scene_crop_from_int64(obs_data_get_int(item_data, "crop_left")),
+		.top = obs_scene_crop_from_int64(obs_data_get_int(item_data, "crop_top")),
+		.right = obs_scene_crop_from_int64(obs_data_get_int(item_data, "crop_right")),
+		.bottom = obs_scene_crop_from_int64(obs_data_get_int(item_data, "crop_bottom")),
+	};
+	obs_sceneitem_set_crop(item, &crop);
 
 	scale_filter_str = obs_data_get_string(item_data, "scale_filter");
-	item->scale_filter = OBS_SCALE_DISABLE;
-
-	if (scale_filter_str) {
-		if (astrcmpi(scale_filter_str, "point") == 0)
-			item->scale_filter = OBS_SCALE_POINT;
-		else if (astrcmpi(scale_filter_str, "bilinear") == 0)
-			item->scale_filter = OBS_SCALE_BILINEAR;
-		else if (astrcmpi(scale_filter_str, "bicubic") == 0)
-			item->scale_filter = OBS_SCALE_BICUBIC;
-		else if (astrcmpi(scale_filter_str, "lanczos") == 0)
-			item->scale_filter = OBS_SCALE_LANCZOS;
-		else if (astrcmpi(scale_filter_str, "area") == 0)
-			item->scale_filter = OBS_SCALE_AREA;
-	}
+	item->scale_filter = (enum obs_scale_type)obs_scene_item_scale_filter_from_name(scale_filter_str, astrcmpi);
 
 	blend_method_str = obs_data_get_string(item_data, "blend_method");
-	item->blend_method = OBS_BLEND_METHOD_DEFAULT;
-
-	if (blend_method_str) {
-		if (astrcmpi(blend_method_str, "srgb_off") == 0)
-			item->blend_method = OBS_BLEND_METHOD_SRGB_OFF;
-	}
+	item->blend_method =
+		(enum obs_blending_method)obs_scene_item_blend_method_from_name(blend_method_str, astrcmpi);
 
 	blend_str = obs_data_get_string(item_data, "blend_type");
-	item->blend_type = OBS_BLEND_NORMAL;
-
-	if (blend_str) {
-		if (astrcmpi(blend_str, "additive") == 0)
-			item->blend_type = OBS_BLEND_ADDITIVE;
-		else if (astrcmpi(blend_str, "subtract") == 0)
-			item->blend_type = OBS_BLEND_SUBTRACT;
-		else if (astrcmpi(blend_str, "screen") == 0)
-			item->blend_type = OBS_BLEND_SCREEN;
-		else if (astrcmpi(blend_str, "multiply") == 0)
-			item->blend_type = OBS_BLEND_MULTIPLY;
-		else if (astrcmpi(blend_str, "lighten") == 0)
-			item->blend_type = OBS_BLEND_LIGHTEN;
-		else if (astrcmpi(blend_str, "darken") == 0)
-			item->blend_type = OBS_BLEND_DARKEN;
-	}
+	item->blend_type = (enum obs_blending_type)obs_scene_item_blend_type_from_name(blend_str, astrcmpi);
 
 	obs_data_t *show_data = obs_data_get_obj(item_data, "show_transition");
 	if (show_data) {
@@ -1175,7 +1196,7 @@ static void scene_save_item(obs_data_array_t *array, struct obs_scene_item *item
 	obs_data_set_int(item_data, "id", item->id);
 	obs_data_set_bool(item_data, "group_item_backup", !!backup_group);
 
-	if (!item->absolute_coordinates) {
+	if (obs_scene_item_save_relative(item->absolute_coordinates)) {
 		/* For backwards compatibility, also store absolute values. */
 		struct vec2 tmp_abs;
 
@@ -1214,45 +1235,13 @@ static void scene_save_item(obs_data_array_t *array, struct obs_scene_item *item
 		full_unlock(group_scene);
 	}
 
-	if (item->scale_filter == OBS_SCALE_POINT)
-		scale_filter = "point";
-	else if (item->scale_filter == OBS_SCALE_BILINEAR)
-		scale_filter = "bilinear";
-	else if (item->scale_filter == OBS_SCALE_BICUBIC)
-		scale_filter = "bicubic";
-	else if (item->scale_filter == OBS_SCALE_LANCZOS)
-		scale_filter = "lanczos";
-	else if (item->scale_filter == OBS_SCALE_AREA)
-		scale_filter = "area";
-	else
-		scale_filter = "disable";
-
+	scale_filter = obs_scene_item_scale_filter_name((int)item->scale_filter);
 	obs_data_set_string(item_data, "scale_filter", scale_filter);
 
-	if (item->blend_method == OBS_BLEND_METHOD_SRGB_OFF)
-		blend_method = "srgb_off";
-	else
-		blend_method = "default";
-
+	blend_method = obs_scene_item_blend_method_name((int)item->blend_method);
 	obs_data_set_string(item_data, "blend_method", blend_method);
 
-	if (item->blend_type == OBS_BLEND_NORMAL)
-		blend_type = "normal";
-	else if (item->blend_type == OBS_BLEND_ADDITIVE)
-		blend_type = "additive";
-	else if (item->blend_type == OBS_BLEND_SUBTRACT)
-		blend_type = "subtract";
-	else if (item->blend_type == OBS_BLEND_SCREEN)
-		blend_type = "screen";
-	else if (item->blend_type == OBS_BLEND_MULTIPLY)
-		blend_type = "multiply";
-	else if (item->blend_type == OBS_BLEND_LIGHTEN)
-		blend_type = "lighten";
-	else if (item->blend_type == OBS_BLEND_DARKEN)
-		blend_type = "darken";
-	else
-		blend_type = "normal";
-
+	blend_type = obs_scene_item_blend_type_name((int)item->blend_type);
 	obs_data_set_string(item_data, "blend_type", blend_type);
 
 	obs_data_t *show_data = obs_sceneitem_transition_save(item, true);
@@ -1370,6 +1359,50 @@ static inline void scene_mix_audio(float *p_out, float *p_in, size_t pos, size_t
 		*(out++) += *(in++);
 }
 
+/* The window decisions are obs-scene-audio-window.c.h. The scene still takes
+ * audio_lock, calls apply_scene_item_volume() and
+ * process_all_audio_actions(), asks the sources for their pending state,
+ * timestamp and mix, and mixes. It reads each item and source field only
+ * where the old expressions read it, in their order. */
+
+/* The source an item's audio is read from. The reads of the old
+ * `visible && active(show) ? show : !visible && active(hide) ? hide : source`:
+ * visible, the show transition when visible, then, when it is not picked,
+ * visible again and the hide transition when not visible. */
+static inline struct obs_source *audio_window_source(struct obs_scene_item *item)
+{
+	bool visible = item->visible;
+	bool show_active = false;
+	bool hide_active = false;
+
+	if (visible)
+		show_active = scene_transition_active(item->show_transition);
+	if (!show_active) {
+		visible = item->visible;
+		if (!visible)
+			hide_active = scene_transition_active(item->hide_transition);
+	}
+
+	switch (obs_scene_audio_window_pick(visible, show_active, hide_active)) {
+	case OBS_SCENE_AUDIO_WINDOW_SHOW:
+		return item->show_transition;
+	case OBS_SCENE_AUDIO_WINDOW_HIDE:
+		return item->hide_transition;
+	case OBS_SCENE_AUDIO_WINDOW_SOURCE:
+		break;
+	}
+	return item->source;
+}
+
+/* The reads of the old `item->visible || active(hide)`: visible, and the
+ * hide transition only when not visible. */
+static inline void audio_window_heard(const struct obs_scene_item *item, bool *visible, bool *hide_active)
+{
+	*visible = item->visible;
+	if (!*visible)
+		*hide_active = scene_transition_active(item->hide_transition);
+}
+
 static bool scene_audio_render(void *data, uint64_t *ts_out, struct obs_source_audio_mix *audio_output, uint32_t mixers,
 			       size_t channels, size_t sample_rate)
 {
@@ -1383,26 +1416,21 @@ static bool scene_audio_render(void *data, uint64_t *ts_out, struct obs_source_a
 
 	item = scene->first_item;
 	while (item) {
-		struct obs_source *source;
-		if (item->visible && scene_transition_active(item->show_transition))
-			source = item->show_transition;
-		else if (!item->visible && scene_transition_active(item->hide_transition))
-			source = item->hide_transition;
-		else
-			source = item->source;
+		struct obs_source *source = audio_window_source(item);
+		const bool pending = obs_source_audio_pending(source);
+		bool visible = false;
+		bool hide_active = false;
 
-		if (!obs_source_audio_pending(source) &&
-		    (item->visible || scene_transition_active(item->hide_transition))) {
-			uint64_t source_ts = obs_source_get_audio_timestamp(source);
+		if (!pending)
+			audio_window_heard(item, &visible, &hide_active);
 
-			if (source_ts && (!timestamp || source_ts < timestamp))
-				timestamp = source_ts;
-		}
+		if (obs_scene_audio_window_counts(pending, visible, hide_active))
+			timestamp = obs_scene_audio_window_earliest(timestamp, obs_source_get_audio_timestamp(source));
 
 		item = item->next;
 	}
 
-	if (!timestamp) {
+	if (obs_scene_audio_window_silent(timestamp)) {
 		/* just process all pending audio actions if no audio playing,
 		 * otherwise audio actions will just never be processed */
 		item = scene->first_item;
@@ -1417,49 +1445,37 @@ static bool scene_audio_render(void *data, uint64_t *ts_out, struct obs_source_a
 
 	item = scene->first_item;
 	while (item) {
-		uint64_t source_ts;
-		size_t pos;
-		size_t count;
+		struct obs_scene_audio_window window;
+		uint64_t source_ts = 0;
 		bool apply_buf;
-		struct obs_source *source;
-
-		if (item->visible && scene_transition_active(item->show_transition))
-			source = item->show_transition;
-		else if (!item->visible && scene_transition_active(item->hide_transition))
-			source = item->hide_transition;
-		else
-			source = item->source;
+		bool pending;
+		bool visible = false;
+		bool hide_active = false;
+		struct obs_source *source = audio_window_source(item);
 
 		apply_buf = apply_scene_item_volume(item, buf, timestamp, sample_rate);
 
-		if (obs_source_audio_pending(source)) {
+		pending = obs_source_audio_pending(source);
+		if (!pending)
+			source_ts = obs_source_get_audio_timestamp(source);
+
+		window = obs_scene_audio_window_frames(pending, source_ts, timestamp, sample_rate);
+		if (!window.mix) {
 			item = item->next;
 			continue;
 		}
 
-		source_ts = obs_source_get_audio_timestamp(source);
-		if (!source_ts) {
-			item = item->next;
-			continue;
-		}
+		if (!apply_buf)
+			audio_window_heard(item, &visible, &hide_active);
 
-		pos = (size_t)ns_to_audio_frames(sample_rate, source_ts - timestamp);
-
-		if (pos >= AUDIO_OUTPUT_FRAMES) {
-			item = item->next;
-			continue;
-		}
-
-		count = AUDIO_OUTPUT_FRAMES - pos;
-
-		if (!apply_buf && !item->visible && !scene_transition_active(item->hide_transition)) {
+		if (!obs_scene_audio_window_mixes(apply_buf, visible, hide_active)) {
 			item = item->next;
 			continue;
 		}
 
 		obs_source_get_audio_mix(source, &child_audio);
 
-		if (!source->audio_is_duplicated) {
+		if (obs_scene_audio_window_adds(source->audio_is_duplicated)) {
 			for (size_t mix = 0; mix < MAX_AUDIO_MIXES; mix++) {
 				if ((mixers & (1 << mix)) == 0)
 					continue;
@@ -1468,9 +1484,9 @@ static bool scene_audio_render(void *data, uint64_t *ts_out, struct obs_source_a
 					float *out = audio_output->output[mix].data[ch];
 					float *in = child_audio.output[mix].data[ch];
 					if (apply_buf)
-						mix_audio_with_buf(out, in, buf, pos, count);
+						mix_audio_with_buf(out, in, buf, window.pos, window.count);
 					else
-						scene_mix_audio(out, in, pos, count);
+						scene_mix_audio(out, in, window.pos, window.count);
 				}
 			}
 		}
@@ -2077,7 +2093,7 @@ static obs_sceneitem_t *obs_scene_add_internal(obs_scene_t *scene, obs_source_t 
 		return NULL;
 	}
 
-	if (source->removed) {
+	if (os_atomic_load_bool(&source->removed)) {
 		blog(LOG_WARNING, "Tried to add a removed source to a scene");
 		goto release_source_and_fail;
 	}
@@ -2393,7 +2409,7 @@ void load_transform_states(obs_data_t *temp, void *vp_scene)
 	obs_data_get_vec2(temp, "scale", &info.scale);
 	info.rot = (float)obs_data_get_double(temp, "rot");
 	info.alignment = (uint32_t)obs_data_get_int(temp, "alignment");
-	info.bounds_type = (enum obs_bounds_type)obs_data_get_int(temp, "bounds_type");
+	info.bounds_type = valid_bounds_type(obs_data_get_int(temp, "bounds_type"));
 	info.bounds_alignment = (uint32_t)obs_data_get_int(temp, "bounds_alignment");
 	obs_data_get_vec2(temp, "bounds", &info.bounds);
 	info.crop_to_bounds = obs_data_get_bool(temp, "crop_to_bounds");
@@ -2639,7 +2655,7 @@ void obs_sceneitem_set_order_position(obs_sceneitem_t *item, int position)
 void obs_sceneitem_set_bounds_type(obs_sceneitem_t *item, enum obs_bounds_type type)
 {
 	if (item) {
-		item->bounds_type = type;
+		item->bounds_type = valid_bounds_type(type);
 		do_update_transform(item);
 	}
 }
@@ -2773,7 +2789,7 @@ static inline void scene_item_set_info_internal(obs_sceneitem_t *item, const str
 
 	item->rot = info->rot;
 	item->align = info->alignment;
-	item->bounds_type = info->bounds_type;
+	item->bounds_type = valid_bounds_type(info->bounds_type);
 	item->bounds_align = info->bounds_alignment;
 }
 
@@ -2994,14 +3010,10 @@ void obs_sceneitem_set_crop(obs_sceneitem_t *item, const struct obs_sceneitem_cr
 
 	memcpy(&item->crop, crop, sizeof(*crop));
 
-	if (item->crop.left < 0)
-		item->crop.left = 0;
-	if (item->crop.right < 0)
-		item->crop.right = 0;
-	if (item->crop.top < 0)
-		item->crop.top = 0;
-	if (item->crop.bottom < 0)
-		item->crop.bottom = 0;
+	item->crop.left = obs_scene_clamp_crop(item->crop.left);
+	item->crop.right = obs_scene_clamp_crop(item->crop.right);
+	item->crop.top = obs_scene_clamp_crop(item->crop.top);
+	item->crop.bottom = obs_scene_clamp_crop(item->crop.bottom);
 
 	os_atomic_set_bool(&item->update_transform, true);
 }
@@ -3228,10 +3240,13 @@ static void apply_group_transform(obs_sceneitem_t *item, obs_sceneitem_t *group)
 	update_item_transform(item, false);
 }
 
+/* The fold and the size are obs-scene-extent.c.h. The scene still walks
+ * its items and still shifts the children so the content starts at the
+ * origin. */
+
 static bool resize_scene_base(obs_scene_t *scene, struct vec2 *minv, struct vec2 *maxv, struct vec2 *scale)
 {
-	vec2_set(minv, M_INFINITE, M_INFINITE);
-	vec2_set(maxv, -M_INFINITE, -M_INFINITE);
+	obs_scene_extent_init(minv, maxv);
 
 	obs_sceneitem_t *item = scene->first_item;
 	if (!item) {
@@ -3241,27 +3256,7 @@ static bool resize_scene_base(obs_scene_t *scene, struct vec2 *minv, struct vec2
 	}
 
 	while (item) {
-#define get_min_max(x_val, y_val)                             \
-	do {                                                  \
-		struct vec3 v;                                \
-		vec3_set(&v, x_val, y_val, 0.0f);             \
-		vec3_transform(&v, &v, &item->box_transform); \
-		if (v.x < minv->x)                            \
-			minv->x = v.x;                        \
-		if (v.y < minv->y)                            \
-			minv->y = v.y;                        \
-		if (v.x > maxv->x)                            \
-			maxv->x = v.x;                        \
-		if (v.y > maxv->y)                            \
-			maxv->y = v.y;                        \
-	} while (false)
-
-		get_min_max(0.0f, 0.0f);
-		get_min_max(1.0f, 0.0f);
-		get_min_max(0.0f, 1.0f);
-		get_min_max(1.0f, 1.0f);
-#undef get_min_max
-
+		obs_scene_extent_add(minv, maxv, &item->box_transform);
 		item = item->next;
 	}
 
@@ -3280,9 +3275,7 @@ static bool resize_scene_base(obs_scene_t *scene, struct vec2 *minv, struct vec2
 		}
 	}
 
-	vec2_sub(scale, maxv, minv);
-	scene->cx = (uint32_t)ceilf(scale->x);
-	scene->cy = (uint32_t)ceilf(scale->y);
+	obs_scene_extent_size(scale, &scene->cx, &scene->cy, minv, maxv);
 	return true;
 }
 

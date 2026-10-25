@@ -789,3 +789,130 @@ void HandlePlatformDisplayNativeEvent(OBSQTDisplay *display, void *message)
 	(void)display;
 	(void)message;
 }
+
+void SetOutputNetworkOptions(config_t *, obs_data_t *)
+{
+	/* No host-specific streaming output options. */
+}
+
+void TranslateLegacyEncoderId(const char *&)
+{
+	/* No legacy encoder ids on this host. */
+}
+
+void RaiseAfterFileDialog(QWidget *)
+{
+	/* File dialogs give focus back to their parent window here. */
+}
+
+bool UseNativeComboBoxPopup()
+{
+	return false;
+}
+
+enum gs_color_space ScreenshotColorSpace(obs_source_t *)
+{
+	/* Tonemap to SDR if HDR */
+	return GS_CS_SRGB;
+}
+
+bool SaveHdrScreenshot(const char *, uint8_t *, uint32_t, uint32_t)
+{
+	/* No HDR image format here: screenshots are rendered in sRGB. */
+	return false;
+}
+
+bool IsPlatformImageExtension(const char *)
+{
+	return false;
+}
+
+const char *GetPlatformTextSourceId()
+{
+	return "text_ft2_source";
+}
+
+void SetPlatformTextFileSettings(obs_data_t *settings, const char *file, QString &)
+{
+	obs_data_set_bool(settings, "from_file", true);
+	obs_data_set_string(settings, "text_file", file);
+}
+
+bool ResolvePlatformDroppedFile(QString &, QFileInfo &, QString &)
+{
+	return true;
+}
+
+const char *GetPlatformMetaKeyText()
+{
+	return "Hotkeys.Super";
+}
+
+QString GetPlatformScreenName(QScreen *screen)
+{
+	QString name = screen->model().simplified();
+
+	if (name.length() > 1 && name.endsWith("-")) {
+		name.chop(1);
+	}
+	return name;
+}
+
+bool PlatformUsesDesktopAudioDevice()
+{
+	return true;
+}
+
+QIcon GetPlatformTrayIcon(TrayIconState state)
+{
+	switch (state) {
+	case TrayIconState::Active:
+		return QIcon(":/res/images/tray_active.png");
+	case TrayIconState::Paused:
+		return QIcon(":/res/images/obs_paused.png");
+	case TrayIconState::Idle:
+		break;
+	}
+	return QIcon(":/res/images/obs.png");
+}
+
+bool PlatformTrayActivationTogglesWindow()
+{
+	return true;
+}
+
+void SetPlatformDockIconVisible(bool) {}
+
+/* The Rust brand installs it as obs-studio-rust-nvenc-test (#2296). */
+#ifndef OBS_NVENC_TEST_NAME
+#define OBS_NVENC_TEST_NAME "obs-nvenc-test"
+#endif
+
+const char *GetPlatformNvencTestProgram()
+{
+	return OBS_NVENC_TEST_NAME;
+}
+
+void ShowPlatformPermissionsDialog(QWidget *) {}
+
+bool PlatformRecreatesWindowsOnTopToggle()
+{
+	return true;
+}
+
+bool PlatformSupportsBuiltinUpdater()
+{
+	return false;
+}
+
+QThread *CreatePlatformUpdateThread(bool, bool)
+{
+	return nullptr;
+}
+
+bool IsWhatsNewItemForPlatform(bool, bool, bool onLinux)
+{
+	return onLinux;
+}
+
+#undef OBS_NVENC_TEST_NAME

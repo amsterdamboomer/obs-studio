@@ -586,8 +586,15 @@ void OBSBasic::on_actionImportProfile_triggered()
 	const QString sourceDirectory = SelectDirectory(this, QTStr("Basic.MainMenu.Profile.Import"), home);
 
 	if (!sourceDirectory.isEmpty() && !sourceDirectory.isNull()) {
-		const std::filesystem::path sourcePath = std::filesystem::u8path(sourceDirectory.toStdString());
-		const std::string directoryName = sourcePath.filename().u8string();
+		const std::filesystem::path sourcePath =
+			std::filesystem::u8path(QDir::cleanPath(sourceDirectory).toStdString());
+		const std::string directoryName = ProfileImportDirectoryName(sourceDirectory);
+
+		if (directoryName.empty()) {
+			blog(LOG_WARNING, "Failed to import profile from '%s': the path has no folder name",
+			     QT_TO_UTF8(sourceDirectory));
+			return;
+		}
 
 		if (auto profile = GetProfileByDirectoryName(directoryName)) {
 			OBSMessageBox::warning(this, QTStr("Basic.MainMenu.Profile.Import"),
@@ -595,52 +602,30 @@ void OBSBasic::on_actionImportProfile_triggered()
 			return;
 		}
 
-		std::string destinationPathString;
-		destinationPathString.reserve(App()->userProfilesLocation.u8string().size() + OBSProfilePath.size() +
-					      directoryName.size());
-		destinationPathString.append(App()->userProfilesLocation.u8string())
-			.append(OBSProfilePath)
-			.append(directoryName);
+		std::string profilesDirectoryString;
+		profilesDirectoryString.reserve(App()->userProfilesLocation.u8string().size() + OBSProfilePath.size());
+		profilesDirectoryString.append(App()->userProfilesLocation.u8string()).append(OBSProfilePath);
 
-		const std::filesystem::path destinationPath = std::filesystem::u8path(destinationPathString);
+		const ProfileImportResult result =
+			ImportProfileFiles(sourcePath, std::filesystem::u8path(profilesDirectoryString), directoryName);
 
-		try {
-			std::filesystem::create_directory(destinationPath);
-		} catch (const std::filesystem::filesystem_error &error) {
-			blog(LOG_WARNING, "Failed to create profile directory '%s':\n%s", directoryName.c_str(),
-			     error.what());
+		switch (result.status) {
+		case ProfileImportResult::Status::Imported:
+			break;
+		case ProfileImportResult::Status::NoDirectoryName:
 			return;
-		}
-
-		const std::array<std::pair<std::string, bool>, 4> profileFiles{{
-			{"basic.ini", true},
-			{"service.json", false},
-			{"streamEncoder.json", false},
-			{"recordEncoder.json", false},
-		}};
-
-		for (auto &[file, isMandatory] : profileFiles) {
-			const std::filesystem::path sourceFile = sourcePath / std::filesystem::u8path(file);
-
-			if (!std::filesystem::exists(sourceFile)) {
-				if (isMandatory) {
-					blog(LOG_ERROR,
-					     "Failed to import profile from directory '%s' - necessary file '%s' not found",
-					     directoryName.c_str(), file.c_str());
-					return;
-				}
-				continue;
-			}
-
-			const std::filesystem::path destinationFile = destinationPath / std::filesystem::u8path(file);
-
-			try {
-				std::filesystem::copy(sourceFile, destinationFile);
-			} catch (const std::filesystem::filesystem_error &error) {
-				blog(LOG_WARNING, "Failed to copy import file '%s' for profile '%s':\n%s", file.c_str(),
-				     directoryName.c_str(), error.what());
-				return;
-			}
+		case ProfileImportResult::Status::CreateFailed:
+			blog(LOG_WARNING, "Failed to create profile directory '%s':\n%s", directoryName.c_str(),
+			     result.error.c_str());
+			return;
+		case ProfileImportResult::Status::MissingFile:
+			blog(LOG_ERROR, "Failed to import profile from directory '%s' - necessary file '%s' not found",
+			     directoryName.c_str(), result.file.c_str());
+			return;
+		case ProfileImportResult::Status::CopyFailed:
+			blog(LOG_WARNING, "Failed to copy import file '%s' for profile '%s':\n%s", result.file.c_str(),
+			     directoryName.c_str(), result.error.c_str());
+			return;
 		}
 
 		RefreshProfiles(true);
@@ -972,7 +957,6 @@ struct ErrorDetails {
 };
 using CheckResult = std::optional<ErrorDetails>;
 
-#ifndef __APPLE__
 CheckResult CheckNVENCInternal(const std::unordered_set<std::string_view> &missing_encoders)
 {
 	const std::vector<std::pair<std::string_view, std::string_view>> nvencFailureReasons = {
@@ -996,11 +980,7 @@ CheckResult CheckNVENCInternal(const std::unordered_set<std::string_view> &missi
 		return ErrorDetails{"plugin_not_loaded", QTStr("EncoderMissing.MissingModule").arg("obs-nvenc")};
 	}
 
-#ifdef _WIN32
-	BPtr testBinary = os_get_executable_path_ptr("obs-nvenc-test.exe");
-#else
-	BPtr testBinary = os_get_executable_path_ptr("obs-nvenc-test");
-#endif
+	BPtr testBinary = os_get_executable_path_ptr(GetPlatformNvencTestProgram());
 
 	OsProcessArgs args{os_process_args_create(testBinary), os_process_args_destroy};
 
@@ -1085,7 +1065,6 @@ CheckResult CheckNVENC(const std::unordered_set<std::string_view> &missing_encod
 	static auto result = CheckNVENCInternal(missing_encoders);
 	return result;
 }
-#endif
 
 CheckResult CheckX264()
 {
@@ -1093,6 +1072,71 @@ CheckResult CheckX264()
 	// This should be the only failure mode possible here.
 	if (!module_loaded) {
 		return ErrorDetails{"plugin_not_loaded", QTStr("EncoderMissing.MissingModule").arg("obs-x264")};
+	}
+
+	return std::nullopt;
+}
+
+bool MissingEncoderModuleLoaded(const char *name)
+{
+	return obs_get_module(name) != nullptr;
+}
+
+/* VA-API and QSV register their encoders only when a device can encode
+ * with them, and a build may leave obs-qsv11 out (the AppImage does):
+ * obs-rust/obs-studio#1720. */
+/* Why obs-ffmpeg found no VA-API device, with the fix: the support rounds of
+ * obs-rust/obs-studio#1720, done by OBS (#1862). */
+ErrorDetails VaapiMissingDetails(const char *encoder)
+{
+	struct profile_vaapi_diagnosis d;
+	profile_vaapi_diagnose(&profile_vaapi_system_host, &d);
+
+	static const char *const causes[] = {"no render device", "NVIDIA GPU only", "no access to the render device",
+					     "no VA-API driver installed", "driver cannot encode this format"};
+	blog(LOG_WARNING, "VAAPI: encoder '%s' missing: %s (device '%s', vendor 0x%04x%s%s)", encoder, causes[d.cause],
+	     d.device, d.vendor, d.package ? ", package " : "", d.package ? d.package : "");
+
+	switch (d.cause) {
+	case PROFILE_VAAPI_NO_RENDER_NODE:
+		return ErrorDetails{"vaapi_no_device", QTStr("EncoderMissing.VAAPI.NoRenderNode")};
+	case PROFILE_VAAPI_NVIDIA:
+		return ErrorDetails{"vaapi_nvidia", QTStr("EncoderMissing.VAAPI.NVIDIA")};
+	case PROFILE_VAAPI_NO_ACCESS:
+		return ErrorDetails{"vaapi_no_access", QTStr("EncoderMissing.VAAPI.NoAccess").arg(d.device)};
+	case PROFILE_VAAPI_NO_DRIVER:
+		if (d.install_command) {
+			return ErrorDetails{"vaapi_no_driver",
+					    QTStr("EncoderMissing.VAAPI.NoDriver").arg(d.install_command)};
+		}
+		if (d.package) {
+			return ErrorDetails{"vaapi_no_driver",
+					    QTStr("EncoderMissing.VAAPI.NoDriverPackage").arg(d.package)};
+		}
+		break;
+	case PROFILE_VAAPI_NO_ENCODE:
+		break;
+	}
+	return ErrorDetails{"vaapi_not_supported", QTStr("EncoderMissing.VAAPI.NotSupported")};
+}
+
+CheckResult CheckHardwareEncoder(std::string_view encoder)
+{
+	const std::string id(encoder);
+	const char *module = nullptr;
+
+	switch (profile_missing_encoder_reason(id.c_str(), MissingEncoderModuleLoaded, &module)) {
+	case PROFILE_MISSING_ENCODER_MODULE_NOT_LOADED:
+		if (std::string_view(module) == "obs-qsv11") {
+			return ErrorDetails{"plugin_not_loaded", QTStr("EncoderMissing.QSV.NotInBuild")};
+		}
+		return ErrorDetails{"plugin_not_loaded", QTStr("EncoderMissing.MissingModule").arg(module)};
+	case PROFILE_MISSING_ENCODER_NO_VAAPI_DEVICE:
+		return VaapiMissingDetails(id.c_str());
+	case PROFILE_MISSING_ENCODER_NO_QSV_DEVICE:
+		return ErrorDetails{"qsv_no_device", QTStr("EncoderMissing.QSV.NoDevice")};
+	case PROFILE_MISSING_ENCODER_UNKNOWN:
+		break;
 	}
 
 	return std::nullopt;
@@ -1139,10 +1183,10 @@ void OBSBasic::CheckForMissingEncoders()
 
 		if (encoder.find("x264") != std::string_view::npos) {
 			res = CheckX264();
-#ifndef __APPLE__
-		} else if (encoder.find("nvenc") != std::string_view::npos) {
+		} else if (encoder.find("nvenc") != std::string_view::npos && GetPlatformNvencTestProgram()) {
 			res = CheckNVENC(missing_encoders);
-#endif
+		} else {
+			res = CheckHardwareEncoder(encoder);
 		}
 
 		if (res) {

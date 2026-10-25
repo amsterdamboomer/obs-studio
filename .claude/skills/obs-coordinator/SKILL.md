@@ -17,6 +17,22 @@ the coordinator role (AGENTS.md says so).
 A tick is never "quiet" while any item in §1 to §4 has work left. Check all
 four every tick before reporting.
 
+**Start every tick with the computed work list** from the org skill
+`obs-org-coordinator` (obs-rust/.github): `uv run -m workflow.coordinator`
+in its checkout. It lists every task in every org repo (fix-master,
+requeue, fix-ci, enqueue, rebase, review, decide, triage, stalled,
+investigating, escalated) with what to do. Take each task's lease first
+(`uv run -m workflow.coordinator take <kind> <repo> <N> --owner "$COORDINATOR_ID"`;
+exit 1 means another coordinator has it), so parallel coordinators never
+do the same work. The sections below are how to do each task in this repo.
+
+The rest of the org (obs-deps, obs-browser, obs-websocket,
+obs-studio-libs, ...) is in the same tick: after §1 to §4 here, run the
+org sweep in the `obs-org-coordinator` skill, which lives in
+[obs-rust/.github](https://github.com/obs-rust/.github/blob/master/.claude/skills/obs-org-coordinator/SKILL.md)
+(`gh api repos/obs-rust/.github/contents/.claude/skills/obs-org-coordinator/SKILL.md -H 'Accept: application/vnd.github.raw'`),
+and report each repo in §5.
+
 ## 1. Queue every ready PR
 
 Ready means open, not a draft, every check green, and `mergeStateStatus`
@@ -55,8 +71,22 @@ authorizes.
   keep both lines, force-push with `--force-with-lease`, and queue the PR
   again. If the conflict is in code, comment for the author instead.
 - **Behind master with stale failures:** rebase it so CI runs fresh.
-- **Ejected from the queue:** rebase it on the new master and queue it
-  again in the same tick. Do not wait for the author.
+- **Ejected from the queue:** read the failed merge-group log first
+  (`gh run list --event merge_group`, then
+  `gh run view <run> --job <job> --log`). Then:
+  - **Conflict, or a failure that a later merge fixed:** rebase it on the
+    new master and queue it again in the same tick. Do not wait for the
+    author.
+  - **Master is red:** fix master first. The same test fails on master
+    alone, so the PR isn't the cause. Re-queuing only ejects the PR again
+    and holds up every PR behind it.
+  - **A real failure in the PR:** comment for the author as above.
+
+  Never re-queue an ejected PR without reading why it failed. On
+  2026-10-23, #1875 was re-queued unread and ejected again 40 minutes
+  later: master was red because #1879 and #1883 had added core cmocka
+  tests without bumping the count in `rust/obs-build/tests/native.rs`.
+  #1896 fixed master.
 - **About to go in:** rebase the PRs behind the head of the queue ahead
   of time when they touch the same files (`docs/features.md` above all), so
   they are not ejected when the head lands.
@@ -70,6 +100,18 @@ authorizes.
 - **Fixups:** push small mechanical fixes that keep a ready PR from landing
   (lint, formatting, a features-ledger line, a stale reference) as a
   `fixup:` commit, and say so in a comment.
+- **Handed-off PRs** (`Handed off to the coordinator`, obs-worker §7):
+  the worker has moved on, so don't wait for them on anything mechanical.
+  Rebase, resolve list conflicts, fix counts and formatting, rerun flakes
+  and re-queue yourself, in the same tick. A real failure in the PR's own
+  logic still goes back to the worker as a comment.
+- **Before you take over a rebase or fixup,** look at the PR's latest
+  commits. If the author pushed after the failure, their push may already
+  fix it. Read it instead of racing them: a lease-protected push fails
+  safely, but the work was wasted.
+- **Fetch PR heads with a forced refspec** (`+pull/<N>/head:prN`). A
+  plain refspec leaves a stale local ref after a force-push, and conflict
+  dry runs on it give wrong answers.
 
 Push to a fork branch only when the PR allows maintainer edits, and always
 with `--force-with-lease=<branch>:<old head sha>`. These rebases are the
@@ -91,8 +133,58 @@ a fixup commit. Leave design changes to the author.
 Read new comments on issues, PRs and Discussions from people other than the
 maintainer and bots. Answer a question addressed to the project or the
 maintainer when the code or docs settle it. Leave questions that two
-contributors are already handling between themselves, and leave decisions
-of policy or scope to the maintainer: list those in your report instead.
+contributors are already handling between themselves. Open decisions go
+through §3b.
+
+## 3b. Decide open decisions
+
+The maintainer delegates decisions to you: a `decision-needed` issue should
+not wait for a human when the project already answers it. Every tick, take
+each open one, oldest first:
+
+```sh
+gh issue list --repo obs-rust/obs-studio --label decision-needed \
+  --state open --json number,title,createdAt
+```
+
+1. **Research it.** Read the issue, its `Decision needed:` comment and the
+   options. Check what settles it: AGENTS.md, the testing policy,
+   coordination.md, SECURITY.md, docs/features.md, the code, earlier
+   decisions in related issues and PRs, and the product's identity (OBS
+   Studio Rust, not upstream OBS).
+2. **Decide it** when that research settles it, or when one option is a
+   safe, reversible default that the rules favor. Comment with `Decided:`
+   on the first line, then the choice, the reasons and the sources:
+
+   ```
+   Decided: point Help → Discord at the OBS Rust server.
+   Reasons: ... (links to the rules, docs or prior decisions)
+   ```
+
+   The claim bot clears `decision-needed` (your account is a maintainer's).
+   If the issue is unclaimed and the change is small, do it yourself as
+   §4 allows; otherwise the claimant or the issue's author carries it out.
+3. **Escalate it** only when no rule or prior decision settles it and the
+   options really differ: a change to project policy or scope, the
+   constitution or governance, money, legal or licensing, a security
+   trade-off, an outside party (another org, a vendor), something hard to
+   undo (deleting data, a public release or announcement), or the maintainer's
+   personal preference. Remove `decision-needed`, add `human-review-needed`,
+   and comment with what you found, the options and your recommendation.
+   End the comment with how to answer: a comment whose first line starts
+   `Decided:` (or `Decision:`) from the maintainer clears
+   `human-review-needed` and resumes a blocked claim (#2212). Removing the
+   label by hand also works. Stop listing the issue in §5 once the label is
+   gone.
+
+   ```sh
+   gh issue edit <N> --repo obs-rust/obs-studio \
+     --remove-label decision-needed --add-label human-review-needed
+   ```
+
+Example: #2097 (Help → Discord opened upstream's server) was settled by the
+README already inviting users to the OBS Rust Discord (#2095), so it is a
+§3b decision, not one for the maintainer.
 
 ## 4. Close stalled follow-ups
 
@@ -113,6 +205,13 @@ End each tick with a short list of what you did (queued, rebased, re-ran,
 answered, closed) and of what needs the maintainer, such as a code
 conflict, a policy question, or a real failure the author hasn't picked up. Say
 "quiet" only when §1 to §4 all came up empty.
+
+Every tick, report the decisions you made under §3b (issue and answer), and
+list each open `human-review-needed` issue with its age and a link to your
+escalation comment, until the maintainer answers
+(`gh issue list --repo obs-rust/obs-studio --label human-review-needed
+--state open --json number,title,createdAt`). A `decision-needed` issue
+should never reach the report undecided.
 
 "Needs the maintainer" is a last resort. Before you list a stuck PR there,
 open its conflict or failure and try §2. A PR reported as "waiting on the

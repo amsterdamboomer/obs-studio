@@ -201,11 +201,7 @@ void OBSBasic::on_action_Settings_triggered()
 
 void OBSBasic::on_actionShowMacPermissions_triggered()
 {
-#ifdef __APPLE__
-	OBSPermissions check(this, CheckPermission(kScreenCapture), CheckPermission(kVideoDeviceAccess),
-			     CheckPermission(kAudioDeviceAccess), CheckPermission(kInputMonitoring));
-	check.exec();
-#endif
+	ShowPlatformPermissionsDialog(this);
 }
 
 void OBSBasic::on_actionAdvAudioProperties_triggered()
@@ -336,7 +332,10 @@ void OBSBasic::on_actionCheckForUpdates_triggered()
 
 void OBSBasic::on_actionRepair_triggered()
 {
-#if defined(_WIN32)
+	if (!PlatformSupportsBuiltinUpdater()) {
+		return;
+	}
+
 	ui->actionCheckForUpdates->setEnabled(false);
 	ui->actionRepair->setEnabled(false);
 
@@ -344,9 +343,8 @@ void OBSBasic::on_actionRepair_triggered()
 		return;
 	}
 
-	updateCheckThread.reset(new AutoUpdateThread(false, true));
+	updateCheckThread.reset(CreatePlatformUpdateThread(false, true));
 	updateCheckThread->start();
-#endif
 }
 
 void OBSBasic::on_actionRestartSafe_triggered()
@@ -389,7 +387,7 @@ void OBSBasic::on_actionWebsite_triggered()
 
 void OBSBasic::on_actionDiscord_triggered()
 {
-	QUrl url = QUrl("https://obsproject.com/discord", QUrl::TolerantMode);
+	QUrl url = QUrl("https://discord.gg/6MWWX4x9pf", QUrl::TolerantMode);
 	QDesktopServices::openUrl(url);
 }
 
@@ -442,13 +440,13 @@ void OBSBasic::on_actionShowProfileFolder_triggered()
 
 void OBSBasic::on_actionAlwaysOnTop_triggered()
 {
-#ifndef _WIN32
 	/* Make sure all dialogs are safely and successfully closed before
-	 * switching the always on top mode due to the fact that windows all
-	 * have to be recreated, so queue the actual toggle to happen after
-	 * all events related to closing the dialogs have finished */
-	CloseDialogs();
-#endif
+	 * switching the always on top mode where windows all have to be
+	 * recreated, so queue the actual toggle to happen after all events
+	 * related to closing the dialogs have finished */
+	if (PlatformRecreatesWindowsOnTopToggle()) {
+		CloseDialogs();
+	}
 
 	QMetaObject::invokeMethod(this, &OBSBasic::ToggleAlwaysOnTop, Qt::QueuedConnection);
 }
@@ -538,9 +536,7 @@ void OBSBasic::SetShowing(bool showing)
 			EnablePreviewDisplay(false);
 		}
 
-#ifdef __APPLE__
-		EnableOSXDockIcon(false);
-#endif
+		SetPlatformDockIconVisible(false);
 
 	} else if (showing && !isVisible()) {
 		if (showHide) {
@@ -552,9 +548,7 @@ void OBSBasic::SetShowing(bool showing)
 			EnablePreviewDisplay(true);
 		}
 
-#ifdef __APPLE__
-		EnableOSXDockIcon(true);
-#endif
+		SetPlatformDockIconVisible(true);
 
 		/* raise and activate window to ensure it is on top */
 		raise();

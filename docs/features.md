@@ -44,9 +44,27 @@ not get a line.
 
 - **Hybrid Rust/C application build.** Completed Rust ports replace their C
   equivalents in the normal application; unported components remain available.
+  Property parameter destructors observe the original parameter during replacement
+  (C API compatibility; [#1938](https://github.com/obs-rust/obs-studio/issues/1938),
+  [#1939](https://github.com/obs-rust/obs-studio/pull/1939)).
+  Property destructors that remove or add groups run each callback once, and a
+  removed group stays readable in its own destructor (C API compatibility;
+  [#1943](https://github.com/obs-rust/obs-studio/issues/1943)).
+  Settings retain valid JSON members when a plugin produces NaN or infinity,
+  and recover valid backups when local JSON contains invalid UTF-8.
   *All*, 2026-10-21. Issue
   [#1587](https://github.com/obs-rust/obs-studio/issues/1587), PR
-  [#1588](https://github.com/obs-rust/obs-studio/pull/1588).
+  [#1588](https://github.com/obs-rust/obs-studio/pull/1588). Plugin string
+  edits preserve converted strings even when their recorded capacity is zero.
+  Issue [#1941](https://github.com/obs-rust/obs-studio/issues/1941), PR
+  [#1945](https://github.com/obs-rust/obs-studio/pull/1945). Persistence fix:
+  issue [#1940](https://github.com/obs-rust/obs-studio/issues/1940), PR
+  [#1946](https://github.com/obs-rust/obs-studio/pull/1946).
+
+  Opening an unreadable config preserves its contents; failed reads keep the
+  C API's empty-config result. Issue
+  [#1942](https://github.com/obs-rust/obs-studio/issues/1942), PR
+  [#1944](https://github.com/obs-rust/obs-studio/pull/1944).
 
 - Rust libobs process pipes fill reads across kernel pipe chunks, matching the C API on Linux and macOS.
 
@@ -178,6 +196,34 @@ not get a line.
 
 ### Encoding, streaming and recording
 
+- **Missing encoder reasons.** When a profile names a VA-API or Intel QSV
+  encoder this OBS does not have, the Missing Encoders dialog says why
+  instead of "Unknown", and how to fix it. For VA-API it names the cause:
+  no GPU render device, an NVIDIA GPU (use NVENC), no access to the render
+  device (with the `usermod` command), or no VA-API driver installed (with
+  the install command for Debian/Ubuntu, Fedora or Arch), and logs it as a
+  `VAAPI:` line. A build without QSV (the AppImage) says to pick another
+  encoder for Streaming and Recording. *All*, pending merge. Issues
+  [#1720](https://github.com/obs-rust/obs-studio/issues/1720),
+  [#1862](https://github.com/obs-rust/obs-studio/issues/1862), PRs
+  [#1841](https://github.com/obs-rust/obs-studio/pull/1841),
+  [#1872](https://github.com/obs-rust/obs-studio/pull/1872).
+- **QSV probe log.** On Linux, the OBS log has one `QSV probe:` line per GPU
+  render device, with whether VA-API opened it, its driver and whether it
+  encodes HEVC and AV1. That is what decides which Quick Sync encoders
+  appear, so a log from real Intel hardware is enough to check and pin that
+  decision in a test. *Linux*, pending merge. Issue
+  [#1863](https://github.com/obs-rust/obs-studio/issues/1863), PR
+  [#1879](https://github.com/obs-rust/obs-studio/pull/1879).
+- **Missing source types.** When a loaded scene collection has sources whose
+  plugin this OBS does not have, a "Missing Source Types" warning lists them
+  instead of leaving them blank without a word: browser sources (not in this
+  build yet, with the Window Capture workaround), VLC, or the plugin type,
+  with how many sources each. The sources keep their settings. Safe mode only
+  logs it. *All*, pending merge. Issue
+  [#1865](https://github.com/obs-rust/obs-studio/issues/1865), PR
+  [#1883](https://github.com/obs-rust/obs-studio/pull/1883).
+
 - **let buffered queues fit one chunk.** Large buffered recording chunks complete when the configured queue limit is smaller than a chunk. *All*, 2026-10-20. Issue [#1526](https://github.com/obs-rust/obs-studio/issues/1526), PR [#1527](https://github.com/obs-rust/obs-studio/pull/1527).
 
 - **FFmpeg output retry and encoder errors.** FFmpeg output can retry after a connection attempt that finishes before thread creation returns, and missing FFmpeg video encoders report an error using initialized message storage. *All*, pending merge. Split from PR [#1464](https://github.com/obs-rust/obs-studio/pull/1464).
@@ -204,6 +250,11 @@ not get a line.
   2026-10-16. Issue
   [#1012](https://github.com/obs-rust/obs-studio/issues/1012), PR
   [#1016](https://github.com/obs-rust/obs-studio/pull/1016).
+- **Chromium 156 with H.264/AAC for browser sources.** Linux x86_64 builds
+  use CEF 8078 (Chromium 156), built by obs-rust with proprietary codecs,
+  so browser sources and panels play H.264/AAC media. *Linux*, 2026-10-23.
+  Issue [#1864](https://github.com/obs-rust/obs-studio/issues/1864), PR
+  [#1948](https://github.com/obs-rust/obs-studio/pull/1948).
 
 ### Scenes and UI
 
@@ -230,9 +281,15 @@ not get a line.
   [#409](https://github.com/obs-rust/obs-studio/pull/409),
   [#475](https://github.com/obs-rust/obs-studio/pull/475),
   [#791](https://github.com/obs-rust/obs-studio/pull/791).
+- **Help → Discord opens the OBS Rust server.** The Help menu's Discord
+  item opens the OBS Rust Discord, where this build's bugs and questions
+  belong, instead of upstream OBS Studio's server. *All*, 2026-10-24.
+  Issue [#2097](https://github.com/obs-rust/obs-studio/issues/2097).
 - **No upstream release notes or donor list downloads.** The What's New
   dialog, which showed upstream OBS Studio's release notes from
-  obsproject.com, is off by default (`ENABLE_WHATSNEW=OFF`), and the About
+  obsproject.com, is off by default (`ENABLE_WHATSNEW=OFF`); a build that
+  turns it on reads `whatsnew.json` from the obs-rust release assets
+  ([#1882](https://github.com/obs-rust/obs-studio/issues/1882)). The About
   box no longer downloads upstream's Patreon list; it links to the
   obs-rust repository instead. Two obsproject.com data feeds stay on
   because they are data only and useful: the streaming-service list
@@ -279,6 +336,11 @@ not get a line.
 ### Stability
 
 - Repeated null-output encoding sessions reclaim completed stop threads. *All*.
+- **No swscale warning for every JPEG.** Loading a JPEG image (Image
+  Source, Image Slide Show) no longer logs FFmpeg's "deprecated pixel
+  format used, make sure you did set range correctly" once per image or
+  slide; the colours are unchanged. *All*, pending merge. Issue
+  [#2334](https://github.com/obs-rust/obs-studio/issues/2334).
 
 - **preserve empty item types for defaults.** Empty settings items retain their type when an incompatible default is supplied. *All*, 2026-10-20. Issue [#1528](https://github.com/obs-rust/obs-studio/issues/1528), PR [#1530](https://github.com/obs-rust/obs-studio/pull/1530).
 - Callback parameters that exactly fill a fixed calldata buffer are preserved. *All*.
@@ -361,6 +423,25 @@ not get a line.
   [#927](https://github.com/obs-rust/obs-studio/pull/927),
   [#1227](https://github.com/obs-rust/obs-studio/pull/1227),
   [#1234](https://github.com/obs-rust/obs-studio/pull/1234).
+- **.deb version is the release version.** A release .deb's package
+  version is the OBS-Studio-Rust version (`1:0.1.0~beta.20261024`), not
+  upstream's `git describe` string, so `dpkg -l` matches the About box and
+  each daily installs as an upgrade. *Linux*, 2026-10-24. Issue
+  [#2299](https://github.com/obs-rust/obs-studio/issues/2299).
+- **WHIP streaming in the AppImage.** The AppImage ships obs-webrtc and its
+  libdatachannel, so WHIP appears in Settings > Stream > Service. *Linux*,
+  2026-10-23. Issue [#1744](https://github.com/obs-rust/obs-studio/issues/1744),
+  PR [#1871](https://github.com/obs-rust/obs-studio/pull/1871).
+- **AppImage names a missing libwayland-egl.** On a host without
+  libwayland-egl.so.1, the AppImage says which package to install
+  (libwayland-egl1 on Debian and Ubuntu) instead of "Failed to initialize
+  video: Graphics module not found". *Linux (AppImage)*, pending merge.
+  Issue [#2298](https://github.com/obs-rust/obs-studio/issues/2298).
+- **AppImage names a missing libGLX.** On a host without libGLX.so.0, the
+  AppImage says which package to install (libglx0 on Debian and Ubuntu)
+  instead of the dynamic loader's "error while loading shared libraries".
+  *Linux (AppImage)*, pending merge. Issue
+  [#2337](https://github.com/obs-rust/obs-studio/issues/2337).
 - **Builds with Qt 6.8.** The frontend builds against distribution Qt 6.8,
   for example on Debian 13. *Linux*, 2026-10-16. Issue
   [#1015](https://github.com/obs-rust/obs-studio/issues/1015), PR
@@ -393,6 +474,12 @@ not get a line.
   against the signed manifest, installs it and restarts. *Windows, macOS*,
   2026-10-22. PR [#1742](https://github.com/obs-rust/obs-studio/pull/1742).
 
+- **AppImage updates follow certified releases.** The AppImage's embedded
+  update information (AppImageUpdate, `.zsync` deltas) points at the
+  certified Latest release, like the Windows and macOS updaters, instead of
+  the daily `continuous` build. *Linux (AppImage)*, 2026-10-23. Issue
+  [#1881](https://github.com/obs-rust/obs-studio/issues/1881).
+
 - **Opt-in nightly updates.** Settings > General > Updates > Update Channel
   offers **Nightly** next to **Stable** (the default). On Nightly, the
   Windows and macOS updaters offer each day's build as soon as it passes the
@@ -414,6 +501,34 @@ not get a line.
   `hybrid-release-evidence.json` approval is gone; regressions are fixed
   forward and covered by new automated tests. *All platforms*, 2026-10-22.
   Issue [#1818](https://github.com/obs-rust/obs-studio/issues/1818).
+
+- **Main window title names OBS Studio Rust.** The title bar reads "OBS Studio
+  Rust <version>": the release version, or for development builds the newest
+  `obs-studio-rust-v*` tag plus `-dev+<commits>-g<sha>` (or `dev` without a
+  tag). Profile, scene collection, safe mode and portable mode still follow;
+  `--version` and Help > About keep the upstream base version.
+  *All platforms*, 2026-10-23. Issue [#1983](https://github.com/obs-rust/obs-studio/issues/1983).
+- **A hung recording share can't stall obs-websocket.** Free disk space
+  answers within 200 ms: one query per path runs at a time, and while a
+  network share hangs, callers get its last value (0 before the first). So
+  clients polling `GetStats` no longer fill obs-websocket's worker pool and
+  stop every request and event. *All platforms*, 2026-10-25.
+  Issue [#1345](https://github.com/obs-rust/obs-studio/issues/1345).
+- **The .deb brings its desktop helpers.** It recommends xdg-utils and
+  xdg-desktop-portal with a backend, so on a minimal Ubuntu install Show
+  Recordings, log and dialog links, and Wayland capture work after
+  `apt install`; it suggests v4l2loopback-dkms for the virtual camera.
+  *Linux*, 2026-10-24. Issue [#2301](https://github.com/obs-rust/obs-studio/issues/2301).
+- **Software centres link to obs-rust.** The Linux AppStream metainfo names
+  obs-rust as developer and points its homepage, bug tracker and source links
+  at obs-rust/obs-studio, and the .deb's Homepage and Maintainer follow, so
+  "Report an issue" in GNOME Software or KDE Discover reaches this project.
+  *Linux*, 2026-10-24. Issue [#2302](https://github.com/obs-rust/obs-studio/issues/2302).
+- **The .deb installs next to the distribution's OBS.** On Linux the
+  helpers are `obs-studio-rust-ffmpeg-mux` and `obs-studio-rust-nvenc-test`,
+  so `apt install` no longer fails over `/usr/bin/obs-nvenc-test` when
+  Ubuntu's obs-studio is installed, in either order.
+  *Linux*, 2026-10-24. Issue [#2296](https://github.com/obs-rust/obs-studio/issues/2296).
 
 ## Fixed upstream bugs
 
@@ -481,6 +596,27 @@ area.
   [#1254](https://github.com/obs-rust/obs-studio/issues/1254), PR
   [#1256](https://github.com/obs-rust/obs-studio/pull/1256), upstream
   [obsproject/obs-studio#1349](https://github.com/obsproject/obs-studio/issues/1349).
+- obs-websocket GetInputPropertiesListPropertyItems no longer aborts OBS
+  when a list item has no name or no value, such as the placeholder at the
+  top of the macOS Screen Capture display and application lists; those items
+  are reported with empty strings. *All*, 2026-10-23. Issue
+  [#1266](https://github.com/obs-rust/obs-studio/issues/1266), PR
+  [#1996](https://github.com/obs-rust/obs-studio/pull/1996), upstream
+  [obsproject/obs-studio#13905](https://github.com/obsproject/obs-studio/issues/13905).
+- A RequestBatch with the Parallel execution type no longer crashes OBS
+  when its last request finishes. *All*, 2026-10-23. PR
+  [#1996](https://github.com/obs-rust/obs-studio/pull/1996).
+- obs-websocket GetStats reports each client's CPU usage since that client's
+  own previous GetStats, not since the last one from any client, and clients
+  polling at the same time no longer race on one shared state. *All*,
+  2026-10-23. Issue
+  [#1346](https://github.com/obs-rust/obs-studio/issues/1346), PR
+  [#1996](https://github.com/obs-rust/obs-studio/pull/1996).
+- obs-websocket RemoveInput removes the scene items of the input at once,
+  also in scenes that are not on program or preview, so GetSceneItemList
+  and GetInputList no longer show the removed input. *All*, 2026-10-24.
+  Issue [#1613](https://github.com/obs-rust/obs-studio/issues/1613), PR
+  [#2196](https://github.com/obs-rust/obs-studio/pull/2196).
 
 ### Video capture
 
@@ -643,17 +779,62 @@ area.
   once. *Linux*, 2026-10-17. Issue
   [#1068](https://github.com/obs-rust/obs-studio/issues/1068), PR
   [#1217](https://github.com/obs-rust/obs-studio/pull/1217).
+- Window Capture has a "List OBS windows" option (off by default) that adds
+  OBS's own windows, such as projectors, to the window list so OBS can capture
+  itself. *Windows*, 2026-10-24. Issue
+  [#2226](https://github.com/obs-rust/obs-studio/issues/2226).
 - Screen Capture (XSHM) follows a change of the screen's resolution: the
   capture is resized instead of freezing (screen made smaller) or staying
   cropped to the old size (screen made larger). *Linux*, 2026-10-20. Issue
   [#1494](https://github.com/obs-rust/obs-studio/issues/1494), PR
   [#1495](https://github.com/obs-rust/obs-studio/pull/1495), port of
   [obsproject/obs-studio#12937](https://github.com/obsproject/obs-studio/pull/12937).
+- Screen Capture (XSHM) draws the cursor in the right place after the captured
+  monitor moves without changing size (a monitor plugged in or rearranged).
+  *Linux*, 2026-10-24. Issue
+  [#2265](https://github.com/obs-rust/obs-studio/issues/2265).
 - The OBS Virtual Camera no longer burns about a millisecond of CPU per frame
   spinning inside the app that uses it (Zoom, Teams, a browser); it hands each
   frame to that app slightly earlier instead. *Windows*, 2026-10-21. Issue
   [#1279](https://github.com/obs-rust/obs-studio/issues/1279), PR
   [#1638](https://github.com/obs-rust/obs-studio/pull/1638).
+- A camera or other async source rotated by a multiple of 90 degrees other
+  than 0, 90, -90, 180 or 270 (such as -180, -270 or 450, from a camera's
+  autorotation or a plugin) is drawn turned in its place, instead of outside
+  its box. *All*, pending merge. Issue
+  [#2121](https://github.com/obs-rust/obs-studio/issues/2121).
+- Turning off Autorotation on a Video Capture Device source takes back the
+  rotation it applied, instead of leaving the camera turned until OBS
+  restarts or the source is recreated. *Windows*, pending merge. Issue
+  [#2137](https://github.com/obs-rust/obs-studio/issues/2137).
+- A PipeWire screen or window capture of a stream with the Flipped or
+  Flipped180 transform is mirrored left to right again instead of drawn
+  upside down: `GS_FLIP_U` on a 2D texture (`gs_draw_sprite()`, and a
+  full-size `gs_draw_sprite_subregion()`) flips it on u, not on v, as it did
+  before upstream 7b8b51b29. *All*, 2026-10-24. Issue
+  [#2124](https://github.com/obs-rust/obs-studio/issues/2124), PR
+  [#2135](https://github.com/obs-rust/obs-studio/pull/2135).
+- A V4L2 Video Capture Device follows its camera, not a /dev/videoN number:
+  a camera replugged or renumbered under another number is captured again,
+  and another camera that takes its old number is not captured in its place
+  (the log says the source waits for its camera). The source saves the
+  camera's name, bus and USB serial number next to the node; two cameras of
+  one model without serial numbers are told apart by their USB port.
+  *Linux*, pending merge. Issue
+  [#2262](https://github.com/obs-rust/obs-studio/issues/2262), upstream
+  [obsproject/obs-studio#3824](https://github.com/obsproject/obs-studio/issues/3824),
+  [obsproject/obs-studio#4972](https://github.com/obsproject/obs-studio/issues/4972).
+- A V4L2 camera that stops working without being unplugged (a firmware
+  hang, an error after suspend and resume) no longer freezes its source on
+  the last frame: OBS closes the camera and opens it again until it
+  delivers frames. *Linux*, pending merge. Issue
+  [#2264](https://github.com/obs-rust/obs-studio/issues/2264), upstream
+  [obsproject/obs-studio#9434](https://github.com/obsproject/obs-studio/issues/9434).
+- The Virtual Camera can be stopped and started again while recording: the
+  recording no longer keeps the v4l2loopback device open, and no longer
+  holds the VA-API encoder's GPU device either. *Linux*, pending merge.
+  Issue [#2278](https://github.com/obs-rust/obs-studio/issues/2278), upstream
+  [obsproject/obs-studio#14054](https://github.com/obsproject/obs-studio/issues/14054).
 
 ### Audio
 
@@ -782,6 +963,29 @@ area.
   samples clip instead of wrapping around. *Linux*, 2026-10-21. Issue
   [#1697](https://github.com/obs-rust/obs-studio/issues/1697), PR
   [#1709](https://github.com/obs-rust/obs-studio/pull/1709).
+- A push-to-talk or push-to-mute delay too large to count in nanoseconds
+  no longer wraps around and ends the moment the key is released; it holds
+  for as long as it can. A negative delay in a scene collection loads as no
+  delay. An audio balance outside full left to full right, from a scene
+  collection, a plugin or a script, is clamped to that range (NaN is
+  centred) instead of inverting or overdriving a channel. *All*, pending
+  merge. Issue
+  [#2051](https://github.com/obs-rust/obs-studio/issues/2051), PR
+  [#2058](https://github.com/obs-rust/obs-studio/pull/2058).
+- A source volume that is not a number, negative or infinite, from a scene
+  collection, a plugin or a script, no longer silences or corrupts every
+  audio track the source is in: NaN is read as 100%, a negative volume as
+  0% and an infinite one as 2000% (+26 dB), the most the volume controls
+  allow. *All*, pending merge. Issue
+  [#2108](https://github.com/obs-rust/obs-studio/issues/2108).
+- Desktop Audio set to "Default" on PulseAudio no longer goes silent when the
+  default output changes, and no longer records the microphone when the
+  default output is unplugged: it follows the new default output. Saving its
+  properties unchanged no longer restarts it. *Linux*, pending merge. Issue
+  [#2260](https://github.com/obs-rust/obs-studio/issues/2260), PR
+  [#2271](https://github.com/obs-rust/obs-studio/pull/2271), upstream
+  [obsproject/obs-studio#4828](https://github.com/obsproject/obs-studio/issues/4828),
+  [obsproject/obs-studio#3211](https://github.com/obsproject/obs-studio/issues/3211).
 
 ### Encoding, streaming and recording
 
@@ -1063,6 +1267,23 @@ area.
   leak a copy of a video frame for each caption. *All*, 2026-10-22. Issue
   [#1777](https://github.com/obs-rust/obs-studio/issues/1777), PR
   [#1778](https://github.com/obs-rust/obs-studio/pull/1778).
+- A plugin or script that adds an encoder region of interest (ROI) that is
+  upside down (bottom above top, or right left of left) or has a NaN
+  priority gets it refused, as a too small one is; before, it was stored and
+  passed to the encoder's quality map. An ROI edge that an upscaled
+  encoder scales past the largest value an edge can hold gets that value
+  instead of an undefined one, and a NULL encoder no longer crashes OBS. *All*, pending merge. Issue
+  [#1959](https://github.com/obs-rust/obs-studio/issues/1959), PR
+  [#1964](https://github.com/obs-rust/obs-studio/pull/1964).
+- Changing the bitrate of a QSV encoder while streaming no longer races the
+  other QSV encoders: the reset now takes the lock they share. A device that
+  stays busy or stops finishing frames now stops the output with an error
+  instead of leaving it connected at 0 kbps. Live bitrate changes now also
+  apply in VBR and in CBR with "low" or "normal" latency, and settings that
+  leave the bitrate alone no longer reset the encoder. *Linux, Windows*,
+  pending merge. Issue
+  [#2291](https://github.com/obs-rust/obs-studio/issues/2291), upstream
+  [obsproject/obs-studio#13228](https://github.com/obsproject/obs-studio/issues/13228).
 
 ### Sources and filters
 
@@ -1266,9 +1487,38 @@ area.
   *All*, 2026-10-21. Issue
   [#1677](https://github.com/obs-rust/obs-studio/issues/1677), PR
   [#1678](https://github.com/obs-rust/obs-studio/pull/1678).
+- Double-rate deinterlacing (Yadif 2x, Linear 2x, Discard 2x) shows both
+  fields of the first frame when a source starts, restarts or comes back
+  after a pause, instead of skipping the second field or holding the frame
+  too long (an unbuffered source still moves straight on when its next
+  frame is already waiting). *All*, pending merge. Issue
+  [#1965](https://github.com/obs-rust/obs-studio/issues/1965), PR
+  [#1995](https://github.com/obs-rust/obs-studio/pull/1995).
+- Double-rate deinterlacing (Yadif 2x, Linear 2x, Discard 2x) shows every
+  frame of a buffered source after it falls behind and catches up, instead
+  of sometimes skipping the fields of a later frame and showing the frame
+  after it a frame early. *All*, pending merge. Issue
+  [#2009](https://github.com/obs-rust/obs-studio/issues/2009), PR
+  [#2048](https://github.com/obs-rust/obs-studio/pull/2048).
+- A camera, capture card or media source whose deinterlace mode is not one
+  OBS knows (from an edited or generated scene collection, a plugin or a
+  script) is drawn with deinterlacing off, instead of drawing nothing, and
+  its Deinterlacing menu shows Disable. *All*, pending merge. Issue
+  [#2090](https://github.com/obs-rust/obs-studio/issues/2090).
+
+- Screen Capture (XSHM) keeps capturing the monitor it was set to when
+  another monitor is unplugged or plugged in: it saves the RandR monitor's
+  name, not only its place in the list, and shows no other monitor when its
+  own goes away. *Linux*, 2026-10-25. Issue
+  [#2261](https://github.com/obs-rust/obs-studio/issues/2261), upstream
+  [obsproject/obs-studio#5502](https://github.com/obsproject/obs-studio/issues/5502).
 
 ### Scenes and UI
 
+- Edit > Undo is no longer clickable when there is nothing to undo; it was
+  enabled again after loading a scene collection or closing the Filters
+  dialog, even with an empty history. *All*, 2026-10-24. Issue
+  [#2222](https://github.com/obs-rust/obs-studio/issues/2222).
 - Theme metadata, theme string variables and effect annotation strings that
   contain escape characters no longer end with a stray closing quote. *All*,
   2026-10-09. Issue [#48](https://github.com/obs-rust/obs-studio/issues/48),
@@ -1501,6 +1751,33 @@ area.
   English names. *All*, 2026-10-21. Issue
   [#1656](https://github.com/obs-rust/obs-studio/issues/1656), PR
   [#1673](https://github.com/obs-rust/obs-studio/pull/1673).
+- A scene collection with a negative scene item crop (edited by hand or
+  written by another tool) loads with that crop at 0, as the Edit
+  Transform dialog and obs-websocket set it; before, the item was drawn
+  2 pixels wide or high. A crop past the integer range, the crop of a
+  nested scene that grows far, and the size of a group whose sources are
+  very far apart now get the nearest value in range instead of a wrong
+  one. *All*, 2026-10-22. Issue
+  [#1839](https://github.com/obs-rust/obs-studio/issues/1839), PR
+  [#1840](https://github.com/obs-rust/obs-studio/pull/1840).
+- A scene collection whose transition has an unknown scale type (edited by
+  hand or written by another tool) loads with the default, which only
+  scales sources down to fit; before, the transition drew its scenes with
+  an undefined scale. *All*, pending merge. Issue
+  [#2064](https://github.com/obs-rust/obs-studio/issues/2064), PR
+  [#2080](https://github.com/obs-rust/obs-studio/pull/2080).
+
+- Narrowing the main window and widening it again keeps the docks' relative
+  sizes: docks side by side no longer come back all the same width after the
+  window squeezed them to their minimum. *All*, 2026-10-24. Issue
+  [#2225](https://github.com/obs-rust/obs-studio/issues/2225).
+
+- Importing a profile from a folder path that ends in a slash (as the
+  macOS folder dialog returns it) creates the profile in a folder of its
+  own; before, its files were copied into the profiles folder itself and no
+  profile showed up. *All*, pending merge. Issue
+  [#2295](https://github.com/obs-rust/obs-studio/issues/2295), upstream
+  [obsproject/obs-studio#13862](https://github.com/obsproject/obs-studio/issues/13862).
 
 ### Scripting
 
@@ -1542,6 +1819,19 @@ area.
 
 ### Stability
 
+- A scene item with a bounds type OBS doesn't know (a hand-edited or
+  foreign scene collection, undo data, a plugin) no longer draws inside a
+  phantom bounding box; it is loaded and set as no bounds. *All*, pending
+  merge. Issue [#2281](https://github.com/obs-rust/obs-studio/issues/2281).
+- Restoring a source's filters (undo, paste, scene collection load) no longer
+  crashes when the source's size is read while a filter is being attached; a
+  filter with no target yet reports a size of 0. *All*, 2026-10-24. Issue
+  [#2172](https://github.com/obs-rust/obs-studio/issues/2172).
+- DeckLink output no longer crashes when a saved output mode is one the
+  device doesn't offer (settings from another card or firmware); the start
+  fails with an error in the log. An HDR start with no video conversion
+  starts as SDR instead of crashing. *All*, 2026-10-24. Issue
+  [#2144](https://github.com/obs-rust/obs-studio/issues/2144).
 - Upload Previous Log File no longer aborts OBS when no previous log exists;
   it reports that there is no log file. *Linux*, 2026-10-22. Issue
   [#1768](https://github.com/obs-rust/obs-studio/issues/1768), PR
@@ -1655,6 +1945,101 @@ area.
   duplicate, not the source's old name. *All*, 2026-10-22. Issue
   [#1787](https://github.com/obs-rust/obs-studio/issues/1787), PR
   [#1804](https://github.com/obs-rust/obs-studio/pull/1804).
+- A plugin or script that asks whether a NULL output protocol is registered,
+  or lists the outputs for one, no longer crashes OBS; no output supports a
+  protocol that is not there. The auto-configuration wizard's bandwidth test
+  reports that no output fits, instead of crashing, when its stream service
+  could not be created (for example without the rtmp-services plugin).
+  *All*, 2026-10-22. Issue
+  [#1827](https://github.com/obs-rust/obs-studio/issues/1827), PR
+  [#1828](https://github.com/obs-rust/obs-studio/pull/1828).
+- A tool or plugin host that adds module search paths with
+  obs_add_module_path() gets a defined module type for the modules found
+  there (undefined: neither core nor legacy), so the disabled list applies
+  to them; before, the type was whatever was in memory. *All*, 2026-10-23.
+  Issue [#1900](https://github.com/obs-rust/obs-studio/issues/1900), PR
+  [#1906](https://github.com/obs-rust/obs-studio/pull/1906).
+- A source type that a plugin fails to register (libobs rejects it, for
+  example a composite audio source or one without a name) is no longer
+  counted as that plugin's: its sources show as missing in the Sources list
+  instead of as provided by a loaded plugin, and the type is not credited to
+  the plugin if something else registers it later. A plugin or script that
+  adds a type id to no module (NULL) no longer leaks a copy of it. *All*,
+  pending merge. Issue [#1953](https://github.com/obs-rust/obs-studio/issues/1953), PR
+  [#1960](https://github.com/obs-rust/obs-studio/pull/1960).
+- A plugin or script that gives an output an audio mixer index OBS does not
+  have (6 or more) no longer changes the output's mixers; the call is
+  ignored with a warning. A raw output with a preferred (scaled) size but no
+  video no longer crashes OBS when asked for its video conversion; it has
+  none. *All*, pending merge. Issue
+  [#2127](https://github.com/obs-rust/obs-studio/issues/2127).
+- A canvas that a plugin or script creates, or that a scene collection
+  (edited by hand or written by another tool) loads, keeps only the public
+  canvas flags. Before, a removed bit in its flags made the canvas count as
+  removed from the start, so removing it later did not tell OBS or other
+  plugins, which kept it; unknown bits were saved back. A canvas that fails
+  to set up is no longer leaked. *All*, pending merge. Issue
+  [#2141](https://github.com/obs-rust/obs-studio/issues/2141).
+- When the system cannot set up a lock or start a thread, OBS reports it
+  instead of carrying on as if it had worked: a source, output or other
+  object whose lock fails is not created, and a source that fails to set up
+  no longer crashes OBS while it is cleaned up; an output whose reconnect
+  thread does not start no longer stays "reconnecting" for good; and the
+  screen saver inhibitor reports that it could not start. *All*, pending
+  merge. Issue [#2152](https://github.com/obs-rust/obs-studio/issues/2152).
+- A filter that is removed (in the Filters dialog, by a script or by
+  obs-websocket) while OBS is drawing it no longer crashes OBS when it has
+  nothing to draw (for example while it is disabled or has a size of 0); it
+  draws nothing for that frame. *All*, pending merge. Issue
+  [#2160](https://github.com/obs-rust/obs-studio/issues/2160).
+- When the system cannot set up the event that OBS waits on, OBS no
+  longer crashes on it: a task that OBS hands to another of its threads
+  still runs once and is waited for; recording through the buffered file
+  writer or ffmpeg-mux, macOS window capture and the screen saver
+  inhibitor fail to start instead; macOS display and screen capture do not
+  start their stream; and a streaming service's ingest list refresh is not
+  waited for. macOS display and screen capture also no longer free the
+  same event twice after an update that could not restart them. *All*,
+  pending merge. Issue [#2164](https://github.com/obs-rust/obs-studio/issues/2164).
+- A plugin that registers a source, output, encoder or service with a
+  structure size that ends partway through its type data fields no longer
+  crashes OBS when the registration is refused; the type data is freed only
+  when the size holds both fields whole. *All*, pending merge. Issue
+  [#2195](https://github.com/obs-rust/obs-studio/issues/2195).
+- A plugin that registers a source, output, encoder or service with a
+  structure size that ends partway through a callback or its type data no
+  longer leaves that field partly copied, which crashed OBS when it was
+  called later or at shutdown; a field is kept only when the size holds it
+  whole. *All*, pending merge. Issue
+  [#2203](https://github.com/obs-rust/obs-studio/issues/2203).
+- A plugin, script or headless tool that creates an output before OBS has
+  set up video no longer crashes OBS; the output has no video until one is
+  set, and it cannot start without it. *All*, pending merge. Issue
+  [#2237](https://github.com/obs-rust/obs-studio/issues/2237).
+- A plugin, script or headless tool that asks for the main texture, adds or
+  removes a raw video callback, asks whether NV12 or P010 texture output is
+  active, or reads the position or scale of a scene item that is no longer
+  in a scene before OBS has set up video no longer crashes OBS; it gets no
+  texture, a refused callback with a warning, "not active" and a 0x0
+  canvas. *All*, pending merge. Issue
+  [#2253](https://github.com/obs-rust/obs-studio/issues/2253).
+- An SDR white level or HDR nominal peak level of 0, below 0, NaN or
+  infinite (from an edited profile, a plugin or a script) no longer makes
+  HDR and scRGB sources draw solid white, black or garbage: the level is
+  ignored with a warning in the log and the previous one stays. With
+  graphics up, the levels also start at 300 and 1000 nits instead of 0
+  until something sets them. *All*, pending merge. Issue
+  [#2209](https://github.com/obs-rust/obs-studio/issues/2209).
+- A plugin or script that resets an effect parameter to its default with
+  a parameter it failed to look up no longer crashes OBS; the call logs an
+  error and does nothing, like the other effect parameter setters. *All*,
+  pending merge. Issue
+  [#2210](https://github.com/obs-rust/obs-studio/issues/2210).
+- Asking whether a video encoder uses NV12 or P010 texture input no longer
+  crashes OBS when the encoder has no video yet, or when its video belonged
+  to a canvas that has been removed; the answer is "not active", so an
+  encoder plugin falls back to raw frames. *All*, pending merge. Issue
+  [#2267](https://github.com/obs-rust/obs-studio/issues/2267).
 
 ### Security hardening
 
@@ -1683,6 +2068,20 @@ area.
 - Rust graphics preserves separate C trigonometric calls on macOS and signaling
   NaN rounding on macOS/Windows. *macOS, Windows*, 2026-10-18.
   PR [#1398](https://github.com/obs-rust/obs-studio/pull/1398).
+- Downloads and remote text requests no longer ask servers for brotli: what
+  comes back can no longer reach a Brotli decoder with a public
+  out-of-bounds write while the packaged libraries still carry it. *All*,
+  2026-10-24. Issue
+  [#2211](https://github.com/obs-rust/obs-studio/issues/2211), PR
+  [#2213](https://github.com/obs-rust/obs-studio/pull/2213).
+
+### Building from source
+
+- Building with `-DENABLE_CORE_MODULES=OFF` works again: libobs no longer
+  fails to compile a core module list that was never generated. *All*,
+  pending merge. Issue
+  [#2280](https://github.com/obs-rust/obs-studio/issues/2280);
+  obsproject/obs-studio#14013.
 
 ## Development builds
 
@@ -1692,3 +2091,9 @@ area.
   *Linux*, 2026-10-22. Issue [#1332](https://github.com/obs-rust/obs-studio/issues/1332),
   PRs [#1725](https://github.com/obs-rust/obs-studio/pull/1725),
   [#1772](https://github.com/obs-rust/obs-studio/pull/1772).
+- **Explicit Qt SDKs for Cargo builds.** `OBS_QT_TARGET_PREFIX` and
+  `OBS_QT_HOST_PREFIX` select the target Qt SDK and its host tools. Cargo resolves
+  Qt Core, Gui and Widgets from the SDK's exported targets, validates the
+  architecture, Qt version and CRT, and cross builds no longer fall back to
+  host pkg-config. *Linux; Windows and macOS SDK resolution*, 2026-10-22.
+  Issue [#1869](https://github.com/obs-rust/obs-studio/issues/1869).

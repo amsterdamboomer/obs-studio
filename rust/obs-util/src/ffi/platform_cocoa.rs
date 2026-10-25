@@ -43,7 +43,10 @@ unsafe fn alloc_terminated(bytes: &[u8]) -> *mut c_char {
 
 #[cfg(unix)]
 mod shims {
-    use super::*;
+    use super::{
+        alloc_bytes, alloc_terminated, c_char, c_int, c_void, cocoa, cstr, dstr, dstr_ffi,
+        os_proc_memory_usage, ptr, slice,
+    };
 
     /// # Safety
     /// No pointer arguments.
@@ -246,7 +249,13 @@ mod shims {
     /// `dir` is a C string or null.
     #[unsafe(no_mangle)]
     pub unsafe extern "C" fn os_get_free_disk_space(dir: *const c_char) -> u64 {
-        cocoa::free_disk_space(cstr(dir))
+        match cstr(dir) {
+            // Bounded: a hung share must not stall the caller (#1345).
+            Some(dir) => {
+                crate::bounded_free_space::shared(|dir| cocoa::free_disk_space(Some(dir))).get(dir)
+            }
+            None => cocoa::free_disk_space(None),
+        }
     }
 
     /// # Safety

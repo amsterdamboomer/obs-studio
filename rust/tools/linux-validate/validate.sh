@@ -52,6 +52,30 @@ if [ -n "${OBS_CTEST_SHARD:-}" ]; then
   fi
   shard_args=(-I "$shard_index,,$shard_count")
 fi
+# OBS_CTEST_PART: run every test (default), only the RUN_SERIAL ones
+# ("serial") or all but those ("suite"). CI runs the two parts of a mode on
+# separate runners, so the serial tests keep a runner to themselves without
+# idling the other cores (#2071).
+part="${OBS_CTEST_PART:-}"
+case "$part" in
+"" | suite | serial) ;;
+*) echo "FAIL: OBS_CTEST_PART must be suite or serial, got '$part'"; exit 2 ;;
+esac
+if [ -n "$part" ] && [ -n "${OBS_CTEST_SHARD:-}" ]; then
+  echo "FAIL: OBS_CTEST_PART and OBS_CTEST_SHARD cannot be combined" >&2
+  exit 2
+fi
+# Sets mode_shard_args to the part's tests of build tree $1, mode $2.
+select_part() {
+  local registry="$1/tier2-registry-$2.json" serial
+  ctest --test-dir "$1" --show-only=json-v1 >"$registry"
+  # OBS_CTEST_SERIAL_SHARD=<i>/<n>: the serial part's ith of n runners (#2072).
+  serial=$(uv run --no-project "$SRC/rust/tools/linux-validate/serial-tests.py" "$registry" ${OBS_CTEST_SERIAL_SHARD:-})
+  case "$part" in
+  suite) mode_shard_args=(-E "$serial") ;;
+  serial) mode_shard_args=(-R "$serial") ;;
+  esac
+}
 
 # Roots: the container paths run.sh sets up (/ro: the checkout, mounted
 # read-only and built out of source; /build: every build output), unless
@@ -115,7 +139,7 @@ cd "$SRC"
 # fresh clone or another worktree, whose mtimes differ, or a CI runner) from
 # recompiling OBS. ZCCACHE_CACHE_DIR defaults to the build volume; run.sh
 # points it at a host dir (OBS_ZCCACHE_DIR, which CI restores and saves with
-# actions/cache) or the shared zccache volume. The daemon starts on the first
+# actions/cache) or the checkout's zccache volume. The daemon starts on the first
 # compile; stop it on exit so its index is flushed to the cache dir.
 export ZCCACHE_CACHE_DIR="${ZCCACHE_CACHE_DIR:-$BUILD/zccache}"
 trap 'zccache stop >/dev/null 2>&1 || true' EXIT
@@ -178,6 +202,7 @@ else
   # Restart the daemon and rebuild once; ninja redoes only the failed edges,
   # and a real compile error fails the second time too.
   tier2_targets=(libobs libobs-c-reference cmocka-tests decklink obs-nvenc obs-nvenc-c-reference)
+  "$SRC"/rust/tools/linux-validate/drop-depless-objects.sh "$build"
   if ! cmake --build "$build" --target "${tier2_targets[@]}" -- -k 0 >"$build.build.log" 2>&1; then
     # Ninja colors its log (\e[31mFAILED: ...), so strip the escapes first.
     launcher_failed=$(sed 's/\x1b\[[0-9;]*m//g' "$build.build.log" | grep -c '^FAILED: \[code=125\]' || true)
@@ -361,7 +386,8 @@ if [ "$stage" != build ]; then
       mode_shard_args=(-R "$(cat "$plan")")
     fi
 
-    echo "== [$mode] ctest${OBS_CTEST_SHARD:+ shard $OBS_CTEST_SHARD}"
+    [ -z "$part" ] || select_part "$build" "$mode"
+    echo "== [$mode] ctest${OBS_CTEST_SHARD:+ shard $OBS_CTEST_SHARD}${part:+ ($part)}"
     # xvfb-run gives display tests an X server; the PipeWire tests start their
     # own private PipeWire daemon and D-Bus bus (#776).
     # Tests share this display. Do not reset it when its last client exits:
