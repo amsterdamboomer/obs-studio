@@ -10,10 +10,7 @@ if(OS_LINUX AND TARGET linux-capture AND TARGET OBS::libobs-opengl)
     XCB
     REQUIRED XCB XFIXES RANDR SHM XINERAMA COMPOSITE
   )
-  add_executable(
-    test_xshm_monitor_move
-    test_xshm_monitor_move.c
-  )
+  add_executable(test_xshm_monitor_move test_xshm_monitor_move.c)
   target_include_directories(
     test_xshm_monitor_move
     PRIVATE ${CMOCKA_INCLUDE_DIR} "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/plugins/linux-capture"
@@ -34,10 +31,7 @@ if(OS_LINUX AND TARGET linux-capture AND TARGET OBS::libobs-opengl)
       ${CMOCKA_LIBRARIES}
   )
   # A build tree has no libobs-opengl on the loader path, so load it by path.
-  target_compile_definitions(
-    test_xshm_monitor_move
-    PRIVATE GRAPHICS_MODULE_PATH="$<TARGET_FILE:OBS::libobs-opengl>"
-  )
+  target_compile_definitions(test_xshm_monitor_move PRIVATE GRAPHICS_MODULE_PATH="$<TARGET_FILE:OBS::libobs-opengl>")
   add_dependencies(test_xshm_monitor_move libobs-opengl)
   add_dependencies(cmocka-tests test_xshm_monitor_move)
   find_program(OBS_TEST_XVFB_RUN xvfb-run)
