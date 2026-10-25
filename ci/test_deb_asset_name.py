@@ -9,13 +9,12 @@ other release apt fails with a wall of unmet dependencies.
 from __future__ import annotations
 
 import re
-import sys
 import unittest
 from pathlib import Path
 
+import release_decision
+
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "ci"))
-import release_decision  # noqa: E402
 
 WORKFLOW = (ROOT / ".github/workflows/release-rust.yaml").read_text()
 
