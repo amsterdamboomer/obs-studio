@@ -2,15 +2,15 @@
   "app": {
     "by_dir": {
       "frontend": 82257,
-      "libobs": 80637,
+      "libobs": 80784,
       "plugins": 144549,
       "shared": 15915
     },
-    "percent": 10.02,
-    "ported_lines": 32389,
-    "total_lines": 323358
+    "percent": 10.11,
+    "ported_lines": 32711,
+    "total_lines": 323505
   },
-  "commit": "2d1f123",
+  "commit": "7992b0b",
   "date": "2026-10-25",
   "excluded": [
     "rust/obs-c-oracle/legacy/ (Tier 3 oracle copy of the original C)",
@@ -34,9 +34,9 @@
           "total_lines": 52084
         },
         "graphics": {
-          "percent": 21.2,
-          "ported_lines": 2631,
-          "total_lines": 12413
+          "percent": 22.93,
+          "ported_lines": 2858,
+          "total_lines": 12465
         },
         "media-io": {
           "percent": 72.52,
@@ -44,16 +44,16 @@
           "total_lines": 3159
         },
         "util": {
-          "percent": 87.82,
-          "ported_lines": 11400,
-          "total_lines": 12981
+          "percent": 87.91,
+          "ported_lines": 11495,
+          "total_lines": 13076
         }
       },
-      "files": 198,
-      "hybrid_lines": 48248,
-      "percent": 40.17,
-      "ported_lines": 32389,
-      "total_lines": 80637
+      "files": 203,
+      "hybrid_lines": 48073,
+      "percent": 40.49,
+      "ported_lines": 32711,
+      "total_lines": 80784
     },
     "hosts": {
       "linux": {
@@ -64,9 +64,9 @@
             "total_lines": 47983
           },
           "graphics": {
-            "percent": 21.49,
-            "ported_lines": 2631,
-            "total_lines": 12243
+            "percent": 23.25,
+            "ported_lines": 2858,
+            "total_lines": 12295
           },
           "media-io": {
             "percent": 72.52,
@@ -74,14 +74,14 @@
             "total_lines": 3159
           },
           "util": {
-            "percent": 90.47,
-            "ported_lines": 9000,
-            "total_lines": 9948
+            "percent": 90.44,
+            "ported_lines": 8973,
+            "total_lines": 9921
           }
         },
-        "files": 178,
-        "hybrid_lines": 43344,
-        "percent": 40.89,
+        "files": 181,
+        "hybrid_lines": 43169,
+        "percent": 41.15,
         "ported_files": [
           "audio-monitoring/pulse/pulseaudio-monitor-format.c.h",
           "audio-monitoring/pulse/pulseaudio-stream-flags.c.h",
@@ -92,6 +92,7 @@
           "graphics/axisang.c.h",
           "graphics/bounds.c.h",
           "graphics/effect-lookups.c.h",
+          "graphics/effect-params.c.h",
           "graphics/effect-parser-lifecycle.c.h",
           "graphics/graphics-sprite.c.h",
           "graphics/image-file.c.h",
@@ -202,6 +203,7 @@
           "util/pipe-posix.c.h",
           "util/pipe.c.h",
           "util/platform-conversions.c.h",
+          "util/platform-file-host-posix.c.h",
           "util/platform-file.c.h",
           "util/platform-filename.c.h",
           "util/platform-mkdirs.c.h",
@@ -211,6 +213,7 @@
           "util/platform-nix.c.h",
           "util/platform-number.c.h",
           "util/platform-time.c.h",
+          "util/profiler-io-host-posix.c.h",
           "util/profiler-io.c.h",
           "util/profiler-snapshot.c.h",
           "util/profiler.c.h",
@@ -220,8 +223,8 @@
           "util/threading-posix.c.h",
           "util/utf8.c.h"
         ],
-        "ported_lines": 29989,
-        "total_lines": 73333
+        "ported_lines": 30189,
+        "total_lines": 73358
       },
       "macos": {
         "areas": {
@@ -231,9 +234,9 @@
             "total_lines": 42850
           },
           "graphics": {
-            "percent": 21.49,
-            "ported_lines": 2631,
-            "total_lines": 12243
+            "percent": 23.25,
+            "ported_lines": 2858,
+            "total_lines": 12295
           },
           "media-io": {
             "percent": 72.52,
@@ -241,14 +244,14 @@
             "total_lines": 3159
           },
           "util": {
-            "percent": 90.4,
-            "ported_lines": 8924,
-            "total_lines": 9872
+            "percent": 90.37,
+            "ported_lines": 8897,
+            "total_lines": 9845
           }
         },
-        "files": 166,
-        "hybrid_lines": 38924,
-        "percent": 42.86,
+        "files": 169,
+        "hybrid_lines": 38749,
+        "percent": 43.14,
         "ported_files": [
           "callback/calldata.c.h",
           "callback/decl.c.h",
@@ -257,6 +260,7 @@
           "graphics/axisang.c.h",
           "graphics/bounds.c.h",
           "graphics/effect-lookups.c.h",
+          "graphics/effect-params.c.h",
           "graphics/effect-parser-lifecycle.c.h",
           "graphics/graphics-sprite.c.h",
           "graphics/image-file.c.h",
@@ -365,12 +369,14 @@
           "util/pipe.c.h",
           "util/platform-cocoa.m.h",
           "util/platform-conversions.c.h",
+          "util/platform-file-host-posix.c.h",
           "util/platform-file.c.h",
           "util/platform-filename.c.h",
           "util/platform-mkdirs.c.h",
           "util/platform-nix.c.h",
           "util/platform-number.c.h",
           "util/platform-time.c.h",
+          "util/profiler-io-host-posix.c.h",
           "util/profiler-io.c.h",
           "util/profiler-snapshot.c.h",
           "util/profiler.c.h",
@@ -380,8 +386,8 @@
           "util/threading-posix.c.h",
           "util/utf8.c.h"
         ],
-        "ported_lines": 29200,
-        "total_lines": 68124
+        "ported_lines": 29400,
+        "total_lines": 68149
       },
       "windows": {
         "areas": {
@@ -391,9 +397,9 @@
             "total_lines": 44009
           },
           "graphics": {
-            "percent": 21.22,
-            "ported_lines": 2631,
-            "total_lines": 12398
+            "percent": 22.96,
+            "ported_lines": 2858,
+            "total_lines": 12450
           },
           "media-io": {
             "percent": 72.52,
@@ -401,14 +407,14 @@
             "total_lines": 3159
           },
           "util": {
-            "percent": 84.96,
-            "ported_lines": 8931,
-            "total_lines": 10512
+            "percent": 84.99,
+            "ported_lines": 8951,
+            "total_lines": 10532
           }
         },
-        "files": 170,
-        "hybrid_lines": 40871,
-        "percent": 41.68,
+        "files": 173,
+        "hybrid_lines": 40696,
+        "percent": 41.99,
         "ported_files": [
           "callback/calldata.c.h",
           "callback/decl.c.h",
@@ -417,6 +423,7 @@
           "graphics/axisang.c.h",
           "graphics/bounds.c.h",
           "graphics/effect-lookups.c.h",
+          "graphics/effect-params.c.h",
           "graphics/effect-parser-lifecycle.c.h",
           "graphics/graphics-sprite.c.h",
           "graphics/image-file.c.h",
@@ -524,12 +531,14 @@
           "util/pipe-windows.c.h",
           "util/pipe.c.h",
           "util/platform-conversions.c.h",
+          "util/platform-file-host-windows.c.h",
           "util/platform-file.c.h",
           "util/platform-filename.c.h",
           "util/platform-mkdirs.c.h",
           "util/platform-number.c.h",
           "util/platform-time.c.h",
           "util/platform-windows.c.h",
+          "util/profiler-io-host-windows.c.h",
           "util/profiler-io.c.h",
           "util/profiler-snapshot.c.h",
           "util/profiler.c.h",
@@ -540,12 +549,12 @@
           "util/utf8-host-windows.c.h",
           "util/utf8.c.h"
         ],
-        "ported_lines": 29207,
-        "total_lines": 70078
+        "ported_lines": 29454,
+        "total_lines": 70150
       }
     }
   },
   "rust": {
-    "lines": 115994
+    "lines": 116799
   }
 }
