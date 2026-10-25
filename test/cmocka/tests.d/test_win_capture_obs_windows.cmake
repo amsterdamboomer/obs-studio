@@ -12,10 +12,7 @@ if(MSVC AND TARGET win-capture)
       "${CMAKE_SOURCE_DIR}/plugins/win-capture"
       $<TARGET_PROPERTY:win-capture,INCLUDE_DIRECTORIES>
   )
-  target_compile_definitions(
-    test_win_capture_obs_windows
-    PRIVATE $<TARGET_PROPERTY:win-capture,COMPILE_DEFINITIONS>
-  )
+  target_compile_definitions(test_win_capture_obs_windows PRIVATE $<TARGET_PROPERTY:win-capture,COMPILE_DEFINITIONS>)
   target_link_libraries(
     test_win_capture_obs_windows
     PRIVATE
