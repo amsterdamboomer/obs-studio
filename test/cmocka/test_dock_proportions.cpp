@@ -262,6 +262,24 @@ static void side_column_comes_back_after_narrow_then_wide(void **state)
 	assert_column_width(f, column_width);
 }
 
+static void side_column_comes_back_after_steps(void **state)
+{
+	auto *f = static_cast<ColumnFixture *>(*state);
+
+	/* Dragging the window edge: many small resizes. */
+	for (int w = 1600; w >= 700; w -= 50) {
+		f->window->resize(w, 900);
+		QTest::qWait(10);
+	}
+	for (int w = 700; w <= 1600; w += 50) {
+		f->window->resize(w, 900);
+		QTest::qWait(10);
+	}
+	QTest::qWait(50);
+	printf("after steps: column %d px\n", f->column.first()->width());
+	assert_column_width(f, column_width);
+}
+
 static void dragged_column_width_is_kept(void **state)
 {
 	auto *f = static_cast<ColumnFixture *>(*state);
@@ -290,6 +308,7 @@ int main(int argc, char **argv)
 		cmocka_unit_test_setup_teardown(unclamped_resize_is_untouched, setup, teardown),
 		cmocka_unit_test_setup_teardown(side_column_comes_back_after_narrow_then_wide, setup_column,
 						teardown_column),
+		cmocka_unit_test_setup_teardown(side_column_comes_back_after_steps, setup_column, teardown_column),
 		cmocka_unit_test_setup_teardown(dragged_column_width_is_kept, setup_column, teardown_column),
 	};
 	return cmocka_run_group_tests(tests, NULL, NULL);
