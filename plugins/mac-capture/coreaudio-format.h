@@ -17,11 +17,12 @@
  * Returns false (leaving *channels_out untouched) when the format cannot be
  * captured, true with the clamped count in *channels_out otherwise.
  */
-static inline bool coreaudio_capture_format(uint32_t channels_per_frame, uint32_t max_channels,
-					    uint32_t *channels_out)
+static inline bool coreaudio_capture_format(uint32_t channels_per_frame, uint32_t max_channels, uint32_t *channels_out)
 {
-	/* RED: today's behaviour -- take the device's count as-is. */
-	(void)max_channels;
-	*channels_out = channels_per_frame;
+	if (!channels_per_frame || !max_channels) {
+		return false;
+	}
+
+	*channels_out = channels_per_frame > max_channels ? max_channels : channels_per_frame;
 	return true;
 }
